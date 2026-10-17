@@ -960,12 +960,15 @@ window.hoshiSelection = {
         const selection = window.getSelection();
         if (!selection || selection.isCollapsed || !selection.rangeCount || !selection.toString()) return null;
         // Read only when Android receives an unusable native menu anchor, never
-        // while tracking selection handles. Clip each fragment before unioning.
+        // while tracking selection handles. Match its endpoint-based placement:
+        // the intervening columns can fill the screen while both handles are
+        // near the top, especially when the end includes a paragraph's period.
+        const range = selection.getRangeAt(0);
         let bounds = null;
-        for (const rect of selection.getRangeAt(0).getClientRects()) {
+        const includeRect = rect => {
             const left = Math.max(0, rect.left), top = Math.max(0, rect.top);
             const right = Math.min(innerWidth, rect.right), bottom = Math.min(innerHeight, rect.bottom);
-            if (right <= left || bottom <= top) continue;
+            if (right <= left || bottom <= top) return;
             if (!bounds) bounds = { left, top, right, bottom, viewportWidth: innerWidth };
             else {
                 bounds.left = Math.min(bounds.left, left);
@@ -973,7 +976,21 @@ window.hoshiSelection = {
                 bounds.right = Math.max(bounds.right, right);
                 bounds.bottom = Math.max(bounds.bottom, bottom);
             }
+        };
+        for (const start of [true, false]) {
+            const caret = range.cloneRange();
+            caret.collapse(start);
+            const rect = caret.getBoundingClientRect();
+            if (rect.right <= rect.left && rect.bottom <= rect.top) continue;
+            // A caret has zero extent in the writing direction. Keep its anchor
+            // nonempty so Android can position the floating menu.
+            includeRect({ left: rect.left, top: rect.top,
+                right: Math.max(rect.right, rect.left + 1), bottom: Math.max(rect.bottom, rect.top + 1) });
         }
+        if (bounds) return bounds;
+        // Both endpoints may be offscreen or have no geometry at element
+        // boundaries. In that case use the remaining visible selected fragments.
+        for (const rect of range.getClientRects()) includeRect(rect);
         return bounds;
     },
 

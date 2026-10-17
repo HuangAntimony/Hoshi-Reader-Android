@@ -861,7 +861,15 @@ test('native menu anchor includes only visible selection fragments without chang
     ];
     const native = {
         isCollapsed: false, rangeCount: 1, toString: () => '読書',
-        getRangeAt: () => ({ getClientRects: () => rects }),
+        getRangeAt: () => ({
+            getClientRects: () => rects,
+            cloneRange: () => ({
+                collapse(start) { this.start = start; },
+                getBoundingClientRect() { return this.start
+                    ? {left:30,top:-200,right:80,bottom:-200}
+                    : {left:280,top:830,right:320,bottom:830}; },
+            }),
+        }),
     };
     window.getSelection = () => native;
     assert.deepEqual(JSON.parse(JSON.stringify(selection.nativeSelectionMenuRect())),
@@ -876,6 +884,31 @@ test('native menu anchor includes only visible selection fragments without chang
     assert.equal(selection.nativeSelectionMenuRect(), null);
 });
 
+test('native menu fallback uses current visible carets instead of intervening columns', () => {
+    const {selection,window} = loadSelection('本文。');
+    let endpoints = [{left:300,top:22,right:332,bottom:22},{left:220,top:44,right:252,bottom:44}];
+    const range = {
+        getClientRects:()=>[{left:220,top:0,right:332,bottom:748}],
+        cloneRange:()=>({
+            collapse(start) { this.start = start; },
+            getBoundingClientRect() { return endpoints[this.start?0:1]; },
+        }),
+    };
+    window.getSelection = () => ({isCollapsed:false,rangeCount:1,toString:()=> '本文。',getRangeAt:()=>range});
+    const bounds = () => JSON.parse(JSON.stringify(selection.nativeSelectionMenuRect()));
+    assert.deepEqual(bounds(),{left:220,top:22,right:332,bottom:45,viewportWidth:400},
+        'A period in a new vertical column keeps the menu near both handles');
+    endpoints = [{left:22,top:300,right:22,bottom:332},{left:44,top:220,right:44,bottom:252}];
+    assert.deepEqual(bounds(),{left:22,top:220,right:45,bottom:332,viewportWidth:400},
+        'Horizontal carets also form a nonempty anchor');
+    endpoints = [{left:300,top:-22,right:332,bottom:-22},{left:220,top:44,right:252,bottom:44}];
+    assert.deepEqual(bounds(),{left:220,top:44,right:252,bottom:45,viewportWidth:400},
+        'Only visible carets contribute to the anchor');
+    endpoints = [{left:0,top:0,right:0,bottom:0},{left:0,top:0,right:0,bottom:0}];
+    assert.deepEqual(bounds(),{left:220,top:0,right:332,bottom:748,viewportWidth:400},
+        'Element boundaries without caret geometry still use visible fragments');
+});
+
 
 test('native menu measurement is invalidated once by selection or scroll without reading layout', () => {
     const { selection, window, changeNativeSelection, dispatchDocumentEvent } = loadSelection('読書');
@@ -883,10 +916,13 @@ test('native menu measurement is invalidated once by selection or scroll without
     let reads = 0;
     const native = {
         isCollapsed: false, rangeCount: 1, toString: () => '読書',
-        getRangeAt: () => ({ getClientRects: () => {
-            reads++;
-            return [{ left: 20, top: 50, right: 40, bottom: 90 }];
-        }}),
+        getRangeAt: () => ({
+            getClientRects: () => { reads++; return [{ left: 20, top: 50, right: 40, bottom: 90 }]; },
+            cloneRange: () => ({
+                collapse() {},
+                getBoundingClientRect() { reads++; return {left:0,top:0,right:0,bottom:0}; },
+            }),
+        }),
     };
     window.getSelection = () => native;
     selection.configure({ bridge: 'android-reader', nativeSelectionToken: 'chapter-a' });
@@ -895,16 +931,19 @@ test('native menu measurement is invalidated once by selection or scroll without
         invalidateMenuAnchor: (id, token) => events.push([id, token]),
     };
     selection.nativeSelectionMenuRect(1);
+    const measuredReads = reads;
     changeNativeSelection(native);
     changeNativeSelection(native);
     dispatchDocumentEvent('scroll');
     assert.deepEqual(events, [[1, 'chapter-a']]);
-    assert.equal(reads, 1, 'Invalidation never reads layout');
+    assert.equal(reads, measuredReads, 'Invalidation never reads layout');
     selection.nativeSelectionMenuRect(2);
+    const remeasuredReads = reads;
+    assert.ok(remeasuredReads > measuredReads, 'A new menu measures its current geometry');
     dispatchDocumentEvent('scroll');
     dispatchDocumentEvent('scroll');
     assert.deepEqual(events, [[1, 'chapter-a'], [2, 'chapter-a']]);
-    assert.equal(reads, 2);
+    assert.equal(reads, remeasuredReads);
 });
 
 

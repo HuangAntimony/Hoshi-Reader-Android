@@ -438,9 +438,12 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   moving selection endpoints back and forth. WebViews without overflow-clip
   support retain the scroll-lock fallback. Native menus keep WebView's valid
   ActionMode content bounds. If those bounds are empty or wholly offscreen,
-  Android may measure the visible DOM selection once per ActionMode and use its
-  clipped fragment bounds. Selection changes, scroll, and resize discard this
-  fallback without rereading layout during the gesture; document, mode, and
+  Android measures the current visible DOM endpoint carets once per ActionMode,
+  keeping their anchor nonempty even in vertical writing. It uses clipped selected
+  fragments only when neither endpoint provides visible geometry. Using all
+  intervening columns can move a recovered menu to the bottom of the screen even
+  when both handles are near the top. Selection changes, scroll, and resize discard
+  this fallback without rereading layout during the gesture; document, mode, and
   request-generation guards reject stale replies. If Chromium sends a trusted
   touch context-menu request outside the viewport or selected text after a handle drag, shared
   selection validates a visible fragment center inside the current range, choosing

@@ -269,6 +269,12 @@ node --test app/src/test/js/*.test.mjs
   another handle adjustment, preserves both endpoints, and keeps Highlight visible.
   Include this boundary in real-book checks; a recovery point at the first selected
   glyph may overlap the native start handle even though it hits selected DOM text.
+  In real books, include the final period of a paragraph that wraps into another
+  column, and check menu coordinates beyond the recovery long-press deadline.
+  Verify the menu stays near the handles instead of jumping to the bottom of the
+  intervening columns. Check endpoint-based DOM fallback in both
+  writing directions, one endpoint offscreen, and element boundaries without
+  caret geometry; fragments remain the fallback when no visible caret exists.
   `pendingMenuRecoveryStopsWhenSelectionOrDocumentChanges` checks cancellation
   before the long-press deadline; `menuRecoveryReplyCannotOutliveNewTouch` blocks
   the JS reply while a new touch arrives and rejects a late recovery gesture.
