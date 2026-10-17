@@ -144,6 +144,39 @@ class ReaderSelectionViewportWebViewTest {
     }
 
     @Test
+    fun initialLongPressKeepsItsNativeMenuWhenCaretProbeDisagrees() {
+        val webView = createWebView()
+        try {
+            loadFixture(webView, vertical = true, plain = true)
+            evaluate(webView, """
+                window.initialMenuEvents=[];
+                const recover=hoshiSelection.recoverNativeSelectionMenu;
+                hoshiSelection.recoverNativeSelectionMenu=function(e){return recover.call(this,{
+                    isTrusted:e.isTrusted,pointerType:e.pointerType,button:e.button,clientX:-1,clientY:-1,
+                    preventDefault(){e.preventDefault();}});};
+                document.addEventListener('contextmenu',e=>{
+                    if(e.isTrusted)initialMenuEvents.push({pointer:e.pointerType,prevented:e.defaultPrevented});
+                });true
+            """.trimIndent())
+            val rect = JSONObject(evaluate(webView,
+                "document.getElementById('tail').getBoundingClientRect().toJSON()"))
+            val location = IntArray(2)
+            var density = 1f
+            instrumentation.runOnMainSync {
+                webView.getLocationOnScreen(location)
+                density = webView.resources.displayMetrics.density
+            }
+            gesture(location[0] + ((rect.getDouble("left") + rect.getDouble("right")) / 2 * density).toFloat(),
+                location[1] + ((rect.getDouble("top") + rect.getDouble("bottom")) / 2 * density).toFloat(), duration = 900)
+            assertEquals("The original touch menu must pass through: ${evaluate(webView, "JSON.stringify(initialMenuEvents)")}", "true",
+                evaluate(webView, "initialMenuEvents.some(e=>e.pointer==='touch'&&!e.prevented)"))
+            assertAppActionsVisible()
+        } finally {
+            destroyFixture(webView)
+        }
+    }
+
+    @Test
     fun shortSelectionsRecoverThroughContentAfterDraggingEitherHandle() {
         val webView = createWebView()
         try {
@@ -263,9 +296,13 @@ class ReaderSelectionViewportWebViewTest {
             // contextmenu; generated chapter metrics need not match the user's font.
             evaluate(webView, """
                 const recover=hoshiSelection.recoverNativeSelectionMenu;
-                hoshiSelection.recoverNativeSelectionMenu=function(e){return recover.call(this,{
-                    isTrusted:e.isTrusted,pointerType:e.pointerType,button:e.button,clientX:-1,clientY:-1,
-                    preventDefault(){e.preventDefault();}});};true
+                hoshiSelection.recoverNativeSelectionMenu=function(e){
+                    const result=recover.call(this,{
+                        isTrusted:e.isTrusted,pointerType:e.pointerType,button:e.button,clientX:-1,clientY:-1,
+                        preventDefault(){e.preventDefault();}});
+                    if(this.nativeMenuRecovery)document.dispatchEvent(new Event('selectionchange'));
+                    return result;
+                };true
             """.trimIndent())
             requestMenuRecovery(webView)
             assertAppActionsVisible(menuActions)
@@ -455,7 +492,7 @@ class ReaderSelectionViewportWebViewTest {
                 document.addEventListener('contextmenu',e=>{
                     if(e.isTrusted) recoveryMenuEvents.push({button:e.button,pointer:e.pointerType});
                 });
-                hoshiSelection.recoverNativeSelectionMenu({isTrusted:true,pointerType:'touch',button:0,
+                hoshiSelection.recoverNativeSelectionMenu({isTrusted:true,pointerType:'mouse',button:-1,
                     clientX:-1,clientY:-1,preventDefault(){}});
                 return true;
             })()
@@ -604,8 +641,13 @@ class ReaderSelectionViewportWebViewTest {
     private fun gesture(x: Float, y: Float, endX: Float = x, endY: Float = y, duration: Long) {
         val start = SystemClock.uptimeMillis()
         fun send(action: Int, px: Float, py: Float) {
-            val event = MotionEvent.obtain(start, SystemClock.uptimeMillis(), action, px, py, 0)
-            event.source = InputDevice.SOURCE_TOUCHSCREEN
+            val event = MotionEvent.obtain(start, SystemClock.uptimeMillis(), action, 1,
+                arrayOf(MotionEvent.PointerProperties().apply { id = 0; toolType = MotionEvent.TOOL_TYPE_FINGER }),
+                arrayOf(MotionEvent.PointerCoords().apply {
+                    this.x = px; this.y = py
+                    pressure = if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) 0f else 1f
+                }),
+                0, 0, 1f, 1f, 0, 0, InputDevice.SOURCE_TOUCHSCREEN, 0)
             instrumentation.sendPointerSync(event)
             event.recycle()
         }

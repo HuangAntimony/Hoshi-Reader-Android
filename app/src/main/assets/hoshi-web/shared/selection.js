@@ -884,10 +884,11 @@ window.hoshiSelection = {
 
     recoverNativeSelectionMenu(event) {
         const bridge = window.HoshiNativeSelection;
-        // Touch-handle adjustments can report pointerType "mouse" and button -1.
-        // Exclude actual secondary clicks without filtering native handle requests.
+        // Chromium's handle adjustments report pointerType "mouse", button -1.
+        // A touch/pen contextmenu belongs to a long press still in progress:
+        // injecting another DOWN would interrupt it before the user's release.
         if (this.options.bridge !== 'android-reader' || !bridge?.recoverMenu ||
-            !event.isTrusted || event.button === 2) return;
+            !event.isTrusted || event.pointerType !== 'mouse' || event.button === 2) return;
         // Chromium can repeat the same bad anchor for the recovery long press.
         // Let that gesture open its menu instead of recursively replacing it.
         if (this.nativeMenuRecoveryReplay !== null) return;
@@ -930,7 +931,8 @@ window.hoshiSelection = {
         }
         if (!point) return;
         const id = ++this.nativeMenuRecoverySequence;
-        this.nativeMenuRecovery = { id, point };
+        this.nativeMenuRecovery = { id, point,
+            endpoints: [selection.anchorNode, selection.anchorOffset, selection.focusNode, selection.focusOffset] };
         event.preventDefault();
         bridge.recoverMenu(id, this.options.nativeSelectionToken);
     },
@@ -938,19 +940,27 @@ window.hoshiSelection = {
     takeNativeMenuRecovery(id, anchorRequest) {
         if (this.nativeMenuRecovery?.id !== id) return null;
         this.nativeMenuAnchorRequest = anchorRequest;
-        const point = this.nativeMenuRecovery.point;
+        const recovery = this.nativeMenuRecovery;
         this.nativeMenuRecovery = null;
-        this.nativeMenuRecoveryReplay = id;
-        return point;
+        this.nativeMenuRecoveryReplay = recovery;
+        return recovery.point;
     },
 
     cancelNativeMenuRecoveryReplay(id, documentToken) {
         if (this.options.nativeSelectionToken !== documentToken) return;
-        if (this.nativeMenuRecoveryReplay === id) this.nativeMenuRecoveryReplay = null;
+        if (this.nativeMenuRecoveryReplay?.id === id) this.nativeMenuRecoveryReplay = null;
         if (this.nativeMenuRecovery?.id === id) this.nativeMenuRecovery = null;
     },
 
-    invalidateNativeMenuAnchor() {
+    invalidateNativeMenuAnchor(selectionChanged = false) {
+        const recovery = this.nativeMenuRecovery || this.nativeMenuRecoveryReplay;
+        const selection = selectionChanged && recovery ? window.getSelection() : null;
+        if (recovery && selection && !selection.isCollapsed) {
+            const endpoints = [selection.anchorNode, selection.anchorOffset, selection.focusNode, selection.focusOffset];
+            // A handle's contextmenu can precede its final duplicate selectionchange.
+            // Keep the queued point/replay until the endpoints actually change.
+            if (recovery.endpoints.every((value, index) => value === endpoints[index])) return;
+        }
         this.nativeMenuRecovery = null;
         this.nativeMenuRecoveryReplay = null;
         const request = this.nativeMenuAnchorRequest;
@@ -1032,7 +1042,7 @@ document.addEventListener('contextmenu', event => window.hoshiSelection.recoverN
 document.addEventListener('scroll', () => window.hoshiSelection.invalidateNativeMenuAnchor(), true);
 window.addEventListener?.('resize', () => window.hoshiSelection.invalidateNativeMenuAnchor());
 document.addEventListener('selectionchange', () => {
-    window.hoshiSelection.invalidateNativeMenuAnchor();
+    window.hoshiSelection.invalidateNativeMenuAnchor(true);
     const s = getSelection();
     const hasSelection = !!s && !s.isCollapsed;
     if (hasSelection === lastHasSelection) return;

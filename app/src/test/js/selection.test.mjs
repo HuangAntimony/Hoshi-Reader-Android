@@ -947,7 +947,7 @@ test('native menu measurement is invalidated once by selection or scroll without
 });
 
 
-test('invalid touch menu requests recover once at a visible selected character', () => {
+test('invalid handle menu requests recover once at a visible selected character', () => {
     const { selection, window, document, dispatchDocumentEvent, changeNativeSelection } = loadSelection('読書');
     const calls = [];
     const invalidations = [];
@@ -960,7 +960,8 @@ test('invalid touch menu requests recover once at a visible selected character',
         }),
         comparePoint: (node) => node === textNode ? 0 : 1,
     };
-    const native = { isCollapsed:false,rangeCount:1,toString:()=> '読書',getRangeAt:()=>range };
+    const native = { isCollapsed:false,rangeCount:1,toString:()=> '読書',getRangeAt:()=>range,
+        anchorNode:textNode,anchorOffset:0,focusNode:textNode,focusOffset:2 };
     window.getSelection = () => native;
     document.caretRangeFromPoint = () => ({startContainer:textNode,startOffset:0});
     selection.configure({bridge:'android-reader',nativeSelectionToken:'chapter'});
@@ -968,7 +969,12 @@ test('invalid touch menu requests recover once at a visible selected character',
         postMessage(){}, recoverMenu:(id,token)=>calls.push([id,token]),
         invalidateMenuAnchor:(id,token)=>invalidations.push([id,token]),
     };
-    const event = (overrides={}) => ({isTrusted:true,pointerType:'touch',button:0,clientX:30,clientY:-400,preventDefault(){this.prevented=true;},...overrides});
+    const event = (overrides={}) => ({isTrusted:true,pointerType:'mouse',button:-1,clientX:30,clientY:-400,preventDefault(){this.prevented=true;},...overrides});
+    for (const pointerType of ['touch','pen']) {
+        const initialPress = event({pointerType,button:-1});
+        dispatchDocumentEvent('contextmenu', initialPress);
+        assert.notEqual(initialPress.prevented,true,'A native long press must not start a second touch before the user lifts their finger');
+    }
     dispatchDocumentEvent('contextmenu', event({clientY:50}));
     dispatchDocumentEvent('contextmenu', event({isTrusted:false}));
     dispatchDocumentEvent('contextmenu', event({button:2}));
@@ -991,9 +997,11 @@ test('invalid touch menu requests recover once at a visible selected character',
     dispatchDocumentEvent('contextmenu', replayedAgain);
     assert.notEqual(replayedAgain.prevented,true,'Repeated callbacks remain native until a new interaction or invalidation');
     assert.equal(calls.length,1,'A recovery gesture cannot recursively recover itself');
+    native.focusOffset=1;
     changeNativeSelection(native);
     assert.deepEqual(invalidations, [[42, 'chapter']], 'Moving after consumption invalidates the pending native reply');
-    dispatchDocumentEvent('contextmenu',event({pointerType:'',button:-1}));
+    dispatchDocumentEvent('contextmenu',event({pointerType:'mouse',button:-1}));
+    native.focusOffset=2;
     changeNativeSelection(native);
     assert.equal(selection.takeNativeMenuRecovery(calls.at(-1)[0]),null,'Moving the selection cancels recovery');
     dispatchDocumentEvent('contextmenu',event());
@@ -1030,7 +1038,7 @@ for (const {name, target, rangePosition} of [
         const calls = [];
         window.HoshiNativeSelection = {recoverMenu:id=>calls.push(id)};
         const request = () => {
-            const event = {isTrusted:true,button:-1,clientX:-1,clientY:-1,preventDefault(){this.prevented=true;}};
+            const event = {isTrusted:true,pointerType:'mouse',button:-1,clientX:-1,clientY:-1,preventDefault(){this.prevented=true;}};
             dispatchDocumentEvent('contextmenu',event);
             return event;
         };
@@ -1076,6 +1084,48 @@ test('cancelled native replays cannot suppress a later recovery and stale cancel
     selection.cancelNativeMenuRecoveryReplay(current, 'old-document');
     assert.notEqual(request().prevented,true,'Stale cancellation cannot re-enable recursion for the active replay');
 });
+
+for (const consumed of [false, true]) {
+    test(`unchanged selection notifications preserve ${consumed ? 'replaying' : 'pending'} menu recovery`, () => {
+        const {selection,window,document,dispatchDocumentEvent,changeNativeSelection} = loadSelection('読書');
+        const node = {nodeType:3};
+        const range = {
+            getClientRects:()=>[{left:20,top:40,right:40,bottom:80}],comparePoint:()=>0,
+            cloneRange:()=>({
+                collapse(start) { this.start = start; },
+                getBoundingClientRect() { return {left:20,right:40,top:this.start?40:80,bottom:this.start?40:80}; },
+            }),
+        };
+        const native = {isCollapsed:false,rangeCount:1,toString:()=> '読書',getRangeAt:()=>range,
+            anchorNode:node,anchorOffset:0,focusNode:node,focusOffset:2};
+        window.getSelection = () => native;
+        document.caretRangeFromPoint = () => ({startContainer:node,startOffset:0});
+        selection.configure({bridge:'android-reader',nativeSelectionToken:'chapter'});
+        const calls = [],invalidations = [];
+        window.HoshiNativeSelection = {postMessage(){},recoverMenu:id=>calls.push(id),
+            invalidateMenuAnchor:(...args)=>invalidations.push(args)};
+        const request = () => {
+            const event = {isTrusted:true,pointerType:'mouse',button:-1,clientX:-1,clientY:-1,preventDefault(){this.prevented=true;}};
+            dispatchDocumentEvent('contextmenu',event);
+            return event;
+        };
+        request();
+        if (consumed) assert.ok(selection.takeNativeMenuRecovery(calls[0],42));
+        // WebView can deliver its final, duplicate selectionchange immediately
+        // after the handle's contextmenu, before Android has consumed the point.
+        changeNativeSelection(native);
+        if (!consumed) assert.ok(selection.takeNativeMenuRecovery(calls[0],42),
+            'The queued native reply still receives its recovery point');
+        assert.notEqual(request().prevented,true,'An unchanged selection cannot disarm the replay guard');
+        assert.equal(calls.length,1,'A duplicate notification cannot create another recovery');
+        assert.deepEqual(invalidations,[]);
+        // Identical text with reversed anchor/focus is still a real change.
+        native.anchorOffset=2;native.focusOffset=0;
+        changeNativeSelection(native);
+        assert.deepEqual(invalidations,[[42,'chapter']]);
+        assert.equal(request().prevented,true,'A real endpoint change permits a fresh recovery');
+    });
+}
 
 test('menu recovery targets selected text away from both handles regardless of text-node fragmentation', () => {
     for (const vertical of [true, false]) for (const fragmented of [true, false]) {

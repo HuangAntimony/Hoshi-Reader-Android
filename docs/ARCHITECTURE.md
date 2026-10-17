@@ -445,13 +445,19 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   when both handles are near the top. Selection changes, scroll, and resize discard
   this fallback without rereading layout during the gesture; document, mode, and
   request-generation guards reject stale replies. If Chromium sends a trusted
-  touch context-menu request outside the viewport or selected text after a handle drag, shared
+  handle context-menu request outside the viewport or selected text, shared
   selection validates a visible point inside the current range, choosing
   the one furthest from both endpoint carets. Vertical text uses each fragment's
   left interior edge: a single glyph's center can hit the start handle extending
   from its right, whereas the left interior stays above the end handle.
   Using the first glyph of fragmented text can hit a native handle instead of
   content and leave the menu hidden.
+  Chromium's handle requests use mouse pointer events. Touch/pen context-menu
+  events keep their native path: they can arrive before the original press ends,
+  and injecting another touch would interrupt that gesture.
+  The recovery press includes WebView's tap timeout plus long-press timeout and
+  a release margin; releasing at the recognition threshold can instead trigger
+  a tap that clears the selection.
   Android consumes
   that point once and replays a touch long press directly through WebView,
   bypassing reader page/tap gestures while preserving the selected range and
@@ -464,6 +470,10 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   recovery gesture's context-menu events pass through to WebView even when
   Chromium repeats invalid coordinates. They cannot recursively request another
   recovery. Android clears that guard when rejecting or cancelling the request.
+  Pending and replaying recoveries retain their exact anchor/focus endpoints.
+  A duplicate `selectionchange` after the handle's context-menu request does not
+  cancel an unchanged recovery; an actual endpoint or selection-direction change
+  still invalidates it. Scroll and resize always invalidate recovery geometry.
   Queued replies and pending touches are cancelled on deselection, anchor expiry,
   document replacement, a new user touch, focus loss or release. Geometry is read
   only at the menu request, not during handle movement.

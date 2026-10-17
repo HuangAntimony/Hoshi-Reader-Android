@@ -245,23 +245,37 @@ node --test app/src/test/js/*.test.mjs
   narration cues prepared, menu recreation after dragging plain text in a single
   paragraph spanning pages, and
   immediate scroll prevention, visible/logical position retention, and resumed
-  paging in both writing directions. Verify the visible menu reappears after
+  paging in both writing directions. Recovery holds must exceed WebView's sum of
+  tap timeout and long-press timeout; merely adding 100 ms to Android's long-press
+  timeout can release exactly at recognition and intermittently clear the range
+  as a tap. Verify the visible menu reappears after
   repeated drags in both plain and ruby-adjacent text, preserves the dragged
-  range, and copies/highlights that range. Existing ActionMode or selected-text
+  range, and copies/highlights that range. Repeat successive drags in paginated
+  and continuous modes. Existing ActionMode or selected-text
   state alone does not prove menu visibility. On Android 14+ with a `sw600dp+`
   window, compare normal long-press and handle-drag recovery: both visible menus
   must retain the localized Highlight and TTS Replace actions. WebView's mouse
   dropdown is a separate menu path and does not validate touch ActionMode recovery.
-  Do not reject handle requests by DOM `pointerType`: current WebView can report
-  a touch-handle adjustment as `pointerType="mouse"`, `button=-1`. Exercise an
-  actual native handle drag as well as an injected recovery request.
+  Current WebView reports a touch-handle adjustment as `pointerType="mouse"`,
+  `button=-1`. Actual touch/pen long presses keep their native menu path, even
+  when the caret probe disagrees with the selected range; do not inject a second
+  DOWN while that press is still in progress.
+  `initialLongPressKeepsItsNativeMenuWhenCaretProbeDisagrees` verifies the native
+  touch menu survives that disagreement. Exercise an actual native handle drag
+  as well as an injected recovery request.
   `recoveredMenuPreservesExactSelectionAndVisibleAppActions` checks the real
   touch menu and unchanged native endpoints in both writing directions;
   `reversedCrossParagraphRecoverySettlesAndKeepsBothHandlesUsable` repeats an
   invalid native anchor for a reverse selection across paragraphs, waits past
-  two long-press deadlines, and drags both handles. Create handle fixtures with
+  two long-press deadlines, and drags both handles. It also emits
+  a duplicate unchanged `selectionchange` after the menu request and before its
+  recovery point is consumed; the recovery must still run exactly once. Check
+  the same notification during replay, and confirm real endpoint/direction
+  changes still cancel stale requests. Create handle fixtures with
   native long-press and drag gestures; DOM-only selections do not establish their
-  visibility. A briefly visible menu is insufficient: recovery must settle without
+  visibility. Fixture touchscreen events must specify `TOOL_TYPE_FINGER` as well
+  as `SOURCE_TOUCHSCREEN`; an unknown tool produces an empty DOM `pointerType`
+  and does not exercise a real finger long press. A briefly visible menu is insufficient: recovery must settle without
   repeated gestures or a hidden handle.
   `draggingStartToRubyBoundaryRecoversThroughSelectedTextInsteadOfHandle` drags
   a native start handle to a single-character text node immediately after ruby.

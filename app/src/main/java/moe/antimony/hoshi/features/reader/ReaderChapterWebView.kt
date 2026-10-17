@@ -775,7 +775,10 @@ internal class HoshiReaderWebView(context: Context) : WebView(context) {
             val touch = SelectionMenuRecoveryTouch(SystemClock.uptimeMillis(), x, y)
             selectionMenuRecoveryTouch = touch
             dispatchSelectionMenuRecoveryTouch(touch, MotionEvent.ACTION_DOWN)
-            postDelayed(finishSelectionMenuRecoveryTouch, ViewConfiguration.getLongPressTimeout().toLong() + 100L)
+            // Chromium waits for tap timeout + long-press timeout. Ending at
+            // that threshold can race its timer and turn recovery into a tap.
+            val holdMillis = ViewConfiguration.getTapTimeout().toLong() + ViewConfiguration.getLongPressTimeout() + 100L
+            postDelayed(finishSelectionMenuRecoveryTouch, holdMillis)
         }
     }
 
