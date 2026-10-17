@@ -47,23 +47,25 @@ internal class NakuruTranscriptAligner(book: EpubBook) {
         }
         val times = arrayOfNulls<Timing>(text.size)
         val anchors = mutableListOf(Anchor(0, 0))
-        chapters.firstOrNull { it.length >= 16 }?.let { chapter ->
-            find(speech, normalized.subList(chapter.start, chapter.start + 16), 0, speech.size)?.let {
+        chapters.firstOrNull { it.length >= 12 }?.let { chapter ->
+            find(speech, normalized.subList(chapter.start, chapter.start + 12), 0, speech.size)?.let {
                 anchors[0] = Anchor(it, chapter.start)
             }
         }
         var cursor = 0
-        for (index in 0..speech.size - 16 step 100) {
-            val probe = speech.subList(index, index + 16)
-            val limit = minOf(normalized.size, cursor + 2016)
+        var hit = 0
+        for (index in 0..speech.size - 12 step 100) {
+            val probe = speech.subList(index, index + 12)
+            val limit = minOf(normalized.size, cursor + 2012 + index - hit)
             val found = find(normalized, probe, cursor, limit) ?: continue
             if (find(normalized, probe, found + 1, limit) != null) continue
-            cursor = found + 16
+            cursor = found + 12
+            hit = index
             val previous = anchors.last()
             if (index > previous.speech && found > previous.book) anchors += Anchor(index, found)
         }
-        chapters.filter { it.length >= 16 }.forEach { chapter ->
-            val probe = normalized.subList(chapter.start, chapter.start + 16)
+        chapters.filter { it.length >= 12 }.forEach { chapter ->
+            val probe = normalized.subList(chapter.start, chapter.start + 12)
             val after = anchors.indexOfFirst { it.book > chapter.start }.let { if (it < 0) anchors.size else it }
             if (anchors[after - 1].book == chapter.start) return@forEach
             val low = anchors[after - 1].speech + 1
