@@ -1,5 +1,6 @@
 package moe.antimony.hoshi.features.sasayaki
 
+import kotlin.random.Random
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.coroutines.CancellationException
@@ -77,5 +78,57 @@ class NakuruTranscriptAlignerTest {
                 assertEquals(case.name, expected.copy(startTime = actual.startTime, endTime = actual.endTime), actual)
             }
         }
+    }
+
+    @Test fun unreadPageBeforeIntroStaysUnmatched() = runTest {
+        val random = Random(1)
+        val page = sentences(random, 4)
+        val story = sentences(random, 20)
+        val speech = Speech(random)
+        speech.say(kana(random, 40))
+        story.forEach { speech.say(it, .03) }
+        val result = NakuruTranscriptAligner(book(page, story)).align(speech.tokens)
+        assertEquals(0, result.matches.count { it.chapterIndex == 0 })
+        assertEquals(20, result.matches.count { it.chapterIndex == 1 })
+    }
+
+    @Test fun alignsAudioStartingAtLaterChapter() = runTest {
+        val random = Random(2)
+        val skipped = List(10) { sentences(random, 40) }
+        val first = sentences(random, 120)
+        val second = sentences(random, 40)
+        val speech = Speech(random)
+        speech.say(kana(random, 30))
+        speech.say(first[0].replaceRange(4, 5, kana(random, 1)))
+        (first.drop(1) + second).forEach { speech.say(it, .03) }
+        val result = NakuruTranscriptAligner(book(*skipped.toTypedArray(), first, second)).align(speech.tokens)
+        assertEquals(0, result.matches.count { it.chapterIndex < 10 })
+        assertEquals(120, result.matches.count { it.chapterIndex == 10 })
+        assertEquals(40, result.matches.count { it.chapterIndex == 11 })
+    }
+
+    private class Speech(private val random: Random) {
+        val tokens = mutableListOf<SasayakiToken>()
+        private var time = 0.0
+
+        fun say(text: String, errors: Double = 0.0) {
+            text.chunked(6).forEach { word ->
+                val spoken = word.map { if (random.nextDouble() < errors) kana(random, 1)[0] else it }.joinToString("")
+                tokens += SasayakiToken(spoken, time, time + .15 * spoken.length - .03)
+                time += .15 * spoken.length
+            }
+            time += .4
+        }
+    }
+
+    private companion object {
+        fun kana(random: Random, length: Int) = String(CharArray(length) { (0x3042 + random.nextInt(0x52)).toChar() })
+
+        fun sentences(random: Random, count: Int) = List(count) { kana(random, 12 + random.nextInt(17)) }
+
+        fun book(vararg chapters: List<String>) = EpubBook(title = "", chapters = chapters.mapIndexed { index, sentences ->
+            val html = "<body>" + sentences.joinToString("") { "<p>$it。</p>" } + "</body>"
+            EpubChapter("chapter-$index", "chapter-$index.xhtml", "application/xhtml+xml", html)
+        })
     }
 }

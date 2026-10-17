@@ -15,7 +15,7 @@ internal class NakuruTranscriptAligner(book: EpubBook) {
     private data class Chapter(val index: Int, val start: Int, val length: Int) {
         val end get() = start + length
     }
-    private data class Timing(val start: Double, val end: Double)
+    private data class Timing(val start: Double, val end: Double, val exact: Boolean = false)
     private data class Anchor(val speech: Int, val book: Int)
     private data class Span(val from: Double, val to: Double, val lower: Int, val upper: Int)
     private val text = mutableListOf<Int>()
@@ -61,7 +61,7 @@ internal class NakuruTranscriptAligner(book: EpubBook) {
         var hit = 0
         for (index in 0..speech.size - 12 step 100) {
             val probe = speech.subList(index, index + 12)
-            val limit = minOf(normalized.size, cursor + 2012 + index - hit)
+            val limit = if (cursor == 0) normalized.size else minOf(normalized.size, cursor + 2012 + index - hit)
             val found = find(normalized, probe, cursor, limit) ?: continue
             if (find(normalized, probe, found + 1, limit) != null) continue
             cursor = found + 12
@@ -80,19 +80,24 @@ internal class NakuruTranscriptAligner(book: EpubBook) {
             anchors.add(after, Anchor(found, chapter.start))
         }
         anchors += Anchor(speech.size, text.size)
+        suspend fun assign(anchor: Anchor, next: Anchor) {
+            val spoken = speech.subList(anchor.speech, next.speech)
+            val written = normalized.subList(anchor.book, next.book)
+            val (removed, inserted) = difference(spoken, written)
+            var offset = 0
+            removed.forEachIndexed { index, deleted ->
+                if (!deleted) while (offset < inserted.size && inserted[offset]) offset++
+                val target = anchor.book + minOf(offset, written.lastIndex)
+                if (times[target] == null) times[target] = timings[anchor.speech + index].copy(exact = !deleted)
+                if (!deleted || (offset < inserted.size && inserted[offset])) offset++
+            }
+        }
         anchors.zipWithNext().forEach { (anchor, next) ->
             context.ensureActive()
             if (next.speech > anchor.speech && next.book > anchor.book) {
-                val spoken = speech.subList(anchor.speech, minOf(next.speech, anchor.speech + 2000))
-                val written = normalized.subList(anchor.book, minOf(next.book, anchor.book + 2000))
-                val (removed, inserted) = difference(spoken, written)
-                var offset = 0
-                removed.forEachIndexed { index, deleted ->
-                    if (!deleted) while (offset < inserted.size && inserted[offset]) offset++
-                    val target = anchor.book + minOf(offset, written.lastIndex)
-                    if (times[target] == null) times[target] = timings[anchor.speech + index]
-                    if (!deleted || (offset < inserted.size && inserted[offset])) offset++
-                }
+                assign(anchor, Anchor(minOf(next.speech, anchor.speech + 2000), minOf(next.book, anchor.book + 2000)))
+                val tail = Anchor(maxOf(next.speech - 2000, anchor.speech), maxOf(next.book - 2000, anchor.book))
+                if (next.book < text.size && (tail.speech > anchor.speech || tail.book > anchor.book)) assign(tail, next)
             }
         }
         return cut(times)
@@ -124,6 +129,9 @@ internal class NakuruTranscriptAligner(book: EpubBook) {
     }
 
     private fun time(start: Int, index: Int, chapter: Chapter, times: Array<Timing?>, previous: Double?): Span? {
+        val low = maxOf(start - 20, chapter.start)
+        val high = minOf(index + 20, chapter.end - 1)
+        if ((low..high).count { times[it]?.exact == true } * 4 < high - low + 1) return null
         val timed = (start..index).filter { times[it] != null }
         if (timed.isEmpty()) return interpolate(start, index, chapter, times, previous)
         val first = timed.first()
