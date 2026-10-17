@@ -248,9 +248,21 @@ node --test app/src/test/js/*.test.mjs
   paging in both writing directions. Verify the visible menu reappears after
   repeated drags in both plain and ruby-adjacent text, preserves the dragged
   range, and copies/highlights that range. Existing ActionMode or selected-text
-  state alone does not prove menu visibility. Record the tested WebView version:
-  recovery uses generic secondary-button events, whose zero-actionButton handling
-  differs across Chromium versions. Repeat real-book ruby handle drags and
+  state alone does not prove menu visibility. On Android 14+ with a `sw600dp+`
+  window, compare normal long-press and handle-drag recovery: both visible menus
+  must retain the localized Highlight and TTS Replace actions. WebView's mouse
+  dropdown is a separate menu path and does not validate touch ActionMode recovery.
+  Do not reject handle requests by DOM `pointerType`: current WebView can report
+  a touch-handle adjustment as `pointerType="mouse"`, `button=-1`. Exercise an
+  actual native handle drag as well as an injected recovery request.
+  `recoveredMenuPreservesExactSelectionAndVisibleAppActions` checks the real
+  touch menu and unchanged native endpoints in both writing directions;
+  `pendingMenuRecoveryStopsWhenSelectionOrDocumentChanges` checks cancellation
+  before the long-press deadline; `menuRecoveryReplyCannotOutliveNewTouch` blocks
+  the JS reply while a new touch arrives and rejects a late recovery gesture.
+  Remove fixture WebViews from their parent before calling `destroy()`.
+  Record the tested WebView version, Android API level and smallest-width bucket.
+  Repeat real-book ruby handle drags and
   inspect recordings frame by frame for unrelated columns becoming selected;
   final scroll position alone cannot validate this. During gesture acceptance,
   do not poll DOM geometry or suspend threads with JDWP method tracing: both

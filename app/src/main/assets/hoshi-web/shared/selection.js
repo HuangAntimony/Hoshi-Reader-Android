@@ -883,6 +883,8 @@ window.hoshiSelection = {
 
     recoverNativeSelectionMenu(event) {
         const bridge = window.HoshiNativeSelection;
+        // Touch-handle adjustments can report pointerType "mouse" and button -1.
+        // Exclude actual secondary clicks without filtering native handle requests.
         if (this.options.bridge !== 'android-reader' || !bridge?.recoverMenu ||
             !event.isTrusted || event.button === 2) return;
         const selection = window.getSelection();

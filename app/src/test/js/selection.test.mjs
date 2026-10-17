@@ -925,12 +925,14 @@ test('invalid touch menu requests recover once at a visible selected character',
         postMessage(){}, recoverMenu:(id,token)=>calls.push([id,token]),
         invalidateMenuAnchor:(id,token)=>invalidations.push([id,token]),
     };
-    const event = (overrides={}) => ({isTrusted:true,button:0,clientX:30,clientY:-400,preventDefault(){this.prevented=true;},...overrides});
+    const event = (overrides={}) => ({isTrusted:true,pointerType:'touch',button:0,clientX:30,clientY:-400,preventDefault(){this.prevented=true;},...overrides});
     dispatchDocumentEvent('contextmenu', event({clientY:50}));
     dispatchDocumentEvent('contextmenu', event({isTrusted:false}));
     dispatchDocumentEvent('contextmenu', event({button:2}));
-    assert.equal(calls.length,0,'Normal, script, and mouse menus are not replayed');
-    const broken = event();
+    dispatchDocumentEvent('contextmenu', event({pointerType:'mouse',button:2}));
+    assert.equal(calls.length,0,'Normal, script, and secondary-button menus are not replayed');
+    // Chromium reports touch-handle adjustment as a mouse pointer with no changed button.
+    const broken = event({pointerType:'mouse',button:-1});
     dispatchDocumentEvent('contextmenu',broken);
     assert.equal(broken.prevented,true);
     assert.equal(calls.length,1);
@@ -941,7 +943,7 @@ test('invalid touch menu requests recover once at a visible selected character',
     assert.equal(selection.takeNativeMenuRecovery(calls[0][0]),null,'A request can be consumed only once');
     changeNativeSelection(native);
     assert.deepEqual(invalidations, [[42, 'chapter']], 'Moving after consumption invalidates the pending native reply');
-    dispatchDocumentEvent('contextmenu',event());
+    dispatchDocumentEvent('contextmenu',event({pointerType:'',button:-1}));
     changeNativeSelection(native);
     assert.equal(selection.takeNativeMenuRecovery(calls.at(-1)[0]),null,'Moving the selection cancels recovery');
     dispatchDocumentEvent('contextmenu',event());

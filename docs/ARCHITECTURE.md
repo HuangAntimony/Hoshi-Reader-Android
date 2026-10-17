@@ -444,10 +444,16 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   request-generation guards reject stale replies. If Chromium sends a trusted
   touch context-menu request outside the viewport or selected text after a handle drag, shared
   selection validates a visible point inside the current range. Android consumes
-  that point once and sends secondary-button events through WebView's generic
-  motion path to recreate the native menu without changing the selection.
-  Recovery shares the anchor generation guard; normal/mouse requests are never
-  replayed. Geometry is read only at the menu request, not during handle movement.
+  that point once and replays a touch long press directly through WebView,
+  bypassing reader page/tap gestures while preserving the selected range and
+  WebView's ActionMode ownership. Mouse requests use a separate dropdown on
+  Android 14+ large screens and must not be used for touch-menu recovery.
+  Recovery validates both anchor and interaction generations; valid-position and
+  secondary-button requests are never replayed. Native handle requests may report
+  `pointerType="mouse"` with `button=-1`, so pointer type does not exclude them.
+  Queued replies and pending touches are cancelled on deselection, anchor expiry,
+  document replacement, a new user touch, focus loss or release. Geometry is read
+  only at the menu request, not during handle movement.
 - Reader, Dictionary search, and Process Text lookup popups render through the
   shared `reader-popup-host.js` iframe stack and `ReaderLookupPopupWebBridge`.
   Kotlin owns popup payloads, resource handling, and native service bridges for
