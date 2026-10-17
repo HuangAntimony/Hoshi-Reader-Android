@@ -32,6 +32,7 @@ internal data class SasayakiTranscriptionUiState(
     val remainingSeconds: Double? = null,
     val hasTranscript: Boolean = false,
     val transcriptComplete: Boolean = false,
+    val transcriptModel: SasayakiTranscriptionModel? = null,
     val hasSource: Boolean = false,
     val transcriptMatchesSource: Boolean = true,
     val isLoading: Boolean = false,
@@ -133,7 +134,7 @@ internal class SasayakiTranscriptionViewModel internal constructor(
         }
     }
 
-    fun start(preset: SasayakiTranscriptionPreset = SasayakiTranscriptionPreset.Balanced) {
+    fun start(preset: SasayakiTranscriptionPreset = SasayakiTranscriptionPreset.Balanced, model: SasayakiTranscriptionModel = SasayakiTranscriptionModel.ReazonSpeech) {
         if (!_uiState.value.canStart) return
         val activeRoot = root ?: return
         val activeSource = source ?: return
@@ -141,7 +142,7 @@ internal class SasayakiTranscriptionViewModel internal constructor(
         _uiState.value = _uiState.value.copy(isUpdating = true, error = null, showClearConfirmation = false)
         startJob = scope.launch {
             try {
-                coordinator.start(activeRoot, activeSource, preset)
+                coordinator.start(activeRoot, activeSource, preset, model)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
@@ -206,7 +207,7 @@ internal class SasayakiTranscriptionViewModel internal constructor(
             try {
                 val loaded = repository.load(activeRoot)
                 if (generation == loadGeneration) {
-                    transcript = loaded?.let { TranscriptSummary(it.through, it.duration, it.source, it.isComplete) }
+                    transcript = loaded?.let { TranscriptSummary(it.through, it.duration, it.source, it.isComplete, it.model) }
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -236,6 +237,7 @@ internal class SasayakiTranscriptionViewModel internal constructor(
             remainingSeconds = runningTask?.remainingSeconds,
             hasTranscript = runningTask?.hasTranscript == true || transcript != null,
             transcriptComplete = transcript?.isComplete == true,
+            transcriptModel = savedProgress?.model,
             hasSource = source != null,
             transcriptMatchesSource = transcript?.source == null || transcript?.source == source,
             busyElsewhere = task.running && ownTask == null,
@@ -258,5 +260,6 @@ internal class SasayakiTranscriptionViewModel internal constructor(
         val duration: Double,
         val source: String?,
         val isComplete: Boolean,
+        val model: SasayakiTranscriptionModel,
     )
 }

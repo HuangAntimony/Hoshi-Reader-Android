@@ -674,9 +674,23 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   the phrase. Only overlapping leading tokens are redistributed after already emitted
   text. Core checkpoints remain independent of recognized trailing padding; resume
   passes the saved one-second token tail by interval overlap to the same stitcher.
+- Nakuru is an optional alternative selected in the transcription card; ReazonSpeech
+  remains the default. `SasayakiBackendRouter` selects the backend for each run.
+  The transcript's optional `model` field pins resume and realignment to its engine;
+  absent fields retain legacy ReazonSpeech behavior. Clear a transcript before
+  changing its model. The setting is stored in DataStore.
+  `NakuruTranscriptionBackend` calls the Nakuru C API through JNA, feeding it the
+  existing FFmpeg decoder's 16 kHz audio and mapping Light/Balanced/Fast to its
+  three performance settings. Nakuru matches only on pause/completion or explicit
+  realignment, using `NakuruTranscriptAligner`, a port of desktop's aligner tested
+  against desktop-generated fixtures.
+  `libnakuru.so` (arm64-v8a, armeabi-v7a) and `nakuru.pack` are downloaded on first
+  use into `noBackupFilesDir/Nakuru/` through the existing verified download stores;
+  `nakuru-runtime.json` and `nakuru-model.json` pin their URLs, sizes and SHA-256.
+  Other ABIs show a localized unavailable message.
 - A process-wide `SasayakiTranscriptionCoordinator` serializes transcription,
   checkpoints `sasayaki_transcript.json` approximately every 15 seconds, and
-  runs one conflated matching worker alongside recognition. The first text batch
+  runs one conflated matching worker alongside ReazonSpeech recognition. The first text batch
   requests a match immediately; subsequent updates are throttled to 15 seconds
   and consume the latest immutable token snapshot. Pausing flushes unmatched
   batches; completion and explicit realignment perform a full calibration.

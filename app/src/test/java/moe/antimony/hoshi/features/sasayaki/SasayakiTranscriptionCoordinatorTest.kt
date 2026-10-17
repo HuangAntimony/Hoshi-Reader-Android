@@ -26,6 +26,45 @@ import org.junit.rules.TemporaryFolder
 class SasayakiTranscriptionCoordinatorTest {
     @get:Rule val temporary = TemporaryFolder()
 
+    @Test fun nakuruKeepsItsBackendAndAlignsOnlyAfterPause() = runTest {
+        val selected = mutableListOf<SasayakiTranscriptionModel>()
+        var saved: SasayakiTranscript? = null
+        val aligned = mutableListOf<SasayakiTranscriptionModel>()
+        val repository = object : SasayakiTranscriptionRepository {
+            override suspend fun load(root: File) = saved
+            override suspend fun save(root: File, transcript: SasayakiTranscript) { saved = transcript }
+            override suspend fun clear(root: File) { saved = null }
+            override suspend fun openAlignment(root: File): SasayakiTranscriptionAlignment = error("Model required")
+            override suspend fun openAlignment(root: File, model: SasayakiTranscriptionModel): SasayakiTranscriptionAlignment {
+                aligned += model
+                return SasayakiTranscriptionAlignment { _, _ -> SasayakiMatchData(emptyList(), 0) }
+            }
+        }
+        val backend = object : SasayakiTranscriptionBackend {
+            override fun forModel(model: SasayakiTranscriptionModel): SasayakiTranscriptionBackend { selected += model; return this }
+            override suspend fun duration(source: String) = 100.0
+            override suspend fun transcribe(source: String, from: Double, onDownloadRequired: suspend (Long) -> Unit, onDownload: suspend (Double) -> Unit, onBatch: suspend (SasayakiTranscriptionBatch) -> Unit, parallelism: Int, previousTokens: List<SasayakiToken>) {
+                onBatch(SasayakiTranscriptionBatch(listOf(SasayakiToken("日本語", from + 1, from + 2)), from + 3))
+                awaitCancellation()
+            }
+        }
+        val root = temporary.newFolder()
+        val coordinator = SasayakiTranscriptionCoordinator(backend, repository, BookWorkRegistry(), backgroundScope, StandardTestDispatcher(testScheduler))
+        coordinator.start(root, "audio", model = SasayakiTranscriptionModel.Nakuru)
+        runCurrent()
+        assertTrue(aligned.isEmpty())
+        coordinator.pause(root)
+        runCurrent()
+        assertEquals(SasayakiTranscriptionModel.Nakuru, saved!!.model)
+        assertEquals(listOf(SasayakiTranscriptionModel.Nakuru), aligned)
+        coordinator.start(root, "audio", model = SasayakiTranscriptionModel.ReazonSpeech)
+        runCurrent()
+        assertEquals(listOf(SasayakiTranscriptionModel.Nakuru, SasayakiTranscriptionModel.Nakuru), selected)
+        coordinator.pause(root)
+        runCurrent()
+        assertEquals(6.0, saved!!.through, 0.0)
+    }
+
     @Test fun preparingModelsDoesNotShowTranscriptionOrCompletedDownload() = runTest {
         val download = CompletableDeferred<Unit>()
         val loadModels = CompletableDeferred<Unit>()

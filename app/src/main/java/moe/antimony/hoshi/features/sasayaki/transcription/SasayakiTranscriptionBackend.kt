@@ -9,6 +9,8 @@ data class SasayakiTranscriptionBatch(
 )
 
 interface SasayakiTranscriptionBackend {
+    fun forModel(model: moe.antimony.hoshi.features.sasayaki.SasayakiTranscriptionModel): SasayakiTranscriptionBackend = this
+
     suspend fun duration(source: String): Double
 
     suspend fun transcribe(

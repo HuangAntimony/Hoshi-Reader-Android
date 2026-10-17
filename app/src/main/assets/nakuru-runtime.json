@@ -1,0 +1,20 @@
+{
+  "files": {
+    "arm64-v8a": [
+      {
+        "name": "libnakuru.so",
+        "url": "https://huggingface.co/Oxydlate/Nakuru/resolve/233f7b962e511d7886868a22c263b47a8c2e66e7/nakuru/runtime/android-arm64-v8a/1/libnakuru.so",
+        "bytes": 526224,
+        "sha256": "9683fcfd2ff45432deec2712677a7938f850fe1e467057fa6085cededa542f1a"
+      }
+    ],
+    "armeabi-v7a": [
+      {
+        "name": "libnakuru.so",
+        "url": "https://huggingface.co/Oxydlate/Nakuru/resolve/233f7b962e511d7886868a22c263b47a8c2e66e7/nakuru/runtime/android-armeabi-v7a/1/libnakuru.so",
+        "bytes": 345784,
+        "sha256": "e5f60efeb9e5a14d2d31e351ccec0f3e75cc945ee2562292cdbd644ead25b8f6"
+      }
+    ]
+  }
+}

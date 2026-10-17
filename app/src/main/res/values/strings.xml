@@ -1101,4 +1101,9 @@
     <string name="diagnostics_exit_other">Other exit</string>
     <string name="diagnostics_exit_unknown">Unknown exit</string>
     <string name="diagnostics_webview" translatable="false">WebView</string>
+    <string name="sasayaki_transcription_model">Speech recognition model</string>
+    <string name="sasayaki_model_reazon">ReazonSpeech</string>
+    <string name="sasayaki_model_nakuru">Nakuru</string>
+    <string name="sasayaki_transcription_model_clear">Clear the transcript to change models.</string>
+    <string name="sasayaki_nakuru_unavailable">Nakuru is not available on this device.</string>
 </resources>

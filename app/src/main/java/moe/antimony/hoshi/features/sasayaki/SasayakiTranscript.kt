@@ -11,6 +11,7 @@ data class SasayakiTranscript(
     val duration: Double,
     val tokens: List<SasayakiToken>,
     val source: String? = null,
+    val model: SasayakiTranscriptionModel = SasayakiTranscriptionModel.ReazonSpeech,
 ) {
     // Android commits fully processed audio and marks EOF with the exact duration.
     // Legacy iOS files lack source and can stop at the final recognition timestamp.

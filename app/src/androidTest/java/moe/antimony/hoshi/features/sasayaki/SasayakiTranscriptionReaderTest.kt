@@ -153,6 +153,23 @@ class SasayakiTranscriptionReaderTest {
         assertEquals(10.0, reader.backend.resumedFrom, 0.0)
     }
 
+    @Test fun modelSelectionLocksToTheSavedTranscript() = withReader { reader ->
+        compose.runOnIdle { reader.playback.value = SasayakiPlaybackData(0.0, audioUri = "content://test/audiobook") }
+        compose.waitUntil { reader.model.uiState.value.canStart }
+        compose.onNodeWithText(reader.text(R.string.sasayaki_model_nakuru)).performClick()
+        compose.onNodeWithText(reader.text(R.string.sasayaki_transcription_start)).performClick()
+        compose.waitUntil { reader.backend.runs == 1 }
+        assertEquals(SasayakiTranscriptionModel.Nakuru, reader.backend.selectedModel)
+        compose.onNodeWithText(reader.text(R.string.sasayaki_model_reazon)).assertIsNotEnabled()
+        reader.batch(10.0)
+        compose.waitUntil { reader.model.uiState.value.through == 10.0 }
+        compose.onNodeWithText(reader.text(R.string.sasayaki_transcription_pause)).performClick()
+        compose.waitUntil { reader.model.uiState.value.canStart }
+        assertEquals(SasayakiTranscriptionModel.Nakuru, reader.repository.saved!!.model)
+        compose.onNodeWithText(reader.text(R.string.sasayaki_model_reazon)).assertIsNotEnabled()
+        compose.onNodeWithText(reader.text(R.string.sasayaki_transcription_model_clear)).assertExists()
+    }
+
     private fun withReader(test: (Reader) -> Unit) {
         val reader = Reader()
         try {
@@ -166,8 +183,9 @@ class SasayakiTranscriptionReaderTest {
                         if (reader.visible.value) {
                             SasayakiTranscriptionSection(
                                 state = state, enabled = true,
+                                model = reader.selectedModel.value, onModelChange = { reader.selectedModel.value = it },
                                 preset = reader.preset.value, onPresetChange = { reader.preset.value = it },
-                                onStart = { reader.model.start(reader.preset.value) }, onPause = reader.model::pause,
+                                onStart = { reader.model.start(reader.preset.value, reader.selectedModel.value) }, onPause = reader.model::pause,
                                 onConfirmDownload = reader.model::confirmDownload,
                                 onRequestClear = reader.model::requestClear, onDismissClear = reader.model::dismissClear,
                                 onConfirmClear = reader.model::confirmClear,
@@ -196,6 +214,7 @@ class SasayakiTranscriptionReaderTest {
         val audioRepository = SasayakiAudioRepository(root)
         val playback = mutableStateOf<SasayakiPlaybackData?>(null)
         val visible = mutableStateOf(true)
+        val selectedModel = mutableStateOf(SasayakiTranscriptionModel.ReazonSpeech)
         val preset = mutableStateOf(SasayakiTranscriptionPreset.Balanced)
         val matches = mutableListOf<SasayakiMatchData>()
         val lifecycle = ReaderLifecycle()
@@ -212,6 +231,8 @@ class SasayakiTranscriptionReaderTest {
 
     private class Backend : SasayakiTranscriptionBackend {
         val batches = Channel<SasayakiTranscriptionBatch>(Channel.UNLIMITED)
+        @Volatile var selectedModel = SasayakiTranscriptionModel.ReazonSpeech
+        override fun forModel(model: SasayakiTranscriptionModel): SasayakiTranscriptionBackend { selectedModel = model; return this }
         @Volatile var runs = 0
         @Volatile var parallelism = 0
         @Volatile var resumedFrom = 0.0

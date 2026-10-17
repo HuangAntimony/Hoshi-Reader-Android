@@ -20,24 +20,30 @@ internal class SasayakiRuntimeRepository @Inject constructor(
     @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) {
     // All descriptors and hashes come from the installed APK, never a remote manifest.
-    suspend fun store(): SasayakiModelStore = withContext(ioDispatcher) {
+    suspend fun store(includeInference: Boolean = true): SasayakiModelStore = withContext(ioDispatcher) {
         val catalog = transcriptionRuntimeCatalog(context)
         val supported = if (Process.is64Bit()) Build.SUPPORTED_64_BIT_ABIS else Build.SUPPORTED_32_BIT_ABIS
         val abi = supported.firstOrNull { it in catalog } ?: throw IOException("Unsupported transcription ABI")
         SasayakiModelStore(File(context.noBackupFilesDir, "SasayakiRuntime/$abi"),
-            HttpSasayakiModelTransport(), ioDispatcher, catalog.getValue(abi), readOnly = true)
+            HttpSasayakiModelTransport(), ioDispatcher, catalog.getValue(abi).let { if (includeInference) it else it.takeLast(1) }, readOnly = true)
     }
 
-    suspend fun load(directory: File) = withContext(ioDispatcher) {
+    suspend fun load(directory: File, includeInference: Boolean = true) = withContext(ioDispatcher) {
         val catalog = transcriptionRuntimeCatalog(context)
         val files = catalog.getValue(directory.name).map { File(directory, it.name) }
-        SasayakiNativeLibraries.prepare(files)
+        if (includeInference) SasayakiNativeLibraries.prepare(files) else SasayakiNativeLibraries.prepareAudio(files.last())
     }
 }
 
 /** Called by the official bindings whose System.loadLibrary calls are redirected at build time. */
 internal object SasayakiNativeLibraries {
     private var loaded: List<String>? = null
+    private var audioLoaded = false
+
+    @Synchronized fun prepareAudio(file: File) {
+        if (!audioLoaded) System.load(file.absolutePath)
+        audioLoaded = true
+    }
 
     @Synchronized fun prepare(files: List<File>) {
         val paths = files.map { it.absolutePath }
@@ -46,10 +52,11 @@ internal object SasayakiNativeLibraries {
         // ONNX must be available before the JNI library's DT_NEEDED dependency resolves.
         paths.forEach(System::load)
         loaded = paths
+        audioLoaded = true
     }
 
     @JvmStatic @Synchronized fun loadLibrary(name: String) {
-        check(name in setOf("sherpa-onnx-jni", "hoshiaudio_jni") && loaded != null) { "Transcription runtime must be prepared first" }
+        check((name == "hoshiaudio_jni" && audioLoaded) || (name == "sherpa-onnx-jni" && loaded != null)) { "Transcription runtime must be prepared first" }
     }
 }
 

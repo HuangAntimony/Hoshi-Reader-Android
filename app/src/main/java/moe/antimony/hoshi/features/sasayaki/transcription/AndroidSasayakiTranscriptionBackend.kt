@@ -161,5 +161,5 @@ internal class AndroidSasayakiTranscriptionBackend @Inject constructor(
 internal abstract class SasayakiTranscriptionBackendModule {
     @Binds
     @Singleton
-    abstract fun bindBackend(backend: AndroidSasayakiTranscriptionBackend): SasayakiTranscriptionBackend
+    abstract fun bindBackend(backend: SasayakiBackendRouter): SasayakiTranscriptionBackend
 }

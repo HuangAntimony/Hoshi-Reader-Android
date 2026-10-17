@@ -191,6 +191,9 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   native selection menu disappears or is recreated.
 - Reduce text-selection flicker in paginated reading by preventing selection
   autoscroll while dragging selection handles.
+- Choose Nakuru as an alternative to ReazonSpeech for Japanese audiobook transcription,
+  using the desktop recognition pipeline and book aligner. Nakuru downloads its model
+  and runtime on first use and supports arm64 and 32-bit ARM devices.
 
 ## [v1.4.0] - 2026-09-24
 

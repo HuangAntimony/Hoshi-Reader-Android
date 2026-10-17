@@ -9,6 +9,7 @@ import moe.antimony.hoshi.ui.withErrorDetails
 internal enum class SasayakiFailureKind {
     AudioSource,
     ModelResources,
+    NakuruUnavailable,
     Recognition,
     BookMatch,
     Storage,
@@ -29,6 +30,7 @@ internal fun Throwable.asSasayakiFailure(kind: SasayakiFailureKind): SasayakiOpe
 internal fun sasayakiFailureText(kind: SasayakiFailureKind): UiText.Resource = UiText.Resource(
     when (kind) {
         SasayakiFailureKind.AudioSource -> R.string.sasayaki_transcription_error_audio
+        SasayakiFailureKind.NakuruUnavailable -> R.string.sasayaki_nakuru_unavailable
         SasayakiFailureKind.ModelResources -> R.string.sasayaki_transcription_error_resources
         SasayakiFailureKind.Recognition -> R.string.sasayaki_transcription_error_recognition
         SasayakiFailureKind.BookMatch -> R.string.sasayaki_transcription_error_match

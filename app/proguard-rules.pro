@@ -46,3 +46,5 @@
 
 # Official sherpa bindings call this bridge after runtime verification.
 -keep class moe.antimony.hoshi.features.sasayaki.transcription.SasayakiNativeLibraries { *; }
+
+-keep class moe.antimony.hoshi.features.sasayaki.transcription.NakuruNative** { *; }

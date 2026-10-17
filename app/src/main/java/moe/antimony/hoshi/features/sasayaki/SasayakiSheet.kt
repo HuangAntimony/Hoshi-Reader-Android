@@ -214,7 +214,7 @@ internal fun SasayakiSheet(
                         subtitleMatching = subtitleMatching,
                         onMatchModeChange = transcriptionViewModel::selectMode,
                         onSubtitleMatchingChange = { subtitleMatching = it },
-                        onStartTranscription = { transcriptionViewModel.start(settings.transcriptionPreset) },
+                        onStartTranscription = { transcriptionViewModel.start(settings.transcriptionPreset, settings.transcriptionModel) },
                         onPauseTranscription = transcriptionViewModel::pause,
                         onConfirmDownload = transcriptionViewModel::confirmDownload,
                         onRequestClearTranscription = transcriptionViewModel::requestClear,
@@ -579,6 +579,8 @@ private fun SasayakiResourcesTab(
             )
             SasayakiMatchMode.Transcription -> SasayakiTranscriptionSection(
                 state = transcriptionState,
+                model = settings.transcriptionModel,
+                onModelChange = { onSettingsChange { current -> current.copy(transcriptionModel = it) } },
                 preset = settings.transcriptionPreset,
                 onPresetChange = { onSettingsChange { current -> current.copy(transcriptionPreset = it) } },
                 enabled = !isImporting && !subtitleMatching,

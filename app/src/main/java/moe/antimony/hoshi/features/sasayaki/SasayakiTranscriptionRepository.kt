@@ -17,6 +17,7 @@ internal interface SasayakiTranscriptionRepository {
     suspend fun save(root: File, transcript: SasayakiTranscript)
     suspend fun clear(root: File)
     suspend fun openAlignment(root: File): SasayakiTranscriptionAlignment
+    suspend fun openAlignment(root: File, model: SasayakiTranscriptionModel): SasayakiTranscriptionAlignment = openAlignment(root)
 }
 
 internal fun interface SasayakiTranscriptionAlignment {
@@ -34,15 +35,26 @@ internal class AndroidSasayakiTranscriptionRepository @Inject constructor(
     override suspend fun load(root: File) = store.load(root)
     override suspend fun save(root: File, transcript: SasayakiTranscript) = store.save(root, transcript)
     override suspend fun clear(root: File) = store.clear(root)
-    override suspend fun openAlignment(root: File): SasayakiTranscriptionAlignment {
+    override suspend fun openAlignment(root: File): SasayakiTranscriptionAlignment = openAlignment(root, SasayakiTranscriptionModel.ReazonSpeech)
+
+    override suspend fun openAlignment(root: File, model: SasayakiTranscriptionModel): SasayakiTranscriptionAlignment {
         val book = withContext(ioDispatcher) {
             check(root.isDirectory)
             parser.parse(root)
         }
-        val session = withContext(defaultDispatcher) { SasayakiTranscriptAligner.Session(book) }
+        val align: (List<SasayakiToken>, Boolean) -> SasayakiMatchData = withContext(defaultDispatcher) {
+            when (model) {
+                SasayakiTranscriptionModel.ReazonSpeech -> SasayakiTranscriptAligner.Session(book)::align
+                SasayakiTranscriptionModel.Nakuru -> {
+                    val session = NakuruTranscriptAligner(book)
+                    val run: (List<SasayakiToken>, Boolean) -> SasayakiMatchData = { tokens, _ -> session.align(tokens) }
+                    run
+                }
+            }
+        }
         var previous: SasayakiMatchData? = null
         return SasayakiTranscriptionAlignment { tokens, complete ->
-            val result = withContext(defaultDispatcher) { session.align(tokens, complete) }
+            val result = withContext(defaultDispatcher) { align(tokens, complete) }
             if (result != previous) {
                 withContext(ioDispatcher) {
                     check(root.isDirectory)

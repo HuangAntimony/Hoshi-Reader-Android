@@ -85,6 +85,8 @@ private fun <T> SasayakiOptionControl(
 internal fun SasayakiTranscriptionSection(
     state: SasayakiTranscriptionUiState,
     enabled: Boolean,
+    model: SasayakiTranscriptionModel = SasayakiTranscriptionModel.ReazonSpeech,
+    onModelChange: (SasayakiTranscriptionModel) -> Unit = {},
     preset: SasayakiTranscriptionPreset,
     onPresetChange: (SasayakiTranscriptionPreset) -> Unit,
     onStart: () -> Unit,
@@ -100,6 +102,18 @@ internal fun SasayakiTranscriptionSection(
         state.stage != SasayakiTranscriptionStage.Downloading && state.stage != SasayakiTranscriptionStage.AwaitingDownload
     SasayakiResourceCard {
         Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(stringResource(R.string.sasayaki_transcription_model), style = MaterialTheme.typography.labelLarge)
+            SasayakiOptionControl(
+                SasayakiTranscriptionModel.entries, state.transcriptModel ?: model,
+                enabled && !state.controlsLocked && !currentTranscript,
+                label = { when (it) {
+                    SasayakiTranscriptionModel.ReazonSpeech -> R.string.sasayaki_model_reazon
+                    SasayakiTranscriptionModel.Nakuru -> R.string.sasayaki_model_nakuru
+                } }, onSelected = onModelChange,
+            )
+            if (currentTranscript) {
+                Text(stringResource(R.string.sasayaki_transcription_model_clear), style = MaterialTheme.typography.bodySmall)
+            }
             if (!currentTranscript || !state.transcriptComplete) {
                 Text(stringResource(R.string.sasayaki_transcription_speed), style = MaterialTheme.typography.labelLarge)
                 SasayakiOptionControl(

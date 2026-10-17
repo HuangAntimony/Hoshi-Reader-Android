@@ -1099,4 +1099,9 @@
     <string name="diagnostics_exit_other">其他退出</string>
     <string name="diagnostics_exit_unknown">未知退出</string>
     <string name="diagnostics_webview" translatable="false">WebView</string>
+    <string name="sasayaki_transcription_model">语音识别模型</string>
+    <string name="sasayaki_model_reazon">ReazonSpeech</string>
+    <string name="sasayaki_model_nakuru">Nakuru</string>
+    <string name="sasayaki_transcription_model_clear">清除转录后可更换模型。</string>
+    <string name="sasayaki_nakuru_unavailable">此设备不支持 Nakuru。</string>
 </resources>
