@@ -682,8 +682,7 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   `NakuruTranscriptionBackend` calls the Nakuru C API through JNA, feeding it the
   existing FFmpeg decoder's 16 kHz audio and mapping Light/Balanced/Fast to its
   three performance settings. Nakuru matches only on pause/completion or explicit
-  realignment, using `NakuruTranscriptAligner`, a port of desktop's aligner tested
-  against desktop-generated fixtures.
+  realignment, using `NakuruTranscriptAligner`.
   `libnakuru.so` (arm64-v8a, armeabi-v7a) and `nakuru.pack` are downloaded on first
   use into `noBackupFilesDir/Nakuru/` through the existing verified download stores;
   `nakuru-runtime.json` and `nakuru-model.json` pin their URLs, sizes and SHA-256.

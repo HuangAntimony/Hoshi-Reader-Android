@@ -16,9 +16,9 @@ class NakuruTranscriptAlignerTest {
         val expected: SasayakiMatchData,
     )
 
-    @Test fun matchesDesktopRustReference() {
+    @Test fun matchesExpectedAlignments() {
         val json = Json { ignoreUnknownKeys = true }
-        val cases = javaClass.getResourceAsStream("/nakuru/desktop-aligner.json")!!.bufferedReader().use {
+        val cases = javaClass.getResourceAsStream("/nakuru/aligner.json")!!.bufferedReader().use {
             json.decodeFromString<List<Case>>(it.readText())
         }
         cases.forEach { case ->

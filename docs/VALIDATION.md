@@ -87,24 +87,21 @@ node --test app/src/test/js/*.test.mjs
   Transcription and start a transcription once so the app downloads and verifies
   its resources. The device tests below use those files and fail instead of
   downloading.
-- `NakuruDeviceTest` accepts `nakuruClip` (an app-readable 16 kHz PCM16 mono WAV)
-  and `nakuruReference` (JSON array of desktop Nakuru timed tokens). Invoke it
-  directly with `adb shell am instrument -w -r -e class
+- `NakuruDeviceTest` accepts `nakuruClip` (an app-readable 16 kHz PCM16 mono WAV).
+  Invoke it directly with `adb shell am instrument -w -r -e class
   moe.antimony.hoshi.features.sasayaki.transcription.NakuruDeviceTest ...
   moe.antimony.hoshi.debug.test/androidx.test.runner.AndroidJUnitRunner` and require
-  `OK (2 tests)`. It compares all three presets against the supplied reference,
-  then tests cancellation/resume without touching book sidecars. Outputs remain
-  in app cache as `nakuru-result-<preset>.json`. Use both short and multi-segment
-  excerpts; fixture equality is not a claim about whole-book accuracy or identical
-  platform decoding of compressed audio.
+  `OK (2 tests)`. It checks that all three presets give identical, valid timed
+  tokens, then tests cancellation/resume without touching book sidecars. Outputs
+  remain in app cache as `nakuru-result-<preset>.json`.
 - Run `TranscriptionBenchmarkDeviceTest#benchmarkExcerpt` explicitly with `clip`,
   `preset` (1/2/3), and `engine` (`nakuru` or `reazon`). It requires an excerpt
   of at most 300 seconds, checks valid timed tokens, and records end-to-end
   backend timing and output in app cache. It does not establish recognition
   accuracy.
-- `NakuruTranscriptAlignerTest` compares the aligner with expected results from
-  desktop's aligner on synthetic fixtures; do not change expectations merely to
-  make a failing test pass.
+- `NakuruTranscriptAlignerTest` compares the aligner with expected results on
+  synthetic fixtures; do not change expectations merely to make a failing test
+  pass.
 - In Resources > Transcription, select Nakuru, start/pause/resume, then realign a
   completed transcript. The selected engine locks once a transcript exists;
   clearing it permits a change. ReazonSpeech must still work in the same
