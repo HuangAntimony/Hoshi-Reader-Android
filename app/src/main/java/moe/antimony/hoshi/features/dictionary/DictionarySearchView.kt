@@ -6,6 +6,7 @@ import moe.antimony.hoshi.ui.theme.hoshiContainerBorder
 import android.annotation.SuppressLint
 import android.view.MotionEvent
 import android.webkit.WebView
+import moe.antimony.hoshi.ui.theme.HoshiWebView
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -45,7 +46,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.luminance
+import moe.antimony.hoshi.ui.theme.LocalHoshiDarkTheme
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -196,7 +197,7 @@ internal fun DictionarySearchView(
     val fontFaceCss = remember(fontManager, fontLibraryState.revision) { fontManager.popupFontFaceCss() }
     val rootContentLanguageProfile = profileState.effectiveContentLanguageProfile
     val readerPopupBridgeHolder = session.bridge
-    val popupDarkMode = hoshiSurfaces.page.luminance() < 0.5f
+    val popupDarkMode = LocalHoshiDarkTheme.current
     val popupOptions = dictionarySearchPopupOptions(
         readerSettings = readerSettings,
         dictionarySettings = uiState.dictionarySettings,
@@ -236,8 +237,6 @@ internal fun DictionarySearchView(
         readerSettings.popupReducedMotionScrolling,
         readerSettings.popupReducedMotionScrollPercent,
         readerSettings.popupReducedMotionSwipeThreshold,
-        popupDarkMode,
-        readerSettings.eInkMode,
         popupAudioSettings,
         ankiUiState.popupSettings,
         fontFaceCss,
@@ -248,6 +247,7 @@ internal fun DictionarySearchView(
     ) {
         LookupPopupHtml.renderIframeDocument(
             assets = null,
+            assetVersion = assets.hashCode(),
             dictionaryStyles = uiState.dictionaryStyles,
             settings = uiState.dictionarySettings,
             swipeToDismiss = readerSettings.popupSwipeToDismiss,
@@ -255,8 +255,6 @@ internal fun DictionarySearchView(
             reducedMotionScrolling = readerSettings.popupReducedMotionScrolling,
             reducedMotionScrollPercent = readerSettings.popupReducedMotionScrollPercent,
             reducedMotionSwipeThreshold = readerSettings.popupReducedMotionSwipeThreshold,
-            darkMode = popupDarkMode,
-            eInkMode = readerSettings.eInkMode,
             audioSettings = popupAudioSettings,
             noAudioFoundText = noAudioFoundText,
             audioLoadingText = audioLoadingText,
@@ -740,7 +738,7 @@ private fun DictionarySearchIframeHost(
         session = session,
         modifier = modifier.fillMaxSize(),
         factory = { viewContext ->
-            WebView(viewContext).apply {
+            HoshiWebView(viewContext).apply {
                 applyHoshiWebViewSecurityDefaults()
                 isVerticalScrollBarEnabled = false
                 isHorizontalScrollBarEnabled = false

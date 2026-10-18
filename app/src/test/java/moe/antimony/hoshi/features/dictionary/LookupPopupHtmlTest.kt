@@ -281,15 +281,6 @@ class LookupPopupHtmlTest {
     }
 
     @Test
-    fun eInkPopupCssTargetsPopupControlsAndStructuredRows() {
-        val html = LookupPopupHtml.renderIframeDocument(eInkMode = true)
-
-        assertTrue(html.contains("""html[data-hoshi-eink-mode="true"] .button-slot"""))
-        assertTrue(html.contains("""html[data-hoshi-eink-mode="true"] .frequency-group"""))
-        assertTrue(html.contains("""html[data-hoshi-eink-mode="true"] .overlay"""))
-    }
-
-    @Test
     fun deinflectionTraceRowsAreCarriedInEntryJsonForIframePopup() {
         val entryJson = LookupPopupHtml.entryJsonString(
             lookupResult(

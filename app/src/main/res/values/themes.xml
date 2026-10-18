@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.HoshiReader" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.HoshiReader" parent="Theme.AppCompat.DayNight.NoActionBar" />
 
-    <style name="Theme.HoshiReader.ProcessTextOverlay" parent="android:Theme.Material.Light.NoActionBar">
+    <style name="Theme.HoshiReader.ProcessTextOverlay" parent="Theme.AppCompat.DayNight.NoActionBar">
         <item name="android:windowIsTranslucent">true</item>
         <item name="android:windowBackground">@android:color/transparent</item>
         <item name="android:windowNoTitle">true</item>

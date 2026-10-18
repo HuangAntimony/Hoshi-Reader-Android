@@ -9,7 +9,7 @@ import android.view.KeyEvent
 import android.view.WindowManager
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
+import moe.antimony.hoshi.ui.theme.LocalSystemDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
@@ -234,7 +234,7 @@ fun ReaderWebView(
     val sasayakiMediaStopJson = remember { Json { ignoreUnknownKeys = true } }
     var sasayakiAutoPageJob by remember(book) { mutableStateOf<Job?>(null) }
     val view = LocalView.current
-    val systemDarkTheme = isSystemInDarkTheme()
+    val systemDarkTheme = LocalSystemDarkTheme.current
     val clampedInitialIndex = initialChapterIndex.coerceIn(0, book.chapters.lastIndex)
     val stateHolder = remember(book) {
         ReaderWebViewStateHolder(
@@ -305,8 +305,6 @@ fun ReaderWebView(
         effectiveSettings.popupReducedMotionScrolling,
         effectiveSettings.popupReducedMotionScrollPercent,
         effectiveSettings.popupReducedMotionSwipeThreshold,
-        popupDarkMode,
-        effectiveSettings.eInkMode,
         popupAudioSettings,
         ankiUiState.popupSettings,
         fontManager,
@@ -318,6 +316,7 @@ fun ReaderWebView(
     ) {
         LookupPopupHtml.renderIframeDocument(
             assets = null,
+            assetVersion = popupAssets.hashCode(),
             dictionaryStyles = dictionaryStyles,
             settings = dictionarySettings,
             swipeToDismiss = effectiveSettings.popupSwipeToDismiss,
@@ -325,8 +324,6 @@ fun ReaderWebView(
             reducedMotionScrolling = effectiveSettings.popupReducedMotionScrolling,
             reducedMotionScrollPercent = effectiveSettings.popupReducedMotionScrollPercent,
             reducedMotionSwipeThreshold = effectiveSettings.popupReducedMotionSwipeThreshold,
-            darkMode = popupDarkMode,
-            eInkMode = effectiveSettings.eInkMode,
             audioSettings = popupAudioSettings,
             noAudioFoundText = noAudioFoundText,
             audioLoadingText = audioLoadingText,

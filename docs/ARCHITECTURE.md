@@ -243,6 +243,21 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   previews, dimming the page, or changing list geometry; colors come from confirmed
   settings. The full settings page and Reader panel share this content. The Reader
   panel title is inside its scrollable content; the drag handle remains outside.
+- `SystemThemeObserver` reads device brightness only from the Application Context,
+  on configuration changes and process foreground entry. `LocalSystemDarkTheme`
+  carries that value to display settings and Reader; Activity `uiMode` is the
+  app's resolved appearance and must never be used to infer the device setting.
+  Both entry Activities use AppCompat DayNight. After confirmed display settings
+  load, `nativeThemeReady` maps the shared policy to `setDefaultNightMode` before
+  mounting normal content. AppCompat 1.8 dispatches configuration changes to the
+  retained View tree under the Activities' `uiMode` handling. No second persisted
+  night-mode setting is introduced. Native selection menus and the highlight
+  palette close on theme changes; the palette uses Compose overlay/outline roles.
+  All WebViews inherit `HoshiWebView`: if first View construction resets native
+  resources to the system theme, it reports the actual configuration to AppCompat
+  and dispatches the restored configuration to the not-yet-attached View. This
+  keeps cold-start media queries aligned without recreating Activities or manually
+  mutating Resources; WebView pre-start alone does not prevent this provider reset.
 - Display migration targets the settings format shipped in Android v1.3.3. It reads
   the global active profile before Reader profile initialization or book-specific
   profile activation. If that profile's settings file is missing or unreadable,
@@ -495,6 +510,18 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   Kotlin owns popup payloads, resource handling, and native service bridges for
   audio, dictionary media, Anki, and external links; do not reintroduce Android
   native overlay popup fallback paths for these flows.
+- `popup-theme.css` owns the iOS-compatible semantic palette and Android E-ink
+  overrides. Default palette selectors use `:where` so dictionary/user CSS can
+  override variables. Dictionary styles target `:where(div)[data-dictionary]`;
+  default text colors never override custom colors with `!important`.
+  `setPopupTheme` is sent before initial content and on appearance changes;
+  the iframe URL excludes brightness/E-ink state and includes the shared asset
+  version. Pure theme changes retain DOM, scroll, history and audio candidate
+  selection. Monochrome image filters and canvas fills use that same palette;
+  existing canvases redraw and late image loads read the current palette.
+  WebView's native DayNight theme supplies `prefers-color-scheme` for copied iOS
+  CSS, with algorithmic darkening disabled. Android keeps CSS `zoom` and exposes
+  `--popup-scale: 1` within that coordinate system, avoiding double scaling.
 - Dictionary's `DictionarySearchSession` is owned by the AppShell composition.
   It retains the WebView's current DOM, scroll position and JS history across tab
   removal, with root scroll state, child history counts and the bridge callback

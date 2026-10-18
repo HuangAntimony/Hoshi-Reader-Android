@@ -355,6 +355,43 @@ node --test app/src/test/js/*.test.mjs
 Preserve app data and cover all four tabs, every settings category, native Reader
 panels, dialogs, menus, and Process Text lookup:
 
+- Run the 12-case popup matrix: system Light/Dark × App Light/Dark/Automatic,
+  both with and without E-ink. Verify audio source menus, dictionary/recursive
+  lookup, ordinary and conjugation table headers, explanatory overlays, monochrome
+  images/canvases, native text toolbars and highlight palettes. App appearance must
+  control both built-in colors and `prefers-color-scheme`, regardless of the system.
+  Repeat foreground/background system changes and cold entry through Main and
+  external Process Text. Native text toolbar/highlight palette may close; Compose
+  dialogs, reading position, lookup DOM/scroll/history and audio selection persist.
+  E-ink lookup button gray tint is intentionally retained.
+- `LookupPopupThemeWebViewTest` uses actual Chromium computed styles/pixels, the
+  reference iOS stylesheet supplied only to the test APK (initialize the pinned
+  `reference/Hoshi-Reader-iOS` submodule first), and copied user media-query
+  CSS. It covers App/native disagreement, E-ink, dictionary cascade isolation and
+  `--popup-scale` at 0.8/1/2. `ReaderNativePopupThemeTest` checks native popup roles
+  and dismissal. Build `:app:assembleDebugAndroidTest`, install both APKs with
+  `adb install -r`, invoke these classes with `am instrument -w -r -e class`, and
+  require `OK`, never just a successful shell exit.
+- `AppThemeDeviceTest` is an opt-in populated-device matrix using the installed
+  「食べる」/明鏡国語辞典 第三版 fixture. It drives normal Theme ViewModel events,
+  verifies retained real lookup views, system independence, custom palette groups,
+  foreground return and Process Text; screenshots/results go to app cache.
+  It changes global theme preferences, so back up **only** their file first:
+  `adb exec-out run-as moe.antimony.hoshi.debug cat files/datastore/app-display-settings.preferences_pb > /tmp/hoshi-display-before.preferences_pb`.
+  Record `adb shell cmd uimode night`. Run with `-e verifyThemeMatrix true` and
+  `-e class moe.antimony.hoshi.features.display.AppThemeDeviceTest`. Afterwards,
+  including failures, force-stop the app, restore the exact saved file with
+  `adb shell "run-as moe.antimony.hoshi.debug sh -c 'cat > files/datastore/app-display-settings.preferences_pb'" < /tmp/hoshi-display-before.preferences_pb`,
+  restore the recorded system mode via `cmd uimode night`, and relaunch. Do not
+  clear app data or overwrite any other preferences/profile files. This exact-file
+  restoration preserves nullable E-ink overrides and inactive custom palette colors.
+  For cold coverage, invoke `#preparePersistedThemeForColdStart` with `themeMode`
+  (`light`/`dark`/`auto`), `themeSystemDark` and `themeEInk` (`true`/`false`). Then
+  invoke `#coldNativeThemeIsAppliedBeforeFirstLookupWebView` in a **separate**
+  instrumentation process, with `themeEntry` (`main`/`processText`), `expectedDark`
+  and `themeSystemDark`. Repeat both entries for all 12 cases before restoring the
+  backup. This catches first WebView construction resetting Activity resources;
+  running cold assertions after other WebView tests in the same process cannot.
 - Both switching modes show Light / Sepia / Custom Light and Dark / Warm Dark /
   Custom Dark. Automatic mode has one selection per group; manual mode has one
   selection across all six options. Change system night mode while foregrounded

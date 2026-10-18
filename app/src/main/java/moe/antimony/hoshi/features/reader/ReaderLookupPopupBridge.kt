@@ -604,6 +604,7 @@ internal data class LookupPopupAssetResponse(
 internal fun lookupPopupAssetResponse(name: String, assets: LookupPopupAssets): LookupPopupAssetResponse? {
     val content = when (name) {
         "popup.css" -> assets.popupCss
+        "popup-theme.css" -> assets.popupThemeCss
         "language-ja.js" -> assets.languageJapaneseJs
         "selection-ja.js" -> assets.selectionJapaneseJs
         "selection-en.js" -> assets.selectionEnglishJs
@@ -613,7 +614,7 @@ internal fun lookupPopupAssetResponse(name: String, assets: LookupPopupAssets): 
         "reader-popup-host.js" -> assets.readerPopupHostJs
         else -> return null
     }
-    val mimeType = if (name == "popup.css") "text/css" else "application/javascript"
+    val mimeType = if (name.endsWith(".css")) "text/css" else "application/javascript"
     return LookupPopupAssetResponse(mimeType, content)
 }
 

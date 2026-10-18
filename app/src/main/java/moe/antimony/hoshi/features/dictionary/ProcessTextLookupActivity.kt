@@ -9,14 +9,17 @@ import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
 import android.webkit.WebView
-import androidx.activity.ComponentActivity
+import moe.antimony.hoshi.ui.theme.HoshiWebView
+import androidx.appcompat.app.AppCompatActivity
+import moe.antimony.hoshi.ui.theme.SystemThemeObserver
+import moe.antimony.hoshi.ui.theme.nativeThemeReady
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.statusBars
-import androidx.compose.material3.MaterialTheme
+import moe.antimony.hoshi.ui.theme.LocalHoshiDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -87,8 +90,10 @@ internal class ProcessTextLookupDependencies @Inject constructor(
 )
 
 @AndroidEntryPoint
-class ProcessTextLookupActivity : ComponentActivity() {
+class ProcessTextLookupActivity : AppCompatActivity() {
     @Inject internal lateinit var dependencies: ProcessTextLookupDependencies
+
+    @Inject lateinit var systemThemeObserver: SystemThemeObserver
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -124,15 +129,17 @@ class ProcessTextLookupActivity : ComponentActivity() {
             val settingsState by settingsViewModel.uiState.collectAsStateWithLifecycle()
             val loadedReaderSettings = settingsState.settings
             val profileState by dependencies.profileRepository.state.collectAsStateWithLifecycle()
-            val systemDark = androidx.compose.foundation.isSystemInDarkTheme()
+            val systemDark by systemThemeObserver.dark.collectAsStateWithLifecycle()
+            val nativeReady = nativeThemeReady(loadedReaderSettings?.displaySettings, systemDark)
             HoshiReaderTheme(
+                systemDarkTheme = systemDark,
                 darkTheme = loadedReaderSettings?.usesDarkInterface(systemDark) ?: systemDark,
                 eInkMode = loadedReaderSettings?.eInkMode ?: false,
                 useDarkSystemBarIcons = loadedReaderSettings?.usesDarkSystemBarIcons(systemDark) ?: !systemDark,
                 accentSeed = loadedReaderSettings?.displaySettings?.takeIf { it.accentSource == DisplayAccentSource.Custom }?.accentSeed,
             ) {
                 ReaderSettingsHostError(settingsState, settingsViewModel)
-                if (loadedReaderSettings == null) return@HoshiReaderTheme
+                if (loadedReaderSettings == null || !nativeReady) return@HoshiReaderTheme
                 ProcessTextLookupOverlay(
                     query = request.query,
                     readerSettings = loadedReaderSettings,
@@ -162,7 +169,7 @@ private fun ProcessTextLookupOverlay(
     AnkiOperationErrorDialog(ankiSynchronizationWarning, R.string.anki_sync_failed) { ankiSynchronizationWarning = null }
     var iframeHostWebView by remember { mutableStateOf<WebView?>(null) }
     val context = LocalContext.current
-    val darkMode = MaterialTheme.colorScheme.background.luminanceForPopup() < 0.5f
+    val darkMode = LocalHoshiDarkTheme.current
     val density = LocalDensity.current
     val topInset = with(density) {
         WindowInsets.statusBars.getTop(this).toDp().value
@@ -188,8 +195,6 @@ private fun ProcessTextLookupOverlay(
         readerSettings.popupReducedMotionScrollPercent,
         readerSettings.popupReducedMotionSwipeThreshold,
         readerSettings.popupScale,
-        darkMode,
-        readerSettings.eInkMode,
         ankiUiState.popupSettings,
         fontFaceCss,
         noAudioFoundText,
@@ -197,6 +202,7 @@ private fun ProcessTextLookupOverlay(
     ) {
         LookupPopupHtml.renderIframeDocument(
             assets = null,
+            assetVersion = assets.hashCode(),
             dictionaryStyles = popupSettings?.dictionaryStyles.orEmpty(),
             settings = popupSettings?.dictionarySettings ?: DictionarySettings(),
             swipeToDismiss = true,
@@ -204,8 +210,6 @@ private fun ProcessTextLookupOverlay(
             reducedMotionScrolling = readerSettings.popupReducedMotionScrolling,
             reducedMotionScrollPercent = readerSettings.popupReducedMotionScrollPercent,
             reducedMotionSwipeThreshold = readerSettings.popupReducedMotionSwipeThreshold,
-            darkMode = darkMode,
-            eInkMode = readerSettings.eInkMode,
             audioSettings = popupAudioSettings,
             noAudioFoundText = noAudioFoundText,
             audioLoadingText = audioLoadingText,
@@ -236,7 +240,7 @@ private fun ProcessTextLookupOverlay(
     }
     val readerPopupBridgeHolder = remember { ReaderLookupPopupBridgeCallbackHolder() }
 
-    LaunchedEffect(query, readerSettings, darkMode, contentLanguageProfile) {
+    LaunchedEffect(query, contentLanguageProfile) {
         runCatching {
             withContext(Dispatchers.IO) {
                 dependencies.dictionaryRepository.rebuildLookupQuery()
@@ -569,7 +573,7 @@ private fun ProcessTextLookupIframeHost(
     AndroidView(
         modifier = modifier.fillMaxSize(),
         factory = { viewContext ->
-            WebView(viewContext).apply {
+            HoshiWebView(viewContext).apply {
                 applyHoshiWebViewSecurityDefaults()
                 isVerticalScrollBarEnabled = false
                 isHorizontalScrollBarEnabled = false
@@ -723,6 +727,3 @@ internal object ProcessTextLookupOverlayLayout {
     private const val ScreenBorderPadding = 6.0
     private const val SyntheticSelectionSize = 1.0
 }
-
-private fun androidx.compose.ui.graphics.Color.luminanceForPopup(): Float =
-    red * 0.2126f + green * 0.7152f + blue * 0.0722f

@@ -222,6 +222,10 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 - Optionally hide thumbnails in collapsed shelves; this setting is off by default.
 - Add global Theme settings with system or manual light/dark palettes, separate custom
   light and dark reading colors, interface accents, and app-wide E-ink optimization.
+  Native text menus, highlight palettes and all lookup popups follow the chosen App
+  theme even when the system differs; switching preserves lookup contents and history.
+  Dictionary colors and custom CSS now share iOS semantic variables and light/dark
+  media-query behavior, including tables and monochrome images.
 - Archive deleted-book reading statistics, restore them on reimport, and edit daily
   records. Deleting all records requires confirmation.
 - Add calendar and all-time Statistics views with period comparisons, averages, goal

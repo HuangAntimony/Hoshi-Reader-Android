@@ -14,6 +14,7 @@ import android.provider.MediaStore
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
+import moe.antimony.hoshi.ui.theme.HoshiWebView
 import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
@@ -248,7 +249,7 @@ private fun ReaderFullscreenSvgImage(
     AndroidView(
         modifier = modifier,
         factory = { context ->
-            WebView(context).apply {
+            HoshiWebView(context).apply {
                 applyHoshiWebViewSecurityDefaults()
                 settings.builtInZoomControls = true
                 settings.displayZoomControls = false

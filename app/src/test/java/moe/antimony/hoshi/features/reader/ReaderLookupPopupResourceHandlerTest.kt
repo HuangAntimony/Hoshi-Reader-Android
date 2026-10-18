@@ -7,6 +7,14 @@ import org.junit.Test
 
 class ReaderLookupPopupResourceHandlerTest {
     @Test
+    fun semanticThemeIsServedAsStylesheet() {
+        val response = lookupPopupAssetResponse("popup-theme.css", LookupPopupAssets(
+            popupJs = "", popupCss = "", popupThemeCss = "body { color: red; }"))
+        assertEquals("text/css", response?.mimeType)
+        assertEquals("body { color: red; }", response?.content)
+    }
+
+    @Test
     fun appAssetsRoutesRecognizePopupFontAndImageRequestsForNotFoundFallbacks() {
         assertEquals(
             ReaderLookupPopupAppAssetRoute.Popup,

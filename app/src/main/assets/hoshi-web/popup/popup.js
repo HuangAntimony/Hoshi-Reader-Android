@@ -1095,6 +1095,7 @@ function createDefinitionImageCanvas(imageUrl, alt, onLoad) {
 }
 
 function renderDefinitionImageToCanvas(canvas, image, usedWidth, invAspectRatio, appearance) {
+    canvas.hoshiRedraw = () => renderDefinitionImageToCanvas(canvas, image, usedWidth, invAspectRatio, appearance);
     const emSize = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
     const scaleFactor = Math.ceil(window.devicePixelRatio * 2);
     const pixelWidth = Math.round(usedWidth * emSize * scaleFactor);
@@ -1121,7 +1122,8 @@ function renderDefinitionImageToCanvas(canvas, image, usedWidth, invAspectRatio,
 
     if (appearance === 'monochrome') {
         context.globalCompositeOperation = 'source-in';
-        context.fillStyle = window.matchMedia?.('(prefers-color-scheme: dark)')?.matches ? '#ffffff' : '#000000';
+        context.fillStyle = getComputedStyle(canvas).getPropertyValue('--text-color').trim()
+            || getComputedStyle(document.body).getPropertyValue('--text-color').trim() || '#000000';
         context.fillRect(0, 0, canvas.width, canvas.height);
         context.globalCompositeOperation = 'source-over';
     }
@@ -2235,9 +2237,9 @@ function createGlossarySection(dictName, contents, isFirst, entryIdx) {
     const dictStyle = window.dictionaryStyles?.[dictName] ?? '';
     dictWrapper.appendChild(el('style', {
         textContent: `
-            [data-dictionary="${dictName}"] {
+            :where(div)[data-dictionary="${dictName}"] {
+                color: var(--text-color);
                 ${dictStyle}
-                color: var(--text-color) !important;
             }
         `.trim()
     }));
@@ -2332,6 +2334,7 @@ function appendPendingHistoryRestore(flush = false) {
     if (chunk.length) {
         pending.container.append(...chunk);
         observePendingDictionaryMedia(pending.container);
+        applyHoshiPopupThemeOverrides(pending.container);
         popupTermNavigator.entryRendered();
     }
     if (!pending.nodes.length) {
@@ -2579,21 +2582,28 @@ function navigate(origin, destination) {
 window.navigateBack = () => navigate(backStack, forwardStack);
 window.navigateForward = () => navigate(forwardStack, backStack);
 
+window.setHoshiPopupTheme = ({darkMode, eInkMode}) => {
+    const root = document.documentElement;
+    root.dataset.hoshiColorScheme = darkMode ? 'dark' : 'light';
+    root.dataset.hoshiEinkMode = String(!!eInkMode);
+    applyHoshiPopupThemeOverrides();
+};
+
 function applyHoshiPopupThemeOverrides(root = document) {
     const colorScheme = document.documentElement.dataset.hoshiColorScheme;
     const buttonColor = colorScheme === 'dark' ? 'rgba(235, 235, 245, 0.92)' : 'rgba(60, 60, 67, 0.86)';
-    const tableHeaderBackgroundColor = colorScheme === 'dark' ? '#333333' : '#eeeeee';
-    const tableHeaderTextColor = colorScheme === 'dark' ? '#ffffff' : '#000000';
+    const eInk = document.documentElement.dataset.hoshiEinkMode === 'true';
+    // E Ink's existing gray tint is intentional; ordinary defaults belong in CSS.
     root.querySelectorAll('button.button-slot').forEach(button => {
-        button.style.setProperty('color', buttonColor, 'important');
+        if (eInk) {
+            button.style.setProperty('color', buttonColor, 'important');
+            button.dataset.hoshiEinkTint = 'true';
+        } else if (button.dataset.hoshiEinkTint === 'true') {
+            button.style.removeProperty('color');
+            delete button.dataset.hoshiEinkTint;
+        }
     });
-    root.querySelectorAll('table[data-sc-content="formsTable"] th, table[data-sc-content="formsTable"] .gloss-sc-th').forEach(header => {
-        header.style.setProperty('background-color', tableHeaderBackgroundColor, 'important');
-        header.style.setProperty('color', tableHeaderTextColor, 'important');
-        header.querySelectorAll('*').forEach(child => {
-            child.style.setProperty('color', 'inherit', 'important');
-        });
-    });
+    root.querySelectorAll('canvas.gloss-image').forEach(canvas => canvas.hoshiRedraw?.());
 }
 
 function popupEventTarget(event) {

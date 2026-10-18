@@ -32,6 +32,7 @@ jobs:
         run: |
           set -euo pipefail
           git submodule update --init --recursive third_party/hoshidicts-kotlin-bridge
+          git submodule update --init --depth 1 reference/Hoshi-Reader-iOS
           git submodule status --recursive
 
       - name: Set up JDK

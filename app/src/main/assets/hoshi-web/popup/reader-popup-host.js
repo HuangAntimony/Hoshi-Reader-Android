@@ -151,7 +151,16 @@
         return message;
     }
 
+    function syncIframeTheme(record) {
+        const {darkMode, eInkMode} = record.payload;
+        const key = `${!!darkMode}/${!!eInkMode}`;
+        if (record.themeKey === key) return;
+        record.themeKey = key;
+        record.iframe.contentWindow?.postMessage({type: 'setPopupTheme', darkMode: !!darkMode, eInkMode: !!eInkMode}, ORIGIN);
+    }
+
     function renderIframe(record) {
+        syncIframeTheme(record);
         record.iframe.contentWindow?.postMessage(iframeRenderMessage(record.payload), ORIGIN);
     }
 
@@ -206,6 +215,7 @@
         shell.dataset.revealReady = 'false';
         const record = { shell, iframe, payload, contentReady: false, revealReady: false, loaded: false, root: false };
         iframe.addEventListener('load', () => {
+            record.themeKey = null;
             record.loaded = true;
             if (record.payload) {
                 frameSources.set(iframe.contentWindow, record.payload.id);
@@ -285,8 +295,9 @@
             resetIframe(record);
             record.loaded = false;
             record.iframe.src = payload.iframeUrl;
-        } else if (needsRender && record.loaded) {
-            renderIframe(record);
+        } else if (record.loaded) {
+            syncIframeTheme(record);
+            if (needsRender) renderIframe(record);
         }
     }
 

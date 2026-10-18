@@ -24,6 +24,7 @@ import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
+import moe.antimony.hoshi.ui.theme.HoshiWebView
 import android.webkit.WebViewClient
 import android.webkit.ValueCallback
 import android.widget.LinearLayout
@@ -39,6 +40,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import moe.antimony.hoshi.ui.theme.hoshiSurfaces
+import moe.antimony.hoshi.ui.theme.LocalHoshiDarkTheme
+import moe.antimony.hoshi.ui.theme.LocalHoshiEInkMode
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
@@ -127,6 +132,9 @@ internal fun ChapterWebView(
     val currentOnRestoreStarted = rememberUpdatedState(onRestoreStarted)
     val currentOnRestoreCompleted = rememberUpdatedState(onRestoreCompleted)
     val currentOnBeforeRestoreVisible = rememberUpdatedState(onBeforeRestoreVisible)
+    val nativePopupSurfaces = hoshiSurfaces
+    val nativePopupDark = LocalHoshiDarkTheme.current
+    val nativePopupEInk = LocalHoshiEInkMode.current
     val context = LocalContext.current
     val readerWebAssets = remember(context) { ReaderWebAssets.load(context) }
     val viewportDensity = context.resources.displayMetrics.density.coerceAtLeast(1f)
@@ -313,6 +321,7 @@ internal fun ChapterWebView(
         },
         update = { webView ->
             if (webView.isReleased) return@AndroidView
+            webView.updateNativePopupTheme(nativePopupDark, nativePopupEInk, nativePopupSurfaces.overlay.toArgb(), nativePopupSurfaces.outline.toArgb())
             fun selectAt(x: Float, y: Float, onBlankTap: () -> Unit) {
                 val density = webView.resources.displayMetrics.density
                 webView.evaluateJavascript(
@@ -604,7 +613,7 @@ internal fun readerSelectionMaxLength(settings: DictionarySettings): Int =
 internal fun WebView.readerNativeSelectionState(): StateFlow<Boolean>? =
     (this as? HoshiReaderWebView)?.nativeSelectionState
 
-internal class HoshiReaderWebView(context: Context) : WebView(context) {
+internal class HoshiReaderWebView(context: Context) : HoshiWebView(context) {
     var isReleased = false
         private set
 
@@ -841,6 +850,21 @@ internal class HoshiReaderWebView(context: Context) : WebView(context) {
         }
     }
 
+    private var nativePopupTheme: Pair<Boolean, Boolean>? = null
+    private var nativePopupBackground = AndroidColor.WHITE
+    private var nativePopupOutline = 0x22000000
+
+    fun updateNativePopupTheme(dark: Boolean, eInk: Boolean, background: Int, outline: Int) {
+        val next = dark to eInk
+        if (nativePopupTheme != null && (nativePopupTheme != next || nativePopupBackground != background || nativePopupOutline != outline)) {
+            nativeSelectionActionMode?.finish()
+            dismissHighlightColorPopup()
+        }
+        nativePopupTheme = next
+        nativePopupBackground = background
+        nativePopupOutline = outline
+    }
+
     fun showHighlightColorPicker(anchorRect: Rect? = nativeSelectionContentRect) {
         if (isReleased) return
         dismissHighlightColorPopup()
@@ -848,9 +872,9 @@ internal class HoshiReaderWebView(context: Context) : WebView(context) {
         val popupContent = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             background = GradientDrawable().apply {
-                setColor(AndroidColor.WHITE)
+                setColor(nativePopupBackground)
                 cornerRadius = 20f * density
-                setStroke((1f * density).toInt().coerceAtLeast(1), 0x22000000)
+                setStroke((1f * density).toInt().coerceAtLeast(1), nativePopupOutline)
             }
             elevation = 8f * density
             val paddingHorizontal = (ReaderHighlightSelectionMenu.colorPickerHorizontalPaddingDp * density).toInt()

@@ -15,15 +15,13 @@ This document tracks open Android work after checking iOS upstream `develop`.
 Only open work is listed below. After removing completed slices, renumber the
 remaining slices consecutively from 1 and update all slice references.
 
-### 1. Lookup popup two-column layout and dictionary CSS isolation
+### 1. Lookup popup two-column layout
 
 Status: pending Android sync.
 
 Commits:
 
 - `ed25036` - masonry layout and popup visual redesign.
-- `8d1442e` - add Yomitan danger/success theme variables.
-- `0a91398` - scope dictionary CSS to div wrappers.
 
 Dependency/value reasoning:
 
@@ -35,8 +33,7 @@ iOS behavior to mirror:
 - Dictionary settings add a Two-Column Layout toggle. Multi-dictionary glossary
   cards use masonry/two-column layout when enabled and keep one column otherwise.
 - Popup cards, padding, theme accents, and definition image canvas sizing match
-  the refreshed design. Dictionary styles target `:where(div)[data-dictionary]`
-  so labels carrying the same dictionary name do not inherit glossary styles.
+  the refreshed design.
 
 Android current gap:
 
@@ -44,16 +41,14 @@ Android current gap:
   `twoColumnLayout` setting.
 - `LookupPopupHtml.kt` injects compact glossary and pitch options but no two-
   column flag. `popup.js` has no masonry/ResizeObserver path, uses
-  `maxCanvasSize = 128`, and `popup.css` lacks the refreshed cards and danger/
-  success variables.
-- The glossary selector in `popup.js` still targets every `[data-dictionary]`
-  element. Height is already configurable to 1000 in `ReaderAppearanceView.kt`;
-  the upstream height increase requires no remaining Android work.
+  `maxCanvasSize = 128`, and `popup.css` lacks the refreshed cards.
+- Height is already configurable to 1000 in `ReaderAppearanceView.kt`; the
+  upstream height increase requires no remaining Android work.
 
 Suggested slice:
 
 - Add profile-aware setting persistence and bootstrap injection, port the final
-  asset behavior and div-scoped dictionary styles while preserving Android
+  layout behavior while preserving Android
   bridge calls, with focused behavior tests.
 
 Validation:
@@ -68,13 +63,17 @@ Validation:
 
 | Commit | Date | iOS summary | Android status |
 | --- | --- | --- | --- |
-| `ed25036`, `8d1442e`, `0a91398` | 2026-06-14 / 07-01 / 08-22 | Popup layout/themes and dictionary CSS isolation | Pending settings/assets and div-scoped styles |
+| `ed25036` | 2026-06-14 | Popup layout and visual redesign | Pending settings/layout assets |
 
 ## Suggested Implementation Order
 
-1. Popup layout/CSS isolation (1): shared lookup presentation and settings.
+1. Popup layout (1): shared lookup presentation and settings.
 
 ## Covered Or No Android Action
+
+- `8d1442e`, `0a91398`: the shared popup theme asset now provides the complete
+  iOS danger/success/annotation palette, with real-WebView reference-contract tests;
+  dictionary CSS uses div-scoped selectors and permits user variable/color overrides.
 
 - `02ed801`: Android now uses actual viewport height for paginated CSS and
   page steps, with ordinary user padding and no font-size overlap compensation.

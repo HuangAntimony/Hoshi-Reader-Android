@@ -3,7 +3,7 @@ package moe.antimony.hoshi.features.display
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
+import moe.antimony.hoshi.ui.theme.LocalSystemDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -138,7 +138,7 @@ private fun DisplaySettingsContent(
     modifier: Modifier = Modifier,
     header: (@Composable () -> Unit)? = null,
 ) {
-    val systemDark = isSystemInDarkTheme()
+    val systemDark = LocalSystemDarkTheme.current
 
     val scrollState = rememberScrollState()
     Column(

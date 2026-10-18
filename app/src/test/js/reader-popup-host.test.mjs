@@ -908,3 +908,18 @@ test('continuous reader clips source highlight layers without clipping popup fra
     assert.equal(layer.querySelector('.hoshi-reader-popup-shell').style.left, '0px');
     assert.equal(layer.querySelector('.hoshi-reader-popup-shell').style.clipPath, undefined);
 });
+
+test('theme changes reach a retained iframe without replacing results or history', () => {
+    const scene = popupHost();
+    const payload = {...rootPopupPayload(), entriesCount: 1, initialEntryJson: '{"expression":"食べる"}', darkMode: false, eInkMode: false};
+    scene.host.renderStack({popups: [payload]});
+    const iframe = scene.document.getElementById('hoshi-reader-popup-layer').children[0].querySelector('.hoshi-reader-popup-iframe');
+    const messages = [];
+    iframe.contentWindow.postMessage = message => messages.push(message);
+    iframe.dispatchEvent('load');
+    assert.equal(messages[0].type, 'setPopupTheme');
+    messages.length = 0;
+    scene.host.renderStack({popups: [{...payload, darkMode: true, eInkMode: true, backCount: 2}]});
+    assert.deepEqual(JSON.parse(JSON.stringify(messages)), [{type: 'setPopupTheme', darkMode: true, eInkMode: true}]);
+    assert.equal(scene.document.getElementById('hoshi-reader-popup-layer').children[0].querySelector('.hoshi-reader-popup-iframe'), iframe);
+});
