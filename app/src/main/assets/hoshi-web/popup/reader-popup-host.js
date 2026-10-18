@@ -738,6 +738,7 @@
             writing-mode: horizontal-tb;
             direction: ltr;
             text-orientation: mixed;
+            color-scheme: light;
             background: #fff;
             border: 1px solid rgba(120, 120, 128, 0.36);
             border-radius: 10px;
@@ -769,6 +770,7 @@
             pointer-events: none;
         }
         #${LAYER_ID} .hoshi-reader-popup-shell[data-dark-mode="true"] {
+            color-scheme: dark;
             background: #000;
             border-color: rgba(255, 255, 255, 0.34);
             box-shadow: 0 3px 12px rgba(0, 0, 0, 0.44);

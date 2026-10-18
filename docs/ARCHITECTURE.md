@@ -520,7 +520,9 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   selection. Monochrome image filters and canvas fills use that same palette;
   existing canvases redraw and late image loads read the current palette.
   WebView's native DayNight theme supplies `prefers-color-scheme` for copied iOS
-  CSS, with algorithmic darkening disabled. Android keeps CSS `zoom` and exposes
+  CSS. Popup shells give their iframe elements the same explicit `color-scheme`
+  as the embedded document so Chromium preserves transparent canvas backgrounds,
+  with algorithmic darkening disabled. Android keeps CSS `zoom` and exposes
   `--popup-scale: 1` within that coordinate system, avoiding double scaling.
 - Dictionary's `DictionarySearchSession` is owned by the AppShell composition.
   It retains the WebView's current DOM, scroll position and JS history across tab

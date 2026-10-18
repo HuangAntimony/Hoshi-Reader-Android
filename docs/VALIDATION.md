@@ -364,6 +364,10 @@ panels, dialogs, menus, and Process Text lookup:
   external Process Text. Native text toolbar/highlight palette may close; Compose
   dialogs, reading position, lookup DOM/scroll/history and audio selection persist.
   E-ink lookup button gray tint is intentionally retained.
+  For transparent lookup pages, also verify the embedding iframe's `color-scheme`
+  matches its document after light/dark switches. Checking computed transparent
+  backgrounds alone is insufficient: Chromium paints an opaque canvas when the
+  two schemes differ. Compare the visible page with the surrounding App surface.
 - `LookupPopupThemeWebViewTest` uses actual Chromium computed styles/pixels, the
   reference iOS stylesheet supplied only to the test APK (initialize the pinned
   `reference/Hoshi-Reader-iOS` submodule first), and copied user media-query

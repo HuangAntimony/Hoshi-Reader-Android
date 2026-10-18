@@ -24,7 +24,7 @@ body {
     --list-padding1: 1.4em;
     --list-padding2: var(--list-padding1);
     color: var(--text-color);
-    background-color: var(--background-color);
+    background-color: transparent;
     font-family: Arial, var(--hoshi-content-font-family, "Noto Sans CJK JP", "NotoSansCJKJP-Regular", sans-serif) !important;
     overscroll-behavior-y: contain;
     touch-action: pan-y;

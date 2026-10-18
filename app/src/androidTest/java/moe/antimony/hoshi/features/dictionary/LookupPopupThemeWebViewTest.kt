@@ -17,6 +17,48 @@ import java.util.concurrent.TimeUnit
 /** Real Chromium CSS/media queries. Synthetic content; never writes user settings or dictionaries. */
 @RunWith(AndroidJUnit4::class)
 class LookupPopupThemeWebViewTest {
+    @Test fun transparentIframeMatchesItsEmbeddingColorSchemeAcrossThemeChanges() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val assets = LookupPopupAssets.load(context)
+        val child = LookupPopupHtml.renderIframeDocument(assets = assets)
+        withPopup(false, false) { web ->
+            evaluate(web, """
+                (() => {
+                    document.documentElement.style.colorScheme = 'normal';
+                    window.eval(${JSONObject.quote(assets.readerPopupHostJs)});
+                    window.themeFrame = {id:'dictionary-search-root', frame:{left:0,top:0,width:300,height:250},
+                        iframeUrl:'about:blank', darkMode:false, eInkMode:false, entriesCount:0};
+                    hoshiReaderPopupHost.renderStack({popups:[themeFrame]});
+                    const frame = document.querySelector('iframe');
+                    frame.srcdoc = ${JSONObject.quote(child)};
+                    return {};
+                })()
+            """)
+            for (dark in listOf(false, true, false)) {
+                evaluate(web, "(() => { themeFrame = {...themeFrame, darkMode:$dark}; hoshiReaderPopupHost.renderStack({popups:[themeFrame]}); return {}; })()")
+                val deadline = android.os.SystemClock.uptimeMillis() + 5000
+                var actual: JSONObject
+                do {
+                    actual = evaluate(web, """
+                        (() => {
+                            const frame = document.querySelector('iframe'), doc = frame.contentDocument;
+                            return {ready:doc.documentElement.dataset.hoshiColorScheme === '${if (dark) "dark" else "light"}',
+                                outer:getComputedStyle(frame).colorScheme,
+                                inner:frame.contentWindow.getComputedStyle(doc.documentElement).colorScheme,
+                                background:doc.body && frame.contentWindow.getComputedStyle(doc.body).backgroundColor};
+                        })()
+                    """)
+                    if (actual.optBoolean("ready")) break
+                    android.os.SystemClock.sleep(20)
+                } while (android.os.SystemClock.uptimeMillis() < deadline)
+                assertTrue(actual.toString(), actual.optBoolean("ready"))
+                assertEquals(if (dark) "dark" else "light", actual.getString("inner"))
+                assertEquals("A scheme mismatch makes Chromium paint an opaque iframe canvas", actual.getString("inner"), actual.getString("outer"))
+                assertEquals("rgba(0, 0, 0, 0)", actual.getString("background"))
+            }
+        }
+    }
+
     @Test fun appPaletteIsIndependentOfNativeMediaTheme() {
         for (nativeDark in listOf(false, true)) for (appDark in listOf(false, true)) for (eInk in listOf(false, true)) {
             withPopup(nativeDark, appDark, eInk = eInk) { web ->
@@ -40,7 +82,7 @@ class LookupPopupThemeWebViewTest {
                 assertEquals(label, if (appDark) { if (eInk) "rgb(0, 0, 0)" else "rgb(51, 51, 51)" } else "rgb(255, 255, 255)", result.getString("menu"))
                 assertEquals(label, if (appDark) "rgb(255, 255, 255)" else "rgb(0, 0, 0)", result.getString("text"))
                 assertEquals(label, if (appDark) { if (eInk) "rgb(0, 0, 0)" else "rgb(51, 51, 51)" } else { if (eInk) "rgb(255, 255, 255)" else "rgb(238, 238, 238)" }, result.getString("table"))
-                assertEquals(label, if (appDark) "rgb(0, 0, 0)" else "rgb(255, 255, 255)", result.getString("body"))
+                assertEquals(label, "rgba(0, 0, 0, 0)", result.getString("body"))
                 assertEquals(label, result.getString("table"), result.getString("forms"))
                 assertEquals(label, result.getString("text"), result.getString("formsText"))
                 assertEquals(label, if (appDark) "rgba(235, 235, 245, 0.92)" else "rgba(60, 60, 67, 0.86)", result.getString("button"))
