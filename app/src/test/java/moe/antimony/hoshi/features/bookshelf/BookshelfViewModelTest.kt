@@ -549,27 +549,29 @@ class BookshelfViewModelTest {
     }
 
     @Test
-    fun tappingAnotherCloudBookCancelsPreviousDownloadAndSkipsSecondOpenSync() {
+    fun tappingAnotherCloudBookKeepsPreviousDownloadAndSkipsSecondOpenSync() {
         val first = bookEntry("first")
         val second = bookEntry("second")
         val gate = CompletableDeferred<Unit>()
-        var firstCancelled = false
-        val repository = FakeBookshelfRepository(entries = listOf(first, second), openBookOperation = { entry, progress ->
+        var firstFinished = false
+        val repository = FakeBookshelfRepository(entries = listOf(first, second), openBookId = second.metadata.id, downloadBookOperation = { entry, progress ->
             progress(0.5)
             if (entry.metadata.id == first.metadata.id) {
-                try { gate.await() } finally { firstCancelled = true }
+                gate.await()
+                firstFinished = true
             }
-            entry.metadata.id
         })
         val viewModel = BookshelfViewModel(repository, testScope())
         viewModel.openBook(first)
         assertEquals(0.5, viewModel.uiState.value.remoteImportProgressById[first.metadata.id])
         viewModel.openBook(first)
-        assertFalse(firstCancelled)
         viewModel.openBook(second)
-        assertTrue(firstCancelled)
         assertEquals(second.metadata.id, viewModel.uiState.value.openReaderBookId)
         assertTrue(viewModel.uiState.value.openReaderSkipSync)
+        assertEquals(mapOf(first.metadata.id to 0.5), viewModel.uiState.value.remoteImportProgressById)
+        gate.complete(Unit)
+        assertTrue(firstFinished)
+        assertEquals(second.metadata.id, viewModel.uiState.value.openReaderBookId)
         assertTrue(viewModel.uiState.value.remoteImportProgressById.isEmpty())
         assertEquals(listOf(BookSortOption.Recent), repository.loadRequests)
     }
@@ -1407,7 +1409,7 @@ class BookshelfViewModelTest {
         var entries: List<BookEntry> = emptyList(),
         var progressById: Map<String, Double> = emptyMap(),
         var openBookId: String = "book-a",
-        var openBookOperation: (suspend (BookEntry, (Double) -> Unit) -> String)? = null,
+        var downloadBookOperation: (suspend (BookEntry, (Double) -> Unit) -> Unit)? = null,
         var importBookId: String = "imported-book",
         var shelves: List<BookShelf> = emptyList(),
         var coverSourcesById: Map<String, BookCoverSource> = emptyMap(),
@@ -1496,7 +1498,11 @@ class BookshelfViewModelTest {
             )
         }
 
-        override suspend fun openBook(entry: BookEntry, onProgress: (Double) -> Unit): String = openBookOperation?.invoke(entry, onProgress) ?: openBookId
+        override suspend fun openBook(entry: BookEntry): String = openBookId
+
+        override suspend fun downloadBook(entry: BookEntry, onProgress: (Double) -> Unit) {
+            downloadBookOperation?.invoke(entry, onProgress)
+        }
 
         override suspend fun importBook(uri: android.net.Uri): String = importBookId
 

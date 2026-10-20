@@ -200,6 +200,34 @@ class GoogleDriveSyncManagerTest {
         assertEquals(reference.modified, f.store.state.books.getValue("book-a").sources[SyncFileType.epub])
     }
 
+    @Test fun downloadAllAndTappedDownloadFetchEveryMissingEpub() = runTest {
+        val f = fixture()
+        val folders = listOf("book-a", "book-b", "book-c")
+        val roots = folders.map { folder ->
+            f.books.createBookDirectory(folder).also { root ->
+                f.books.saveMetadata(root, BookMetadata(folder, folder, folder = folder, epub = "$folder.epub", lastAccess = 0.0))
+                root.resolve("$folder.epub").writeText("$folder-content")
+                f.store.handleBookImport(f.books.loadMetadata(root)!!, root)
+            }
+        }
+        f.manager.sync()
+        runCurrent()
+        for (folder in folders) f.store.deleteLocalBook(folder)
+        f.manager.sync()
+        runCurrent()
+        assertEquals(3, f.manager.state.value.missingBooks)
+        val tapped = async { f.manager.downloadBook(f.books.loadMetadata(roots[1])!!) {} }
+        f.manager.downloadAll()
+        val reading = async { f.manager.sync(f.books.loadMetadata(roots[0])) }
+        tapped.await()
+        reading.await()
+        runCurrent()
+        for ((root, folder) in roots.zip(folders)) assertEquals("$folder-content", root.resolve("$folder.epub").readText())
+        assertEquals(0, f.manager.state.value.missingBooks)
+        assertFalse(f.manager.state.value.isSyncing)
+        assertTrue(f.manager.state.value.queue.isEmpty())
+    }
+
     @Test fun debouncesFromFirstEditAtBuildInterval() = runTest {
         val interval = if (BuildConfig.DEBUG) 2_000L else 30_000L
         val f = fixture()

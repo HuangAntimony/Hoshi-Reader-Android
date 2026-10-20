@@ -20,7 +20,6 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -60,6 +59,7 @@ data class GoogleDriveSyncState(
     val progress: SyncProgress? = null,
     val attachPending: Boolean = false,
     val attachDismissed: Boolean = false,
+    val missingBooks: Int = 0,
 )
 
 enum class AttachChoice { Merge, Device, Cloud }
@@ -71,6 +71,8 @@ enum class SyncTransferDirection { Upload, Download, Both }
 data class SyncProgress(val done: Int, val total: Int, val current: String?)
 
 private enum class SyncPhase { State, File }
+
+private data class TransferJob(val key: String, val epub: Boolean)
 
 private data class BookError(val title: String, val message: UiText, val cause: Throwable)
 
@@ -145,13 +147,19 @@ class GoogleDriveSyncManager internal constructor(
     private var fileTransferTask: Job? = null
     private var pollTask: Job? = null
     private var debounceTask: Job? = null
-    private var downloadTask: Job? = null
     private var stopped = false
     private var unsupportedFormat = false
     private var transfers = listOf<SyncQueueItem>()
     private var progress: SyncProgress? = null
     private var bookErrors = mapOf<Pair<String, SyncPhase>, BookError>()
     private var runError: Exception? = null
+    private val jobs = mutableListOf<TransferJob>()
+    private var active = 0
+    private var epubs = 0
+    private var priority = 0
+    private var downloads = setOf<String>()
+    private val busy = mutableSetOf<String>()
+    private val wakeSignal = MutableStateFlow(0)
     var flushReader: (suspend (String) -> Unit)? = null
     var stopReader: (suspend (String) -> Unit)? = null
     var reloadSyncedMatch: (suspend (String) -> Unit)? = null
@@ -215,14 +223,12 @@ class GoogleDriveSyncManager internal constructor(
         debounceTask = null
         stateTask?.cancel()
         fileTransferTask?.cancel()
-        downloadTask?.cancel()
         withContext(ioDispatcher) { client.stop() }
         stateTask?.join()
         fileTransferTask?.join()
-        downloadTask?.join()
         stateTask = null
         fileTransferTask = null
-        downloadTask = null
+        downloads = emptySet()
         transfers = emptyList()
         progress = null
         bookErrors = emptyMap()
@@ -321,14 +327,9 @@ class GoogleDriveSyncManager internal constructor(
         }
         debounceTask?.cancel()
         debounceTask = null
-        val previousFiles = if (book == null) null else fileTransferTask
-        if (book != null) {
-            previous?.cancel()
-            previousFiles?.cancel()
-        }
+        if (book != null) previous?.cancel()
         val task = scope.launch(start = CoroutineStart.LAZY) {
             previous?.join()
-            previousFiles?.join()
             try {
                 currentCoroutineContext().ensureActive()
                 mutableState.value = state.value.copy(errorMessage = null)
@@ -356,7 +357,7 @@ class GoogleDriveSyncManager internal constructor(
                 stateTask = null
                 val succeeded = state.value.errorMessage == null && bookErrors.keys.none { it.second == SyncPhase.State }
                 if (book != null || (succeeded && store.transaction { store.state.books.values.any { it.pending } || store.state.shelvesPending })) schedule()
-                if (book == null) startFileSync()
+                startFileSync()
                 publish()
             }
         }
@@ -391,7 +392,8 @@ class GoogleDriveSyncManager internal constructor(
     }
 
     private suspend fun startFileSync() {
-        if (!enabled() || unsupportedFormat || state.value.errorMessage != null || stateTask != null || fileTransferTask != null || downloadTask != null || cache.bookFolder.isEmpty()) return
+        if (!enabled() || unsupportedFormat || state.value.errorMessage != null || stateTask != null || cache.bookFolder.isEmpty()) return
+        if (fileTransferTask != null) return enqueue(reset = false)
         val task = scope.launch(start = CoroutineStart.LAZY) {
             var published = false
             try {
@@ -405,25 +407,25 @@ class GoogleDriveSyncManager internal constructor(
                 progress = null
                 publish()
             }
-            if (published) scope.launch { sync() }
+            val queued = jobs.isNotEmpty()
+            jobs.clear()
+            if (published) scope.launch { sync() } else if (queued) startFileSync()
         }
         fileTransferTask = task
         publish()
         task.start()
     }
 
+    suspend fun downloadAll(): Unit = withContext(mainDispatcher) {
+        downloads = downloads + store.transaction { store.state.books.filterValues { it.missingEpub }.keys }
+        startFileSync()
+    }
+
     private suspend fun runFileSync(): Boolean {
-        val keys = store.transaction { store.state.books.keys.sorted() }
-        beginTransfers(keys)
+        enqueue(reset = true)
         val listing = if (progress == null) Listing() else listFiles()
         try {
-            concurrent(keys) { key ->
-                currentCoroutineContext().ensureActive()
-                progress = progress?.copy(current = key)
-                publish()
-                recordBook(key, SyncPhase.File, runCatching { syncFiles(key, listing) })
-                finishTransfer(key)
-            }
+            coroutineScope { repeat(8) { launch { work(listing) } } }
         } finally {
             withContext(NonCancellable) { saveCache() }
         }
@@ -438,6 +440,87 @@ class GoogleDriveSyncManager internal constructor(
             }
         }
         return listing.published
+    }
+
+    private suspend fun work(listing: Listing) {
+        while (true) {
+            currentCoroutineContext().ensureActive()
+            val version = wakeSignal.value
+            val open = epubs < 3 && priority == 0
+            val index = jobs.indexOfFirst { !it.epub || open }
+            if (index < 0) {
+                if (jobs.isEmpty() && active == 0) return
+                wakeSignal.first { it != version }
+                continue
+            }
+            val job = jobs.removeAt(index)
+            active++
+            if (job.epub) epubs++
+            progress = progress?.copy(current = job.key)
+            publish()
+            val result = runCatching {
+                lock(job.key)
+                try {
+                    if (job.epub) downloadFile(job.key, SyncFileType.epub, listing) else syncFiles(job.key, listing)
+                } finally {
+                    unlock(job.key)
+                }
+            }
+            val failure = runCatching { recordBook(job.key, SyncPhase.File, result) }.exceptionOrNull()
+            val succeeded = failure == null && (job.key to SyncPhase.File) !in bookErrors
+            val deferred = !job.epub && succeeded && wantsEpub(job.key)
+            active--
+            if (job.epub) {
+                epubs--
+                if (succeeded) downloads = downloads - job.key
+            }
+            if (deferred) jobs += TransferJob(job.key, true)
+            if (failure != null) jobs.clear()
+            finishTransfer(job.key, !deferred)
+            wake()
+            failure?.let { throw it }
+        }
+    }
+
+    private suspend fun lock(key: String) {
+        while (key in busy) {
+            val version = wakeSignal.value
+            wakeSignal.first { it != version }
+        }
+        busy += key
+    }
+
+    private fun unlock(key: String) {
+        busy -= key
+        wake()
+    }
+
+    private fun wake() {
+        wakeSignal.value++
+    }
+
+    private fun wantsEpub(key: String): Boolean =
+        key in downloads && store.state.books[key]?.missingEpub == true
+
+    private suspend fun enqueue(reset: Boolean) {
+        if (reset) {
+            jobs.clear()
+            active = 0
+            epubs = 0
+            transfers = emptyList()
+            progress = null
+        }
+        for (key in store.transaction { store.state.books.keys.sorted() }) {
+            val job = TransferJob(key, false)
+            if (job !in jobs) jobs += job
+            val record = store.state.books[key] ?: continue
+            if (transfers.any { it.key == key }) continue
+            val direction = record.transferDirection(key in downloads) ?: continue
+            transfers = transfers + SyncQueueItem(key, bookTitle(key, record.deleted), direction, null)
+            progress = (progress ?: SyncProgress(0, 0, null)).let { it.copy(total = it.total + 1) }
+        }
+        wake()
+        publish()
     }
 
     private suspend fun syncFiles(key: String, listing: Listing) {
@@ -458,17 +541,8 @@ class GoogleDriveSyncManager internal constructor(
         failure?.let { throw it }
     }
 
-    private suspend fun beginTransfers(keys: List<String>) {
-        transfers = keys.mapNotNull { key ->
-            val record = store.state.books[key] ?: return@mapNotNull null
-            record.transferDirection()?.let { SyncQueueItem(key, bookTitle(key, record.deleted), it, null) }
-        }
-        progress = if (transfers.isEmpty()) null else SyncProgress(0, transfers.size, null)
-        publish()
-    }
-
-    private fun finishTransfer(key: String) {
-        if (transfers.none { it.key == key }) return
+    private fun finishTransfer(key: String, finished: Boolean) {
+        if (!finished || transfers.none { it.key == key }) return
         progress = progress?.let { it.copy(done = it.done + 1) }
         if ((key to SyncPhase.File) !in bookErrors) transfers = transfers.filter { it.key != key }
         publish()
@@ -510,37 +584,46 @@ class GoogleDriveSyncManager internal constructor(
     }
 
     private fun publish() {
-        mutableState.value = state.value.copy(isSyncing = stateTask != null || fileTransferTask != null, queue = queue(), progress = progress, attachPending = cache.attachPending)
-    }
-
-    suspend fun cancelDownload(): Unit = withContext(mainDispatcher) {
-        downloadTask?.cancel()
-        downloadTask = null
+        mutableState.value = state.value.copy(
+            isSyncing = stateTask != null || fileTransferTask != null,
+            queue = queue(),
+            progress = progress,
+            attachPending = cache.attachPending,
+            missingBooks = store.state.books.values.count { it.missingEpub },
+        )
     }
 
     suspend fun downloadBook(book: BookMetadata, onProgress: (Double) -> Unit): BookMetadata = withContext(mainDispatcher) {
-        downloadTask?.cancel()
-        val task = scope.async(start = CoroutineStart.LAZY) {
+        scope.async {
             val key = book.folder!!.syncKey()
-            sync(book)
-            if (unsupportedFormat) throw SyncFormatError()
-            (state.value.errorMessage ?: bookErrors[key to SyncPhase.State]?.message)?.let { throw GoogleDriveSyncException(it) }
-            currentCoroutineContext().ensureActive()
-            if (store.state.books[key]?.deleted == true) throw GoogleDriveSyncException(UiText.Resource(R.string.sync_book_deleted))
-            if (enabled() && store.state.books[key]?.files?.get(SyncFileType.epub)?.value != null) downloadFile(key, SyncFileType.epub, Listing(), onProgress)
-            currentCoroutineContext().ensureActive()
-            val metadata = books.loadMetadata(store.bookDirectory(book.folder)) ?: book
-            if (metadata.epub == null) throw GoogleDriveSyncException(UiText.Resource(R.string.sync_book_not_uploaded))
-            metadata
-        }
-        downloadTask = task
-        try {
-            task.await()
-        } finally {
-            task.cancel()
-            if (downloadTask === task) downloadTask = null
-            if (currentCoroutineContext().isActive) startFileSync()
-        }
+            try {
+                sync(book)
+                if (unsupportedFormat) throw SyncFormatError()
+                (state.value.errorMessage ?: bookErrors[key to SyncPhase.State]?.message)?.let { throw GoogleDriveSyncException(it) }
+                currentCoroutineContext().ensureActive()
+                if (store.state.books[key]?.deleted == true) throw GoogleDriveSyncException(UiText.Resource(R.string.sync_book_deleted))
+                if (enabled() && store.state.books[key]?.files?.get(SyncFileType.epub)?.value != null) {
+                    priority++
+                    try {
+                        lock(key)
+                        try {
+                            downloadFile(key, SyncFileType.epub, Listing(), onProgress)
+                        } finally {
+                            unlock(key)
+                        }
+                    } finally {
+                        priority--
+                        wake()
+                    }
+                }
+                currentCoroutineContext().ensureActive()
+                val metadata = books.loadMetadata(store.bookDirectory(book.folder)) ?: book
+                if (metadata.epub == null) throw GoogleDriveSyncException(UiText.Resource(R.string.sync_book_not_uploaded))
+                metadata
+            } finally {
+                withContext(NonCancellable) { startFileSync() }
+            }
+        }.await()
     }
 
     private suspend fun changes(): RemoteChanges {
@@ -941,10 +1024,13 @@ fun Throwable.syncMessage(): UiText = when (this) {
 private val Throwable.stopsRun: Boolean
     get() = this !is Exception || this is CancellationException || this is SyncFormatError || this is GoogleDriveUnavailableException
 
-private fun SyncRecord.transferDirection(): SyncTransferDirection? {
+private val SyncRecord.missingEpub: Boolean
+    get() = !deleted && files[SyncFileType.epub]?.let { published -> published.value != null && (sources[SyncFileType.epub]?.let { it < published.modified } ?: true) } == true
+
+private fun SyncRecord.transferDirection(epub: Boolean): SyncTransferDirection? {
     val types = SyncFileType.entries.filter { !deleted || it == SyncFileType.cover }
     val upload = attached && types.any { type -> sources[type]?.let { source -> files[type]?.let { it.modified < source } ?: true } == true }
-    val download = types.any { type -> type != SyncFileType.epub && files[type]?.let { published -> sources[type]?.let { it < published.modified } ?: true } == true }
+    val download = types.any { type -> (type != SyncFileType.epub || epub) && files[type]?.let { published -> sources[type]?.let { it < published.modified } ?: true } == true }
     return when {
         upload && download -> SyncTransferDirection.Both
         upload -> SyncTransferDirection.Upload

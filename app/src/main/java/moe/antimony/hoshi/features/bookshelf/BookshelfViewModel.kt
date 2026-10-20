@@ -13,7 +13,10 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -96,6 +99,8 @@ internal class BookshelfViewModel : ViewModel {
     val uiState: StateFlow<BookshelfUiState> = _uiState
     private var openBookJob: Job? = null
     private var openingBookId: String? = null
+    private var menuDownloads: Job? = null
+    private val downloads = mutableMapOf<String, Deferred<Result<Unit>>>()
     private var reloadGeneration = 0
     private var remoteLoadJob: Job? = null
     private val remoteImportsInFlight = mutableSetOf<String>()
@@ -139,12 +144,12 @@ internal class BookshelfViewModel : ViewModel {
         openBookJob?.cancel()
         openingBookId = entry.metadata.id
         val cloud = entry.metadata.epub == null
+        val download = if (cloud) download(entry) else null
         openBookJob = workScope.launch {
-            _uiState.update { it.copy(errorMessage = null, remoteImportProgressById = if (cloud) it.remoteImportProgressById + (entry.metadata.id to 0.0) else it.remoteImportProgressById) }
+            _uiState.update { it.copy(errorMessage = null) }
             try {
-                val bookId = repository.openBook(entry) { progress ->
-                    _uiState.update { it.copy(remoteImportProgressById = it.remoteImportProgressById + (entry.metadata.id to progress)) }
-                }
+                download?.await()?.getOrThrow()
+                val bookId = repository.openBook(entry)
                 if (cloud) reloadBookEntriesSync()
                 _uiState.update { it.copy(openReaderBookId = bookId, openReaderSkipSync = cloud) }
             } catch (error: CancellationException) {
@@ -153,9 +158,39 @@ internal class BookshelfViewModel : ViewModel {
                 _uiState.update { it.copy(errorMessage = if (cloud) error.syncMessage() else UiText.Resource(R.string.bookshelf_open_failed).withErrorDetails(error)) }
             } finally {
                 if (openingBookId == entry.metadata.id) openingBookId = null
+            }
+        }
+    }
+
+    fun downloadBooks(entries: List<BookEntry>) {
+        val previous = menuDownloads
+        menuDownloads = workScope.launch {
+            previous?.join()
+            for (entry in entries) {
+                download(entry).await().onFailure { error -> _uiState.update { it.copy(errorMessage = error.syncMessage()) } }
+            }
+            reloadBookEntriesSync()
+        }
+    }
+
+    private fun download(entry: BookEntry): Deferred<Result<Unit>> {
+        downloads[entry.metadata.id]?.let { return it }
+        val download = workScope.async(start = CoroutineStart.LAZY) {
+            _uiState.update { it.copy(remoteImportProgressById = it.remoteImportProgressById + (entry.metadata.id to 0.0)) }
+            try {
+                runCatching {
+                    repository.downloadBook(entry) { progress ->
+                        _uiState.update { it.copy(remoteImportProgressById = it.remoteImportProgressById + (entry.metadata.id to progress)) }
+                    }
+                }
+            } finally {
+                downloads -= entry.metadata.id
                 _uiState.update { it.copy(remoteImportProgressById = it.remoteImportProgressById - entry.metadata.id) }
             }
         }
+        downloads[entry.metadata.id] = download
+        download.start()
+        return download
     }
 
     fun importBook(uri: Uri, displayName: String? = null) {

@@ -923,6 +923,12 @@
         <item quantity="one">%1$d failed</item>
         <item quantity="other">%1$d failed</item>
     </plurals>
+    <string name="sync_download_all_books">Download All Books</string>
+    <string name="sync_download_all_books_title">Download All Books?</string>
+    <plurals name="sync_download_all_books_confirmation">
+        <item quantity="one">This will download %1$d book from Google Drive.</item>
+        <item quantity="other">This will download %1$d books from Google Drive.</item>
+    </plurals>
     <string name="sync_delete_local">Delete Local</string>
     <string name="sync_delete_everywhere">Delete Everywhere</string>
     <string name="tts_tab_voice" comment="TTS panel tab containing source, voice and rate controls.">Voice</string>

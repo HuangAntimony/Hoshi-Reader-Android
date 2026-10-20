@@ -920,6 +920,12 @@
         <item quantity="one">%1$d 本失败</item>
         <item quantity="other">%1$d 本失败</item>
     </plurals>
+    <string name="sync_download_all_books">下载全部书籍</string>
+    <string name="sync_download_all_books_title">下载全部书籍？</string>
+    <plurals name="sync_download_all_books_confirmation">
+        <item quantity="one">将从 Google Drive 下载 %1$d 本书籍。</item>
+        <item quantity="other">将从 Google Drive 下载 %1$d 本书籍。</item>
+    </plurals>
     <string name="sync_delete_local">删除本地副本</string>
     <string name="sync_delete_everywhere">在所有设备上删除</string>
     <string name="tts_tab_voice" comment="TTS panel tab containing source, voice and rate controls.">音源</string>

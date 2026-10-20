@@ -145,6 +145,7 @@ fun SyncSettingsView(
     var operationError by remember { mutableStateOf<UiText?>(null) }
     var showSignOutConfirmation by remember { mutableStateOf(false) }
     var showClearCacheConfirmation by remember { mutableStateOf(false) }
+    var showDownloadAllConfirmation by remember { mutableStateOf(false) }
     var showAuthorizationError by remember { mutableStateOf(false) }
     var showQueue by remember { mutableStateOf(false) }
     val screenState = SyncSettingsScreenState(settings = settings, authStatus = authStatus)
@@ -447,6 +448,28 @@ fun SyncSettingsView(
             },
             dismissButton = {
                 TextButton(onClick = { showClearCacheConfirmation = false }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            },
+        )
+    }
+    if (showDownloadAllConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showDownloadAllConfirmation = false },
+            title = { Text(stringResource(R.string.sync_download_all_books_title)) },
+            text = { Text(pluralStringResource(R.plurals.sync_download_all_books_confirmation, hoshiState.missingBooks, hoshiState.missingBooks)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDownloadAllConfirmation = false
+                        scope.launch { hoshiSync.downloadAll() }
+                    },
+                ) {
+                    Text(stringResource(R.string.action_download))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDownloadAllConfirmation = false }) {
                     Text(stringResource(R.string.action_cancel))
                 }
             },
@@ -784,6 +807,13 @@ fun SyncSettingsView(
                             enabled = !hoshiState.isSyncing,
                         ) {
                             Text(stringResource(R.string.sync_now))
+                        }
+                        SettingsDivider()
+                        TextButton(
+                            onClick = { showDownloadAllConfirmation = true },
+                            enabled = hoshiState.missingBooks > 0,
+                        ) {
+                            Text(stringResource(R.string.sync_download_all_books))
                         }
                     }
                     hoshiState.errorMessage?.let {
