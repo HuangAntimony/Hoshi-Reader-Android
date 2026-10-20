@@ -127,6 +127,14 @@ class GoogleDriveClient internal constructor(
         request("files/${fileId.urlPathSegment()}", method = "PATCH", body = "{\"trashed\":true}".toByteArray())
     }
 
+    suspend fun renameFile(fileId: String, name: String) {
+        request("files/${fileId.urlPathSegment()}", method = "PATCH", body = buildJsonObject { put("name", name) }.toString().toByteArray())
+    }
+
+    suspend fun deleteFile(fileId: String) {
+        request("files/${fileId.urlPathSegment()}", method = "DELETE", contentType = null)
+    }
+
     suspend fun performRequest(
         url: String,
         method: String,

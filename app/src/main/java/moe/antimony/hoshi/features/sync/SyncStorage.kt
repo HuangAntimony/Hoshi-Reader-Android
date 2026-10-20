@@ -111,6 +111,42 @@ class SyncStorage @Inject constructor(
         saveChanges()
     }
 
+    suspend fun hasData(): Boolean = transaction {
+        bookDirectories().any { root ->
+            if (root.parentFile!!.name == "statistics_archive") statistics.loadSessions(root).values.any { it.value != null }
+            else books.loadMetadata(root)?.epub != null
+        }
+    }
+
+    suspend fun removeDeletionRecords() = transaction {
+        val cleared = mutableListOf<File>()
+        for (root in bookDirectories()) {
+            val archived = root.parentFile!!.name == "statistics_archive"
+            val sessions = statistics.loadSessions(root)
+            val liveSessions = sessions.filterValues { it.value != null }
+            if (archived && liveSessions.isEmpty()) {
+                cleared += root
+                continue
+            }
+            if (liveSessions.size != sessions.size) statistics.applySessions(root, liveSessions)
+            if (archived) continue
+
+            val highlights = sidecars.loadHighlightRecords(root)
+            val liveHighlights = highlights.filterValues { it.value != null }
+            if (liveHighlights.size != highlights.size) sidecars.saveHighlightRecords(root, liveHighlights)
+            val metadata = books.loadMetadata(root)
+            val shelves = metadata?.shelves
+            if (shelves != null && shelves.any { !it.value.value }) {
+                sidecars.saveMetadata(root, metadata.copy(shelves = shelves.filterValues { it.value }))
+            }
+        }
+        val shelves = books.loadShelfList()
+        if (shelves.any { it.value.value == null }) books.saveShelfList(shelves.filterValues { it.value != null })
+        state = state.copy(books = state.books - cleared.map { it.name.syncKey() }.toSet())
+        save()
+        cleared.forEach { it.deleteRecursively() }
+    }
+
     suspend fun prepareLibrary() = transaction {
         val empty = mutableListOf<File>()
         for (root in bookDirectories()) {

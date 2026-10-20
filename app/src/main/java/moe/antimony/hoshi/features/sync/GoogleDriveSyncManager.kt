@@ -48,6 +48,8 @@ data class GoogleDriveSyncCache(
     @Required val bookFolder: String = "",
     @Required val bookVersions: Map<String, Map<String, String>> = emptyMap(),
     val bookFolders: Map<String, String> = emptyMap(),
+    val attachPending: Boolean = false,
+    val replacedRoot: Boolean = false,
 )
 
 data class GoogleDriveSyncState(
@@ -56,7 +58,11 @@ data class GoogleDriveSyncState(
     val lastSync: Long? = null,
     val queue: List<SyncQueueItem> = emptyList(),
     val progress: SyncProgress? = null,
+    val attachPending: Boolean = false,
+    val attachDismissed: Boolean = false,
 )
+
+enum class AttachChoice { Merge, Device, Cloud }
 
 data class SyncQueueItem(val key: String, val title: String, val direction: SyncTransferDirection?, val error: UiText?)
 
@@ -95,6 +101,8 @@ private class Listing {
 }
 
 class GoogleDriveSyncException(val text: UiText) : Exception()
+
+private class AttachPending : Exception()
 
 @Singleton
 class GoogleDriveSyncManager internal constructor(
@@ -152,6 +160,7 @@ class GoogleDriveSyncManager internal constructor(
         cache = withContext(ioDispatcher) {
             runCatching { SyncFormat.decode<GoogleDriveSyncCache>(filesDir.resolve("drive-sync.json").readText()) }.getOrDefault(GoogleDriveSyncCache())
         }
+        mutableState.value = state.value.copy(attachPending = cache.attachPending)
         runCatching { store.prepareLibrary() }
         Unit
     }
@@ -163,7 +172,7 @@ class GoogleDriveSyncManager internal constructor(
 
     private suspend fun enabled(): Boolean {
         val config = settings.settings.first()
-        return config.enabled && config.provider == SyncProvider.Gdrive && isAuthenticated() && !stopped
+        return config.enabled && config.provider == SyncProvider.Gdrive && isAuthenticated() && !stopped && !cache.attachPending
     }
 
     suspend fun start(): Unit = withContext(mainDispatcher) {
@@ -235,11 +244,48 @@ class GoogleDriveSyncManager internal constructor(
     }
 
     suspend fun clearCache(): Unit = withContext(mainDispatcher) {
+        initialization.await()
         stop()
-        cache = GoogleDriveSyncCache()
+        cache = GoogleDriveSyncCache(root = cache.root, attachPending = cache.attachPending, replacedRoot = cache.replacedRoot)
         saveCache()
         withContext(ioDispatcher) { clearTtuCache() }
         start()
+    }
+
+    suspend fun attach(choice: AttachChoice): Unit = withContext(mainDispatcher) {
+        initialization.await()
+        stop()
+        client.resume()
+        try {
+            if (choice == AttachChoice.Device) {
+                cache = cache.copy(attachPending = false, replacedRoot = true)
+                saveCache()
+                try {
+                    drive.renameRoot()
+                } catch (error: Exception) {
+                    cache = cache.copy(attachPending = true)
+                    saveCache()
+                    throw error
+                }
+                store.removeDeletionRecords()
+            }
+            val layout = drive.layout()
+            if (choice == AttachChoice.Cloud) clearLibrary()
+            cache = cache.copy(root = layout.root, stateFolder = layout.state, bookFolder = layout.books, attachPending = false)
+            saveCache()
+        } finally {
+            start()
+        }
+    }
+
+    private suspend fun clearLibrary() {
+        for (root in books.loadAllBooks()) stopReader?.invoke(root.name.syncKey())
+        store.transaction {
+            filesDir.resolve("Books").deleteRecursively()
+            filesDir.resolve("Books").mkdirs()
+            store.reload()
+        }
+        store.notifyBooksChanged()
     }
 
     suspend fun resetConnection(restoringBackup: Boolean = false): Unit = withContext(mainDispatcher) {
@@ -250,7 +296,7 @@ class GoogleDriveSyncManager internal constructor(
             removePlaceholders()
             store.resetSyncState()
         }
-        cache = GoogleDriveSyncCache()
+        cache = GoogleDriveSyncCache(replacedRoot = cache.replacedRoot)
         unsupportedFormat = false
         mutableState.value = GoogleDriveSyncState()
         saveCache()
@@ -294,6 +340,8 @@ class GoogleDriveSyncManager internal constructor(
                 }
             } catch (error: CancellationException) {
                 throw error
+            } catch (error: AttachPending) {
+                fileTransferTask?.cancel()
             } catch (error: Exception) {
                 failRun(error)
                 fileTransferTask?.cancel()
@@ -379,6 +427,16 @@ class GoogleDriveSyncManager internal constructor(
         } finally {
             withContext(NonCancellable) { saveCache() }
         }
+        if (cache.replacedRoot) {
+            try {
+                drive.removeReplaced()
+                cache = cache.copy(replacedRoot = false)
+                saveCache()
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+            }
+        }
         return listing.published
     }
 
@@ -447,8 +505,12 @@ class GoogleDriveSyncManager internal constructor(
         return queue
     }
 
+    fun setAttachDismissed(dismissed: Boolean) {
+        mutableState.value = state.value.copy(attachDismissed = dismissed)
+    }
+
     private fun publish() {
-        mutableState.value = state.value.copy(isSyncing = stateTask != null || fileTransferTask != null, queue = queue(), progress = progress)
+        mutableState.value = state.value.copy(isSyncing = stateTask != null || fileTransferTask != null, queue = queue(), progress = progress, attachPending = cache.attachPending)
     }
 
     suspend fun cancelDownload(): Unit = withContext(mainDispatcher) {
@@ -492,6 +554,7 @@ class GoogleDriveSyncManager internal constructor(
             for (change in page.changes) {
                 val file = change.file
                 if (change.removed || file?.parents?.contains(cache.stateFolder) != true) continue
+                if (file.isNewerFormat && file.trashed != true) throw SyncFormatError()
                 file.stateKey?.let { changed[it] = changed[it].orEmpty() + file }
             }
             cursor = page.nextPageToken ?: return RemoteChanges(listed, changed, page.newStartPageToken!!)
@@ -501,7 +564,18 @@ class GoogleDriveSyncManager internal constructor(
     private suspend fun loadLayout() {
         val layout = drive.layout()
         currentCoroutineContext().ensureActive()
-        if (cache.root.isNotEmpty() && cache.root != layout.root) resetConnection()
+        val replaced = cache.root.isNotEmpty() && cache.root != layout.root
+        if (replaced) resetConnection()
+        if (cache.root.isEmpty() && store.hasData()) {
+            val files = drive.children(layout.state)
+            currentCoroutineContext().ensureActive()
+            if (files.any { it.isNewerFormat }) throw SyncFormatError()
+            if ((replaced && !layout.created) || files.any { it.stateKey != null }) {
+                cache = cache.copy(attachPending = true)
+                mutableState.value = state.value.copy(attachDismissed = false)
+                throw AttachPending()
+            }
+        }
         cache = cache.copy(root = layout.root, stateFolder = layout.state, bookFolder = layout.books)
     }
 
@@ -509,6 +583,7 @@ class GoogleDriveSyncManager internal constructor(
         loadLayout()
         val files = drive.children(cache.stateFolder)
         currentCoroutineContext().ensureActive()
+        if (files.any { it.isNewerFormat }) throw SyncFormatError()
         return files.filter { it.stateKey != null }.groupBy { it.stateKey!! }
     }
 

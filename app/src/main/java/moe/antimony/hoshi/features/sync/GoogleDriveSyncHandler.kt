@@ -4,6 +4,10 @@ import java.io.File
 import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
@@ -25,6 +29,7 @@ data class GoogleDriveFile(
 ) {
     val isFolder: Boolean get() = mimeType == "application/vnd.google-apps.folder"
     val isRecent: Boolean get() = runCatching { System.currentTimeMillis() - Instant.parse(createdTime).toEpochMilli() < 86_400_000 }.getOrDefault(false)
+    val isNewerFormat: Boolean get() = name.startsWith(".format-") && (name.drop(8).toIntOrNull() ?: 0) > 1
     val stateKey: String? get() = if (name.endsWith(".json") && !isFolder) name.dropLast(5).syncKey() else null
 }
 
@@ -41,7 +46,7 @@ data class GoogleDriveChanges(
     data class Change(val removed: Boolean, val file: GoogleDriveFile? = null)
 }
 
-data class GoogleDriveLayout(val root: String, val state: String, val books: String)
+data class GoogleDriveLayout(val root: String, val state: String, val books: String, val created: Boolean)
 
 @Singleton
 class GoogleDriveSyncHandler @Inject constructor(private val client: GoogleDriveClient) {
@@ -62,8 +67,30 @@ class GoogleDriveSyncHandler @Inject constructor(private val client: GoogleDrive
     )
 
     suspend fun layout(): GoogleDriveLayout {
-        val root = folder("root", "Hoshi Reader", true)!!
-        return GoogleDriveLayout(root, folder(root, "state", true)!!, folder(root, "books", true)!!)
+        val existing = folder("root", "Hoshi Reader", false)
+        val root = existing ?: createFolder("root", "Hoshi Reader")
+        return GoogleDriveLayout(root, folder(root, "state", true)!!, folder(root, "books", true)!!, existing == null)
+    }
+
+    suspend fun renameRoot() {
+        for (folder in children("root", "Hoshi Reader")) if (folder.isFolder) client.renameFile(folder.id, "Hoshi Reader (replaced)")
+    }
+
+    suspend fun removeReplaced() {
+        for (folder in children("root", "Hoshi Reader (replaced)")) deleteTree(folder.id)
+    }
+
+    private suspend fun deleteTree(id: String) {
+        try {
+            return client.deleteFile(id)
+        } catch (_: GoogleDriveApiException) {
+        }
+        val files = children(id)
+        coroutineScope {
+            val limit = Semaphore(8)
+            for (file in files) launch { limit.withPermit { deleteTree(file.id) } }
+        }
+        client.deleteFile(id)
     }
 
     suspend fun folder(parent: String, name: String, create: Boolean): String? {

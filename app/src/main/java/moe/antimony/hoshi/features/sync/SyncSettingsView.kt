@@ -614,7 +614,15 @@ fun SyncSettingsView(
                     ListItem(
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         headlineContent = { Text(stringResource(R.string.sync_google_drive)) },
-                        supportingContent = { Text(currentAuthStatus.labelText()) },
+                        supportingContent = {
+                            Text(
+                                if (currentSettings.provider == SyncProvider.Gdrive && currentAuthStatus == DriveAuthStatus.Connected && hoshiState.attachPending) {
+                                    stringResource(R.string.sync_status_choice_needed)
+                                } else {
+                                    currentAuthStatus.labelText()
+                                },
+                            )
+                        },
                     )
                     if (currentSettings.provider == SyncProvider.Ttu) {
                         SettingsDivider()
@@ -745,7 +753,13 @@ fun SyncSettingsView(
                             },
                         )
                         SettingsDivider()
-                        TextButton(onClick = { scope.launch { hoshiSync.sync() } }, enabled = !hoshiState.isSyncing) {
+                        TextButton(
+                            onClick = {
+                                hoshiSync.setAttachDismissed(false)
+                                scope.launch { hoshiSync.sync() }
+                            },
+                            enabled = !hoshiState.isSyncing,
+                        ) {
                             Text(stringResource(R.string.sync_now))
                         }
                     }

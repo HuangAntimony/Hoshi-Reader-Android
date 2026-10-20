@@ -907,6 +907,15 @@
     <string name="sync_book_not_uploaded">This book has not been uploaded yet.</string>
     <string name="sync_last_sync">Last Sync</string>
     <string name="sync_now">Sync Now</string>
+    <string name="sync_status_choice_needed">Choice needed</string>
+    <string name="sync_attach_title">Merge Libraries?</string>
+    <string name="sync_attach_message">Google Drive already has a library. Merging combines changes from both libraries.</string>
+    <string name="sync_attach_upload">Upload to Google Drive</string>
+    <string name="sync_attach_download">Download from Google Drive</string>
+    <string name="sync_attach_upload_title">Upload to Google Drive?</string>
+    <string name="sync_attach_download_title">Download from Google Drive?</string>
+    <string name="sync_attach_upload_confirmation">This will permanently delete the library on Google Drive and replace it with the library from this device. Anything not on this device will be lost.</string>
+    <string name="sync_attach_download_confirmation">This will permanently delete the library on this device and replace it with the library from Google Drive. Anything not on Google Drive will be lost.</string>
     <string name="sync_queue">Queue</string>
     <string name="sync_queue_empty">Empty</string>
     <string name="sync_queue_all_synced">All Books Synced</string>

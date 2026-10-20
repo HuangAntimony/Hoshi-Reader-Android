@@ -905,6 +905,15 @@
     <string name="sync_book_not_uploaded">此书籍尚未上传。</string>
     <string name="sync_last_sync">上次同步</string>
     <string name="sync_now">立即同步</string>
+    <string name="sync_status_choice_needed">需要选择</string>
+    <string name="sync_attach_title">合并书库？</string>
+    <string name="sync_attach_message">Google Drive 上已有书库。合并将整合两个书库中的更改。</string>
+    <string name="sync_attach_upload">上传到 Google Drive</string>
+    <string name="sync_attach_download">从 Google Drive 下载</string>
+    <string name="sync_attach_upload_title">上传到 Google Drive？</string>
+    <string name="sync_attach_download_title">从 Google Drive 下载？</string>
+    <string name="sync_attach_upload_confirmation">这将永久删除 Google Drive 上的书库，并替换为此设备上的书库。不在此设备上的内容都将丢失。</string>
+    <string name="sync_attach_download_confirmation">这将永久删除此设备上的书库，并替换为 Google Drive 上的书库。不在 Google Drive 上的内容都将丢失。</string>
     <string name="sync_queue">队列</string>
     <string name="sync_queue_empty">空</string>
     <string name="sync_queue_all_synced">所有书籍已同步</string>
