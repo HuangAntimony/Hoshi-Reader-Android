@@ -50,6 +50,7 @@ import moe.antimony.hoshi.ui.withErrorDetails
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.BuildConfig
+import moe.antimony.hoshi.BuildCommit
 import moe.antimony.hoshi.LocalHoshiUiDependencies
 import moe.antimony.hoshi.R
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -187,13 +188,17 @@ fun AboutScreen(
                         colors = ListItemDefaults.colors(containerColor = hoshiSurfaces.group),
                         headlineContent = { Text("Hoshi Reader") },
                         supportingContent = {
-                            Text(
-                                stringResource(
-                                    R.string.about_version_format,
-                                    BuildConfig.VERSION_NAME,
-                                    BuildConfig.VERSION_CODE,
-                                ),
-                            )
+                            Column {
+                                Text(
+                                    stringResource(
+                                        R.string.about_version_format,
+                                        BuildConfig.VERSION_NAME,
+                                        BuildConfig.VERSION_CODE,
+                                    ),
+                                )
+                                Text(stringResource(R.string.build_commit_format,
+                                    BuildCommit.current?.shortSha ?: stringResource(R.string.diagnostics_unavailable)))
+                            }
                         },
                     )
                 }

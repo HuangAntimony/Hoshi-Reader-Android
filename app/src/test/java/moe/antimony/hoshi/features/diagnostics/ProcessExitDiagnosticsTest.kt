@@ -23,6 +23,7 @@ class ProcessExitDiagnosticsTest {
             packageName = "moe.antimony.hoshi.debug",
             versionName = "0.1.5",
             versionCode = 105,
+            buildCommitSha = "0123456789abcdef0123456789abcdef01234567",
             sdkInt = 35,
             webViewPackageName = "com.google.android.webview",
             webViewVersionName = "125.0.6422.165",
@@ -57,6 +58,8 @@ class ProcessExitDiagnosticsTest {
         assertTrue(text.contains("Hoshi Diagnostics"))
         assertTrue(text.contains("Package: moe.antimony.hoshi.debug"))
         assertTrue(text.contains("Version: 0.1.5 (105)"))
+        assertTrue(text.contains("0123456789abcdef0123456789abcdef01234567"))
+        assertTrue(text.contains("https://github.com/HuangAntimony/Hoshi-Reader-Android/tree/0123456789abcdef0123456789abcdef01234567"))
         assertTrue(text.contains("Android SDK: 35"))
         assertTrue(text.contains("WebView: com.google.android.webview 125.0.6422.165"))
         assertTrue(text.contains("Captured Crash 1"))
@@ -65,6 +68,18 @@ class ProcessExitDiagnosticsTest {
         assertTrue(text.contains("Reason: Java crash"))
         assertTrue(text.contains("Description: FATAL EXCEPTION: main"))
         assertTrue(text.contains("java.lang.IllegalStateException: boom"))
+    }
+
+    @Test
+    fun unknownBuildDoesNotProduceASnapshotLink() {
+        for (sha in listOf(null, "", "unknown", "abcdef0", "../main")) {
+            val report = ProcessExitDiagnosticsReport(
+                packageName = "moe.antimony.hoshi", versionName = "1.4.0",
+                versionCode = 10400, sdkInt = 35, records = emptyList(), buildCommitSha = sha,
+            )
+            assertEquals(null, report.buildCommit)
+            assertFalse(report.toShareText().contains("/tree/"))
+        }
     }
 
     @Test

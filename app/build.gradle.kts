@@ -26,6 +26,20 @@ val releaseAbi = providers.gradleProperty("releaseAbi").getOrElse("arm64-v8a")
 require(releaseAbi in listOf("arm64-v8a", "armeabi-v7a", "x86_64"))
 val releaseVersionName = providers.gradleProperty("releaseVersionName").orNull
 val releaseVersionCode = providers.gradleProperty("releaseVersionCode").orNull?.toIntOrNull()
+val buildCommitSha = providers.gradleProperty("buildCommitSha").orElse(
+    if (rootProject.file(".git").exists()) {
+        providers.exec {
+            workingDir(rootProject.projectDir)
+            commandLine("git", "rev-parse", "HEAD")
+            isIgnoreExitValue = true
+        }.standardOutput.asText.map { it.trim() }
+    } else {
+        providers.provider { "" }
+    }
+).get()
+require(buildCommitSha.isEmpty() || buildCommitSha.matches(Regex("[0-9a-f]{40}"))) {
+    "buildCommitSha must be a full lowercase Git commit SHA."
+}
 if (providers.gradleProperty("releaseVersionCode").isPresent && releaseVersionCode == null) {
     throw GradleException("releaseVersionCode must be an integer.")
 }
@@ -69,6 +83,7 @@ android {
         versionName = "1.4.0"
         releaseVersionCode?.let { versionCode = it }
         releaseVersionName?.let { versionName = it }
+        buildConfigField("String", "BUILD_COMMIT_SHA", "\"$buildCommitSha\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         externalNativeBuild {

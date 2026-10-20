@@ -18,7 +18,7 @@ name: Release APK
         type: boolean
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   resolve-release:
@@ -32,10 +32,12 @@ jobs:
       - name: Resolve release tag
         id: release_tag
         shell: bash
+        env:
+          INPUT_TAG: ${{ inputs.tag_name }}
         run: |
           set -euo pipefail
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            input_tag="${{ inputs.tag_name }}"
+            input_tag="$INPUT_TAG"
           else
             input_tag="${GITHUB_REF_NAME}"
           fi
@@ -59,193 +61,30 @@ jobs:
           } >> "${GITHUB_OUTPUT}"
 
   release-apk:
-    name: Build signed release APK
-    runs-on: ubuntu-latest
+    name: Build signed release APKs
     needs: resolve-release
-    timeout-minutes: 90
+    uses: ./.github/workflows/build-release-apks.yml
+    with:
+      ref: ${{ needs.resolve-release.outputs.tag }}
+      version_name: ${{ needs.resolve-release.outputs.version_name }}
+      version_code: ${{ needs.resolve-release.outputs.version_code }}
+    secrets: inherit
 
-    env:
-      CMAKE_VERSION: "3.31.6"
-      NDK_VERSION: "29.0.14206865"
-      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-      HOSHI_GOOGLE_CLIENT_ID_RELEASE: ${{ secrets.HOSHI_GOOGLE_CLIENT_ID_RELEASE }}
-
+  publish:
+    name: Publish release
+    needs: [resolve-release, release-apk]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      - name: Check Google OAuth configuration
-        shell: bash
-        run: |
-          if [[ -z "${HOSHI_GOOGLE_CLIENT_ID_RELEASE}" ]]; then
-            echo "HOSHI_GOOGLE_CLIENT_ID_RELEASE secret is required." >&2
-            exit 1
-          fi
-
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.resolve-release.outputs.tag }}
-          fetch-depth: 1
-
-      - name: Initialize required submodules
-        shell: bash
-        run: |
-          set -euo pipefail
-          git submodule update --init --recursive third_party/hoshidicts-kotlin-bridge
-          git submodule status --recursive
-
-      - name: Set up JDK
-        uses: actions/setup-java@v4
+          ref: ${{ needs.release-apk.outputs.commit_sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
         with:
-          distribution: temurin
-          java-version: "21"
-
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          packages: platform-tools
-
-      - name: Install Android build tools
-        shell: bash
-        run: |
-          set -euo pipefail
-          sdkmanager \
-            "platforms;android-36.1" \
-            "build-tools;36.0.0" \
-            "cmake;${CMAKE_VERSION}" \
-            "ndk;${NDK_VERSION}"
-          ndk_home="${ANDROID_HOME}/ndk/${NDK_VERSION}"
-          echo "ANDROID_NDK_HOME=${ndk_home}" >> "${GITHUB_ENV}"
-
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
-
-      - name: Restore Cargo cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: app/src/main/rust/hoshiepub
-
-      - name: Install cargo-ndk
-        shell: bash
-        run: |
-          set -euo pipefail
-          if ! command -v cargo-ndk >/dev/null 2>&1; then
-            cargo install cargo-ndk --locked
-          fi
-
-      - name: Restore Gradle cache
-        uses: gradle/actions/setup-gradle@v4
-
-      - name: Decode release keystore
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [[ -z "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]]; then
-            echo "ANDROID_KEYSTORE_BASE64 secret is required." >&2
-            exit 1
-          fi
-          keystore="${RUNNER_TEMP}/hoshi-release-keystore.jks"
-          printf '%s' "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" \
-            | base64 --decode > "${keystore}"
-          echo "ANDROID_KEYSTORE_FILE=${keystore}" >> "${GITHUB_ENV}"
-
-      - name: Warn if Gradle defaults differ from tag
-        shell: bash
-        run: |
-          set -euo pipefail
-          version_name="${{ needs.resolve-release.outputs.version_name }}"
-          version_code="${{ needs.resolve-release.outputs.version_code }}"
-
-          actual_name="$(sed -n 's/^[[:space:]]*versionName[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' app/build.gradle.kts | head -n 1)"
-          actual_code="$(sed -n 's/^[[:space:]]*versionCode[[:space:]]*=[[:space:]]*\([0-9][0-9]*\).*/\1/p' app/build.gradle.kts | head -n 1)"
-
-          if [[ "${actual_name}" != "${version_name}" ]]; then
-            echo "::warning::app/build.gradle.kts versionName=${actual_name}, expected ${version_name}"
-          fi
-
-          if [[ "${actual_code}" != "${version_code}" ]]; then
-            echo "::warning::app/build.gradle.kts versionCode=${actual_code}, expected ${version_code}"
-          fi
-
-      - name: Build and check split release APKs
-        id: assets
-        shell: bash
-        run: |
-          set -euo pipefail
-          tag="${{ needs.resolve-release.outputs.tag }}"
-          version_name="${{ needs.resolve-release.outputs.version_name }}"
-          version_code="${{ needs.resolve-release.outputs.version_code }}"
-          build_tools="${ANDROID_HOME}/build-tools/36.0.0"
-          apk_assets=()
-
-          for abi in arm64-v8a armeabi-v7a; do
-            rm -rf app/build/jniLibs/release app/build/outputs/apk/release
-            ./gradlew --no-daemon clean lintVitalRelease assembleRelease \
-              -PreleaseAbi="${abi}" \
-              -PreleaseVersionName="${version_name}" \
-              -PreleaseVersionCode="${version_code}"
-
-            python3 - <<PY
-          import json
-          from pathlib import Path
-
-          expected_name = "${version_name}"
-          expected_code = int("${version_code}")
-          metadata_path = Path("app/build/outputs/apk/release/output-metadata.json")
-          metadata = json.loads(metadata_path.read_text())
-          element = metadata["elements"][0]
-          actual_name = element["versionName"]
-          actual_code = element["versionCode"]
-
-          if actual_name != expected_name or actual_code != expected_code:
-              raise SystemExit(
-                  f"Release APK metadata mismatch for ${abi}: "
-                  f"versionName={actual_name}, versionCode={actual_code}; "
-                  f"expected versionName={expected_name}, versionCode={expected_code}"
-              )
-          PY
-
-            apk_source="app/build/outputs/apk/release/app-release.apk"
-            apk_asset="Hoshi-Reader-${tag}-${abi}.apk"
-
-            if [[ ! -f "${apk_source}" ]]; then
-              echo "Expected signed APK was not found at ${apk_source}" >&2
-              find app/build/outputs/apk -type f -name '*.apk' -print >&2 || true
-              exit 1
-            fi
-
-            mapfile -t packaged_abis < <(zipinfo -1 "${apk_source}" \
-              | sed -n 's#^lib/\([^/]*\)/.*\.so$#\1#p' \
-              | sort -u)
-            if [[ "${#packaged_abis[@]}" -ne 1 || "${packaged_abis[0]}" != "${abi}" ]]; then
-              echo "Expected only ${abi} native libraries, found: ${packaged_abis[*]:-none}" >&2
-              zipinfo -1 "${apk_source}" | grep '^lib/' >&2 || true
-              exit 1
-            fi
-            zipinfo -1 "${apk_source}" | grep -qx "lib/${abi}/libhoshiepub.so"
-
-            "${build_tools}/apksigner" verify --print-certs "${apk_source}"
-            cp "${apk_source}" "${apk_asset}"
-            apk_assets+=("${apk_asset}")
-            if zipinfo -1 "${apk_source}" | grep -q "libhoshiaudio_jni.so"; then
-              echo "FFmpeg must not be bundled in the base APK" >&2
-              exit 1
-            fi
-          done
-
-          echo "apk_assets=${apk_assets[*]}" >> "${GITHUB_OUTPUT}"
-
-      - name: Verify pinned transcription audio components
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 tools/build-transcription-audio.py --check
-          python3 tools/publish-transcription-components.py \
-            --catalog app/src/main/assets/transcription-audio-runtime.json --remote-check
+          name: signed-release-apks
+          path: release-assets
 
       - name: Generate release notes from CHANGELOG
         shell: bash
@@ -285,7 +124,6 @@ jobs:
         run: |
           set -euo pipefail
           tag="${{ needs.resolve-release.outputs.tag }}"
-          apk_assets="${{ steps.assets.outputs.apk_assets }}"
           prerelease_flag=()
 
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" \
@@ -305,4 +143,4 @@ jobs:
               "${prerelease_flag[@]}"
           fi
 
-          gh release upload "${tag}" ${apk_assets} LICENSE --clobber
+          gh release upload "${tag}" release-assets/*.apk release-assets/LICENSE --clobber

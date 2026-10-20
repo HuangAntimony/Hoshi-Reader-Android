@@ -1,0 +1,219 @@
+---
+name: Build signed APKs
+
+"on":
+  workflow_call:
+    inputs:
+      ref:
+        required: true
+        type: string
+      version_name:
+        default: ""
+        type: string
+      version_code:
+        default: ""
+        type: string
+      preview:
+        default: false
+        type: boolean
+    secrets:
+      HOSHI_GOOGLE_CLIENT_ID_RELEASE:
+        required: true
+      ANDROID_KEYSTORE_BASE64:
+        required: true
+      ANDROID_KEYSTORE_PASSWORD:
+        required: true
+      ANDROID_KEY_ALIAS:
+        required: true
+      ANDROID_KEY_PASSWORD:
+        required: true
+    outputs:
+      commit_sha:
+        value: ${{ jobs.build.outputs.commit_sha }}
+      build_id:
+        value: ${{ jobs.build.outputs.build_id }}
+      built_at:
+        value: ${{ jobs.build.outputs.built_at }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    outputs:
+      commit_sha: ${{ steps.checkout_info.outputs.commit_sha }}
+      build_id: ${{ steps.checkout_info.outputs.build_id }}
+      built_at: ${{ steps.assets.outputs.built_at }}
+    env:
+      CMAKE_VERSION: "3.31.6"
+      NDK_VERSION: "29.0.14206865"
+      HOSHI_GOOGLE_CLIENT_ID_RELEASE: ${{ secrets.HOSHI_GOOGLE_CLIENT_ID_RELEASE }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+    steps:
+      - name: Check Google OAuth configuration
+        shell: bash
+        run: |
+          if [[ -z "${HOSHI_GOOGLE_CLIENT_ID_RELEASE}" ]]; then
+            echo "HOSHI_GOOGLE_CLIENT_ID_RELEASE secret is required." >&2
+            exit 1
+          fi
+
+      - name: Checkout build commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Record checkout commit
+        id: checkout_info
+        run: |
+          echo "commit_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "build_id=${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
+
+      - name: Initialize required submodules
+        shell: bash
+        run: |
+          set -euo pipefail
+          git submodule update --init --recursive third_party/hoshidicts-kotlin-bridge
+          git submodule status --recursive
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Install Android build tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdkmanager \
+            "platforms;android-36.1" \
+            "build-tools;36.0.0" \
+            "cmake;${CMAKE_VERSION}" \
+            "ndk;${NDK_VERSION}"
+          ndk_home="${ANDROID_HOME}/ndk/${NDK_VERSION}"
+          echo "ANDROID_NDK_HOME=${ndk_home}" >> "${GITHUB_ENV}"
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+
+      - name: Restore Cargo cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app/src/main/rust/hoshiepub
+
+      - name: Install cargo-ndk
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v cargo-ndk >/dev/null 2>&1; then
+            cargo install cargo-ndk --locked
+          fi
+
+      - name: Restore Gradle cache
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Decode release keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$KEYSTORE_BASE64" ]]; then
+            echo "ANDROID_KEYSTORE_BASE64 secret is required." >&2
+            exit 1
+          fi
+          keystore="${RUNNER_TEMP}/hoshi-release-keystore.jks"
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$keystore"
+          echo "ANDROID_KEYSTORE_FILE=$keystore" >> "$GITHUB_ENV"
+
+      - name: Build and check split release APKs
+        id: assets
+        env:
+          VERSION_NAME: ${{ inputs.version_name }}
+          VERSION_CODE: ${{ inputs.version_code }}
+          PREVIEW: ${{ inputs.preview }}
+          COMMIT_SHA: ${{ steps.checkout_info.outputs.commit_sha }}
+        run: |
+          set -euo pipefail
+          build_tools="${ANDROID_HOME}/build-tools/36.0.0"
+          version_args=()
+          if [[ -n "$VERSION_NAME" || -n "$VERSION_CODE" ]]; then
+            [[ "$VERSION_NAME" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+            [[ "$VERSION_CODE" =~ ^[0-9]+$ ]]
+            version_args=("-PreleaseVersionName=$VERSION_NAME" "-PreleaseVersionCode=$VERSION_CODE")
+          fi
+          if [[ "$PREVIEW" == true ]]; then
+            prefix="Hoshi-Reader-preview-${COMMIT_SHA:0:7}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          else
+            [[ -n "$VERSION_NAME" && -n "$VERSION_CODE" ]]
+            prefix="Hoshi-Reader-v${VERSION_NAME}"
+          fi
+          mkdir -p release-assets
+          for abi in arm64-v8a armeabi-v7a; do
+            ./gradlew --no-daemon clean lintVitalRelease assembleRelease \
+              "-PreleaseAbi=$abi" "-PbuildCommitSha=$COMMIT_SHA" "${version_args[@]}"
+            ABI="$abi" python3 - <<'PYCODE'
+          import json
+          import os
+          from pathlib import Path
+          import zipfile
+
+          metadata = json.loads(Path("app/build/outputs/apk/release/output-metadata.json").read_text())
+          assert metadata["applicationId"] == "moe.antimony.hoshi", metadata
+          element, = metadata["elements"]
+          if os.environ["VERSION_NAME"]:
+              assert element["versionName"] == os.environ["VERSION_NAME"], element
+              assert element["versionCode"] == int(os.environ["VERSION_CODE"]), element
+          with zipfile.ZipFile("app/build/outputs/apk/release/app-release.apk") as apk:
+              names = apk.namelist()
+              abis = {name.split("/")[1] for name in names if name.startswith("lib/") and name.endswith(".so")}
+              assert abis == {os.environ["ABI"]}, abis
+              assert f"lib/{os.environ['ABI']}/libhoshiepub.so" in names
+              assert not any("libhoshiaudio_jni.so" in name for name in names), "FFmpeg must not be bundled"
+              config = Path("app/build/generated/source/buildConfig/release/moe/antimony/hoshi/BuildConfig.java")
+              if os.environ["PREVIEW"] == "true" or "BUILD_COMMIT_SHA" in config.read_text():
+                  assert any(os.environ["COMMIT_SHA"].encode() in apk.read(name)
+                             for name in names if name.endswith(".dex")), "APK is missing the checkout SHA"
+              else:
+                  print("::warning::Historical formal tag predates build commit metadata; provenance check skipped.")
+          PYCODE
+            "${build_tools}/apksigner" verify --print-certs app/build/outputs/apk/release/app-release.apk
+            cp app/build/outputs/apk/release/app-release.apk "release-assets/${prefix}-${abi}.apk"
+          done
+          cp LICENSE release-assets/LICENSE
+          echo "built_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
+      - name: Verify pinned transcription audio components
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 tools/build-transcription-audio.py --check
+          python3 tools/publish-transcription-components.py \
+            --catalog app/src/main/assets/transcription-audio-runtime.json --remote-check
+
+      - name: Upload checked APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: signed-release-apks
+          path: release-assets/
+          if-no-files-found: error
+          retention-days: 2
+          overwrite: true
+
+      - name: Remove signing keystore
+        if: always()
+        run: rm -f "${RUNNER_TEMP}/hoshi-release-keystore.jks"

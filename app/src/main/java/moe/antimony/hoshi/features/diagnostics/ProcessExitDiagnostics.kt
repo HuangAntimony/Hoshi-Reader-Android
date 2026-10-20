@@ -7,6 +7,7 @@ import android.content.pm.PackageInfo
 import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.webkit.WebViewCompat
+import moe.antimony.hoshi.BuildCommit
 import java.io.File
 import java.io.IOException
 import java.io.PrintWriter
@@ -64,11 +65,22 @@ data class ProcessExitDiagnosticsReport(
     val capturedCrashes: List<CapturedCrashRecord> = emptyList(),
     val nonfatalErrors: List<NonfatalDiagnosticRecord> = emptyList(),
     val records: List<ProcessExitRecord>,
+    val buildCommitSha: String? = null,
 ) {
-    fun toShareText(nonfatalLabels: NonfatalDiagnosticsLabels? = null): String = buildString {
+    internal val buildCommit: BuildCommit? get() = BuildCommit.fromSha(buildCommitSha)
+
+    fun toShareText(
+        nonfatalLabels: NonfatalDiagnosticsLabels? = null,
+        buildCommitLabel: String? = null,
+    ): String = buildString {
         appendLine("Hoshi Diagnostics")
         appendLine("Package: $packageName")
         appendLine("Version: $versionName ($versionCode)")
+        buildCommit?.let { commit ->
+            buildCommitLabel?.let { append("$it: ") }
+            appendLine(commit.sha)
+            appendLine(commit.snapshotUrl)
+        }
         appendLine("Android SDK: $sdkInt")
         appendLine(
             if (webViewPackageName.isNullOrBlank()) {
@@ -176,6 +188,7 @@ fun loadProcessExitDiagnosticsReport(
         packageName = context.packageName,
         versionName = packageInfo.versionName ?: "unknown",
         versionCode = packageInfo.hoshiLongVersionCode(),
+        buildCommitSha = BuildCommit.current?.sha,
         sdkInt = Build.VERSION.SDK_INT,
         webViewPackageName = webViewPackageInfo?.packageName,
         webViewVersionName = webViewPackageInfo?.versionName,

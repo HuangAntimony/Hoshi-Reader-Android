@@ -1,0 +1,6 @@
+# GitHub supports queue: max, but actionlint 1.7.12 does not recognize it yet.
+# https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency
+paths:
+  .github/workflows/android-ci.yml:
+    ignore:
+      - '^unexpected key "queue" for "concurrency" section'

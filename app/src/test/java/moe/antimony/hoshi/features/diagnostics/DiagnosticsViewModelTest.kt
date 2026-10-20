@@ -30,6 +30,42 @@ class DiagnosticsViewModelTest {
     @get:Rule val temporaryFolder = TemporaryFolder()
 
     @Test
+    fun commitLinkOpensFullSnapshotAndPreservesVisibleFailureAndDiagnostics() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        ErrorDiagnosticEvents.buffer.drain()
+        val model = model(load = {
+            report("Runtime error").copy(buildCommitSha = "0123456789abcdef0123456789abcdef01234567")
+        })
+        try {
+            model.reload()
+            runCurrent()
+            var openedUrl: String? = null
+            model.openBuildCommit { openedUrl = it }
+            assertEquals(
+                "https://github.com/HuangAntimony/Hoshi-Reader-Android/tree/0123456789abcdef0123456789abcdef01234567",
+                openedUrl,
+            )
+            val failure = IllegalStateException("No browser handles HTTPS", IOException("Profile policy blocks browser"))
+            model.openBuildCommit { throw failure }
+            val message = model.state.value.linkError!!.resolve({ _, _ -> "Unable to open source snapshot" }, { _, _, _ -> "" })
+            assertTrue(message.contains("Unable to open source snapshot"))
+            assertTrue(message.contains("No browser handles HTTPS"))
+            assertTrue(message.contains("Profile policy blocks browser"))
+            assertSame(failure, ErrorDiagnosticEvents.buffer.drain().single().error)
+            model.dismissLinkError()
+            assertNull(model.state.value.linkError)
+            val cancelled = kotlinx.coroutines.CancellationException("Screen closed")
+            assertSame(cancelled, runCatching { model.openBuildCommit { throw cancelled } }.exceptionOrNull())
+            assertNull(model.state.value.linkError)
+            assertTrue(ErrorDiagnosticEvents.buffer.drain().isEmpty())
+        } finally {
+            model.viewModelScope.coroutineContext.job.cancelAndJoin()
+            ErrorDiagnosticEvents.buffer.drain()
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
     fun newerReloadWinsOverOldSuccessAndExportsLatestRuntimeAndCrashHistory() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val pendingReload = CompletableDeferred<ProcessExitDiagnosticsReport>()

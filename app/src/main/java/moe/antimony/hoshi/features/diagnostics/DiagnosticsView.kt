@@ -2,6 +2,7 @@ package moe.antimony.hoshi.features.diagnostics
 
 import moe.antimony.hoshi.ui.theme.hoshiSurfaces
 import android.content.Intent
+import android.net.Uri
 import android.content.ClipData
 import androidx.core.content.FileProvider
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -53,6 +54,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
@@ -112,12 +114,18 @@ fun DiagnosticsView(
             },
         )
     }
-    operationError?.let { message ->
+    (operationError ?: state.linkError?.asString())?.let { message ->
         HoshiAlertDialog(
-            onDismissRequest = { operationError = null },
+            onDismissRequest = {
+                operationError = null
+                viewModel.dismissLinkError()
+            },
             text = { ErrorDetailsText(message) },
             confirmButton = {
-                TextButton(onClick = { operationError = null }) { Text(stringResource(R.string.action_ok)) }
+                TextButton(onClick = {
+                    operationError = null
+                    viewModel.dismissLinkError()
+                }) { Text(stringResource(R.string.action_ok)) }
             },
         )
     }
@@ -144,7 +152,8 @@ fun DiagnosticsView(
             },
         )
     }
-    val shareText = remember(report, locale) { report?.toShareText(nonfatalLabels).orEmpty() }
+    val buildCommitLabel = stringResource(R.string.build_commit)
+    val shareText = remember(report, locale) { report?.toShareText(nonfatalLabels, buildCommitLabel).orEmpty() }
     BackHandler(onBack = onClose)
     val saveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
         if (uri == null || shareText.isBlank()) return@rememberLauncherForActivityResult
@@ -238,6 +247,19 @@ fun DiagnosticsView(
                                 GroupDivider()
                                 DiagnosticsInfoRow(stringResource(R.string.diagnostics_version_code), report.versionCode.toString())
                                 GroupDivider()
+                                val commit = report.buildCommit
+                                DiagnosticsInfoRow(
+                                    stringResource(R.string.build_commit),
+                                    commit?.shortSha ?: stringResource(R.string.diagnostics_unavailable),
+                                    onClick = commit?.let {
+                                        {
+                                            viewModel.openBuildCommit { url ->
+                                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                                            }
+                                        }
+                                    },
+                                )
+                                GroupDivider()
                                 DiagnosticsInfoRow(stringResource(R.string.diagnostics_android_sdk), report.sdkInt.toString())
                             }
                             Spacer(Modifier.height(24.dp))
@@ -306,13 +328,20 @@ fun DiagnosticsView(
 }
 
 @Composable
-private fun DiagnosticsInfoRow(label: String, value: String) {
-    Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+private fun DiagnosticsInfoRow(label: String, value: String, onClick: (() -> Unit)? = null) {
+    Row(Modifier.fillMaxWidth().then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+        .padding(16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         Text(label, Modifier.weight(0.35f), style = MaterialTheme.typography.bodyMedium)
-        SelectionContainer(Modifier.weight(0.65f)) {
-            Text(value, Modifier.fillMaxWidth(), style = MaterialTheme.typography.bodyMedium,
-                color = hoshiSurfaces.muted, textAlign = TextAlign.End,
+        if (onClick != null) {
+            Text(value, Modifier.weight(0.65f), style = MaterialTheme.typography.bodyMedium,
+                color = Color(0xFF2196F3), textAlign = TextAlign.End,
                 maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
+        } else {
+            SelectionContainer(Modifier.weight(0.65f)) {
+                Text(value, Modifier.fillMaxWidth(), style = MaterialTheme.typography.bodyMedium,
+                    color = hoshiSurfaces.muted, textAlign = TextAlign.End,
+                    maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
+            }
         }
     }
 }

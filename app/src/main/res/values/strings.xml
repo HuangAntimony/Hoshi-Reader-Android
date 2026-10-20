@@ -636,6 +636,9 @@
     <string name="diagnostics_share">Share Diagnostics</string>
     <string name="diagnostics_share_subject">Hoshi diagnostics</string>
     <string name="about_version_format">Version %1$s (%2$d)</string>
+    <string name="build_commit">Build commit</string>
+    <string name="build_commit_format">Build commit: %1$s</string>
+    <string name="diagnostics_open_snapshot_failed">Unable to open the source snapshot</string>
     <string name="about_github_body">If you like this app, consider starring the project on GitHub.</string>
     <string name="about_storage_cleanup">Storage Cleanup</string>
     <string name="about_storage_cleanup_confirm_title">Clean Up Storage</string>

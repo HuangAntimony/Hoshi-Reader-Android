@@ -76,6 +76,16 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   selecting a record opens its selectable detail dialog, without nested list
   scrolling. Save/share always use
   the complete report from either overview or record list.
+- Build provenance comes from the `buildCommitSha` Gradle property in CI and Git
+  HEAD for local checkouts, exposed as `BuildConfig.BUILD_COMMIT_SHA`. Source
+  archives without Git metadata report it as unavailable. About shows the short
+  commit; Diagnostics links it to the full-SHA GitHub source snapshot and includes
+  the full SHA and URL in exported reports.
+- Formal tag releases and post-CI main previews share the signed APK build
+  workflow. APK previews use unique `apk-preview-<sha>-<run>-<attempt>` annotated
+  tags and prereleases, publishing verified ARM APKs before retiring previous
+  workflow-owned previews. App updates continue to use only the latest full
+  GitHub release; optional transcription component releases are independent.
 - Settings and small persisted preferences are stored behind DataStore-backed
   repositories.
 - Persisted settings controls are composed through the required

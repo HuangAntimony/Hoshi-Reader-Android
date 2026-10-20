@@ -40,6 +40,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   and copy or export them with crash history.
   Show app/WebView information on the Diagnostics overview with separate entries
   for crash, error and process-exit records, opening full details from compact lists.
+  Show the build commit in Diagnostics with a link to its source snapshot, include
+  the full commit in exported reports, and display the short commit in About.
   Input validation, including unfinished regex replacement drafts, stays inline
   without entering runtime error history.
 - Add Disable Button After Mining under Anki's Allow Duplicates: disable each term/format

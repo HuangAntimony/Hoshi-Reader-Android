@@ -46,6 +46,7 @@ internal class DiagnosticsRepository @Inject constructor(
 internal data class DiagnosticsUiState(
     val report: ProcessExitDiagnosticsReport? = null,
     val loadError: UiText? = null,
+    val linkError: UiText? = null,
 )
 
 @HiltViewModel
@@ -84,4 +85,21 @@ internal class DiagnosticsViewModel internal constructor(
 
     suspend fun shareFile(text: String): File = shareReport(text)
     suspend fun save(uri: Uri, text: String) = saveReport(uri, text)
+
+    fun openBuildCommit(openUrl: (String) -> Unit) {
+        val commit = _state.value.report?.buildCommit ?: return
+        try {
+            openUrl(commit.snapshotUrl)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            _state.update {
+                it.copy(linkError = UiText.Resource(R.string.diagnostics_open_snapshot_failed).withErrorDetails(error))
+            }
+        }
+    }
+
+    fun dismissLinkError() {
+        _state.update { it.copy(linkError = null) }
+    }
 }

@@ -81,6 +81,8 @@ jobs:
       - name: Test, lint, and assemble debug APK
         shell: bash
         run: |
+          python3 -m pip install -r tools/tests/requirements.txt
+          python3 -m unittest discover -s tools/tests -p 'test_*.py'
           python3 tools/build-transcription-audio.py --check
           ./gradlew --no-daemon --stacktrace \
             "-Dorg.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8" \
@@ -97,3 +99,50 @@ jobs:
             app/build/reports/lint-results-debug.*
           if-no-files-found: ignore
           retention-days: 7
+
+  preview-apks:
+    name: Build preview APKs
+    needs: test-and-lint
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'HuangAntimony/Hoshi-Reader-Android'
+    concurrency:
+      # An older commit's slow tests must not cancel a newer commit's build.
+      group: preview-apk-build-${{ github.sha }}
+      cancel-in-progress: true
+    uses: ./.github/workflows/build-release-apks.yml
+    with:
+      ref: ${{ github.sha }}
+      preview: true
+    secrets: inherit
+
+  publish-preview:
+    name: Publish rolling preview
+    needs: preview-apks
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    concurrency:
+      group: preview-apk-publish
+      cancel-in-progress: false
+      queue: max
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.preview-apks.outputs.commit_sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: signed-release-apks
+          path: release-assets
+      - name: Publish only if this commit is still main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMIT_SHA: ${{ needs.preview-apks.outputs.commit_sha }}
+          BUILD_ID: ${{ needs.preview-apks.outputs.build_id }}
+          BUILT_AT: ${{ needs.preview-apks.outputs.built_at }}
+        run: |
+          python3 tools/publish-preview.py \
+            --directory release-assets --sha "$COMMIT_SHA" \
+            --build-id "$BUILD_ID" \
+            --built-at "$BUILT_AT" \
+            --run-url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"

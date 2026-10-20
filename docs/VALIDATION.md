@@ -40,6 +40,27 @@ filters, signing, native packaging, or other release packaging behavior:
 ./gradlew :app:assembleRelease
 ```
 
+For release workflow or preview publisher changes, run `actionlint`, install the Python test
+dependencies with `python3 -m pip install -r tools/tests/requirements.txt`, then run
+`python3 -m unittest discover -s tools/tests -p 'test_*.py'`.
+The narrow actionlint configuration exception covers GitHub's `queue: max`,
+which actionlint 1.7.12 does not yet recognize; the concurrency configuration is
+also checked by the Python tests. Signed APK builds
+must verify both ARM ABIs, the release package/version/signature, embedded checkout
+SHA, and pinned transcription component downloads. Historical formal tags that
+predate build commit metadata may omit the embedded SHA; previews must always
+include it. Preview publication runs only
+after successful push-to-main CI. Each build owns an annotated
+`apk-preview-<short-sha>-<run-id>-<attempt>` tag and a new prerelease, both marked
+`<!-- hoshi-apk-preview -->`. Upload and verify both APKs before publishing, then
+remove previous owned previews and tags. Failure before publication preserves the
+previous downloadable build; a cleanup retry must preserve the new build.
+Check stale commits, incomplete drafts, corrupt uploads, cleanup failures and
+unrelated releases/tags in publisher tests. Never use broad prerelease cleanup:
+formal releases and optional transcription components must remain untouched.
+After the first main push, verify that exactly one published APK preview remains
+and `/releases/latest` still returns the formal release.
+
 For `minSdk` changes, validate both the newly admitted Android version when
 available and an existing supported Android 9+ device path. Preserve app data
 for existing-user checks, compare release APK structure when packaging output
@@ -216,8 +237,11 @@ settings on a device without Play Services.
 - Open Diagnostics immediately after a runtime failure, then reopen after an
   app restart: the operation, time and original cause/stack must remain. The
   overview must show single-line app/WebView metadata values with separate
-  crash, error and process-exit entries (including independent empty states);
-  each list has one scroll surface and opens selectable full details on tap.
+  crash, error and process-exit entries (including independent empty states).
+  The build commit opens the matching full-SHA GitHub source snapshot. About shows
+  the same short commit without a link; exported diagnostics include the full SHA
+  and snapshot URL. Missing build provenance must not create an invalid link.
+  Each list has one scroll surface and opens selectable full details on tap.
   Return from each list and confirm its navigation state. Save and open Share
   without selecting a recipient from the overview and any record list; exported
   text must include

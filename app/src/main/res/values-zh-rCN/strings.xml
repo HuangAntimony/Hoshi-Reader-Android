@@ -634,6 +634,9 @@
     <string name="diagnostics_share">分享诊断信息</string>
     <string name="diagnostics_share_subject">Hoshi 诊断信息</string>
     <string name="about_version_format">版本 %1$s（%2$d）</string>
+    <string name="build_commit">构建提交</string>
+    <string name="build_commit_format">构建提交：%1$s</string>
+    <string name="diagnostics_open_snapshot_failed">无法打开源码快照</string>
     <string name="about_github_body">如果你喜欢这个应用，可以考虑在 GitHub 上给项目点星。</string>
     <string name="about_storage_cleanup">存储清理</string>
     <string name="about_storage_cleanup_confirm_title">清理存储</string>
