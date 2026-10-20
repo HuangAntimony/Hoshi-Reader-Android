@@ -46,24 +46,6 @@ val hostLibExtension = when {
     else -> "so"
 }
 
-// Test-only upstream reference, with AGP-managed task dependencies for packaging and lint.
-abstract class CopyIosPopupTestCss : DefaultTask() {
-    @get:InputFile abstract val referenceCss: RegularFileProperty
-    @get:OutputDirectory abstract val outputDirectory: DirectoryProperty
-    @TaskAction fun copyCss() {
-        val destination = outputDirectory.file("popup.css").get().asFile
-        destination.parentFile.mkdirs()
-        referenceCss.get().asFile.copyTo(destination, overwrite = true)
-    }
-}
-val copyIosPopupTestCss by tasks.registering(CopyIosPopupTestCss::class) {
-    referenceCss.set(rootProject.layout.projectDirectory.file("reference/Hoshi-Reader-iOS/Features/Popup/popup.css"))
-    outputDirectory.set(layout.buildDirectory.dir("generated/iosPopupTestAssets"))
-}
-androidComponents.onVariants { variant ->
-    variant.androidTest?.sources?.assets?.addGeneratedSourceDirectory(copyIosPopupTestCss, CopyIosPopupTestCss::outputDirectory)
-}
-
 android {
     namespace = "moe.antimony.hoshi"
     ndkVersion = "29.0.14206865"

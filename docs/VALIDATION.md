@@ -374,10 +374,13 @@ panels, dialogs, menus, and Process Text lookup:
   backgrounds alone is insufficient: Chromium paints an opaque canvas when the
   two schemes differ. Compare the visible page with the surrounding App surface.
 - `LookupPopupThemeWebViewTest` uses actual Chromium computed styles/pixels, the
-  reference iOS stylesheet supplied only to the test APK (initialize the pinned
-  `reference/Hoshi-Reader-iOS` submodule first), and copied user media-query
-  CSS. It covers App/native disagreement, E-ink, dictionary cascade isolation and
-  `--popup-scale` at 0.8/1/2. `ReaderNativePopupThemeTest` checks native popup roles
+  tracked `app/src/androidTest/assets/ios-reference/popup.css` fixture supplied
+  only to the test APK, and copied user media-query CSS. CI and Android builds
+  must not require an initialized iOS reference checkout. The fixture README
+  records its source commit and checksum; when adopting upstream popup palette
+  changes, update the fixture and its provenance together and rerun the rendered
+  color contract. It covers App/native disagreement, E-ink, dictionary cascade
+  isolation and `--popup-scale` at 0.8/1/2. `ReaderNativePopupThemeTest` checks native popup roles
   and dismissal. Build `:app:assembleDebugAndroidTest`, install both APKs with
   `adb install -r`, invoke these classes with `am instrument -w -r -e class`, and
   require `OK`, never just a successful shell exit.

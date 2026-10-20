@@ -104,7 +104,7 @@ class LookupPopupThemeWebViewTest {
     }
 
     @Test fun iosSemanticColorContractUsesRenderedReferenceCss() {
-        val css = InstrumentationRegistry.getInstrumentation().context.assets.open("popup.css").bufferedReader().use { it.readText() }
+        val css = InstrumentationRegistry.getInstrumentation().context.assets.open("ios-reference/popup.css").bufferedReader().use { it.readText() }
         for (dark in listOf(false, true)) {
             lateinit var reference: JSONObject
             withPopup(dark, dark, referenceCss = css) { web ->
