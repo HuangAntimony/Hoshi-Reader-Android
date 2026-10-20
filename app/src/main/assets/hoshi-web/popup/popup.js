@@ -2590,19 +2590,6 @@ window.setHoshiPopupTheme = ({darkMode, eInkMode}) => {
 };
 
 function applyHoshiPopupThemeOverrides(root = document) {
-    const colorScheme = document.documentElement.dataset.hoshiColorScheme;
-    const buttonColor = colorScheme === 'dark' ? 'rgba(235, 235, 245, 0.92)' : 'rgba(60, 60, 67, 0.86)';
-    const eInk = document.documentElement.dataset.hoshiEinkMode === 'true';
-    // E Ink's existing gray tint is intentional; ordinary defaults belong in CSS.
-    root.querySelectorAll('button.button-slot').forEach(button => {
-        if (eInk) {
-            button.style.setProperty('color', buttonColor, 'important');
-            button.dataset.hoshiEinkTint = 'true';
-        } else if (button.dataset.hoshiEinkTint === 'true') {
-            button.style.removeProperty('color');
-            delete button.dataset.hoshiEinkTint;
-        }
-    });
     root.querySelectorAll('canvas.gloss-image').forEach(canvas => canvas.hoshiRedraw?.());
 }
 

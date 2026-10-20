@@ -160,12 +160,11 @@ button.button-slot {
     -webkit-tap-highlight-color: transparent;
 }
 
-button.button-slot:active {
+button.button-slot:not(:disabled):active {
     background: rgba(128, 128, 128, 0.16);
 }
 
 button.button-slot:disabled {
-    opacity: 0.38;
     cursor: default;
 }
 

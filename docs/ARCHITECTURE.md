@@ -514,6 +514,9 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   overrides. Default palette selectors use `:where` so dictionary/user CSS can
   override variables. Dictionary styles target `:where(div)[data-dictionary]`;
   default text colors never override custom colors with `!important`.
+  Entry action buttons share opaque black/white enabled colors and gray disabled
+  colors in all display modes, selected by CSS `:disabled`; JavaScript owns
+  availability and icons without injecting button colors.
   `setPopupTheme` is sent before initial content and on appearance changes;
   the iframe URL excludes brightness/E-ink state and includes the shared asset
   version. Pure theme changes retain DOM, scroll, history and audio candidate

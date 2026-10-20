@@ -22,7 +22,8 @@
         --danger-color-transparent25: rgba(200, 60, 40, 0.25);
         --success-color: #51ab30;
         --pronunciation-annotation-color: #000000;
-        --hoshi-button-color: rgba(60, 60, 67, 0.86);
+        --hoshi-button-color: #000;
+        --hoshi-button-disabled-color: #999;
     color-scheme: light;
     --hoshi-monochrome-filter: brightness(0);
 }
@@ -45,12 +46,14 @@
         --danger-color-transparent25: rgba(221, 103, 85, 0.25);
         --success-color: #75cf54;
         --pronunciation-annotation-color: #ffffff;
-        --hoshi-button-color: rgba(235, 235, 245, 0.92);
+        --hoshi-button-color: #fff;
+        --hoshi-button-disabled-color: #666;
     color-scheme: dark;
     --hoshi-monochrome-filter: brightness(0) invert(1);
 }
 
 :where(button.button-slot) { color: var(--hoshi-button-color); }
+:where(button.button-slot:disabled) { color: var(--hoshi-button-disabled-color); }
 .overlay { background: #eee; color: var(--text-color); }
 :where(html[data-hoshi-color-scheme="dark"]) .overlay { background: #222; }
 :where(html[data-hoshi-color-scheme="dark"]) .audio-candidate-menu {
@@ -124,11 +127,9 @@ html[data-hoshi-eink-mode="true"] .frequency-values {
 html[data-hoshi-eink-mode="true"] .button-slot {
     border-radius: 0 !important;
     background-color: transparent !important;
-    color: #000 !important;
-    opacity: 1 !important;
 }
 
-html[data-hoshi-eink-mode="true"] .button-slot:active {
+html[data-hoshi-eink-mode="true"] .button-slot:not(:disabled):active {
     background-color: #fff !important;
     outline: 1px solid #000 !important;
     outline-offset: -1px !important;
@@ -199,14 +200,14 @@ html[data-hoshi-color-scheme="dark"][data-hoshi-eink-mode="true"] .frequency-dic
 }
 
 html[data-hoshi-color-scheme="dark"][data-hoshi-eink-mode="true"] .frequency-values,
-html[data-hoshi-color-scheme="dark"][data-hoshi-eink-mode="true"] .button-slot,
 html[data-hoshi-color-scheme="dark"][data-hoshi-eink-mode="true"] .audio-candidate-menu,
 html[data-hoshi-color-scheme="dark"][data-hoshi-eink-mode="true"] .overlay {
     background-color: #000 !important;
     color: #fff !important;
 }
 
-html[data-hoshi-color-scheme="dark"][data-hoshi-eink-mode="true"] .button-slot:active {
+html[data-hoshi-color-scheme="dark"][data-hoshi-eink-mode="true"] .button-slot:not(:disabled):active {
+    background-color: #000 !important;
     outline: 1px solid #fff !important;
 }
 

@@ -1,14 +1,21 @@
 package moe.antimony.hoshi.features.dictionary
 
 import android.content.res.Configuration
+import android.os.SystemClock
 import android.view.ContextThemeWrapper
+import android.view.MotionEvent
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import moe.antimony.hoshi.webview.applyHoshiWebViewSecurityDefaults
 import org.json.JSONObject
 import org.junit.Assert.*
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.util.concurrent.CountDownLatch
@@ -17,6 +24,8 @@ import java.util.concurrent.TimeUnit
 /** Real Chromium CSS/media queries. Synthetic content; never writes user settings or dictionaries. */
 @RunWith(AndroidJUnit4::class)
 class LookupPopupThemeWebViewTest {
+    @get:Rule val compose = createComposeRule()
+
     @Test fun transparentIframeMatchesItsEmbeddingColorSchemeAcrossThemeChanges() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val assets = LookupPopupAssets.load(context)
@@ -85,7 +94,7 @@ class LookupPopupThemeWebViewTest {
                 assertEquals(label, "rgba(0, 0, 0, 0)", result.getString("body"))
                 assertEquals(label, result.getString("table"), result.getString("forms"))
                 assertEquals(label, result.getString("text"), result.getString("formsText"))
-                assertEquals(label, if (appDark) "rgba(235, 235, 245, 0.92)" else "rgba(60, 60, 67, 0.86)", result.getString("button"))
+                assertEquals(label, if (appDark) "rgb(255, 255, 255)" else "rgb(0, 0, 0)", result.getString("button"))
                 if (eInk) {
                     assertEquals(label, if (appDark) "rgb(0, 0, 0)" else "rgb(255, 255, 255)", result.getString("overlay"))
                     assertEquals(label, if (appDark) "rgb(255, 255, 255)" else "rgb(0, 0, 0)", result.getString("frequency"))
@@ -242,6 +251,7 @@ class LookupPopupThemeWebViewTest {
                         const entry = document.createElement('div');
                         entry.dataset.entryIndex = String(n);
                         entry.innerHTML = '<button class="button-slot">audio</button><canvas class="gloss-image"></canvas>';
+                        entry.querySelector('button').disabled = n % 2 === 1;
                         container.append(entry);
                         renderDefinitionImageToCanvas(entry.querySelector('canvas'), source, 1, 1, 'monochrome');
                     }
@@ -258,22 +268,143 @@ class LookupPopupThemeWebViewTest {
             """)
             for (n in 0 until 8) {
                 assertEquals("history canvas $n", "255,255,255,255", result.getJSONArray("pixels").getString(n))
-                assertEquals("history button $n", "rgba(235, 235, 245, 0.92)", result.getJSONArray("buttons").getString(n))
+                assertEquals("history button $n", if (n % 2 == 0) "rgb(255, 255, 255)" else "rgb(102, 102, 102)", result.getJSONArray("buttons").getString(n))
             }
         }
     }
 
-    @Test fun ordinaryButtonCssOverridesDefaultsButEInkTintIsPreserved() {
-        withPopup(false, false, customCss = "button.button-slot { color: rgb(22, 44, 66); }") { web ->
-            for (eInk in listOf(false, true, false)) {
+    @Test fun customButtonColorsSurviveThemeAndEInkSwitches() {
+        for (customCss in listOf(
+            "body { --hoshi-button-color: #162c42; --hoshi-button-disabled-color: #445566; }",
+            "button.button-slot { color: #162c42; } button.button-slot:disabled { color: #445566; }",
+        )) withPopup(false, false, customCss = customCss) { web ->
+            for (dark in listOf(false, true, false)) for (eInk in listOf(false, true, false)) {
                 val result = evaluate(web, """
                     (() => {
-                        if (!document.querySelector('button.button-slot')) document.body.insertAdjacentHTML('beforeend', '<button class="button-slot">audio</button>');
-                        window.setHoshiPopupTheme({darkMode:false, eInkMode:$eInk});
-                        return {color:getComputedStyle(document.querySelector('button.button-slot')).color};
+                        if (!document.querySelector('button.button-slot')) document.body.insertAdjacentHTML('beforeend', '<button class="button-slot">audio</button><button class="button-slot" disabled>mine</button>');
+                        window.setHoshiPopupTheme({darkMode:$dark, eInkMode:$eInk});
+                        return {enabled:getComputedStyle(document.querySelector('button:enabled')).color,
+                            disabled:getComputedStyle(document.querySelector('button:disabled')).color};
                     })()
                 """)
-                assertEquals(if (eInk) "rgba(60, 60, 67, 0.86)" else "rgb(22, 44, 66)", result.getString("color"))
+                assertEquals("rgb(22, 44, 66)", result.getString("enabled"))
+                assertEquals("rgb(68, 85, 102)", result.getString("disabled"))
+            }
+        }
+    }
+
+    @Test fun buttonAvailabilityRemainsDistinctAcrossThemesAndScale() {
+        for (nativeDark in listOf(false, true)) for (scale in listOf(0.8, 1.0, 2.0)) {
+            withPopup(nativeDark, false, scale = scale) { web ->
+                evaluate(web, """
+                    (() => {
+                        window.themeButtons = [];
+                        const container = document.getElementById('entries-container');
+                        for (const icon of ['square', 'circle', 'diamond', 'square-small', 'circle-small', 'diamond-small']) {
+                            for (const state of ['default', 'duplicate']) for (const enabled of [true, false]) {
+                                const button = createButtonSlot('mine', 0, enabled, icon, icon);
+                                updateButtonSlot(button, {state, enabled});
+                                themeButtons.push(button);
+                            }
+                        }
+                        for (const kind of ['audio', 'notes']) for (const enabled of [true, false]) {
+                            themeButtons.push(createButtonSlot(kind, 0, enabled));
+                        }
+                        container.append(...themeButtons);
+                        return {};
+                    })()
+                """)
+                for (dark in listOf(false, true, false)) for (eInk in listOf(false, true, false)) {
+                    val result = evaluate(web, """
+                        (() => {
+                            window.setHoshiPopupTheme({darkMode:$dark, eInkMode:$eInk});
+                            return {buttons:themeButtons.map(button => {
+                                const css = getComputedStyle(button), icon = getComputedStyle(button.firstElementChild);
+                                return {enabled:!button.disabled, kind:button.dataset.kind, color:css.color,
+                                    opacity:css.opacity, iconColor:icon.backgroundColor, iconOpacity:icon.opacity,
+                                    width:button.getBoundingClientRect().width, background:css.backgroundColor};
+                            })};
+                        })()
+                    """)
+                    val buttons = result.getJSONArray("buttons")
+                    assertEquals(28, buttons.length())
+                    for (index in 0 until buttons.length()) {
+                        val button = buttons.getJSONObject(index)
+                        val label = "native=$nativeDark dark=$dark eink=$eInk scale=$scale button=$index $button"
+                        val expectedColor = if (button.getBoolean("enabled")) {
+                            if (dark) "rgb(255, 255, 255)" else "rgb(0, 0, 0)"
+                        } else {
+                            if (dark) "rgb(102, 102, 102)" else "rgb(153, 153, 153)"
+                        }
+                        assertEquals(label, expectedColor, button.getString("color"))
+                        assertEquals(label, expectedColor, button.getString("iconColor"))
+                        assertEquals(label, "1", button.getString("opacity"))
+                        assertEquals(label, "1", button.getString("iconOpacity"))
+                        assertEquals(label, "rgba(0, 0, 0, 0)", button.getString("background"))
+                        assertEquals(label, (if (button.getString("kind") == "notes") 14 else 28) * scale,
+                            button.getDouble("width"), 0.1)
+                    }
+                }
+            }
+        }
+    }
+
+    @Test fun pressedButtonsKeepTheirIconVisibleAndDisabledButtonsHaveNoFeedback() {
+        withPopup(false, false) { web ->
+            compose.setContent { AndroidView(factory = { web }, modifier = Modifier.fillMaxSize()) }
+            compose.waitForIdle()
+            evaluate(web, """
+                (() => {
+                    window.pressedButton = createButtonSlot('mine', 0, true);
+                    document.getElementById('entries-container').append(pressedButton);
+                    return {};
+                })()
+            """)
+            for (dark in listOf(false, true)) for (eInk in listOf(false, true)) for (enabled in listOf(true, false)) {
+                val point = evaluate(web, """
+                    (() => {
+                        window.setHoshiPopupTheme({darkMode:$dark, eInkMode:$eInk});
+                        updateButtonSlot(pressedButton, {enabled:$enabled});
+                        const rect = pressedButton.getBoundingClientRect();
+                        return {x:rect.x + rect.width / 2, y:rect.y + rect.height / 2, viewport:innerWidth};
+                    })()
+                """)
+                val ratio = web.width / point.getDouble("viewport")
+                val downTime = SystemClock.uptimeMillis()
+                fun touch(action: Int) {
+                    InstrumentationRegistry.getInstrumentation().runOnMainSync {
+                        val event = MotionEvent.obtain(downTime, SystemClock.uptimeMillis(), action,
+                            (point.getDouble("x") * ratio).toFloat(), (point.getDouble("y") * ratio).toFloat(), 0)
+                        try { web.dispatchTouchEvent(event) } finally { event.recycle() }
+                    }
+                }
+                touch(MotionEvent.ACTION_DOWN)
+                try {
+                    val deadline = SystemClock.uptimeMillis() + 3000
+                    var result: JSONObject
+                    do {
+                        result = evaluate(web, """
+                            (() => {
+                                const css = getComputedStyle(pressedButton);
+                                return {active:pressedButton.matches(':active'), color:css.color,
+                                    background:css.backgroundColor, outline:css.outlineStyle};
+                            })()
+                        """)
+                        if (result.getBoolean("active")) break
+                        SystemClock.sleep(20)
+                    } while (SystemClock.uptimeMillis() < deadline && enabled)
+                    val label = "dark=$dark eink=$eInk enabled=$enabled $result"
+                    if (enabled) {
+                        assertTrue(label, result.getBoolean("active"))
+                        assertEquals(label, if (dark) "rgb(255, 255, 255)" else "rgb(0, 0, 0)", result.getString("color"))
+                        assertEquals(label, if (eInk) {
+                            if (dark) "rgb(0, 0, 0)" else "rgb(255, 255, 255)"
+                        } else "rgba(128, 128, 128, 0.16)", result.getString("background"))
+                    } else {
+                        assertEquals(label, "rgba(0, 0, 0, 0)", result.getString("background"))
+                        assertEquals(label, "none", result.getString("outline"))
+                    }
+                } finally { touch(MotionEvent.ACTION_CANCEL) }
             }
         }
     }

@@ -363,7 +363,12 @@ panels, dialogs, menus, and Process Text lookup:
   Repeat foreground/background system changes and cold entry through Main and
   external Process Text. Native text toolbar/highlight palette may close; Compose
   dialogs, reading position, lookup DOM/scroll/history and audio selection persist.
-  E-ink lookup button gray tint is intentionally retained.
+  Entry action buttons share opaque enabled/disabled colors in both display modes:
+  light uses `#000000` / `#999999`, dark uses `#ffffff` / `#666666`. Verify all
+  format icons/sizes, audio and note search, including duplicates with Allow
+  Duplicates on/off, pending mining and failure recovery. Availability controls
+  tint independently of the duplicate icon; disabled buttons have no pressed
+  feedback. Check custom button CSS, history restoration, and scale 0.8/1/2.
   For transparent lookup pages, also verify the embedding iframe's `color-scheme`
   matches its document after light/dark switches. Checking computed transparent
   backgrounds alone is insufficient: Chromium paints an opaque canvas when the
