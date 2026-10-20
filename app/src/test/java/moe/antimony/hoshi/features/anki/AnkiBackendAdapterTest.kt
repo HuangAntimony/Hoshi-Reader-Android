@@ -1,6 +1,7 @@
 package moe.antimony.hoshi.features.anki
 
 import android.content.Intent
+import moe.antimony.hoshi.ui.diagnosticMessage
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -9,6 +10,18 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AnkiBackendAdapterTest {
+    @Test
+    fun unreadableModelAggregationKeepsTheOriginalProviderCause() {
+        val backend = AnkiDroidBackendAdapter(FakeAnkiContentApi(
+            fieldError = AnkiFetchException(AnkiFetchFailure.ModelFieldsUnavailable, cause = java.io.IOException("collection database is locked")),
+        ))
+
+        val error = assertAnkiFetchFailure(AnkiFetchFailure.ModelFieldsUnavailable) { backend.fetchNoteTypes() }
+
+        assertTrue(error.message.contains("Lapis"))
+        assertTrue(error.diagnosticMessage().contains("collection database is locked"))
+    }
+
     @Test
     fun adapterBuildsFieldsInNoteTypeOrderAndBlocksDuplicatesByDefault() {
         val api = FakeAnkiContentApi(
@@ -290,6 +303,7 @@ class AnkiBackendAdapterTest {
         private val modelFailure: AnkiFetchFailure? = null,
         private val nullFieldModelIds: Set<Long> = emptySet(),
         private val syncResult: Boolean = false,
+        private val fieldError: Throwable? = null,
     ) : AnkiContentApi {
         var addedFields: Array<String>? = null
             private set
@@ -315,7 +329,7 @@ class AnkiBackendAdapterTest {
                 ?: throw AnkiFetchException(AnkiFetchFailure.ModelListUnavailable)
 
         override fun fieldList(modelId: Long): List<String> =
-            if (modelId in nullFieldModelIds) {
+            fieldError?.let { throw it } ?: if (modelId in nullFieldModelIds) {
                 throw AnkiFetchException(AnkiFetchFailure.ModelFieldsUnavailable)
             } else {
                 fields[modelId].orEmpty()

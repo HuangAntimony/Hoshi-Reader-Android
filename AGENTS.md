@@ -6,6 +6,7 @@ Hoshi Reader Android 是 Hoshi Reader 的 Android/Kotlin/Jetpack Compose 原生�
 
 - iOS 用户可见行为和 UI 是唯一真源。开始功能切片或行为修复前，先查看 `reference/Hoshi-Reader-iOS` 中的对应实现，并总结交互、状态流和边界行为。
 - 修复问题时不要叠补丁。先对齐 iOS 行为和状态流；只有平台差异确实需要时，才加入最小 Android 侧适配。
+- 未发布功能以当前数据格式和交互为准，不为开发期旧格式增加迁移、兼容分支或面向用户的迁移提示。
 - 涉及 Android 平台能力、权限、SAF、WebView、Media3、WorkManager、Google/Jetpack API、打包、安装或后台行为时，优先查 Android/Google/Jetpack 官方文档确认当前推荐做法。
 
 ## 工作区与规划产物
@@ -24,6 +25,7 @@ Hoshi Reader Android 是 Hoshi Reader 的 Android/Kotlin/Jetpack Compose 原生�
 - DI：生产依赖图使用 Hilt；新增依赖优先通过构造函数注入，并通过 Hilt module/qualifier 接入；ViewModel 使用 `@HiltViewModel`；不要新增手写 app container 或在 Composable 中扩散对象图创建逻辑。现有 `HoshiUiDependencies` 只是 lazy Compose 过渡桥，不应手动创建对象图。
 - Platform：Android API 按平台语义和官方文档选择，不机械映射 iOS API。
 - Settings：小型设置和偏好使用 DataStore-backed repository，不在 Composable 中直接读写 DataStore。
+- Settings 首帧：读取持久化配置的设置页必须通过 `SettingsDetailScaffold(state = ...)`，sheet/嵌入面板通过 `SettingsContent`，仅在 `SettingsLoadState.Loaded` 后创建设置控件。首发前使用 `Loading`，读取失败显示可重试错误；不得用 `Settings()`、默认 `stateIn` 值或 `Loaded(默认值)` 冒充已加载。多个必需数据源全部就绪后再显示；已由上层确认的实际值可直接包装为 `Loaded`。`StaticSettingsDetailScaffold` 仅用于静态菜单/操作，不得绕过持久化设置的加载入口。新增或修改设置状态源时补延迟首发、失败重试测试；profile 设置还需覆盖切换后旧请求不回写。
 - Background work：需要跨进程、重启或离开可见状态后仍可靠执行的任务使用 WorkManager；worker 依赖通过 Hilt worker injection 接入，不做手写查找。
 - EPUB import：通过 Android Storage Access Framework 导入到 app-specific storage。
 
@@ -76,7 +78,9 @@ Hoshi Reader Android 是 Hoshi Reader 的 Android/Kotlin/Jetpack Compose 原生�
 - 非 UI 层发出的可见消息应使用 `UiText` 或等价资源引用，不应持有 `Context`。
 - 新增或修改可见文案时，同时更新 `app/src/main/res/values/strings.xml` 和 `app/src/main/res/values-zh-rCN/strings.xml`。保持占位符、plural quantity、CDATA/转义和 `translatable="false"` 语义一致。
 - 新增或替换图标时使用 Material Icons、Material vector asset 或明确的品牌资产；不要手绘、自造或临时拼接图标。
-- 用户可见错误应通过既有弹窗、Snackbar 或明确错误状态展示；不要把原始异常文本直接渲染到主 UI 内容里。
+- 用户可见错误通过既有弹窗、Snackbar 或明确错误状态展示，保留本地化的操作/类别说明，并附上原始异常的非空消息和 cause 链；没有消息时至少保留原始异常类型或平台/服务实际返回的错误码，不得自定义 App 错误码或把内部枚举名称当成原始诊断。复用 `ui/ErrorDetails.kt`，不得用固定失败文案、布尔值、枚举或 `getOrNull()` 丢弃失败原因；跨 repository、backend、controller 和状态边界时保留原始 cause。批量操作逐项保留文件/对象名称和失败原因。技术诊断可显示在错误弹窗或错误详情中，不得直接混入正常主 UI 内容，也不得仅记录日志而不给用户查看。
+- 新增或修改错误处理时，补充带具体消息及嵌套 cause 的行为/state-flow 测试，确认错误详情确实到达可见状态；`CancellationException` 必须继续传播，不作为失败显示。成功恢复的可选读取、缓存回退和明确约定的自动离线静默可以保持安静，但不能因此吞掉手动操作或终止失败的原因。异常诊断属于外部数据；应用自行编写的提示仍必须使用本地化资源，凭据和认证头不得加入可见诊断。
+- 遇到的运行错误还必须进入内置诊断历史：`withErrorDetails` 自动记录原始 Throwable；若失败在到达 UI 前转成字符串、枚举或批量结果，先用 `ErrorDiagnosticEvents.buffer.record(operation, originalError)` 保留原始异常和堆栈。平台/服务只返回错误响应而没有 Throwable 时，用 `recordServiceFailure` 记录实际返回的错误详情，不得伪造异常或 App 错误码。后台任务的失败/重试也保留原始原因；取消和普通输入校验不记为运行错误。实时表单校验需要展示原始原因时，使用纯格式化的 `diagnosticMessage()` 组成 `UiText`，不要调用会自动写入历史的 `withErrorDetails`。诊断持久化由 Hilt 注入的 logger 在 IO dispatcher 执行，记录失败不得覆盖或递归记录原业务错误；相关回归测试同时确认可见提示与诊断记录保留原因。
 
 ## 领域边界
 

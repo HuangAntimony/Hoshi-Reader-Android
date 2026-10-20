@@ -21,6 +21,7 @@ import java.util.Locale
 internal data class LookupPopupAssets(
     val popupJs: String,
     val popupCss: String,
+    val popupThemeCss: String = "",
     val languageJapaneseJs: String = "",
     val selectionJapaneseJs: String = "",
     val selectionEnglishJs: String = "",
@@ -40,6 +41,7 @@ internal data class LookupPopupAssets(
         private fun read(context: Context): LookupPopupAssets = LookupPopupAssets(
             popupJs = context.readAsset("hoshi-web/popup/popup.js"),
             popupCss = context.readAsset("hoshi-web/popup/popup.css"),
+            popupThemeCss = context.readAsset("hoshi-web/popup/popup-theme.css"),
             languageJapaneseJs = context.readAsset("hoshi-web/shared/language-ja.js"),
             selectionJapaneseJs = context.readAsset("hoshi-web/shared/selection-ja.js"),
             selectionEnglishJs = context.readAsset("hoshi-web/shared/selection-en.js"),
@@ -64,6 +66,7 @@ internal data class LookupPopupAssets(
 internal object LookupPopupHtml {
     fun renderIframeDocument(
         assets: LookupPopupAssets? = null,
+        assetVersion: Int = 0,
         dictionaryStyles: Map<String, String> = emptyMap(),
         settings: DictionarySettings = DictionarySettings(),
         swipeToDismiss: Boolean = false,
@@ -99,7 +102,8 @@ internal object LookupPopupHtml {
         """.trimIndent()
         val customCss = customCssStyle(normalizedSettings.customCSS)
         val fontPrewarmScript = """<script>${popupFontPrewarmScript()}</script>"""
-        val eInkCss = if (eInkMode) """<style>$eInkPopupCss</style>""" else ""
+        val themeCss = assets?.let { """<style>${it.popupThemeCss}</style>""" }
+            ?: """<link rel="stylesheet" href="$PopupAssetBaseUrl/popup-theme.css">"""
         val selectionSupportJs = assets
             ?.selectionSupportJs(contentLanguageProfile)
             ?.takeIf(String::isNotBlank)
@@ -130,13 +134,13 @@ internal object LookupPopupHtml {
             <!DOCTYPE html>
             <html lang="${contentLanguageProfile.htmlLang}" data-hoshi-color-scheme="$colorScheme" data-hoshi-eink-mode="$eInkMode">
             <head>
+                <meta name="hoshi-popup-asset-version" content="$assetVersion">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
                 $popupCss
-                <style>$androidColorSchemeCss</style>
+                $themeCss
                 $popupTypographyCss
                 $customCss
                 $fontPrewarmScript
-                $eInkCss
                 <style>
                     html,
                     body {
@@ -217,8 +221,10 @@ internal object LookupPopupHtml {
                     window.audioPlaybackMode = "${audioSettings.playbackMode.rawValue}";
                     window.needsAudio = ${ankiSettings.needsAudio};
                     window.allowDupes = ${ankiSettings.allowDupes};
+                    window.preventAccidentalDuplicates = ${ankiSettings.preventAccidentalDuplicates};
                     window.useAnkiConnect = ${ankiSettings.useAnkiConnect};
                     window.compactGlossariesAnki = ${ankiSettings.compactGlossaries};
+                    window.excludedDictionaries = ${dictionaryNamesJson(ankiSettings.excludedDictionaries.toSet())};
                     window.ankiFormats = ${ankiFormatsJson(ankiSettings)};
                     window.ankiBackendAvailable = ${ankiSettings.isBackendAvailable};
                     window.disableShowNotes = ${ankiSettings.disableShowNotes};
@@ -298,6 +304,10 @@ internal object LookupPopupHtml {
                         window.addEventListener('message', function(event) {
                             if (event.origin !== 'https://appassets.androidplatform.net') return;
                             var message = event.data || {};
+                            if (message.type === 'setPopupTheme') {
+                                window.setHoshiPopupTheme(message);
+                                return;
+                            }
                             if (message.type === 'reply') {
                                 window.HoshiAndroidPopup.resolveMessage(message.id, message.body);
                                 return;
@@ -566,212 +576,7 @@ internal object LookupPopupHtml {
             TraceSource.DICTIONARY -> 2
         }
 
-    private const val androidColorSchemeCss = """
-        html[data-hoshi-color-scheme="light"],
-        html[data-hoshi-color-scheme="light"] body {
-            --background-color: #fff;
-            --background-color-light: #fff;
-            --text-color: #000;
-            color-scheme: light;
-            background-color: #fff !important;
-        }
 
-        html[data-hoshi-color-scheme="light"] .overlay {
-            background: #eee;
-            color: #000;
-        }
-
-        html[data-hoshi-color-scheme="dark"],
-        html[data-hoshi-color-scheme="dark"] body {
-            --background-color: #000;
-            --background-color-light: #000;
-            --text-color: #fff;
-            --text-color-light1: #aaaaaa;
-            --text-color-light2: #999999;
-            --text-color-light3: #888888;
-            --text-color-light4: #777777;
-            --background-color-dark1: #333333;
-            color-scheme: dark;
-            background-color: #000 !important;
-        }
-
-        html[data-hoshi-color-scheme="dark"] .overlay {
-            background: #000;
-            color: #fff;
-        }
-
-        html[data-hoshi-color-scheme="dark"] .glossary-group > div[data-dictionary] {
-            color: var(--text-color) !important;
-        }
-    """
-
-    private const val eInkPopupCss = """
-        /*
-         * Adapted from E Ink CSS for Yomitan:
-         * https://github.com/Mansive/yomitan-eink-css
-         */
-        html[data-hoshi-eink-mode="true"],
-        html[data-hoshi-eink-mode="true"] body {
-            --background-color: #fff;
-            --background-color-light: #fff;
-            --text-color: #000;
-            --text-color-light1: #000;
-            --text-color-light2: #000;
-            --text-color-light3: #000;
-            --text-color-light4: #000;
-            --background-color-dark1: #fff;
-            color-scheme: light;
-        }
-
-        html[data-hoshi-eink-mode="true"] *,
-        html[data-hoshi-eink-mode="true"] *::before,
-        html[data-hoshi-eink-mode="true"] *::after {
-            transition: none !important;
-            animation-duration: 0s !important;
-            box-shadow: none !important;
-            text-shadow: none !important;
-        }
-
-        html[data-hoshi-eink-mode="true"] ::highlight(hoshi-selection) {
-            background-color: transparent !important;
-            color: inherit;
-            text-decoration-line: underline;
-            text-decoration-color: #000;
-            text-decoration-thickness: 1.5px;
-            text-underline-offset: 2px;
-        }
-
-        html[data-hoshi-eink-mode="true"] .deinflection-tag,
-        html[data-hoshi-eink-mode="true"] .expr-tag,
-        html[data-hoshi-eink-mode="true"] .glossary-tag,
-        html[data-hoshi-eink-mode="true"] .pitch-dict-label {
-            background-color: #fff !important;
-            color: #000 !important;
-            border: 1px solid #000 !important;
-            border-radius: 0 !important;
-        }
-
-        html[data-hoshi-eink-mode="true"] .frequency-group {
-            background-color: #fff !important;
-            color: #000 !important;
-            border: 1px solid #000 !important;
-            border-radius: 0 !important;
-        }
-
-        html[data-hoshi-eink-mode="true"] .frequency-dict-label {
-            background-color: #fff !important;
-            color: #000 !important;
-            border-right: 1px solid #000 !important;
-        }
-
-        html[data-hoshi-eink-mode="true"] .frequency-values {
-            background-color: #fff !important;
-            color: #000 !important;
-        }
-
-        html[data-hoshi-eink-mode="true"] .button-slot {
-            border-radius: 0 !important;
-            background-color: transparent !important;
-            color: #000 !important;
-            opacity: 1 !important;
-        }
-
-        html[data-hoshi-eink-mode="true"] .button-slot:active {
-            background-color: #fff !important;
-            outline: 1px solid #000 !important;
-            outline-offset: -1px !important;
-        }
-
-        html[data-hoshi-eink-mode="true"] .audio-candidate-menu {
-            background: #fff !important;
-            color: #000 !important;
-            border: 1px solid #000 !important;
-            border-radius: 0 !important;
-        }
-
-        html[data-hoshi-eink-mode="true"] .audio-candidate-menu-item {
-            border-radius: 0 !important;
-        }
-
-        html[data-hoshi-eink-mode="true"] .audio-candidate-menu-item:not(:disabled):active {
-            background: #fff !important;
-            outline: 1px solid #000 !important;
-            outline-offset: -1px !important;
-        }
-
-        html[data-hoshi-eink-mode="true"] .glossary-group > summary::before {
-            opacity: 1 !important;
-        }
-
-        html[data-hoshi-eink-mode="true"] .dict-label {
-            opacity: 1 !important;
-        }
-
-        html[data-hoshi-eink-mode="true"] .overlay {
-            background: #fff !important;
-            color: #000 !important;
-            border-top: 1px solid #000 !important;
-        }
-
-        html[data-hoshi-color-scheme="dark"][data-hoshi-eink-mode="true"],
-        html[data-hoshi-color-scheme="dark"][data-hoshi-eink-mode="true"] body {
-            --background-color: #000;
-            --background-color-light: #000;
-            --text-color: #fff;
-            --text-color-light1: #fff;
-            --text-color-light2: #fff;
-            --text-color-light3: #fff;
-            --text-color-light4: #fff;
-            --background-color-dark1: #000;
-            color-scheme: dark;
-        }
-
-        html[data-hoshi-color-scheme="dark"][data-hoshi-eink-mode="true"] .deinflection-tag,
-        html[data-hoshi-color-scheme="dark"][data-hoshi-eink-mode="true"] .expr-tag,
-        html[data-hoshi-color-scheme="dark"][data-hoshi-eink-mode="true"] .glossary-tag,
-        html[data-hoshi-color-scheme="dark"][data-hoshi-eink-mode="true"] .pitch-dict-label,
-        html[data-hoshi-color-scheme="dark"][data-hoshi-eink-mode="true"] .frequency-group {
-            background-color: #000 !important;
-            color: #fff !important;
-            border: 1px solid #fff !important;
-        }
-
-        html[data-hoshi-color-scheme="dark"][data-hoshi-eink-mode="true"] ::highlight(hoshi-selection) {
-            text-decoration-color: #fff;
-        }
-
-        html[data-hoshi-color-scheme="dark"][data-hoshi-eink-mode="true"] .frequency-dict-label {
-            background-color: #000 !important;
-            color: #fff !important;
-            border-right: 1px solid #fff !important;
-        }
-
-        html[data-hoshi-color-scheme="dark"][data-hoshi-eink-mode="true"] .frequency-values,
-        html[data-hoshi-color-scheme="dark"][data-hoshi-eink-mode="true"] .button-slot,
-        html[data-hoshi-color-scheme="dark"][data-hoshi-eink-mode="true"] .audio-candidate-menu,
-        html[data-hoshi-color-scheme="dark"][data-hoshi-eink-mode="true"] .overlay {
-            background-color: #000 !important;
-            color: #fff !important;
-        }
-
-        html[data-hoshi-color-scheme="dark"][data-hoshi-eink-mode="true"] .button-slot:active {
-            outline: 1px solid #fff !important;
-        }
-
-        html[data-hoshi-color-scheme="dark"][data-hoshi-eink-mode="true"] .audio-candidate-menu {
-            border-color: #fff !important;
-        }
-
-        html[data-hoshi-color-scheme="dark"][data-hoshi-eink-mode="true"] .audio-candidate-menu-item:not(:disabled):active {
-            background: #000 !important;
-            outline: 1px solid #fff !important;
-            outline-offset: -1px !important;
-        }
-
-        html[data-hoshi-color-scheme="dark"][data-hoshi-eink-mode="true"] .overlay {
-            border-top: 1px solid #fff !important;
-        }
-    """
 
     private const val PopupAssetBaseUrl = "https://appassets.androidplatform.net/popup"
 }

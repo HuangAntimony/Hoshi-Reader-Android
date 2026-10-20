@@ -1,5 +1,10 @@
 package moe.antimony.hoshi.dictionary
 
+import moe.antimony.hoshi.ui.diagnosticMessage
+import moe.antimony.hoshi.R
+import moe.antimony.hoshi.ui.ErrorDiagnosticEvents
+import moe.antimony.hoshi.ui.UiText
+
 import android.content.ContentResolver
 import android.net.Uri
 import de.manhhao.hoshi.LookupOptions
@@ -93,16 +98,7 @@ internal class DictionaryRepository @Inject constructor(
 
     fun setDictionaryCategory(fileName: String, category: DictionaryCategory) {
         synchronized(lookupQueryLock) {
-            val previousConfig = storage.currentConfig()
             storage.saveConfig(storage.configWithDictionaryCategory(fileName, category))
-            try {
-                rebuildLookupQueryLocked()
-            } catch (error: Throwable) {
-                runCatching { storage.saveConfig(previousConfig) }
-                    .exceptionOrNull()
-                    ?.let(error::addSuppressed)
-                throw error
-            }
         }
     }
 
@@ -174,9 +170,10 @@ internal class DictionaryRepository @Inject constructor(
                 updatedCount += 1
             } catch (error: Exception) {
                 if (error is CancellationException) throw error
+                ErrorDiagnosticEvents.buffer.record(UiText.Resource(R.string.dictionary_update_failed), error)
                 failures += DictionaryUpdateFailure(
                     title = installedIndex.title,
-                    message = error.localizedMessage ?: error::class.java.simpleName,
+                    message = error.diagnosticMessage(),
                 )
             }
         }
@@ -273,9 +270,7 @@ internal class DictionaryRepository @Inject constructor(
     private fun rebuildLookupQueryLocked() {
         val contentLanguageProfile = profileRepository.currentEffectiveContentLanguageProfile
         lookupQueryService.rebuild(
-            termDictionaries = storage.loadDictionaries(DictionaryType.Term)
-                .filter { it.isEnabled && it.category != DictionaryCategory.Exclude }
-                .map { it.path },
+            termDictionaries = storage.enabledDictionaryPaths(DictionaryType.Term),
             frequencyDictionaries = storage.enabledDictionaryPaths(DictionaryType.Frequency),
             pitchDictionaries = storage.enabledDictionaryPaths(DictionaryType.Pitch),
             kanjiDictionaries = storage.enabledDictionaryPaths(DictionaryType.Kanji),

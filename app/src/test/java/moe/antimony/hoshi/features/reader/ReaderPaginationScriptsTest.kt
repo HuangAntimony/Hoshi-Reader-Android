@@ -43,6 +43,7 @@ class ReaderPaginationScriptsTest {
 
         assertEquals(ReaderNavigationResult.Advanced, ReaderPaginationScripts.navigationResult("\"scrolled\""))
         assertEquals(ReaderNavigationResult.Revealed, ReaderPaginationScripts.navigationResult("\"revealed\""))
+        assertEquals(ReaderNavigationResult.Blocked, ReaderPaginationScripts.navigationResult("\"blocked\""))
         assertEquals(ReaderNavigationResult.Limit, ReaderPaginationScripts.navigationResult("\"limit\""))
         assertEquals(ReaderNavigationResult.Limit, ReaderPaginationScripts.navigationResult(null))
     }
@@ -130,6 +131,18 @@ class ReaderPaginationScriptsTest {
         assertEquals(0.95, continuousHorizontal.imageWidthViewportRatio, 0.0)
         assertEquals(1, continuousVertical.imageWidthReductionPx)
         assertEquals(0, continuousHorizontal.imageWidthReductionPx)
+    }
+
+    @Test
+    fun continuousImageBoundsUseTheInsetBodyViewport() {
+        val vertical = readerViewportCssLayout(ReaderSettings(viewMode = ReaderViewMode.Continuous,
+            verticalWriting = true, horizontalPadding = 30, verticalPadding = 0), 480, 800)
+        assertEquals(335, vertical.imageMaxWidthPx)
+        assertEquals(800, vertical.visibleHeightPx)
+        val horizontal = readerViewportCssLayout(ReaderSettings(viewMode = ReaderViewMode.Continuous,
+            verticalWriting = false, horizontalPadding = 0, verticalPadding = 30), 480, 800)
+        assertEquals(560, horizontal.visibleHeightPx)
+        assertEquals(392, horizontal.imageMaxHeightPx)
     }
 
     @Test

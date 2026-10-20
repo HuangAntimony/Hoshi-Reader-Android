@@ -14,6 +14,22 @@ __HOSHI_READER_LAYOUT_SEMANTICS_SCRIPT__
   isVertical: function() {
     return window.getComputedStyle(document.body).writingMode === "vertical-rl";
   },
+  contentViewport: function() {
+    return document.body.getBoundingClientRect();
+  },
+  scrollBy: function(delta) {
+    document.body.scrollBy(delta);
+  },
+  scrollTo: function(position) {
+    document.body.scrollTo(position);
+  },
+  isAtChapterBoundary: function(direction) {
+    var root = document.body;
+    var vertical = this.isVertical();
+    var position = vertical ? -root.scrollLeft : root.scrollTop;
+    var extent = vertical ? root.scrollWidth - root.clientWidth : root.scrollHeight - root.clientHeight;
+    return direction === 'forward' ? position >= extent - 1 : position <= 1;
+  },
   readerCssVariable: function(name) {
     return window.getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   },
@@ -70,14 +86,10 @@ __HOSHI_READER_LAYOUT_SEMANTICS_SCRIPT__
      }
    },
   scrollToChapterStart: function() {
-    var root = document.scrollingElement || document.documentElement;
     window.scrollTo(0, 0);
-    root.scrollTop = 0;
-    root.scrollLeft = 0;
     document.documentElement.scrollTop = 0;
     document.documentElement.scrollLeft = 0;
-    document.body.scrollTop = 0;
-    document.body.scrollLeft = 0;
+    this.scrollTo({ left: 0, top: 0, behavior: 'instant' });
   },
   createWalker: function(rootNode) {
     var root = rootNode || document.body;
@@ -125,12 +137,13 @@ __HOSHI_READER_LAYOUT_SEMANTICS_SCRIPT__
       minStart = Math.min(minStart, start);
       maxEnd = Math.max(maxEnd, end);
     }
+    var viewport = this.contentViewport();
     if (vertical) {
-      if (minStart >= window.innerWidth) return totalChars;
-      if (maxEnd <= window.innerWidth || minStart === Infinity) return 0;
+      if (minStart >= viewport.right) return totalChars;
+      if (maxEnd <= viewport.right || minStart === Infinity) return 0;
     } else {
-      if (maxEnd <= 0) return totalChars;
-      if (minStart >= 0 || minStart === Infinity) return 0;
+      if (maxEnd <= viewport.top) return totalChars;
+      if (minStart >= viewport.top || minStart === Infinity) return 0;
     }
     var offsets = [];
     var prefixCounts = [0];
@@ -165,52 +178,85 @@ __HOSHI_READER_LAYOUT_SEMANTICS_SCRIPT__
     range.setEnd(node, offset + char.length);
     var rect = this.getRect(range);
     if (!rect || rect.width <= 0 || rect.height <= 0) return false;
-    return vertical ? rect.left >= window.innerWidth : rect.bottom <= 0;
+    // Font/ruby metric boxes can overlap adjacent lines by a fraction of a pixel.
+    // A clipped sliver must not become the saved first line on every reopen.
+    var viewport = this.contentViewport();
+    return vertical ? (rect.left + rect.right) / 2 >= viewport.right : (rect.top + rect.bottom) / 2 <= viewport.top;
+  },
+  restoreLineEdge: function(targetNode, targetRect, vertical) {
+    var scope = targetNode.parentElement;
+    while (scope && scope !== document.body) {
+      var display = window.getComputedStyle(scope).display || '';
+      if (/^(block|flow-root|list-item|table.*|flex|grid)$/.test(display)) break;
+      scope = scope.parentElement;
+    }
+    var edge = vertical ? targetRect.right : targetRect.top;
+    var inTargetLine = function(rect) {
+      if (rect.width <= 0 || rect.height <= 0) return false;
+      // Adjacent metric boxes can overlap at tight line heights; their centers
+      // still belong to different lines. Ruby uses its base segment's center.
+      return vertical
+        ? Math.abs((rect.left + rect.right) - (targetRect.left + targetRect.right)) < Math.min(rect.width, targetRect.width)
+        : Math.abs((rect.top + rect.bottom) - (targetRect.top + targetRect.bottom)) < Math.min(rect.height, targetRect.height);
+    };
+    var walker = document.createTreeWalker(scope || document.body, NodeFilter.SHOW_TEXT);
+    var range = document.createRange();
+    var node;
+    while (node = walker.nextNode()) {
+      if (node === targetNode) continue;
+      var annotation = node.parentElement && node.parentElement.closest('rt');
+      var annotationInLine = false;
+      if (annotation) {
+        // Match the annotation's base segment, since rt can lie wholly outside
+        // the base metric box. Adjacent ruby segments may occupy another line.
+        for (var base = annotation.previousSibling; base; base = base.previousSibling) {
+          var tag = base.nodeType === Node.ELEMENT_NODE ? base.tagName.toLowerCase() : '';
+          if (tag === 'rt') break;
+          if (tag === 'rp') continue;
+          range.selectNodeContents(base);
+          if (Array.from(range.getClientRects()).some(inTargetLine)) {
+            annotationInLine = true;
+            break;
+          }
+        }
+        if (!annotationInLine) continue;
+      }
+      range.selectNodeContents(node);
+      var rects = range.getClientRects();
+      for (var i = 0; i < rects.length; i++) {
+        var rect = rects[i];
+        if (rect.width <= 0 || rect.height <= 0) continue;
+        // Include same-line text and annotations, never a neighboring line.
+        if (annotationInLine || inTargetLine(rect)) {
+          edge = vertical ? Math.max(edge, rect.right) : Math.min(edge, rect.top);
+        }
+      }
+    }
+    return edge;
   },
   scrollToTarget: function(target) {
     var rect = this.getRect(target);
-    if (this.isVertical()) {
-      if (rect.left >= 0 && rect.right <= window.innerWidth) return false;
-    } else if (rect.top >= 0 && rect.bottom <= window.innerHeight) {
-      return false;
-    }
+    if (this.sasayakiCueRectIsVisible(rect)) return false;
     if (typeof target.scrollIntoView === 'function') {
-      target.scrollIntoView({ block: 'start', inline: 'nearest' });
-    } else if (this.isVertical()) {
-      var root = document.scrollingElement || document.documentElement;
-      var currentLeft = window.scrollX;
-      if (currentLeft === 0 && root.scrollLeft !== 0) currentLeft = root.scrollLeft;
-      var targetLeft = currentLeft + rect.right - window.innerWidth;
-      window.scrollTo({ left: targetLeft, top: window.scrollY, behavior: 'instant' });
-      root.scrollLeft = targetLeft;
+      target.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'instant' });
     } else {
-      var root = document.scrollingElement || document.documentElement;
-      var currentTop = root.scrollTop;
-      if (currentTop === 0 && window.scrollY !== 0) currentTop = window.scrollY;
-      var targetTop = currentTop + rect.top;
-      window.scrollTo({ left: window.scrollX, top: targetTop, behavior: 'instant' });
-      root.scrollTop = targetTop;
+      var viewport = this.contentViewport();
+      this.scrollBy({
+        left: this.isVertical() ? rect.right - viewport.right : 0,
+        top: this.isVertical() ? 0 : rect.top - viewport.top,
+        behavior: 'instant'
+      });
     }
     return true;
   },
 __HOSHI_READER_SASAYAKI_SCRIPT__
   sasayakiScrollPosition: function() {
-    var root = document.scrollingElement || document.documentElement;
-    if (this.isVertical()) {
-      var left = window.scrollX;
-      if (left === 0 && root.scrollLeft !== 0) left = root.scrollLeft;
-      return left;
-    }
-    var top = root.scrollTop;
-    if (top === 0 && window.scrollY !== 0) top = window.scrollY;
-    return top;
+    return this.isVertical() ? document.body.scrollLeft : document.body.scrollTop;
   },
   sasayakiScrollTargetForRect: function(rect) {
+    var viewport = this.contentViewport();
     var current = this.sasayakiScrollPosition();
-    if (this.isVertical()) {
-      return current + rect.right - window.innerWidth;
-    }
-    return current + rect.top;
+    return this.isVertical() ? current + rect.right - viewport.right : current + rect.top - viewport.top;
   },
   sasayakiTargetForCue: function(cue) {
     var cueId = typeof cue === 'string' ? cue : cue.id;
@@ -254,9 +300,10 @@ __HOSHI_READER_SASAYAKI_SCRIPT__
   },
   sasayakiCueRectIsVisible: function(rect) {
     if (!rect || rect.width <= 0 || rect.height <= 0) return false;
+    var viewport = this.contentViewport();
     return this.isVertical()
-      ? rect.left >= 0 && rect.right <= window.innerWidth
-      : rect.top >= 0 && rect.bottom <= window.innerHeight;
+      ? rect.left >= viewport.left && rect.right <= viewport.right
+      : rect.top >= viewport.top && rect.bottom <= viewport.bottom;
   },
   sasayakiCueScrollTarget: function(cue) {
     var rect = this.sasayakiCueRect(cue);
@@ -276,24 +323,21 @@ __HOSHI_READER_SASAYAKI_SCRIPT__
     return this.sasayakiMediaStopsBetween(this.sasayakiScrollPosition(), targetScroll, true, false);
   },
   sasayakiMediaStopsToChapterEnd: function() {
-    var root = document.scrollingElement || document.documentElement;
+    var root = document.body;
     var endScroll = this.isVertical()
-      ? -Math.max(0, root.scrollWidth - window.innerWidth)
-      : Math.max(0, root.scrollHeight - window.innerHeight);
+      ? -Math.max(0, root.scrollWidth - root.clientWidth)
+      : Math.max(0, root.scrollHeight - root.clientHeight);
     return this.sasayakiMediaStopsBetween(this.sasayakiScrollPosition(), endScroll, true, true);
   },
   showSasayakiMediaStop: function(stop) {
     window.hoshiHighlights?.clearSearchHighlight?.();
     var scroll = Number(stop && stop.scroll);
     if (!Number.isFinite(scroll)) return null;
-    var root = document.scrollingElement || document.documentElement;
-    if (this.isVertical()) {
-      window.scrollTo({ left: scroll, top: window.scrollY, behavior: 'instant' });
-      root.scrollLeft = scroll;
-    } else {
-      window.scrollTo({ left: window.scrollX, top: scroll, behavior: 'instant' });
-      root.scrollTop = scroll;
-    }
+    this.scrollTo({
+      left: this.isVertical() ? scroll : 0,
+      top: this.isVertical() ? 0 : scroll,
+      behavior: 'instant'
+    });
     return this.calculateProgress();
   },
   highlightSasayakiCue: function(cue, reveal) {
@@ -411,24 +455,22 @@ __HOSHI_READER_SASAYAKI_SCRIPT__
           behavior: 'instant'
         });
       } else {
-      var range = document.createRange();
-      var targetText = targetNode.textContent || '';
-      var targetChar = String.fromCodePoint(targetText.codePointAt(targetOffset));
-      range.setStart(targetNode, targetOffset);
-      range.setEnd(targetNode, Math.min(targetText.length, targetOffset + Math.max(1, targetChar.length)));
-      var marker = document.createElement('span');
-      marker.style.display = 'inline-block';
-      marker.style.width = '1px';
-      marker.style.height = '1px';
-      range.insertNode(marker);
-      marker.scrollIntoView({
-        block: progress >= 0.999999 ? 'end' : 'start',
-        inline: 'nearest',
-        behavior: 'instant'
-      });
-      var parent = marker.parentNode;
-      marker.remove();
-      this.normalizeReaderText(parent);
+        var range = document.createRange();
+        var targetText = targetNode.textContent || '';
+        var targetChar = String.fromCodePoint(targetText.codePointAt(targetOffset));
+        range.setStart(targetNode, targetOffset);
+        range.setEnd(targetNode, Math.min(targetText.length, targetOffset + Math.max(1, targetChar.length)));
+        // An inline marker aligns its own baseline box, clipping half the text line.
+        // Use the existing glyph geometry without changing the chapter's layout.
+        var rect = this.getRect(range);
+        var vertical = this.isVertical();
+        var edge = this.restoreLineEdge(targetNode, rect, vertical);
+        var viewport = this.contentViewport();
+        this.scrollBy({
+          left: vertical ? edge - viewport.right : 0,
+          top: vertical ? 0 : edge - viewport.top,
+          behavior: 'instant'
+        });
       }
     }
     requestAnimationFrame(() => {
@@ -452,14 +494,15 @@ __HOSHI_READER_SASAYAKI_SCRIPT__
   paginate: function(direction) {
     window.hoshiHighlights?.clearSearchHighlight?.();
     var vertical = this.isVertical();
-    var root = document.scrollingElement || document.documentElement;
-    var before = vertical ? window.scrollX : root.scrollTop;
-    if (vertical) {
-      window.scrollBy({ left: direction === "forward" ? -window.innerWidth : window.innerWidth, behavior: "instant" });
-    } else {
-      window.scrollBy({ top: direction === "forward" ? window.innerHeight : -window.innerHeight, behavior: "instant" });
-    }
-    var after = vertical ? window.scrollX : root.scrollTop;
+    var root = document.body;
+    var viewport = this.contentViewport();
+    var before = vertical ? root.scrollLeft : root.scrollTop;
+    this.scrollBy({
+      left: vertical ? (direction === 'forward' ? -viewport.width : viewport.width) : 0,
+      top: vertical ? 0 : (direction === 'forward' ? viewport.height : -viewport.height),
+      behavior: 'instant'
+    });
+    var after = vertical ? root.scrollLeft : root.scrollTop;
     return Math.abs(after - before) > 1 ? "scrolled" : "limit";
   }
 };
@@ -468,12 +511,23 @@ window.hoshiReader.initialize = function() {
   if (window.hoshiReader.didInitialize) return;
   window.hoshiReader.didInitialize = true;
   window.hoshiReaderViewport.ensureDeviceViewport();
-  document.documentElement.style.setProperty('--hoshi-vertical-padding-block', (window.innerHeight * __HOSHI_VERTICAL_PADDING_BLOCK_RATIO__) + 'px');
-  document.documentElement.style.setProperty('--hoshi-vertical-padding-gap', (window.innerHeight * __HOSHI_VERTICAL_PADDING_GAP_RATIO__) + 'px');
-  document.documentElement.style.setProperty('--hoshi-continuous-height', window.innerHeight + 'px');
-  document.documentElement.style.setProperty('--hoshi-reader-visible-height', window.innerHeight + 'px');
-  document.documentElement.style.setProperty('--hoshi-image-max-width', Math.max(1, Math.floor(window.innerWidth * __HOSHI_IMAGE_WIDTH_VIEWPORT_RATIO__) - __HOSHI_IMAGE_WIDTH_REDUCTION_PX__) + 'px');
-  document.documentElement.style.setProperty('--hoshi-image-max-height', Math.max(1, Math.floor(window.innerHeight * __HOSHI_IMAGE_HEIGHT_VIEWPORT_RATIO__)) + 'px');
+  document.body.addEventListener('scroll', function() {
+    window.HoshiReaderScroll?.postMessage(__HOSHI_RESTORE_TOKEN_LITERAL__);
+  });
+  var style = document.documentElement.style;
+  style.setProperty('--page-width', window.innerWidth + 'px');
+  style.setProperty('--page-height', window.innerHeight + 'px');
+  style.setProperty('--hoshi-continuous-left', (window.innerWidth * __HOSHI_CONTINUOUS_HORIZONTAL_PADDING_RATIO__) + 'px');
+  style.setProperty('--hoshi-continuous-top', (window.innerHeight * __HOSHI_CONTINUOUS_VERTICAL_PADDING_RATIO__) + 'px');
+  style.setProperty('--hoshi-continuous-width', (window.innerWidth * (1 - 2 * __HOSHI_CONTINUOUS_HORIZONTAL_PADDING_RATIO__)) + 'px');
+  style.setProperty('--hoshi-continuous-height', (window.innerHeight * (1 - 2 * __HOSHI_CONTINUOUS_VERTICAL_PADDING_RATIO__)) + 'px');
+  var viewport = window.hoshiReader.contentViewport();
+  document.documentElement.style.setProperty('--hoshi-vertical-padding-block', (viewport.height * __HOSHI_VERTICAL_PADDING_BLOCK_RATIO__) + 'px');
+  document.documentElement.style.setProperty('--hoshi-vertical-padding-gap', (viewport.height * __HOSHI_VERTICAL_PADDING_GAP_RATIO__) + 'px');
+  document.documentElement.style.setProperty('--hoshi-continuous-height', viewport.height + 'px');
+  document.documentElement.style.setProperty('--hoshi-reader-visible-height', viewport.height + 'px');
+  document.documentElement.style.setProperty('--hoshi-image-max-width', Math.max(1, Math.floor(viewport.width * __HOSHI_IMAGE_WIDTH_VIEWPORT_RATIO__) - __HOSHI_IMAGE_WIDTH_REDUCTION_PX__) + 'px');
+  document.documentElement.style.setProperty('--hoshi-image-max-height', Math.max(1, Math.floor(viewport.height * __HOSHI_IMAGE_HEIGHT_VIEWPORT_RATIO__)) + 'px');
   var images = Array.from(document.querySelectorAll('img'));
   var imageSetupPromise = window.hoshiReaderMediaSemantics.setupReaderImages(document, {
     blurImages: __HOSHI_BLUR_IMAGES__,

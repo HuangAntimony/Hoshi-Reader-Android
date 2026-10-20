@@ -1,9 +1,12 @@
 package moe.antimony.hoshi.features.update
 
 import android.os.Build
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import moe.antimony.hoshi.ui.diagnosticMessage
+import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 import javax.inject.Inject
@@ -162,7 +165,7 @@ internal class GitHubReleaseUpdateRepository private constructor(
             "Accept" to "application/vnd.github+json",
             "User-Agent" to "Hoshi-Reader-Android",
         )
-        var lastError: Throwable? = null
+        val failures = mutableListOf<Pair<String, Throwable>>()
         latestReleaseCandidates().forEachIndexed { index, url ->
             val preferMirrors = index > 0
             runCatching {
@@ -172,10 +175,19 @@ internal class GitHubReleaseUpdateRepository private constructor(
             }.onSuccess { release ->
                 return release
             }.onFailure { error ->
-                lastError = error
+                if (error is CancellationException) throw error
+                failures += url to error
             }
         }
-        throw GitHubReleaseException(lastError?.message ?: "GitHub update check failed.")
+        if (failures.size == 1) {
+            val (url, error) = failures.single()
+            throw GitHubReleaseException(url, error)
+        }
+        throw GitHubReleaseException(
+            failures.joinToString("\n\n") { (url, error) -> "$url\n${error.diagnosticMessage()}" },
+        ).apply {
+            failures.forEach { (_, error) -> addSuppressed(error) }
+        }
     }
 
     private fun latestReleaseCandidates(): List<String> =
@@ -213,18 +225,34 @@ internal object UrlConnectionGitHubHttpClient : GitHubHttpClient {
         connection.readTimeout = 15_000
         return connection.use {
             val code = it.responseCode
-            if (code !in 200..299) {
-                val retryAfter = it.getHeaderField("Retry-After")
-                throw GitHubReleaseException("GitHub update check failed with HTTP $code${retryAfter?.let { value -> " (retry after $value)" }.orEmpty()}.")
+            val details = buildString {
+                append("HTTP $code\n${it.url}")
+                listOf(
+                    "Content-Type", "Retry-After", "X-RateLimit-Limit", "X-RateLimit-Remaining",
+                    "X-RateLimit-Reset", "X-RateLimit-Used", "X-RateLimit-Resource",
+                ).forEach { name ->
+                    it.getHeaderField(name)?.let { value -> append("\n$name: $value") }
+                }
             }
-            it.inputStream.bufferedReader().use { reader -> reader.readText() }
+            val body = try {
+                val stream = if (code in 200..299) it.inputStream else it.errorStream
+                stream?.bufferedReader()?.use { reader -> reader.readText() }.orEmpty()
+            } catch (error: IOException) {
+                throw GitHubReleaseException(details, error)
+            }
+            val mediaType = it.contentType?.substringBefore(';')?.trim().orEmpty()
+            val isJson = mediaType.equals("application/json", ignoreCase = true) ||
+                (mediaType.startsWith("application/", ignoreCase = true) && mediaType.endsWith("+json", ignoreCase = true))
+            if (code !in 200..299 || !isJson) {
+                throw GitHubReleaseException(listOf(details, body).filter { value -> value.isNotBlank() }.joinToString("\n\n"))
+            }
+            body
         }
     }
 }
 
 private val DefaultApiMirrorPrefixes = listOf(
     "https://ghproxy.vip/",
-    "https://githubproxy.cc/",
 )
 
 private val DefaultDownloadMirrorPrefixes = listOf(
@@ -234,7 +262,7 @@ private val DefaultDownloadMirrorPrefixes = listOf(
     "https://fastgit.cc/",
 )
 
-internal class GitHubReleaseException(message: String) : RuntimeException(message)
+internal class GitHubReleaseException(message: String, cause: Throwable? = null) : RuntimeException(message, cause)
 
 internal object GitHubReleaseJson {
     private val json = Json { ignoreUnknownKeys = true }

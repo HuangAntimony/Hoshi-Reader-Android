@@ -67,10 +67,12 @@ class SettingsDetailLayoutTest {
                         .testTag(RootTag),
                 ) {
                     ReaderAppearanceScreen(
-                        settings = ReaderSettings(),
+                        settings = SettingsLoadState.Loaded(ReaderSettings()),
+                        onRetrySettings = {},
                         profileName = "Japanese",
                         onSettingsChange = {},
-                        sasayakiSettings = moe.antimony.hoshi.features.sasayaki.SasayakiSettings(),
+                        sasayakiSettings = SettingsLoadState.Loaded(moe.antimony.hoshi.features.sasayaki.SasayakiSettings()),
+                        onRetrySasayakiSettings = {},
                         onSasayakiSettingsChange = {},
                         fontManager = ReaderFontManager(
                             ApplicationProvider.getApplicationContext<Context>().filesDir,

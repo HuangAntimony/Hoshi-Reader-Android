@@ -31,6 +31,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -44,11 +45,14 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import moe.antimony.hoshi.R
+import moe.antimony.hoshi.ui.ErrorDetailsText
+import moe.antimony.hoshi.ui.asString
 import moe.antimony.hoshi.content.ContentLanguageProfile
 import moe.antimony.hoshi.features.settings.GroupCard
 import moe.antimony.hoshi.features.settings.GroupDivider
 import moe.antimony.hoshi.features.settings.SectionTitle
 import moe.antimony.hoshi.features.settings.SettingsDetailScaffold
+import moe.antimony.hoshi.features.settings.SettingsLoadState
 import moe.antimony.hoshi.profiles.HoshiProfile
 import moe.antimony.hoshi.profiles.ProfileState
 
@@ -59,6 +63,19 @@ internal fun ProfilesView(
     viewModel: ProfilesViewModel = hiltViewModel(),
 ) {
     val state by viewModel.profileState.collectAsStateWithLifecycle()
+    val error by viewModel.error.collectAsStateWithLifecycle()
+    error?.let { message ->
+        AlertDialog(
+            onDismissRequest = viewModel::dismissError,
+            title = { Text(stringResource(R.string.dialog_error_title)) },
+            text = { ErrorDetailsText(message.asString()) },
+            confirmButton = {
+                TextButton(onClick = viewModel::dismissError) {
+                    Text(stringResource(R.string.action_ok))
+                }
+            },
+        )
+    }
     ProfilesContent(
         state = state,
         onClose = onClose,
@@ -87,10 +104,11 @@ private fun ProfilesContent(
     var creatingProfile by remember { mutableStateOf(false) }
 
     SettingsDetailScaffold(
+        state = SettingsLoadState.Loaded(state),
         title = stringResource(R.string.profiles_title),
         onClose = onClose,
         modifier = modifier,
-    ) { contentPadding ->
+    ) { contentPadding, loadedState ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -100,11 +118,11 @@ private fun ProfilesContent(
         ) {
             item {
                 ActiveProfileSection(
-                    state = state,
+                    state = loadedState,
                     onActivateGlobal = onActivateGlobal,
                 )
             }
-            items(state.profileLanguageGroups(), key = { it.language.dictionaryLanguageId }) { group ->
+            items(loadedState.profileLanguageGroups(), key = { it.language.dictionaryLanguageId }) { group ->
                 LanguageProfileSection(
                     group = group,
                     onEdit = { profile -> editingProfile = profile },

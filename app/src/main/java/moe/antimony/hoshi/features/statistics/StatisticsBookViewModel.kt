@@ -16,6 +16,7 @@ import kotlinx.coroutines.launch
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.epub.ReadingSession
 import moe.antimony.hoshi.ui.UiText
+import moe.antimony.hoshi.ui.withErrorDetails
 
 internal data class StatisticsSessionDraft(
     val id: String,
@@ -80,8 +81,8 @@ internal class StatisticsBookViewModel internal constructor(
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
-                if (request == generation) _uiState.update { it.copy(isLoading = false, error = failure()) }
+            } catch (error: Exception) {
+                if (request == generation) _uiState.update { it.copy(isLoading = false, error = failure(error)) }
             }
         }
     }
@@ -133,13 +134,13 @@ internal class StatisticsBookViewModel internal constructor(
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
-                _uiState.update { it.copy(error = failure()) }
+            } catch (error: Exception) {
+                _uiState.update { it.copy(error = failure(error)) }
             } finally {
                 _uiState.update { it.copy(isSaving = false) }
             }
         }
     }
 
-    private fun failure() = UiText.Resource(R.string.statistics_operation_failed)
+    private fun failure(error: Throwable) = UiText.Resource(R.string.statistics_operation_failed).withErrorDetails(error)
 }

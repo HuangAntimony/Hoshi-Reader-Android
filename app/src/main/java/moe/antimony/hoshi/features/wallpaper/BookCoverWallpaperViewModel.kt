@@ -6,8 +6,13 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import java.io.File
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
+import moe.antimony.hoshi.R
+import moe.antimony.hoshi.ui.withErrorDetails
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import moe.antimony.hoshi.ui.UiText
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -35,6 +40,9 @@ internal class BookCoverWallpaperViewModel internal constructor(
         coroutineScope = null,
     )
 
+    private val _error = MutableStateFlow<UiText?>(null)
+    val error = _error.asStateFlow()
+
     private val scope: CoroutineScope
         get() = coroutineScope ?: viewModelScope
 
@@ -43,33 +51,48 @@ internal class BookCoverWallpaperViewModel internal constructor(
     fun iReaderCapability(): IReaderBookCoverCapability = iReaderCapabilityProvider.capability()
 
     fun setUpdateLockScreen(enabled: Boolean) {
-        scope.launch {
+        save {
             updateSettings { it.copy(updateLockScreen = enabled) }
         }
     }
 
     fun setExportEnabled(enabled: Boolean) {
-        scope.launch {
+        save {
             updateSettings { it.copy(exportEnabled = enabled) }
         }
     }
 
     fun setUpdateIReaderBookCover(enabled: Boolean) {
-        scope.launch {
+        save {
             updateSettings { it.copy(updateIReaderBookCover = enabled) }
         }
     }
 
     fun setScaleMode(scaleMode: BookCoverScaleMode) {
-        scope.launch {
+        save {
             updateSettings { it.copy(scaleMode = scaleMode) }
         }
     }
 
     fun setExportTarget(uri: String, onUpdated: () -> Unit = {}) {
-        scope.launch {
+        save {
             updateSettings { it.copy(exportEnabled = true, exportTargetUri = uri) }
             onUpdated()
+        }
+    }
+
+    fun dismissError() { _error.value = null }
+
+    private fun save(operation: suspend () -> Unit) {
+        scope.launch {
+            _error.value = null
+            try {
+                operation()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                _error.value = UiText.Resource(R.string.display_settings_save_failed).withErrorDetails(error)
+            }
         }
     }
 
@@ -79,16 +102,16 @@ internal class BookCoverWallpaperViewModel internal constructor(
                 publisher.publish(coverFile)
             } catch (exception: CancellationException) {
                 throw exception
-            } catch (_: Exception) {
-                BookCoverPublishResult.failedForAll(BookCoverPublishFailure.UnexpectedFailure)
+            } catch (error: Exception) {
+                BookCoverPublishResult.failedForAll(BookCoverPublishFailure.UnexpectedFailure, error)
             }
         }
         val current = try {
             settings.first()
         } catch (exception: CancellationException) {
             throw exception
-        } catch (_: Exception) {
-            return BookCoverPublishResult.failedForAll(BookCoverPublishFailure.SettingsUnavailable)
+        } catch (error: Exception) {
+            return BookCoverPublishResult.failedForAll(BookCoverPublishFailure.SettingsUnavailable, error)
         }
         if (!current.updateLockScreen && !current.updateIReaderBookCover && !current.exportEnabled) {
             return BookCoverPublishResult.Skipped

@@ -20,6 +20,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
+import moe.antimony.hoshi.R
+import moe.antimony.hoshi.ui.ErrorDiagnosticEvents
+import moe.antimony.hoshi.ui.UiText
 import moe.antimony.hoshi.di.ApplicationScope
 import moe.antimony.hoshi.di.IoDispatcher
 import java.util.concurrent.TimeUnit
@@ -97,13 +101,26 @@ internal class UpdateCheckWorker @AssistedInject constructor(
     private val updateCheckService: UpdateCheckService,
 ) : CoroutineWorker(appContext, params) {
     override suspend fun doWork(): Result {
-        val enabled = updateSettingsRepository.settings.first().autoCheckUpdates
+        val enabled = try {
+            updateSettingsRepository.settings.first().autoCheckUpdates
+        } catch (error: Exception) {
+            if (error is CancellationException) throw error
+            ErrorDiagnosticEvents.buffer.record(UiText.Resource(R.string.about_update_check_failed), error)
+            throw error
+        }
         if (!enabled) return Result.success()
-        return runCatching {
+        return updateCheckWorkerResult {
             updateCheckService.check(notifyAvailable = true)
-        }.fold(
-            onSuccess = { Result.success() },
-            onFailure = { Result.retry() },
-        )
+        }
     }
 }
+
+internal suspend fun updateCheckWorkerResult(check: suspend () -> Unit): androidx.work.ListenableWorker.Result =
+    try {
+        check()
+        androidx.work.ListenableWorker.Result.success()
+    } catch (error: Throwable) {
+        if (error is CancellationException) throw error
+        ErrorDiagnosticEvents.buffer.record(UiText.Resource(R.string.about_update_check_failed), error)
+        androidx.work.ListenableWorker.Result.retry()
+    }

@@ -8,6 +8,16 @@ import java.nio.file.Files
 
 class ProcessExitDiagnosticsTest {
     @Test
+    fun diagnosticsExportPreservesOutputFailureAndRejectsMissingStream() {
+        val failure = java.io.IOException("Document provider revoked access")
+        val result = runCatching { saveDiagnosticsReport("report") { throw failure } }
+        org.junit.Assert.assertSame(failure, result.exceptionOrNull())
+        val missing = runCatching { saveDiagnosticsReport("report") { null } }.exceptionOrNull()
+        org.junit.Assert.assertTrue(missing is java.io.IOException)
+        org.junit.Assert.assertTrue(missing?.message.orEmpty().contains("output stream unavailable"))
+    }
+
+    @Test
     fun shareTextIncludesAppDeviceAndRecentExitDetails() {
         val report = ProcessExitDiagnosticsReport(
             packageName = "moe.antimony.hoshi.debug",

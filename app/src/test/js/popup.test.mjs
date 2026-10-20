@@ -150,6 +150,7 @@ function popupContext({
     getEntry = null,
     lookupRedirect = () => 0,
     sourceHistoryRestored = () => {},
+    mine = () => true,
     fetchImpl = async () => ({ json: async () => ({ type: 'audioSourceList', audioSources: [] }) }),
 } = {}) {
     const documentElement = new FakeElement();
@@ -241,13 +242,13 @@ function popupContext({
                 mineEntry: {
                     postMessage(message) {
                         mineEntryMessages.push(message);
-                        return true;
+                        return mine(message);
                     },
                 },
                 duplicateCheck: {
                     postMessage(message) {
                         duplicateCheckMessages.push(message);
-                        return currentDuplicateStates;
+                        return typeof currentDuplicateStates === 'function' ? currentDuplicateStates(message) : currentDuplicateStates;
                     },
                 },
                 showNotes: {
@@ -311,6 +312,42 @@ function popupContext({
         setDuplicateStates(value) { currentDuplicateStates = value; },
     };
 }
+
+test('Anki aggregate glossary excludes categorized dictionaries while explicit glossaries retain them', () => {
+    const { context } = popupContext();
+    // Render plain glossary text with a minimal DOM; exercise both real glossary builders.
+    context.document.createElement = () => ({
+        children: [],
+        hasAttribute: () => false,
+        setAttribute() {},
+        appendChild(child) { this.children.push(child); },
+        get innerHTML() { return this.children.map(child => child.textContent).join(''); },
+    });
+    context.window.lookupEntries = [{ glossaries: [
+        { dictionary: 'Excluded [2026]', content: 'hidden from aggregate', definitionTags: 'n' },
+        { dictionary: 'Included', content: 'included definition', definitionTags: 'n' },
+    ] }];
+    context.window.excludedDictionaries = ['Excluded [2026]'];
+    context.window.dictionaryStyles = {
+        'Excluded [2026]': '.excluded { color: red; }',
+        Included: '.included { color: blue; }',
+    };
+
+    const aggregate = context.constructGlossaryHtml(0);
+    assert.doesNotMatch(aggregate, /Excluded|hidden from aggregate|\.excluded/);
+    assert.match(aggregate, /\(1, n, Included\)/);
+    assert.match(aggregate, /included definition/);
+    assert.match(aggregate, /\.included/);
+    const single = context.constructSingleGlossaryHtml(0);
+    assert.match(single['Excluded [2026]'], /hidden from aggregate/);
+    assert.match(single.Included, /included definition/);
+
+    context.window.excludedDictionaries = ['Excluded [2026]', 'Included'];
+    assert.doesNotMatch(context.constructGlossaryHtml(0), /<li|<style>/);
+    context.window.excludedDictionaries = [];
+    assert.match(context.constructGlossaryHtml(0), /hidden from aggregate/);
+    assert.equal(context.window.lookupEntries[0].glossaries.length, 2);
+});
 
 test('source text renders code points and redirects exact suffix with matched highlight and scroll preservation', async () => {
     const requests = [];
@@ -695,6 +732,17 @@ test('popup geometry keeps scaled visual positions in the scroll coordinate spac
     );
 });
 
+test('popup fixed layout coordinates use CSS zoom even when DOM rects already include zoom', () => {
+    const { context } = popupContext({ htmlZoom: '1.6', htmlProbeWidth: 160 });
+    const geometry = context.window.hoshiPopupGeometry;
+
+    assert.equal(geometry.bridgeRectScale(), 1, 'Chromium DOM rects need no native bridge correction');
+    assert.deepEqual(
+        JSON.parse(JSON.stringify(geometry.visualViewportPointToLayout(320, 160))),
+        { x: 200, y: 100 },
+    );
+});
+
 test('popup touch tap suppresses the duplicate click generated for the same tap', () => {
     const { context, selectTextCalls } = popupContext();
     const container = new FakeContainer();
@@ -1035,6 +1083,206 @@ test('duplicate refresh updates every format and creates or removes show-notes b
     assert.deepEqual(notesButtons.map((button) => button.style.display), ['none', 'none', 'none']);
     assert.deepEqual(mineButtons.map((button) => button.disabled), [false, false, false]);
 });
+
+function miningPopup(options = {}) {
+    const setup = popupContext({ duplicateStates: { word: false, sentence: false }, ...options });
+    Object.assign(setup.context.window, {
+        allowDupes: true,
+        preventAccidentalDuplicates: true,
+        useAnkiConnect: true,
+        ankiBackendAvailable: true,
+        ankiFormats: [
+            { id: 'word', icon: 'square', isValid: true },
+            { id: 'sentence', icon: 'circle', isValid: true },
+        ],
+    });
+    mountMiningEntries(setup);
+    return setup;
+}
+
+function mountMiningEntries(setup, expressions = ['猫', '犬']) {
+    const { context, entriesContainer } = setup;
+    context.window.lookupEntries = expressions.map(expression => ({
+        expression, reading: expression, matched: expression,
+        frequencies: [], pitches: [], rules: [], glossaries: [],
+    }));
+    context.window.entryCount = expressions.length;
+    setup.containers = expressions.map((_, index) => {
+        const container = new FakeElement();
+        container.dataset.entryIndex = String(index);
+        context.appendAnkiFormatButtons(container, index);
+        entriesContainer.appendChild(container);
+        return container;
+    });
+    setup.mineButton = (index = 0, formatId = 'word') => descendants(setup.containers[index])
+        .find(button => button.dataset.kind === 'mine' && button.dataset.formatId === formatId);
+}
+
+for (const existingNote of [false, true]) {
+    test(`mining guard locks a successful format immediately with existing note=${existingNote}`, async () => {
+        const setup = miningPopup({ duplicateStates: { word: existingNote, sentence: false } });
+        const { context, containers, mineButton, mineEntryMessages } = setup;
+        await context.refreshAnkiDuplicateStates(0, containers[0]);
+        assert.equal(mineButton().disabled, false);
+
+        await context.mineEntryAtIndex(0, 'word', containers[0]);
+
+        assert.equal(mineButton().disabled, true);
+        assert.match(mineButton().style.properties.get('--button-icon-url'), /check_box\.svg/);
+        assert.equal(mineButton(0, 'sentence').disabled, false);
+        assert.equal(mineButton(1).disabled, false);
+        await context.refreshAnkiDuplicateStates(0, containers[0]);
+        await context.mineEntryAtIndex(0, 'word', containers[0]);
+        assert.equal(mineEntryMessages.length, 1);
+        await context.mineEntryAtIndex(0, 'sentence', containers[0]);
+        await context.mineEntryAtIndex(1, 'word', containers[1]);
+        assert.deepEqual(mineEntryMessages.map(message => message.formatId), ['word', 'sentence', 'word']);
+    });
+}
+
+test('mining guard survives a duplicate response arriving during an in-flight request', async () => {
+    let finishMining, finishDuplicateCheck;
+    const setup = miningPopup({ mine: () => new Promise(resolve => { finishMining = resolve; }) });
+    const { context, containers, mineButton, mineEntryMessages } = setup;
+    setup.setDuplicateStates(() => new Promise(resolve => { finishDuplicateCheck = resolve; }));
+    const staleRefresh = context.refreshAnkiDuplicateStates(0, containers[0]);
+    const mining = context.mineEntryAtIndex(0, 'word', containers[0]);
+    const repeated = context.mineEntryAtIndex(0, 'word', containers[0]);
+    assert.equal(mineEntryMessages.length, 1);
+
+    finishDuplicateCheck({ word: false, sentence: false });
+    await staleRefresh;
+    assert.equal(mineButton().disabled, true);
+    assert.equal(mineButton(0, 'sentence').disabled, true);
+    setup.setDuplicateStates({ word: false, sentence: false });
+    finishMining(true);
+    await mining;
+    await repeated;
+    assert.equal(mineButton().disabled, true);
+    assert.equal(mineButton(0, 'sentence').disabled, false);
+});
+
+for (const failure of ['false', 'exception']) {
+    test(`mining guard permits retry after ${failure}`, async () => {
+        let calls = 0;
+        const setup = miningPopup({ mine: () => {
+            if (++calls > 1) return true;
+            if (failure === 'exception') throw new Error('backend unavailable');
+            return false;
+        } });
+        const { context, containers, mineButton, mineEntryMessages } = setup;
+        await context.mineEntryAtIndex(0, 'word', containers[0]);
+        assert.equal(mineButton().disabled, false);
+        assert.equal(mineButton(0, 'sentence').disabled, false);
+        await context.mineEntryAtIndex(0, 'word', containers[0]);
+        assert.equal(mineEntryMessages.length, 2);
+        assert.equal(mineButton().disabled, true);
+    });
+}
+
+test('mining guard restores retryable buttons when the backend and duplicate lookup are unavailable', async () => {
+    let offline = false;
+    const setup = miningPopup({
+        duplicateStates: { word: true, sentence: false },
+        mine: () => !offline,
+    });
+    const { context, containers, mineButton, mineEntryMessages } = setup;
+    await context.refreshAnkiDuplicateStates(0, containers[0]);
+    await context.mineEntryAtIndex(0, 'sentence', containers[0]);
+    offline = true;
+    setup.setDuplicateStates({});
+
+    await context.mineEntryAtIndex(0, 'word', containers[0]);
+
+    assert.equal(mineButton().disabled, false);
+    assert.match(mineButton().style.properties.get('--button-icon-url'), /check_box\.svg/);
+    assert.equal(mineButton(0, 'sentence').disabled, true);
+    offline = false;
+    setup.setDuplicateStates({ word: true, sentence: true });
+    await context.mineEntryAtIndex(0, 'word', containers[0]);
+    assert.equal(mineEntryMessages.length, 3);
+    assert.equal(mineButton().disabled, true);
+});
+
+test('mining guard shows success before the delayed AnkiDroid duplicate check', async () => {
+    const setup = miningPopup();
+    const { context, containers, mineButton } = setup;
+    context.window.useAnkiConnect = false;
+    const timers = [];
+    context.setTimeout = callback => { timers.push(callback); };
+    await context.mineEntryAtIndex(0, 'word', containers[0]);
+    assert.equal(mineButton().disabled, true);
+    assert.match(mineButton().style.properties.get('--button-icon-url'), /check_box\.svg/);
+    assert.equal(timers.length, 1);
+    await timers[0]();
+    assert.equal(mineButton().disabled, true);
+    assert.equal(mineButton(0, 'sentence').disabled, false);
+});
+
+test('mining guard keeps successful buttons through history and ignores glossary or audio changes', async () => {
+    const setup = miningPopup();
+    const { context, containers, mineButton, mineEntryMessages } = setup;
+    await context.mineEntryAtIndex(0, 'word', containers[0]);
+    context.redirectKanji({ character: '猫', entries: [] });
+    context.window.navigateBack();
+    context.window.getSelection = () => ({ toString: () => 'different selection' });
+    vm.runInContext("selectedDictionaries[0] = { name: 'Other' }; audioUrls[0] = 'other.mp3';", context);
+    await context.mineEntryAtIndex(0, 'word', containers[0]);
+    assert.equal(mineEntryMessages.length, 1);
+    assert.equal(mineButton().disabled, true);
+});
+
+test('mining guard records success while its history result is detached', async () => {
+    let finishMining;
+    const setup = miningPopup({ mine: () => new Promise(resolve => { finishMining = resolve; }) });
+    const { context, containers, mineButton } = setup;
+    const mining = context.mineEntryAtIndex(0, 'word', containers[0]);
+    context.redirectKanji({ character: '猫', entries: [] });
+    descendants(containers[0]).forEach(node => { node.isConnected = false; });
+    finishMining(true);
+    await mining;
+    context.window.navigateBack();
+    descendants(containers[0]).forEach(node => { node.isConnected = true; });
+    assert.equal(mineButton().disabled, true);
+    assert.match(mineButton().style.properties.get('--button-icon-url'), /check_box\.svg/);
+    assert.equal(mineButton(0, 'sentence').disabled, false);
+});
+
+test('mining guard scopes late completion to old results and allows a newly opened popup', async () => {
+    let finishMining;
+    const setup = miningPopup({ mine: () => new Promise(resolve => { finishMining = resolve; }) });
+    const { context, mineEntryMessages, duplicateCheckMessages } = setup;
+    const oldContainer = setup.containers[0];
+    const mining = context.mineEntryAtIndex(0, 'word', oldContainer);
+    context.window.resetPopupResults();
+    descendants(oldContainer).forEach(node => { node.isConnected = false; });
+    mountMiningEntries(setup, ['犬']);
+    finishMining(true);
+    await mining;
+    assert.equal(setup.mineButton().disabled, false);
+    assert.equal(duplicateCheckMessages.at(-1)['{expression}'], '猫');
+    const newMining = context.mineEntryAtIndex(0, 'word', setup.containers[0]);
+    finishMining(true);
+    await newMining;
+    assert.equal(mineEntryMessages.length, 2);
+    assert.equal(setup.mineButton().disabled, true);
+
+    const child = miningPopup();
+    await child.context.mineEntryAtIndex(0, 'word', child.containers[0]);
+    assert.equal(child.mineEntryMessages.length, 1);
+});
+
+for (const setting of ['allowDupes', 'preventAccidentalDuplicates']) {
+    test(`mining guard does not apply when ${setting} is off`, async () => {
+        const setup = miningPopup();
+        const { context, containers, mineButton, mineEntryMessages } = setup;
+        context.window[setting] = false;
+        await context.mineEntryAtIndex(0, 'word', containers[0]);
+        assert.equal(mineButton().disabled, false);
+        await context.mineEntryAtIndex(0, 'word', containers[0]);
+        assert.equal(mineEntryMessages.length, 2);
+    });
+}
 
 test('popup language detection works with split selection policy assets', () => {
     const { context } = popupContext({
@@ -1736,7 +1984,7 @@ test('default mining completion does not cancel concurrent requested playback', 
 for (const zoom of [0.8, 1, 2]) {
     for (const side of ['below', 'above']) {
         test(`long audio menu stays ${side} its anchor in a short viewport at zoom ${zoom}`, async () => {
-            const { context, body, document } = popupContext({ htmlZoom: String(zoom) });
+            const { context, body, document } = popupContext({ htmlZoom: String(zoom), htmlProbeWidth: 100 * zoom });
             context.window.innerWidth = 320 * zoom;
             context.window.innerHeight = 200 * zoom;
             const createElement = document.createElement.bind(document);
@@ -1762,3 +2010,35 @@ for (const zoom of [0.8, 1, 2]) {
         });
     }
 }
+
+test('audio menu fits a narrow zoomed viewport even when its preferred minimum width is too large', async () => {
+    const zoom = 2;
+    const { context, body, document } = popupContext({ htmlZoom: String(zoom), htmlProbeWidth: 100 * zoom });
+    context.window.innerWidth = 320;
+    context.window.innerHeight = 240;
+    const createElement = document.createElement.bind(document);
+    document.createElement = tag => {
+        const element = createElement(tag);
+        Object.defineProperty(element, 'offsetWidth', {
+            get: () => Math.max(parseFloat(element.style.minWidth) || 180,
+                Math.min(280, parseFloat(element.style.maxWidth) || 280)),
+        });
+        Object.defineProperty(element, 'offsetHeight', {
+            get: () => Math.min(600, parseFloat(element.style.maxHeight) || 600),
+        });
+        return element;
+    };
+    const anchor = new FakeElement();
+    anchor.getBoundingClientRect = () => ({ left: 260, right: 304, top: 20, bottom: 64 });
+    context.window.lookupEntries = [{ expression: '猫', reading: 'ねこ' }];
+    context.window.audioSources = [{ name: 'Remote', url: 'remote://' }];
+    await context.showAudioCandidateMenu(0, anchor);
+
+    const menu = body.children.find(child => child.className === 'audio-candidate-menu');
+    const left = parseFloat(menu.style.left) * zoom;
+    const right = left + menu.offsetWidth * zoom;
+    const top = parseFloat(menu.style.top) * zoom;
+    const bottom = top + menu.offsetHeight * zoom;
+    assert.ok(left >= 8 * zoom && right <= 320 - 8 * zoom, 'menu fits horizontally with scaled margins');
+    assert.ok(top >= 64 + 4 * zoom && bottom <= 240 - 8 * zoom, 'menu fits below the trigger');
+});

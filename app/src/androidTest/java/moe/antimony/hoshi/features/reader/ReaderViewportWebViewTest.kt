@@ -86,6 +86,87 @@ class ReaderViewportWebViewTest {
         } finally { instrumentation.runOnMainSync { webView.destroy() } }
     }
 
+    @Test
+    fun continuousRestoreKeepsTextAlignedWithoutHalfLineDrift() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val assets = ReaderWebAssets.load(instrumentation.targetContext)
+        lateinit var webView: WebView
+        composeRule.setContent {
+            AndroidView(modifier = Modifier.fillMaxSize(), factory = { context ->
+                WebView(context).also { webView = it; it.settings.javaScriptEnabled = true }
+            })
+        }
+        composeRule.waitForIdle()
+        try {
+            for (vertical in listOf(true, false)) for (font in listOf(22, 36)) for (lineHeight in listOf(1.0, 1.75)) for (padding in listOf(0, 30)) {
+                val label = "vertical=$vertical font=$font lineHeight=$lineHeight padding=$padding"
+                val settings = ReaderSettings(
+                    viewMode = ReaderViewMode.Continuous,
+                    verticalWriting = vertical,
+                    fontSize = font,
+                    horizontalPadding = padding,
+                    verticalPadding = padding,
+                    layoutAdvanced = true,
+                    lineHeight = lineHeight,
+                )
+                val loaded = CountDownLatch(1)
+                val styles = ReaderContentStyles.styleTag(settings = settings, readerCssTemplate = assets.readerCss)
+                val script = ReaderPaginationScripts.shellScript(settings = settings, assets = assets)
+                val sentence = "<span>「</span><ruby>読書<rt>どくしょ</rt></ruby>" +
+                    listOf("の", "時間", "です。", "𠮟", "가", "ㄱㆎ", "漢字", "を", "読み", "ます。", "」")
+                        .joinToString("") { "<span>$it</span>" }
+                val body = "<p>${sentence.repeat(80)}<span>文</span><ruby id='anchor'>目印<rt>めじるし</rt></ruby>${sentence.repeat(80)}</p>"
+                instrumentation.runOnMainSync {
+                    webView.webViewClient = object : WebViewClient() {
+                        override fun onPageFinished(view: WebView, url: String) { loaded.countDown() }
+                    }
+                    webView.loadDataWithBaseURL(null,
+                        "<!doctype html><html><head><script>window.HoshiReaderRestore={postMessage:()=>window.testRestored=true};</script>$styles$script</head><body>$body</body></html>",
+                        "text/html", "utf-8", null)
+                }
+                assertTrue(label, loaded.await(15, TimeUnit.SECONDS))
+                composeRule.waitUntil(15_000) { evaluate(webView, "Boolean(window.testRestored)") == "true" }
+                val before = JSONObject(evaluate(webView, """
+                    (() => {
+                        const r = window.hoshiReader, range = document.createRange();
+                        range.selectNodeContents(document.getElementById('anchor'));
+                        const rects = Array.from(range.getClientRects());
+                        const right = Math.max(...rects.map(rect => rect.right));
+                        const top = Math.min(...rects.map(rect => rect.top));
+                        const viewport = r.contentViewport();
+                        r.scrollBy({left: r.isVertical() ? right - viewport.right : 0,
+                            top: r.isVertical() ? 0 : top - viewport.top, behavior: 'instant'});
+                        window.testProgress = r.calculateProgress();
+                        const style = getComputedStyle(document.body);
+                        return {position: r.isVertical() ? document.body.scrollLeft : document.body.scrollTop, progress: window.testProgress,
+                            fontSize: parseFloat(style.fontSize), lineHeight: parseFloat(style.lineHeight)};
+                    })()
+                """.trimIndent()))
+                assertTrue("$label middle of chapter", before.getDouble("progress") in 0.2..0.8)
+                assertEquals("$label font size", font.toDouble(), before.getDouble("fontSize"), 0.01)
+                assertEquals("$label line height", font * lineHeight, before.getDouble("lineHeight"), 0.01)
+                repeat(3) {
+                    evaluate(webView, "window.testRestored=false; window.hoshiReader.restoreProgress(0); true")
+                    composeRule.waitUntil(15_000) { evaluate(webView, "Boolean(window.testRestored)") == "true" }
+                    evaluate(webView, "window.testRestored=false; window.hoshiReader.restoreProgress(window.testProgress); true")
+                    composeRule.waitUntil(15_000) { evaluate(webView, "Boolean(window.testRestored)") == "true" }
+                    val after = JSONObject(evaluate(webView, """
+                        (() => { const r = window.hoshiReader;
+                            const rt = document.querySelector('#anchor rt').getBoundingClientRect();
+                            window.testProgress = r.calculateProgress();
+                            return {
+                            position: r.isVertical() ? document.body.scrollLeft : document.body.scrollTop, progress: window.testProgress,
+                            annotationVisible: r.isVertical() ? rt.right <= r.contentViewport().right + 1 : rt.top >= r.contentViewport().top - 1
+                        }; })()
+                    """.trimIndent()))
+                    assertEquals("$label restore $it", before.getDouble("position"), after.getDouble("position"), 1.0)
+                    assertEquals("$label progress $it", before.getDouble("progress"), after.getDouble("progress"), 0.000001)
+                    assertTrue("$label furigana $it", after.getBoolean("annotationVisible"))
+                }
+            }
+        } finally { instrumentation.runOnMainSync { webView.destroy() } }
+    }
+
     private fun evaluate(webView: WebView, script: String): String {
         val complete = CountDownLatch(1)
         var result = "null"

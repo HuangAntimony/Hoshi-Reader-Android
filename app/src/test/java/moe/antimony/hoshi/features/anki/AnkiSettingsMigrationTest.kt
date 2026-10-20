@@ -9,6 +9,16 @@ import kotlinx.serialization.json.Json
 
 class AnkiSettingsMigrationTest {
     @Test
+    fun missingAccidentalDuplicateSettingDefaultsOffWithoutMigration() {
+        val decoded = decodeAnkiSettings(
+            """{"schemaVersion":2,"allowDupes":true,"cardFormats":[{"id":"saved","name":"Mining"}]}""",
+        ) { error("Unexpected migration") }
+
+        assertFalse(decoded.settings.preventAccidentalDuplicates)
+        assertFalse(decoded.didMigrate)
+    }
+
+    @Test
     fun obsoleteEmbedMediaSettingDoesNotResetSavedConfiguration() {
         val settings = decodeAnkiSettings(
             """{"schemaVersion":2,"embedMedia":false,"cardFormats":[{"id":"saved","name":"Mining","selectedDeckId":3,"fieldMappings":{"Front":"{glossary}"}}]}""",

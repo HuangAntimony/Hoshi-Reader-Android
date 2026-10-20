@@ -1,6 +1,29 @@
 (function(global) {
   'use strict';
 
+  // Native handles may end in annotations or element boundaries. Read the body
+  // slices without changing the Range or its native selection handles.
+  function selectedTextSegments(range) {
+    if (!range || range.collapsed) return [];
+    var isAnnotation = function(node) { return !!node.parentElement?.closest('rt, rp'); };
+    var walker = document.createTreeWalker(range.commonAncestorContainer, NodeFilter.SHOW_TEXT, {
+      acceptNode: function(node) { return isAnnotation(node) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT; }
+    });
+    walker.currentNode = range.startContainer;
+    var node = range.startContainer.nodeType === Node.TEXT_NODE ? range.startContainer : walker.nextNode();
+    var segments = [];
+    while (node) {
+      if (range.comparePoint(node, 0) > 0) break;
+      if (!isAnnotation(node) && range.intersectsNode(node)) {
+        var start = node === range.startContainer ? range.startOffset : 0;
+        var end = node === range.endContainer ? range.endOffset : node.textContent.length;
+        if (end > start) segments.push({ node: node, start: start, end: end });
+      }
+      node = walker.nextNode();
+    }
+    return segments;
+  }
+
   function normalizeReaderText(context, parent) {
     if (!parent) return;
     normalizeRubyTextNodes(parent);
@@ -161,6 +184,7 @@
   }
 
   global.hoshiReaderDomText = {
+    selectedTextSegments: selectedTextSegments,
     captureSasayakiBoundaries: captureSasayakiBoundaries,
     createSasayakiTextIndex: createSasayakiTextIndex,
     sasayakiSegments: sasayakiSegments,

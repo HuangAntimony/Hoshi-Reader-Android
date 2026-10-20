@@ -5,7 +5,6 @@ import moe.antimony.hoshi.ui.theme.hoshiContainerBorder
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.animation.core.Animatable
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.rememberScrollState
@@ -47,7 +46,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import moe.antimony.hoshi.ui.HoshiAlertDialog as AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.CenterAlignedTopAppBar
 import moe.antimony.hoshi.ui.HoshiDropdownMenu as DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -57,7 +55,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -66,9 +63,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.DataObject
@@ -114,6 +109,7 @@ import moe.antimony.hoshi.dictionary.DictionaryInfo
 import moe.antimony.hoshi.dictionary.DictionaryType
 import moe.antimony.hoshi.dictionary.recommendedDictionariesForLanguage
 import moe.antimony.hoshi.features.settings.SettingsDetailScaffold
+import moe.antimony.hoshi.features.settings.SettingsLoadState
 import moe.antimony.hoshi.features.reader.ReaderFontManager
 import moe.antimony.hoshi.importing.ImportFileType
 import moe.antimony.hoshi.importing.MultipleFileImportContent
@@ -145,10 +141,6 @@ fun DictionaryView(
     var intervalMenuExpanded by remember { mutableStateOf(false) }
     val recommendedDictionaries = remember(profileState.effectiveContentLanguageProfile.dictionaryLanguageId) {
         recommendedDictionariesForLanguage(profileState.effectiveContentLanguageProfile.dictionaryLanguageId)
-    }
-
-    LaunchedEffect(profileState.effectiveProfile.id) {
-        dictionaryViewModel.reload()
     }
 
     val importer = rememberLauncherForActivityResult(MultipleFileImportContent()) { uris: List<Uri> ->
@@ -322,8 +314,23 @@ fun DictionaryView(
         }
     }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(dictionaryViewModel) {
         dictionaryViewModel.reload()
+    }
+
+    if (uiState.settingsPageState !is SettingsLoadState.Loaded) {
+        SettingsDetailScaffold(
+            state = uiState.settingsPageState,
+            title = stringResource(when (destination) {
+                DictionaryDestination.Settings -> R.string.settings_title
+                DictionaryDestination.CustomCss -> R.string.dictionary_custom_css
+                null -> R.string.settings_dictionaries
+            }),
+            onClose = { if (destination == null) onClose() else destination = null },
+            modifier = modifier,
+            onRetry = dictionaryViewModel::retrySettings,
+        ) { _, _ -> }
+        return
     }
 
     when (destination) {
@@ -358,6 +365,8 @@ fun DictionaryView(
     val colorScheme = MaterialTheme.colorScheme
 
     SettingsDetailScaffold(
+        state = uiState.settingsPageState,
+        onRetry = dictionaryViewModel::retrySettings,
         title = stringResource(R.string.settings_dictionaries),
         onClose = {
             if (!isBusy) {
@@ -391,7 +400,7 @@ fun DictionaryView(
                 }
             }
         },
-    ) { innerPadding ->
+    ) { innerPadding, _ ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -1057,16 +1066,6 @@ private fun HoshiSwitch(
 private fun hoshiSwitchColors() = SwitchDefaults.colors()
 
 @Composable
-private fun HoshiIconBackButton(onClick: () -> Unit) {
-    IconButton(onClick = onClick) {
-        Icon(
-            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-            contentDescription = stringResource(R.string.action_back),
-        )
-    }
-}
-
-@Composable
 private fun GroupDivider() {
     HorizontalDivider(
         modifier = Modifier.padding(horizontal = 16.dp),
@@ -1104,24 +1103,15 @@ private fun DictionarySettingsView(
         )
         return
     }
-    BackHandler(onBack = onClose)
     val colorScheme = MaterialTheme.colorScheme
-    Scaffold(
+    SettingsDetailScaffold(
+        state = SettingsLoadState.Loaded(settings),
+        title = stringResource(R.string.settings_title),
+        onClose = onClose,
         modifier = modifier.fillMaxSize(),
         containerColor = hoshiSurfaces.page,
-        topBar = {
-            CenterAlignedTopAppBar(
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = hoshiSurfaces.page,
-                    scrolledContainerColor = hoshiSurfaces.page,
-                    titleContentColor = colorScheme.onBackground,
-                    navigationIconContentColor = colorScheme.onBackground,
-                ),
-                title = { Text(stringResource(R.string.settings_title)) },
-                navigationIcon = { HoshiIconBackButton(onClose) },
-            )
-        },
-    ) { innerPadding ->
+        contentColor = colorScheme.onBackground,
+    ) { innerPadding, settings ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -1317,15 +1307,15 @@ private fun CollapsedDictionariesView(
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    BackHandler(onBack = onClose)
     val colorScheme = MaterialTheme.colorScheme
     SettingsDetailScaffold(
+        state = SettingsLoadState.Loaded(dictionaries to collapsedDictionaries),
         title = stringResource(R.string.dictionary_collapse_dictionaries),
         onClose = onClose,
         modifier = modifier.fillMaxSize(),
         containerColor = hoshiSurfaces.page,
         contentColor = colorScheme.onBackground,
-    ) { innerPadding ->
+    ) { innerPadding, (dictionaries, collapsedDictionaries) ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -1383,7 +1373,6 @@ private fun DictionaryCustomCssView(
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    BackHandler(onBack = onClose)
     val colorScheme = MaterialTheme.colorScheme
     val fontLibraryState by fontManager.libraryState.collectAsStateWithLifecycle()
     val fontNames = remember(fontManager, fontLibraryState.revision) { fontManager.allFontNames() }
@@ -1453,31 +1442,23 @@ private fun DictionaryCustomCssView(
         onSettingsChange { it.copy(customCSS = nextValue.text) }
     }
 
-    Scaffold(
+    SettingsDetailScaffold(
+        state = SettingsLoadState.Loaded(settings),
+        title = stringResource(R.string.dictionary_custom_css),
+        onClose = onClose,
         modifier = modifier.fillMaxSize(),
         containerColor = hoshiSurfaces.page,
-        topBar = {
-            CenterAlignedTopAppBar(
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = hoshiSurfaces.page,
-                    scrolledContainerColor = hoshiSurfaces.page,
-                    titleContentColor = colorScheme.onBackground,
-                    navigationIconContentColor = colorScheme.onBackground,
-                ),
-                title = { Text(stringResource(R.string.dictionary_custom_css)) },
-                navigationIcon = { HoshiIconBackButton(onClose) },
-                actions = {
-                    TextButton(
-                        onClick = {
-                            dispatchCustomCssReset(DictionaryCustomCssResetAction.RequestConfirmation)
-                        },
-                    ) {
-                        Text(stringResource(R.string.action_reset))
-                    }
+        contentColor = colorScheme.onBackground,
+        actions = {
+            TextButton(
+                onClick = {
+                    dispatchCustomCssReset(DictionaryCustomCssResetAction.RequestConfirmation)
                 },
-            )
+            ) {
+                Text(stringResource(R.string.action_reset))
+            }
         },
-    ) { innerPadding ->
+    ) { innerPadding, _ ->
         Surface(
             modifier = Modifier
                 .fillMaxSize()

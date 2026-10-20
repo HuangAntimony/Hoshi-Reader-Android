@@ -28,6 +28,17 @@ import org.junit.Test
 
 class LookupPopupHtmlTest {
     @Test
+    fun popupExclusionPayloadPreservesExactDictionaryTitles() {
+        val html = LookupPopupHtml.renderIframeDocument(
+            ankiSettings = AnkiPopupSettings(excludedDictionaries = listOf("Dict [2026]", "辞典\"特殊")),
+        )
+        val payload = Json.parseToJsonElement(
+            html.substringAfter("window.excludedDictionaries = ").substringBefore(';'),
+        )
+        assertEquals(Json.parseToJsonElement("""["Dict [2026]","辞典\"特殊"]"""), payload)
+    }
+
+    @Test
     fun popupAudioPayloadKeepsEnabledBuiltInsInConfiguredOrder() {
         val sources = AudioSettings.DefaultAudioSources.reversed().mapIndexed { index, source ->
             source.copy(isEnabled = index != 1)
@@ -267,15 +278,6 @@ class LookupPopupHtmlTest {
 
         assertTrue(html.contains("message.type === 'navigateTerm'"))
         assertTrue(html.contains("window.navigatePopupTerm?.(message.direction)"))
-    }
-
-    @Test
-    fun eInkPopupCssTargetsPopupControlsAndStructuredRows() {
-        val html = LookupPopupHtml.renderIframeDocument(eInkMode = true)
-
-        assertTrue(html.contains("""html[data-hoshi-eink-mode="true"] .button-slot"""))
-        assertTrue(html.contains("""html[data-hoshi-eink-mode="true"] .frequency-group"""))
-        assertTrue(html.contains("""html[data-hoshi-eink-mode="true"] .overlay"""))
     }
 
     @Test

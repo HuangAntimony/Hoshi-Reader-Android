@@ -68,10 +68,12 @@ class ReaderAppearanceSelectionTest {
             composeRule.setContent {
                 HoshiReaderTheme(darkTheme = dark, eInkMode = eInk, accentSeed = 0xFF2E7D32) {
                     ReaderAppearanceScreen(
-                        settings = settings.value,
+                        settings = moe.antimony.hoshi.features.settings.SettingsLoadState.Loaded(settings.value),
+                        onRetrySettings = {},
                         profileName = "Selection test",
                         onSettingsChange = { settings.value = it(settings.value) },
-                        sasayakiSettings = SasayakiSettings(),
+                        sasayakiSettings = moe.antimony.hoshi.features.settings.SettingsLoadState.Loaded(SasayakiSettings()),
+                        onRetrySasayakiSettings = {},
                         onSasayakiSettingsChange = {},
                         fontManager = fontManager,
                         onClose = {},

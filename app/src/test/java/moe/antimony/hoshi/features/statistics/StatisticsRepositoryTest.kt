@@ -169,18 +169,24 @@ class StatisticsRepositoryTest {
         val books = BookRepository(files)
         val root = books.createStoredBook("active-id", "book", "Archived title", listOf(ReadingStatistics("Book", "2026-06-30", charactersRead = 20)))
         books.deleteBook(root)
+        val repository = AndroidStatisticsRepository(books.statisticsStore)
+        assertEquals(1, repository.loadArchiveSummary().bookCount)
         val corrupt = files.resolve("Books/statistics_archive/corrupt").apply { mkdirs() }
         corrupt.resolve("statistics.json").writeText("broken")
-        val repository = AndroidStatisticsRepository(books.statisticsStore)
-        assertEquals(1, repository.loadArchiveSummary())
-        assertEquals(setOf("corrupt"), repository.loadSnapshot().skippedCorruptBookIds)
+        val archiveSummary = repository.loadArchiveSummary()
+        assertEquals(1, archiveSummary.bookCount)
+        assertEquals(setOf("corrupt"), archiveSummary.readErrors.keys)
+        assertTrue(archiveSummary.hasArchivedData)
+        val snapshot = repository.loadSnapshot()
+        assertEquals(setOf("corrupt"), snapshot.skippedCorruptBookIds)
+        assertTrue(snapshot.readErrors.getValue("corrupt").message.orEmpty().isNotBlank())
         assertTrue(repository.loadBookStatistics("book")!!.isArchived)
         repository.editSession("book", moe.antimony.hoshi.features.sync.TtuStatistics.legacyId("book", "2026-06-30"), 60, 120.0)
         assertEquals(120.0, repository.loadBookStatistics("book")!!.sessions.values.single().value!!.readingTime, 0.0)
         repository.deleteSessions("book", repository.loadBookStatistics("book")!!.sessions.keys)
         assertTrue(repository.loadBookStatistics("book")!!.sessions.values.all { it.value == null })
         repository.clearArchive()
-        assertEquals(0, repository.loadArchiveSummary())
+        assertEquals(0, repository.loadArchiveSummary().bookCount)
     }
 
     private suspend fun BookRepository.createStoredBook(

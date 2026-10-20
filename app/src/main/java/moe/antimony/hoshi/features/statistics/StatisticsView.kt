@@ -16,6 +16,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.TextButton
+import moe.antimony.hoshi.ui.HoshiAlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -34,6 +36,8 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import moe.antimony.hoshi.R
+import moe.antimony.hoshi.ui.ErrorDetailsText
+import moe.antimony.hoshi.ui.asString
 import moe.antimony.hoshi.features.bookshelf.MainShellLayoutSpec
 
 @Composable
@@ -56,6 +60,19 @@ internal fun StatisticsView(
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
         }
+    }
+
+    uiState.loadError?.let { message ->
+        HoshiAlertDialog(
+            onDismissRequest = viewModel::dismissLoadError,
+            text = { ErrorDetailsText(message.asString()) },
+            confirmButton = {
+                TextButton(onClick = viewModel::reload) { Text(stringResource(R.string.settings_retry)) }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::dismissLoadError) { Text(stringResource(R.string.action_close)) }
+            },
+        )
     }
 
     Scaffold(
@@ -83,7 +100,7 @@ internal fun StatisticsView(
             if (uiState.emptyState?.hasPartialReadError == true) {
                 CenteredStatisticsColumn(layoutSpec = layoutSpec) {
                     Text(
-                        text = stringResource(R.string.statistics_partial_unavailable),
+                        text = uiState.emptyState?.readError?.asString() ?: stringResource(R.string.statistics_partial_unavailable),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.error,
                     )

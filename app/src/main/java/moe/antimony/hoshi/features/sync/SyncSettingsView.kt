@@ -12,12 +12,9 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import moe.antimony.hoshi.ui.asString
 import java.text.DateFormat
 import java.util.Date
-import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
@@ -33,7 +30,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.ChevronRight
@@ -42,7 +38,6 @@ import androidx.compose.material.icons.rounded.SwapVert
 import moe.antimony.hoshi.ui.HoshiAlertDialog as AlertDialog
 import moe.antimony.hoshi.ui.HoshiButton as Button
 import androidx.compose.material3.BottomSheetDefaults
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import moe.antimony.hoshi.ui.HoshiDropdownMenu as DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -58,12 +53,10 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedSecureTextField
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -95,9 +88,16 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import moe.antimony.hoshi.LocalHoshiUiDependencies
 import moe.antimony.hoshi.R
+import moe.antimony.hoshi.ui.ErrorDetailsText
 import moe.antimony.hoshi.features.reader.ReaderSettings
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettings
-import moe.antimony.hoshi.features.settings.collectAsLoadedSettings
+import moe.antimony.hoshi.features.settings.SettingsDetailScaffold
+import moe.antimony.hoshi.features.settings.SettingsLoadState
+import moe.antimony.hoshi.features.settings.rememberSettingsLoader
+import moe.antimony.hoshi.ui.UiText
+import moe.antimony.hoshi.ui.asString
+import moe.antimony.hoshi.ui.withErrorDetails
+import kotlinx.coroutines.flow.combine
 import moe.antimony.hoshi.ui.hoshiOutlinedTextFieldColors
 import moe.antimony.hoshi.ui.hoshiSingleLineTextFieldLineLimits
 import moe.antimony.hoshi.ui.rememberSyncedTextFieldState
@@ -119,9 +119,18 @@ fun SyncSettingsView(
     val hoshiSync = appContainer.googleDriveSyncManager
     val hoshiState by hoshiSync.state.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
-    val settings = repository.settings.collectAsLoadedSettings()
-    val readerSettings = readerSettingsRepository.settings.collectAsLoadedSettings()
-    val sasayakiSettings = sasayakiSettingsRepository.settings.collectAsLoadedSettings()
+    val settingsFlow = remember(repository, readerSettingsRepository, sasayakiSettingsRepository) {
+        combine(repository.settings, readerSettingsRepository.settings, sasayakiSettingsRepository.settings) { sync, reader, sasayaki ->
+            Triple(sync, reader, sasayaki)
+        }
+    }
+    val settingsLoader = settingsFlow.rememberSettingsLoader()
+    val confirmed = (settingsLoader.state as? SettingsLoadState.Loaded)?.value
+    val settings = confirmed?.first
+    val readerSettings = confirmed?.second
+    val sasayakiSettings = confirmed?.third
+    var authLoadError by remember { mutableStateOf<UiText?>(null) }
+    var authAttempt by remember { mutableStateOf(0) }
     var authStatus by remember { mutableStateOf<DriveAuthStatus?>(null) }
     var providerMenuExpanded by remember { mutableStateOf(false) }
     var directionMenuExpanded by remember { mutableStateOf(false) }
@@ -133,6 +142,7 @@ fun SyncSettingsView(
     var clientSecret by remember { mutableStateOf("") }
     var devicePrompt by remember { mutableStateOf<DeviceCodePrompt?>(null) }
     var pollIntervalSeconds by remember { mutableStateOf(5L) }
+    var operationError by remember { mutableStateOf<UiText?>(null) }
     var showSignOutConfirmation by remember { mutableStateOf(false) }
     var showClearCacheConfirmation by remember { mutableStateOf(false) }
     var showAuthorizationError by remember { mutableStateOf(false) }
@@ -144,23 +154,30 @@ fun SyncSettingsView(
     val currentAuthStatus = authStatus
     val connectionActions = currentAuthStatus?.let { syncConnectionActions(it, isAuthorizing) }
 
-    fun save(next: SyncSettings) {
+    fun launchOperation(summary: UiText, operation: suspend () -> Unit) {
         scope.launch {
-            repository.update { next }
+            try {
+                operation()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                operationError = summary.withErrorDetails(error)
+            }
         }
     }
 
-    fun saveReaderSettings(next: ReaderSettings) {
-        scope.launch {
-            readerSettingsRepository.update { next }
-        }
+    fun save(next: SyncSettings) = launchOperation(UiText.Resource(R.string.display_settings_save_failed)) {
+        repository.update { next }
     }
 
-    fun saveSasayakiSettings(next: SasayakiSettings) {
-        scope.launch {
-            sasayakiSettingsRepository.update { next }
-        }
+    fun saveReaderSettings(next: ReaderSettings) = launchOperation(UiText.Resource(R.string.display_settings_save_failed)) {
+        readerSettingsRepository.update { next }
     }
+
+    fun saveSasayakiSettings(update: (SasayakiSettings) -> SasayakiSettings) =
+        launchOperation(UiText.Resource(R.string.display_settings_save_failed)) {
+            sasayakiSettingsRepository.update(update)
+        }
 
     val authorizationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
         scope.launch {
@@ -199,10 +216,17 @@ fun SyncSettingsView(
         }
     }
 
-    LaunchedEffect(authorizer) {
-        authorizer.configuredClient()?.let { client ->
-            clientId = client.clientId
-            clientSecret = client.clientSecret
+    LaunchedEffect(authorizer, authAttempt) {
+        authLoadError = null
+        try {
+            authorizer.configuredClient()?.let { client ->
+                clientId = client.clientId
+                clientSecret = client.clientSecret
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            authLoadError = UiText.Resource(R.string.settings_load_failed).withErrorDetails(error)
         }
     }
 
@@ -230,7 +254,7 @@ fun SyncSettingsView(
                 throw error
             } catch (error: Throwable) {
                 DriveAuthorizationResult.Failed(
-                    error.message ?: resources.getString(R.string.sync_google_drive_authorization_failed),
+                    resources.getString(R.string.sync_google_drive_authorization_failed).withErrorDetails(error),
                 )
             }
             when (result) {
@@ -312,8 +336,10 @@ fun SyncSettingsView(
                 message = DeviceCodeDriveAuthorizer.MissingConfigurationMessage
                 return@launch
             }
-            authorizer.saveClient(clientId, clientSecret)
-            runCatching { authorizer.requestDeviceCode() }
+            runCatching {
+                authorizer.saveClient(clientId, clientSecret)
+                authorizer.requestDeviceCode()
+            }
                 .onSuccess { prompt ->
                     pollIntervalSeconds = prompt.intervalSeconds
                     devicePrompt = prompt
@@ -325,11 +351,15 @@ fun SyncSettingsView(
                     )
                     runCatching {
                         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(prompt.verificationUrl)))
+                    }.onFailure { error ->
+                        if (error is CancellationException) throw error
+                        operationError = UiText.Resource(R.string.sync_google_drive_authorization_failed).withErrorDetails(error)
                     }
                 }
                 .onFailure { error ->
+                    if (error is CancellationException) throw error
                     isAuthorizing = false
-                    val text = error.message ?: resources.getString(R.string.sync_google_drive_authorization_failed)
+                    val text = resources.getString(R.string.sync_google_drive_authorization_failed).withErrorDetails(error)
                     authStatus = DriveAuthStatus.Failed(text)
                     message = text
                 }
@@ -337,27 +367,34 @@ fun SyncSettingsView(
     }
 
     fun signOut() {
-        scope.launch {
-            runCatching {
-                hoshiSync.signOut()
-                authStatus = googleAuth.status()
-                message = null
-                copyMessage = null
-                devicePrompt = null
-                isAuthorizing = false
-            }.onFailure { message = resources.getString(R.string.bookshelf_sync_failed) }
+        launchOperation(UiText.Resource(R.string.action_sign_out)) {
+            hoshiSync.signOut()
+            authStatus = googleAuth.status()
+            message = null
+            copyMessage = null
+            devicePrompt = null
+            isAuthorizing = false
         }
     }
 
     fun clearCache() {
-        scope.launch {
-            runCatching { hoshiSync.clearCache() }
-                .onSuccess { message = resources.getString(R.string.sync_cache_cleared) }
-                .onFailure { message = resources.getString(R.string.bookshelf_sync_failed) }
+        launchOperation(UiText.Resource(R.string.sync_clear_cache)) {
+            hoshiSync.clearCache()
+            message = resources.getString(R.string.sync_cache_cleared)
         }
     }
 
-    BackHandler(onBack = onClose)
+    operationError?.let { error ->
+        AlertDialog(
+            onDismissRequest = { operationError = null },
+            title = { Text(stringResource(R.string.dialog_error_title)) },
+            text = { ErrorDetailsText(error.asString()) },
+            confirmButton = {
+                TextButton(onClick = { operationError = null }) { Text(stringResource(R.string.action_ok)) }
+            },
+        )
+    }
+
     if (showAuthorizationError) {
         AlertDialog(
             onDismissRequest = { showAuthorizationError = false },
@@ -370,6 +407,7 @@ fun SyncSettingsView(
             },
         )
     }
+
     if (showSignOutConfirmation) {
         AlertDialog(
             onDismissRequest = { showSignOutConfirmation = false },
@@ -418,24 +456,20 @@ fun SyncSettingsView(
         SyncQueueSheet(state = hoshiState, onDismiss = { showQueue = false })
     }
     val colorScheme = MaterialTheme.colorScheme
-    Scaffold(
-        modifier = modifier.fillMaxSize(),
-        containerColor = hoshiSurfaces.page,
-        topBar = {
-            CenterAlignedTopAppBar(
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = hoshiSurfaces.page,
-                    scrolledContainerColor = hoshiSurfaces.page,
-                ),
-                title = { Text(stringResource(R.string.sync_title), fontWeight = FontWeight.SemiBold) },
-                navigationIcon = {
-                    IconButton(onClick = onClose) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.action_back))
-                    }
-                },
-            )
-        },
-    ) { innerPadding ->
+    val screenLoadState: SettingsLoadState<Triple<SyncSettings, ReaderSettings, SasayakiSettings>> = when {
+        settingsLoader.state is SettingsLoadState.Failed -> settingsLoader.state
+        authLoadError != null -> SettingsLoadState.Failed(requireNotNull(authLoadError))
+        authStatus == null -> SettingsLoadState.Loading
+        else -> settingsLoader.state
+    }
+    SettingsDetailScaffold(
+        state = screenLoadState,
+        title = stringResource(R.string.sync_title),
+        onClose = onClose,
+        onRetry = { settingsLoader.retry(); authAttempt++ },
+        modifier = modifier,
+    ) { innerPadding, (currentSettings, currentReaderSettings, currentSasayakiSettings) ->
+        val currentAuthStatus = requireNotNull(authStatus)
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -445,15 +479,6 @@ fun SyncSettingsView(
             contentPadding = PaddingValues(bottom = 24.dp),
         ) {
             item {
-                if (
-                    !screenState.isContentReady ||
-                    currentSettings == null ||
-                    currentReaderSettings == null ||
-                    currentSasayakiSettings == null ||
-                    currentAuthStatus == null
-                ) {
-                    return@item
-                }
                 Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
                     SettingsCard {
                         ListItem(
@@ -567,9 +592,7 @@ fun SyncSettingsView(
                                                             currentReaderSettings.copy(statisticsSyncEnabled = checked),
                                                         )
                                                     SyncSettingsDataRowKind.SyncAudiobookProgress ->
-                                                        saveSasayakiSettings(
-                                                            currentSasayakiSettings.copy(syncEnabled = checked),
-                                                        )
+                                                        saveSasayakiSettings { current -> current.copy(syncEnabled = checked) }
                                                 }
                                             },
                                         )
@@ -607,7 +630,7 @@ fun SyncSettingsView(
                 }
             }
             item {
-                if (!screenState.isContentReady || currentAuthStatus == null || currentSettings?.enabled != true) {
+                if (!currentSettings.enabled) {
                     return@item
                 }
                 SettingsCard {

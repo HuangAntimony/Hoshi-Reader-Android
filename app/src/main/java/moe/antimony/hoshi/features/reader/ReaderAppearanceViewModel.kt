@@ -21,6 +21,7 @@ import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.di.IoDispatcher
 import moe.antimony.hoshi.ui.UiText
+import moe.antimony.hoshi.ui.withErrorDetails
 
 data class ReaderFontDownloadUiState(
     val familyId: String,
@@ -112,8 +113,8 @@ internal class ReaderAppearanceViewModel @Inject constructor(
                 selectionToApply.value = ReaderFontSelection(familyId, variantId)
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
-                error.value = UiText.Resource(R.string.reader_appearance_font_download_failed)
+            } catch (failure: Exception) {
+                error.value = UiText.Resource(R.string.reader_appearance_font_download_failed).withErrorDetails(failure)
                 failedSelection.value = ReaderFontSelectionRequest(familyId, variantId, origin)
             } finally {
                 downloadState.value = null
@@ -140,8 +141,10 @@ internal class ReaderAppearanceViewModel @Inject constructor(
             failedSelection.value = null
             try {
                 withContext(ioDispatcher) { fontManager.importFont(contentResolver, uri) }
-            } catch (_: Exception) {
-                error.value = UiText.Resource(R.string.reader_appearance_font_import_failed)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                error.value = UiText.Resource(R.string.reader_appearance_font_import_failed).withErrorDetails(failure)
             } finally {
                 importing.value = false
             }
@@ -150,7 +153,15 @@ internal class ReaderAppearanceViewModel @Inject constructor(
 
     fun deleteFamily(familyId: String) {
         viewModelScope.launch {
-            withContext(ioDispatcher) { fontManager.deleteFamily(familyId) }
+            error.value = null
+            failedSelection.value = null
+            try {
+                withContext(ioDispatcher) { fontManager.deleteFamily(familyId) }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                error.value = UiText.Resource(R.string.reader_appearance_font_delete_failed).withErrorDetails(failure)
+            }
         }
     }
 

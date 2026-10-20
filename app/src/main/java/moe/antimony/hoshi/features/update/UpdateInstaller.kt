@@ -9,6 +9,8 @@ import android.os.Build
 import android.provider.Settings
 import androidx.core.content.FileProvider
 import java.io.File
+import moe.antimony.hoshi.R
+import moe.antimony.hoshi.ui.withErrorDetails
 
 internal fun openDownloadedUpdate(context: Context, file: File): String? {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !context.packageManager.canRequestPackageInstalls()) {
@@ -16,9 +18,9 @@ internal fun openDownloadedUpdate(context: Context, file: File): String? {
             .setData(Uri.parse("package:${context.packageName}"))
         return runCatching {
             context.startActivity(settingsIntent)
-            "Allow Hoshi Reader to install unknown apps, then tap Install again."
-        }.getOrElse {
-            "Allow Hoshi Reader to install unknown apps in Android settings, then tap Install again."
+            context.getString(R.string.update_install_permission_required)
+        }.getOrElse { error ->
+            context.getString(R.string.update_install_permission_settings_failed).withErrorDetails(error)
         }
     }
 
@@ -34,9 +36,9 @@ internal fun openDownloadedUpdate(context: Context, file: File): String? {
     return try {
         context.startActivity(intent)
         null
-    } catch (_: ActivityNotFoundException) {
-        "No APK installer is available on this device."
-    } catch (_: SecurityException) {
-        "Android blocked the package installer. Allow Hoshi Reader to install unknown apps, then tap Install again."
+    } catch (error: ActivityNotFoundException) {
+        context.getString(R.string.update_installer_unavailable).withErrorDetails(error)
+    } catch (error: SecurityException) {
+        context.getString(R.string.update_installer_blocked).withErrorDetails(error)
     }
 }

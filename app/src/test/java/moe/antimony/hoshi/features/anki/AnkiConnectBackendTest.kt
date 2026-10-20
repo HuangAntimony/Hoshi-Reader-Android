@@ -12,6 +12,91 @@ import org.junit.Test
 
 class AnkiConnectBackendTest {
     @Test
+    fun terminalActionsPreserveOriginalServiceFailures() {
+        for ((action, invoke) in terminalActions()) {
+            val backend = AnkiConnectBackend("https://anki.example.com", FakeAnkiConnectTransport(
+                """{"result":null,"error":"collection database is locked"}""",
+            ))
+
+            val error = runCatching { invoke(backend) }.exceptionOrNull()
+
+            org.junit.Assert.assertNotNull("$action must retain the service failure", error)
+            assertEquals("collection database is locked", error?.message)
+        }
+    }
+
+    @Test
+    fun terminalActionsPropagateCancellation() {
+        for ((action, invoke) in terminalActions()) {
+            val cancelled = kotlinx.coroutines.CancellationException("cancelled")
+            val backend = AnkiConnectBackend("https://anki.example.com", AnkiConnectTransport { _, _, _ -> throw cancelled })
+
+            org.junit.Assert.assertSame("$action must propagate cancellation", cancelled, runCatching { invoke(backend) }.exceptionOrNull())
+        }
+    }
+
+    @Test
+    fun automaticChecksPropagateCancellation() {
+        val cancelled = kotlinx.coroutines.CancellationException("cancelled")
+        val backend = AnkiConnectBackend("https://anki.example.com", AnkiConnectTransport { _, _, _ -> throw cancelled })
+
+        org.junit.Assert.assertSame(cancelled, runCatching { backend.isAvailable() }.exceptionOrNull())
+        org.junit.Assert.assertSame(cancelled, runCatching {
+            backend.isDuplicate(AnkiDeck(1L, "Mining"), AnkiNoteType(2L, "Basic", listOf("Front")), "猫", AnkiDuplicateScope.Collection, false)
+        }.exceptionOrNull())
+    }
+
+    private fun terminalActions(): List<Pair<String, (AnkiConnectBackend) -> Any?>> {
+        val deck = AnkiDeck(1L, "Mining")
+        val noteType = AnkiNoteType(2L, "Basic", listOf("Front"))
+        return listOf(
+            "addNote" to { backend: AnkiConnectBackend -> backend.addNote(deck, noteType, mapOf("Front" to "猫"), emptySet(), true, AnkiDuplicateScope.Collection, false) },
+            "storeMediaFile" to { backend: AnkiConnectBackend -> backend.addMediaFromBytes(byteArrayOf(1, 2), "audio.mp3", "audio/mpeg") },
+            "sync" to { backend: AnkiConnectBackend -> backend.sync() },
+            "guiBrowse" to { backend: AnkiConnectBackend -> backend.openNotes(deck, noteType, "猫", AnkiDuplicateScope.Collection, false) },
+        )
+    }
+
+    @Test
+    fun cancellationIsNotReclassifiedAsAProviderFailure() {
+        val cancelled = kotlinx.coroutines.CancellationException("cancelled")
+        val backend = AnkiConnectBackend("https://anki.example.com", AnkiConnectTransport { _, _, _ -> throw cancelled })
+
+        org.junit.Assert.assertSame(cancelled, runCatching { backend.fetchDecks() }.exceptionOrNull())
+    }
+
+    @Test
+    fun serviceErrorKeepsRejectionReasonWithoutEchoingTheSubmittedKey() {
+        val backend = AnkiConnectBackend("https://anki.example.com", FakeAnkiConnectTransport(
+            """{"result":null,"error":"key echoed-anki-secret rejected for this operation"}""",
+        ), apiKey = "echoed-anki-secret")
+
+        val error = runCatching { backend.fetchDecks() }.exceptionOrNull()!!
+
+        assertFalse(error.message.orEmpty().contains("echoed-anki-secret"))
+            val stack = java.io.StringWriter().also { error.printStackTrace(java.io.PrintWriter(it)) }.toString()
+            assertFalse(stack.contains("echoed-anki-secret"))
+        assertTrue(error.message.orEmpty().contains("rejected for this operation"))
+    }
+
+    @Test
+    fun httpErrorKeepsStatusAndReasonWithoutEchoingTheSubmittedKey() {
+        okhttp3.mockwebserver.MockWebServer().use { server ->
+            server.enqueue(okhttp3.mockwebserver.MockResponse().setResponseCode(403)
+                .setBody("key echoed-anki-secret rejected for this operation"))
+            val backend = AnkiConnectBackend(server.url("/").toString(), apiKey = "echoed-anki-secret")
+
+            val error = runCatching { backend.fetchDecks() }.exceptionOrNull()!!
+
+            assertFalse(error.message.orEmpty().contains("echoed-anki-secret"))
+            val stack = java.io.StringWriter().also { error.printStackTrace(java.io.PrintWriter(it)) }.toString()
+            assertFalse(stack.contains("echoed-anki-secret"))
+            assertTrue(error.message.orEmpty().contains("403"))
+            assertTrue(error.message.orEmpty().contains("rejected for this operation"))
+        }
+    }
+
+    @Test
     fun pingUsesVersionAction() {
         val transport = FakeAnkiConnectTransport("""{"result":6,"error":null}""")
         val backend = AnkiConnectBackend("https://anki.example.com", transport)

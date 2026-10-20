@@ -78,3 +78,33 @@ internal object ReaderSelectionBridgePayload {
         val height: Double,
     )
 }
+
+@Serializable
+internal data class ReaderNativeSelectionMenuRect(
+    val left: Double,
+    val top: Double,
+    val right: Double,
+    val bottom: Double,
+    val viewportWidth: Double,
+) {
+    companion object {
+        fun fromJavascriptResult(result: String?): ReaderNativeSelectionMenuRect? =
+            runCatching { Json.decodeFromString<ReaderNativeSelectionMenuRect>(result.orEmpty()) }
+                .getOrNull()?.takeIf { rect ->
+                    listOf(rect.left, rect.top, rect.right, rect.bottom, rect.viewportWidth).all { it.isFinite() } &&
+                        rect.viewportWidth > 0 && rect.right > rect.left && rect.bottom > rect.top
+                }
+    }
+}
+
+@Serializable
+internal data class ReaderNativeSelectionMenuPoint(val x: Double, val y: Double, val viewportWidth: Double) {
+    companion object {
+        fun fromJavascriptResult(result: String?): ReaderNativeSelectionMenuPoint? =
+            runCatching { Json.decodeFromString<ReaderNativeSelectionMenuPoint>(result.orEmpty()) }
+                .getOrNull()?.takeIf {
+                    it.x.isFinite() && it.y.isFinite() && it.viewportWidth.isFinite() &&
+                        it.viewportWidth > 0 && it.x >= 0 && it.x < it.viewportWidth && it.y >= 0
+                }
+    }
+}

@@ -18,6 +18,7 @@ internal enum class ReaderNavigationDirection(val jsValue: String) {
 internal enum class ReaderNavigationResult {
     Advanced,
     Revealed,
+    Blocked,
     Limit,
 }
 
@@ -30,9 +31,6 @@ internal object ReaderPaginationScripts {
 
     fun paginateInvocation(direction: ReaderNavigationDirection): String =
         "window.hoshiReader.paginate('${direction.jsValue}')"
-
-    fun nativeSelectionActiveInvocation(active: Boolean): String =
-        "if (window.hoshiReader && typeof window.hoshiReader.setNativeSelectionActive === 'function') { window.hoshiReader.setNativeSelectionActive($active); }"
 
     fun progressInvocation(): String =
         "window.hoshiReader.calculateProgress()"
@@ -62,6 +60,7 @@ internal object ReaderPaginationScripts {
         when (result?.trim()?.trim('"')) {
             "scrolled" -> ReaderNavigationResult.Advanced
             "revealed" -> ReaderNavigationResult.Revealed
+            "blocked" -> ReaderNavigationResult.Blocked
             else -> ReaderNavigationResult.Limit
         }
 
@@ -142,6 +141,8 @@ internal object ReaderPaginationScripts {
                 initialFragment?.javaScriptStringLiteral() ?: "null",
             )
             .replace("__HOSHI_INITIAL_HIGHLIGHTS_JSON__", highlightsJson ?: "null")
+            .replace("__HOSHI_CONTINUOUS_HORIZONTAL_PADDING_RATIO__", generatedLayout.viewportHorizontalPaddingRatio.toString())
+            .replace("__HOSHI_CONTINUOUS_VERTICAL_PADDING_RATIO__", generatedLayout.viewportVerticalPaddingRatio.toString())
             .replace("__HOSHI_VERTICAL_PADDING_BLOCK_RATIO__", (settings.verticalPadding / 200.0).toString())
             .replace("__HOSHI_VERTICAL_PADDING_GAP_RATIO__", (settings.verticalPadding / 100.0).toString())
             .replace("__HOSHI_IMAGE_WIDTH_VIEWPORT_RATIO__", generatedLayout.imageWidthViewportRatio.toString())

@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
@@ -19,6 +20,9 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.channels.Channel
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.coroutines.CoroutineContext
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -184,6 +188,94 @@ class ReaderSettingsRepositoryTest {
 
                 assertTrue(ioDispatcher.dispatchCount >= beforeProfileAccess + 2)
             }
+        }
+    }
+
+    @Test
+    fun profileUpdateKeepsItsTargetWhenTheProfileChangesAfterTransform() = runBlocking {
+        val profiles = ProfileRepository(tempFolder.newFolder("profile-save-boundary"))
+        val firstId = profiles.currentEffectiveProfileId
+        val second = profiles.createProfile("English", "en")
+        profiles.readerSettingsFile(firstId).apply { parentFile?.mkdirs() }.writeText("""{"fontSize":30,"furiganaMode":"Hidden"}""")
+        profiles.readerSettingsFile(second.id).apply { parentFile?.mkdirs() }.writeText("""{"fontSize":18,"furiganaMode":"Off"}""")
+        val io = PausingReaderIoDispatcher()
+        repository(profileRepository = profiles, ioDispatcher = io).use { repository ->
+            val update = async {
+                repository.update { current ->
+                    io.pauseNextDispatch()
+                    current.copy(fontSize = 32)
+                }
+            }
+            val resumeSave = io.awaitPausedDispatch()
+            try {
+                profiles.activateGlobal(second.id)
+            } finally {
+                resumeSave.run()
+            }
+            update.await()
+
+            val untouchedSecond = repository.settings.first()
+            assertEquals(18, untouchedSecond.fontSize)
+            assertEquals(FuriganaMode.Off, untouchedSecond.furiganaMode)
+            profiles.activateGlobal(firstId)
+            val updatedFirst = repository.settings.first()
+            assertEquals(32, updatedFirst.fontSize)
+            assertEquals(FuriganaMode.Hidden, updatedFirst.furiganaMode)
+        }
+    }
+
+    @Test
+    fun profileUpdateCapturesItsTargetBeforeTheFirstReadDispatch() = runBlocking {
+        val profiles = ProfileRepository(tempFolder.newFolder("profile-read-boundary"))
+        val firstId = profiles.currentEffectiveProfileId
+        val second = profiles.createProfile("English", "en")
+        profiles.readerSettingsFile(firstId).apply { parentFile?.mkdirs() }.writeText("""{"fontSize":30}""")
+        profiles.readerSettingsFile(second.id).apply { parentFile?.mkdirs() }.writeText("""{"fontSize":18}""")
+        val io = PausingReaderIoDispatcher()
+        repository(profileRepository = profiles, ioDispatcher = io).use { repository ->
+            io.pauseNextDispatch()
+            var transformedSize: Int? = null
+            val update = async {
+                repository.update { current ->
+                    transformedSize = current.fontSize
+                    current.copy(fontSize = current.fontSize + 2)
+                }
+            }
+            val resumeRead = io.awaitPausedDispatch()
+            try {
+                profiles.activateGlobal(second.id)
+            } finally {
+                resumeRead.run()
+            }
+            update.await()
+
+            assertEquals(30, transformedSize)
+            assertEquals(18, repository.settings.first().fontSize)
+            profiles.activateGlobal(firstId)
+            assertEquals(32, repository.settings.first().fontSize)
+        }
+    }
+
+    @Test
+    fun missingProfileAppearanceMigrationKeepsTheProfileCapturedBeforeReadIo() = runBlocking {
+        val profiles = ProfileRepository(tempFolder.newFolder("profile-migration-boundary"))
+        val firstId = profiles.currentEffectiveProfileId
+        val second = profiles.createProfile("English", "en")
+        profiles.readerSettingsFile(second.id).apply { parentFile?.mkdirs() }.writeText("""{"fontSize":18}""")
+        val io = PausingReaderIoDispatcher()
+        repository(profileRepository = profiles, ioDispatcher = io).use { repository ->
+            io.pauseNextDispatch()
+            val reading = async { repository.settings.first() }
+            val resumeRead = io.awaitPausedDispatch()
+            try {
+                profiles.activateGlobal(second.id)
+            } finally {
+                resumeRead.run()
+            }
+
+            assertEquals(22, reading.await().fontSize)
+            assertTrue(profiles.readerSettingsFile(firstId).isFile)
+            assertEquals(18, repository.settings.first().fontSize)
         }
     }
 
@@ -570,6 +662,7 @@ class ReaderSettingsRepositoryTest {
                     visualNovelMergeCrossScreenSasayakiCues = true,
                     volumeKeysTurnPages = true,
                     volumeKeysNavigatePopupTerms = true,
+                    volumeKeysSeekSasayaki = true,
                     lockCurrentOrientation = true,
                     openLastReadBookOnLaunch = true,
                 )
@@ -588,6 +681,7 @@ class ReaderSettingsRepositoryTest {
             assertTrue(inherited.visualNovelMergeCrossScreenSasayakiCues)
             assertTrue(inherited.volumeKeysTurnPages)
             assertTrue(inherited.volumeKeysNavigatePopupTerms)
+            assertTrue(inherited.volumeKeysSeekSasayaki)
             assertTrue(inherited.lockCurrentOrientation)
             assertTrue(inherited.openLastReadBookOnLaunch)
 
@@ -603,6 +697,7 @@ class ReaderSettingsRepositoryTest {
                     visualNovelMergeCrossScreenSasayakiCues = false,
                     volumeKeysTurnPages = false,
                     volumeKeysNavigatePopupTerms = false,
+                    volumeKeysSeekSasayaki = false,
                     lockCurrentOrientation = false,
                     openLastReadBookOnLaunch = false,
                 )
@@ -620,6 +715,7 @@ class ReaderSettingsRepositoryTest {
             assertTrue(japanese.visualNovelMergeCrossScreenSasayakiCues)
             assertFalse(japanese.volumeKeysTurnPages)
             assertFalse(japanese.volumeKeysNavigatePopupTerms)
+            assertFalse(japanese.volumeKeysSeekSasayaki)
             assertFalse(japanese.lockCurrentOrientation)
             assertFalse(japanese.openLastReadBookOnLaunch)
         }
@@ -718,6 +814,25 @@ class ReaderSettingsRepositoryTest {
         override fun load(): ReaderSettings {
             loadCount += 1
             return settings
+        }
+    }
+
+    private class PausingReaderIoDispatcher : CoroutineDispatcher() {
+        private val pauseNext = AtomicBoolean(false)
+        private val pausedDispatches = Channel<Runnable>(Channel.UNLIMITED)
+
+        fun pauseNextDispatch() {
+            check(pauseNext.compareAndSet(false, true))
+        }
+
+        suspend fun awaitPausedDispatch(): Runnable = pausedDispatches.receive()
+
+        override fun dispatch(context: CoroutineContext, block: Runnable) {
+            if (pauseNext.compareAndSet(true, false)) {
+                check(pausedDispatches.trySend(Runnable { Dispatchers.IO.dispatch(context, block) }).isSuccess)
+            } else {
+                Dispatchers.IO.dispatch(context, block)
+            }
         }
     }
 }

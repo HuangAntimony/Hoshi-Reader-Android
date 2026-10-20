@@ -6,6 +6,8 @@ import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -66,13 +68,13 @@ internal fun SasayakiSubtitleExportHost(viewModel: SasayakiSubtitleExportViewMod
                 SasayakiSubtitleExportAction.Save -> save.launch(request.file.name)
                 SasayakiSubtitleExportAction.Share -> context.startActivity(Intent.createChooser(sasayakiSubtitleShareIntent(context, request.file), null))
             }
-        } catch (_: Exception) { viewModel.launchFailed() }
+        } catch (error: Exception) { viewModel.launchFailed(error) }
     }
     state.message?.let { message ->
         HoshiAlertDialog(
             onDismissRequest = viewModel::dismissMessage,
             title = { Text(stringResource(R.string.sasayaki_export_srt)) },
-            text = { Text(message.asString()) },
+            text = { Text(message.asString(), modifier = Modifier.verticalScroll(rememberScrollState())) },
             confirmButton = { TextButton(onClick = viewModel::dismissMessage) { Text(stringResource(R.string.action_ok)) } },
         )
     }

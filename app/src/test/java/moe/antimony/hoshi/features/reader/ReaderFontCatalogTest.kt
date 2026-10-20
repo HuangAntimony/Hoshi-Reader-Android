@@ -39,11 +39,12 @@ class ReaderFontCatalogTest {
                 "BIZ UDMincho",
                 "Zen Old Mincho",
                 "Noto Sans JP",
-                "BIZ UDPGothic",
+                "BIZ UDGothic",
                 "Zen Kaku Gothic New",
                 "M PLUS 2",
                 "M PLUS Rounded 1c",
                 "Kiwi Maru",
+                "LINE Seed JP",
                 "Klee One",
             ),
             weights.keys.toList(),
@@ -51,6 +52,12 @@ class ReaderFontCatalogTest {
         assertEquals((200..900 step 100).toList(), weights.getValue("Noto Serif JP"))
         assertEquals((100..900 step 100).toList(), weights.getValue("Noto Sans JP"))
         assertEquals((100..900 step 100).toList(), weights.getValue("M PLUS 2"))
+        assertEquals(listOf(400, 700), weights.getValue("BIZ UDGothic"))
+        assertEquals(listOf(100, 400, 700, 800), weights.getValue("LINE Seed JP"))
+        assertEquals(
+            ReaderFontCategory.ROUNDED,
+            ReaderRecommendedFontCatalog.families.first { it.id == "recommended:lineseedjp" }.category,
+        )
         assertEquals(listOf(400, 600), weights.getValue("Klee One"))
         assertEquals(
             listOf(

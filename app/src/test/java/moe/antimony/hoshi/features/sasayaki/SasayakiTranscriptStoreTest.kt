@@ -11,6 +11,22 @@ import org.junit.rules.TemporaryFolder
 class SasayakiTranscriptStoreTest {
     @get:Rule val temporary = TemporaryFolder()
 
+    @Test fun existingEngineMetadataDoesNotAffectCheckpointAndIsNoLongerWritten() = runTest {
+        val root = temporary.newFolder()
+        val file = root.resolve("sasayaki_transcript.json")
+        val store = SasayakiTranscriptStore(StandardTestDispatcher(testScheduler))
+        for (model in listOf("ReazonSpeech", "Nakuru")) {
+            file.writeText("""{"through":12.5,"duration":60,"tokens":[{"text":"今日は","start":10,"end":12}],"source":"audio","model":"$model"}""")
+            val loaded = store.load(root)!!
+            assertEquals("audio", loaded.source)
+            assertEquals(12.5, loaded.through, 0.0)
+            assertEquals(listOf(SasayakiToken("今日は", 10.0, 12.0)), loaded.tokens)
+            store.save(root, loaded)
+            val fields = kotlinx.serialization.json.Json.parseToJsonElement(file.readText()) as kotlinx.serialization.json.JsonObject
+            assertFalse(fields.containsKey("model"))
+        }
+    }
+
     @Test fun readsIosTranscriptAndAtomicallyReplacesCheckpoint() = runTest {
         val root = temporary.newFolder()
         val file = root.resolve("sasayaki_transcript.json")

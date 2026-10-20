@@ -1,0 +1,210 @@
+package moe.antimony.hoshi.features.tts
+
+import android.content.Context
+import android.content.Intent
+import android.os.Bundle
+import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
+import android.speech.tts.Voice
+import dagger.hilt.android.qualifiers.ApplicationContext
+import java.io.File
+import java.util.Locale
+import java.util.UUID
+import moe.antimony.hoshi.ui.diagnosticMessage
+import java.util.concurrent.ConcurrentHashMap
+import javax.inject.Inject
+import javax.inject.Singleton
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+
+data class TtsEngineInfo(val id: String, val label: String)
+@kotlinx.serialization.Serializable
+data class TtsVoiceInfo(val id: String, val network: Boolean, val styles: List<String> = emptyList(), val roles: List<String> = emptyList(), val label: String = id)
+data class TtsCatalog(val selectedEngine: String, val voices: List<TtsVoiceInfo>)
+enum class TtsFailure {
+    NoEngine, MissingJapanese, EngineUnavailable, Synthesis, Timeout, EmptyText, AudioUnavailable, Storage,
+    PrivateHttp, Configuration, Authentication, RateLimited, Network, InvalidResponse,
+}
+class TtsException(
+    val failure: TtsFailure,
+    internal val statusCode: Int? = null,
+    cause: Throwable? = null,
+    message: String? = null,
+) : Exception(message ?: cause?.localizedMessage ?: statusCode?.let { "HTTP $it" }, cause)
+
+internal fun ttsPlatformError(operation: String, code: Int, failure: TtsFailure): TtsException =
+    TtsException(failure, message = "TextToSpeech.$operation: $code")
+
+internal suspend fun <T> resolveAutomaticTtsEngine(
+    engineIds: List<String>,
+    connect: suspend (String) -> T,
+    usable: (T) -> Boolean,
+): Pair<T, String> {
+    val failures = mutableListOf<Pair<String, TtsException>>()
+    for (id in engineIds) {
+        val candidate = try { connect(id) } catch (error: TtsException) { failures += id to error; continue }
+        if (usable(candidate)) return candidate to id
+    }
+    val cause = failures.takeIf { it.isNotEmpty() }?.let { errors ->
+        IllegalStateException(errors.joinToString("\n") { (id, error) -> "$id: ${error.diagnosticMessage()}" }).apply {
+            errors.forEach { (_, error) -> addSuppressed(error) }
+        }
+    }
+    throw TtsException(TtsFailure.MissingJapanese, cause = cause)
+}
+
+// Engines may expose ISO 639-1 (Google) or ISO 639-2 (Samsung) locale language codes.
+internal fun isJapaneseTtsLocale(locale: Locale): Boolean = locale.language == "ja" || locale.language == "jpn"
+
+internal interface TtsDeviceEngine {
+    suspend fun installedEngines(): List<TtsEngineInfo>
+    suspend fun catalog(settings: TtsSettings): TtsCatalog
+    suspend fun synthesize(text: String, settings: TtsSettings, directory: File): List<File>
+}
+
+@Singleton
+class AndroidTtsEngine internal constructor(private val device: TtsDeviceEngine) {
+    @Inject constructor(@ApplicationContext context: Context) : this(AndroidTextToSpeech(context))
+
+    // Catalog reads must stay independent of the platform's serial synthesis queue.
+    // The empty key retains automatic engine selection separately from explicit engines.
+    private val catalogs = ConcurrentHashMap<String, TtsCatalog>()
+    private val discovery = Mutex()
+    fun cachedCatalog(settings: TtsSettings): TtsCatalog? = catalogs[settings.engine]
+    suspend fun catalog(settings: TtsSettings, force: Boolean = false): TtsCatalog {
+        if (!force) cachedCatalog(settings)?.let { return it }
+        return discovery.withLock {
+            if (!force) cachedCatalog(settings)?.let { return@withLock it }
+            device.catalog(settings).also {
+                currentCoroutineContext().ensureActive()
+                catalogs[settings.engine] = it
+            }
+        }
+    }
+    suspend fun installedEngines() = device.installedEngines()
+    suspend fun synthesize(text: String, settings: TtsSettings, directory: File) = device.synthesize(text, settings, directory)
+}
+
+/** Android engines share one serial queue. Cancellation stops the exact active utterance. */
+private class AndroidTextToSpeech(private val context: Context) : TtsDeviceEngine {
+    private val mutex = Mutex()
+    private var instance: TextToSpeech? = null
+    private var engineId: String? = null
+    private var voices: List<Voice>? = null
+
+    private fun installed(): List<TtsEngineInfo> = context.packageManager
+        .queryIntentServices(Intent(TextToSpeech.Engine.INTENT_ACTION_TTS_SERVICE), 0)
+        .map { TtsEngineInfo(it.serviceInfo.packageName, it.loadLabel(context.packageManager).toString()) }
+        .distinctBy { it.id }.sortedBy { it.label }
+
+    private suspend fun connect(id: String): TextToSpeech {
+        if (engineId == id) instance?.let { return it }
+        instance?.shutdown()
+        instance = null
+        engineId = null
+        voices = null
+        val ready = CompletableDeferred<Int>()
+        val created = withContext(Dispatchers.Main) { TextToSpeech(context, { ready.complete(it) }, id) }
+        try {
+            val status = withTimeout(15_000) { ready.await() }
+            if (status != TextToSpeech.SUCCESS) throw ttsPlatformError("onInit", status, TtsFailure.EngineUnavailable)
+            // Android may silently substitute the default when the requested package disappears.
+            if (installed().none { it.id == id }) throw TtsException(TtsFailure.EngineUnavailable)
+            instance = created
+            engineId = id
+            return created
+        } catch (error: Throwable) {
+            created.shutdown()
+            throw error
+        }
+    }
+
+    private suspend fun resolve(settings: TtsSettings): Pair<TextToSpeech, String> {
+        val engines = installed()
+        if (engines.isEmpty()) throw TtsException(TtsFailure.NoEngine)
+        if (settings.engine.isNotBlank()) {
+            if (engines.none { it.id == settings.engine }) throw TtsException(TtsFailure.EngineUnavailable)
+            return connect(settings.engine) to settings.engine
+        }
+        val systemDefault = android.provider.Settings.Secure.getString(context.contentResolver, "tts_default_synth")
+        return resolveAutomaticTtsEngine(engines.sortedByDescending { it.id == systemDefault }.map { it.id }, ::connect) { candidate ->
+            candidate.isLanguageAvailable(Locale.JAPANESE) >= TextToSpeech.LANG_AVAILABLE && japaneseVoices(candidate).isNotEmpty()
+        }
+    }
+
+    private fun japaneseVoices(tts: TextToSpeech): List<Voice> = voices ?: tts.voices.orEmpty()
+        .filter { isJapaneseTtsLocale(it.locale) }.sortedWith(compareBy({ it.isNetworkConnectionRequired }, { it.name }))
+        .also { voices = it }
+
+    override suspend fun catalog(settings: TtsSettings): TtsCatalog = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            voices = null
+            val (tts, id) = resolve(settings)
+            val voices = japaneseVoices(tts)
+            TtsCatalog(id, voices.map { TtsVoiceInfo(it.name, it.isNetworkConnectionRequired) })
+        }
+    }
+
+    override suspend fun installedEngines(): List<TtsEngineInfo> = withContext(Dispatchers.IO) { installed() }
+
+    override suspend fun synthesize(text: String, settings: TtsSettings, directory: File): List<File> {
+        val files = mutableListOf<File>()
+        try {
+            return withContext(Dispatchers.IO) { mutex.withLock {
+                val (tts, _) = resolve(settings)
+                val voices = japaneseVoices(tts)
+                val voice = if (settings.voice.isNotBlank()) voices.firstOrNull { it.name == settings.voice }
+                    else voices.firstOrNull()
+                if (voice == null) throw TtsException(TtsFailure.MissingJapanese)
+                val voiceStatus = tts.setVoice(voice)
+                if (voiceStatus != TextToSpeech.SUCCESS) throw ttsPlatformError("setVoice", voiceStatus, TtsFailure.MissingJapanese)
+                val rateStatus = tts.setSpeechRate(settings.rate)
+                if (rateStatus != TextToSpeech.SUCCESS) throw ttsPlatformError("setSpeechRate", rateStatus, TtsFailure.Synthesis)
+                val pitchStatus = tts.setPitch(Math.pow(2.0, settings.pitch.coerceIn(-12f, 12f) / 12.0).toFloat())
+                if (pitchStatus != TextToSpeech.SUCCESS) throw ttsPlatformError("setPitch", pitchStatus, TtsFailure.Synthesis)
+                if (text.isBlank()) throw TtsException(TtsFailure.EmptyText)
+                directory.mkdirs()
+                try {
+                    for (part in TtsText.chunks(text, TextToSpeech.getMaxSpeechInputLength() - 1)) {
+                        val id = UUID.randomUUID().toString()
+                        val file = File(directory, "$id.wav")
+                        files += file
+                        val completion = CompletableDeferred<Unit>()
+                        tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                            override fun onStart(utteranceId: String?) = Unit
+                            override fun onDone(utteranceId: String?) { if (utteranceId == id) completion.complete(Unit) }
+                            @Deprecated("Android callback")
+                            override fun onError(utteranceId: String?) { if (utteranceId == id) completion.completeExceptionally(TtsException(TtsFailure.Synthesis)) }
+                            override fun onError(utteranceId: String?, errorCode: Int) {
+                                if (utteranceId == id) completion.completeExceptionally(ttsPlatformError("onError", errorCode, TtsFailure.Synthesis))
+                            }
+                            override fun onStop(utteranceId: String?, interrupted: Boolean) = onError(utteranceId)
+                        })
+                        val queueStatus = tts.synthesizeToFile(part, Bundle(), file, id)
+                        if (queueStatus != TextToSpeech.SUCCESS) throw ttsPlatformError("synthesizeToFile", queueStatus, TtsFailure.Synthesis)
+                        withTimeout(60_000) { completion.await() }
+                        if (!file.isFile || file.length() <= 44) throw TtsException(TtsFailure.Synthesis)
+                    }
+                    files
+                } catch (error: Throwable) {
+                    tts.stop()
+                    files.forEach { it.delete() }
+                    throw error
+                } finally {
+                    tts.setOnUtteranceProgressListener(null)
+                }
+            } }
+        } catch (error: Throwable) {
+            // Also own files when cancellation discards a successful cross-dispatcher return.
+            withContext(NonCancellable + Dispatchers.IO) { files.forEach { it.delete() } }
+            throw error
+        }
+    }
+}

@@ -113,7 +113,7 @@ class SasayakiTranscriptionViewModelTest {
         val repository = MemoryRepository()
         val backend = object : SasayakiTranscriptionBackend {
             override suspend fun duration(source: String) = 100.0
-            override suspend fun transcribe(source: String, from: Double, onDownloadRequired: suspend (Long) -> Unit, onDownload: suspend (Double) -> Unit, onBatch: suspend (SasayakiTranscriptionBatch) -> Unit, parallelism: Int, previousTokens: List<SasayakiToken>) = Unit
+            override suspend fun transcribe(source: String, from: Double, onDownloadRequired: suspend (Long) -> Unit, onDownload: suspend (Double) -> Unit, onBatch: suspend (SasayakiTranscriptionBatch) -> Unit, parallelism: Int) = Unit
         }
         val coordinator = SasayakiTranscriptionCoordinator(backend, repository, BookWorkRegistry(), backgroundScope, kotlinx.coroutines.Dispatchers.Unconfined)
         val model = SasayakiTranscriptionViewModel(coordinator, repository, backgroundScope)
@@ -277,7 +277,7 @@ class SasayakiTranscriptionViewModelTest {
         model.bind(temporary.newFolder(), "audio") {}
         runCurrent()
         assertFalse(model.uiState.value.isLoading)
-        assertEquals(UiText.Resource(R.string.sasayaki_transcription_error_storage), model.uiState.value.error)
+        assertEquals(UiText.Joined(listOf(UiText.Resource(R.string.sasayaki_transcription_error_storage), UiText.Literal("Unable to read transcript file"))), model.uiState.value.error)
     }
 
     @Test fun downloadConfirmationGatesWorkAndCancellationKeepsSavedTranscriptUntouched() = runTest {
@@ -383,7 +383,7 @@ class SasayakiTranscriptionViewModelTest {
             prepare?.await()
             return 100.0
         }
-        override suspend fun transcribe(source: String, from: Double, onDownloadRequired: suspend (Long) -> Unit, onDownload: suspend (Double) -> Unit, onBatch: suspend (SasayakiTranscriptionBatch) -> Unit, parallelism: Int, previousTokens: List<SasayakiToken>) {
+        override suspend fun transcribe(source: String, from: Double, onDownloadRequired: suspend (Long) -> Unit, onDownload: suspend (Double) -> Unit, onBatch: suspend (SasayakiTranscriptionBatch) -> Unit, parallelism: Int) {
             if (needsDownload) {
                 onDownloadRequired(161_016_054)
                 downloads++
@@ -399,12 +399,12 @@ class SasayakiTranscriptionViewModelTest {
         var finishAlignment: CompletableDeferred<Unit>? = null
         val match = SasayakiMatchData(listOf(SasayakiMatch("1", 2.0, 3.0, "本文", 0, 0, 2)), 0)
         override suspend fun load(root: File): SasayakiTranscript? {
-            if (failLoad) error("Private file path must never reach the UI")
+            if (failLoad) error("Unable to read transcript file")
             return saved
         }
         override suspend fun save(root: File, transcript: SasayakiTranscript) { saved = transcript }
         override suspend fun clear(root: File) { saved = null }
-        override suspend fun openAlignment(root: File) = SasayakiTranscriptionAlignment { tokens, complete ->
+        override suspend fun openAlignment(root: File) = SasayakiTranscriptionAlignment { tokens ->
             finishAlignment?.await()
             match
         }

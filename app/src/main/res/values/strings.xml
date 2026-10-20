@@ -35,6 +35,8 @@
     <string name="action_copy_code">Copy code</string>
     <string name="action_scan">Scan</string>
     <string name="loading">Loading...</string>
+    <string name="settings_load_failed">Could not load settings. Please try again.</string>
+    <string name="settings_retry" comment="Retry loading persisted settings.">Retry</string>
     <string name="none" comment="Generic empty value label, intentionally matching bookshelf_no_shelf.">None</string>
     <string name="dialog_error_title">Error</string>
     <string name="import_select_epub_book">Select a .epub EPUB book file.</string>
@@ -236,7 +238,7 @@
     <string name="dictionary_download_item_format">%1$s (%2$s)</string>
     <string name="dictionary_type_term">Term</string>
     <string name="dictionary_type_frequency">Frequency</string>
-    <string name="dictionary_type_pitch">Pitch</string>
+    <string name="dictionary_type_pitch" comment="Dictionary type: Japanese pitch accent, distinct from TTS acoustic pitch">Pitch</string>
     <string name="dictionary_type_kanji">Kanji</string>
     <string name="dictionary_category_none" comment="Dictionary category for uncategorized term dictionaries, intentionally matching generic none.">None</string>
     <string name="dictionary_category_monolingual">Monolingual</string>
@@ -302,7 +304,7 @@
     <string name="bookshelf_profile_automatic_uses_format">Uses %1$s</string>
     <string name="reader_behavior_volume_keys_turn_pages">Volume Keys Turn Pages</string>
     <string name="reader_behavior_volume_keys_navigate_popup_terms">Volume Keys Navigate Popup Terms</string>
-    <string name="reader_behavior_volume_keys_seek_sasayaki">Volume Keys Seek Sasayaki</string>
+    <string name="reader_behavior_volume_keys_seek_sasayaki">Volume Keys Control Audiobook / TTS</string>
     <string name="reader_behavior_reverse_volume_key_direction">Reverse Volume Key Direction</string>
     <string name="reader_behavior_keep_screen_on">Keep Screen On</string>
     <string name="reader_behavior_lock_current_orientation">Lock Current Orientation</string>
@@ -358,7 +360,7 @@
     <string name="reader_statistics_sync_behaviour">Sync Behaviour</string>
     <string name="reader_statistics_sync_behaviour_hint">Determines whether statistics are merged entry by entry or replaced completely during sync.</string>
     <string name="reader_statistics_sync_mode_merge">Merge</string>
-    <string name="reader_statistics_sync_mode_replace">Replace</string>
+    <string name="reader_statistics_sync_mode_replace" comment="Reader statistics synchronization mode that replaces local statistics.">Replace</string>
     <string name="reader_statistics_settings_hint">Statistics can be accessed from the Reader\'s context menu.</string>
     <string name="reader_appearance_text">Text</string>
     <string name="reader_appearance_layout">Layout</string>
@@ -397,7 +399,7 @@
     <string name="reader_appearance_font_category_sans">Sans serif / Gothic</string>
     <string name="reader_appearance_font_category_rounded">Rounded</string>
     <string name="reader_appearance_font_category_handwriting">Handwriting / Body</string>
-    <string name="reader_appearance_font_retry">Retry</string>
+    <string name="reader_appearance_font_retry" comment="Retry a downloadable reader font.">Retry</string>
     <string name="reader_appearance_import_font">Import Font</string>
     <string name="reader_appearance_importing" comment="Generic import progress label, intentionally shared with ッツ backup import.">Importing...</string>
     <string name="reader_appearance_font_size">Font Size</string>
@@ -447,7 +449,7 @@
     <string name="reader_appearance_show_statistics_toggle">Show Statistics Toggle</string>
     <string name="reader_appearance_show_reading_speed">Show Reading Speed</string>
     <string name="reader_appearance_show_reading_time">Show Reading Time</string>
-    <string name="reader_appearance_show_sasayaki_toggle">Show Sasayaki Toggle</string>
+    <string name="reader_appearance_show_sasayaki_toggle">Show Audiobook / TTS Toggle</string>
     <string name="reader_appearance_width">Width</string>
     <string name="reader_appearance_height">Height</string>
     <string name="reader_appearance_scale">Scale</string>
@@ -531,9 +533,8 @@
     <string name="backup_restoring">Restoring...</string>
     <string name="backup_exporting">Exporting...</string>
     <string name="backup_importing" comment="ッツ backup import progress label, intentionally matching the generic importing progress text.">Importing...</string>
-    <string name="advanced_audio">Audio</string>
+    <string name="advanced_audio">Word audio</string>
     <string name="advanced_sasayaki_audiobooks">Sasayaki (Audiobooks)</string>
-    <string name="advanced_sasayaki_subtitle">Read along with matched audiobook subtitles</string>
     <string name="audio_sources">Sources</string>
     <string name="audio_add_source">Add Source</string>
     <string name="audio_name">Name</string>
@@ -568,6 +569,7 @@
     <string name="anki_deck" comment="Anki deck selector label, intentionally matching duplicate scope deck label.">Deck</string>
     <string name="anki_model">Model</string>
     <string name="anki_allow_duplicates">Allow Duplicates</string>
+    <string name="anki_prevent_accidental_duplicates">Disable Button After Mining</string>
     <string name="anki_check_duplicates_all_models">Check for duplicates across all models</string>
     <string name="anki_duplicate_check_scope">Duplicate Check Scope</string>
     <string name="anki_compact_glossaries" comment="Anki setting label, intentionally matching dictionary compact glossaries.">Compact Glossaries</string>
@@ -732,7 +734,6 @@
     <string name="sasayaki_no_file_selected">No file selected</string>
     <string name="sasayaki_matching">Matching...</string>
     <string name="settings_book_cover_wallpaper">Book Cover Lock Screen</string>
-    <string name="settings_book_cover_wallpaper_subtitle">Show the current book cover when the device is locked or sleeping</string>
     <string name="book_cover_wallpaper_lock_screen">Update lock screen wallpaper</string>
     <string name="book_cover_wallpaper_lock_screen_summary">Set the current book cover as the Android lock screen wallpaper whenever a book opens. This may not work on some e-ink devices.</string>
     <string name="book_cover_wallpaper_not_supported">Lock screen wallpapers are not supported on this device.</string>
@@ -865,7 +866,7 @@
     <string name="sasayaki_transcription_start">Transcribe</string>
     <string name="sasayaki_transcription_resume">Resume</string>
     <string name="sasayaki_transcription_realign">Match Again</string>
-    <string name="sasayaki_transcription_pause">Pause</string>
+    <string name="sasayaki_transcription_pause" comment="Pause on-device audiobook transcription.">Pause</string>
     <string name="sasayaki_transcription_preparing">Preparing transcription…</string>
     <string name="sasayaki_transcription_downloading">Downloading transcription files… %1$d%%</string>
     <string name="sasayaki_transcription_progress">Transcribing and matching…</string>
@@ -884,13 +885,11 @@
     <string name="sasayaki_transcription_clear_message">Only transcription data will be cleared. The current match will be kept.</string>
     <string name="sasayaki_transcription_error_audio">Couldn’t read this audio. Check that the file is complete, accessible, and in a supported format, then try again.</string>
     <string name="sasayaki_transcription_error_resources">Couldn’t download or verify transcription files. Check your connection and available storage, then try again.</string>
+    <string name="sasayaki_transcription_download_details">File: %1$s\nDownload URL: %2$s\nReceived: %3$d/%4$d bytes\nAttempts: %5$d</string>
     <string name="sasayaki_transcription_error_recognition">Japanese speech recognition couldn’t start or complete. Restart the app and try again; if it repeats, switch to Lightweight mode.</string>
     <string name="sasayaki_transcription_error_match">Couldn’t match the transcription to this book. Check that the book opens correctly and matches this audio.</string>
     <string name="sasayaki_transcription_error_storage">Couldn’t save transcription progress. Check available storage and that the book is still available.</string>
     <string name="sasayaki_transcription_busy">Another book is being transcribed.</string>
-    <string name="about_ffmpeg_license" translatable="false">FFmpeg 9.0.2 · LGPL 2.1+</string>
-    <string name="about_ffmpeg_source">FFmpeg source code</string>
-    <string name="about_transcription_license">Transcription component licenses</string>
     <string name="sasayaki_transcription_speed">Transcription speed</string>
     <string name="sasayaki_transcription_light">Lightweight</string>
     <string name="sasayaki_transcription_balanced">Balanced</string>
@@ -926,4 +925,208 @@
     </plurals>
     <string name="sync_delete_local">Delete Local</string>
     <string name="sync_delete_everywhere">Delete Everywhere</string>
+    <string name="tts_tab_voice" comment="TTS panel tab containing source, voice and rate controls.">Voice</string>
+    <string name="tts_tab_dictionary">Replacements</string>
+    <string name="tts_rate_label">Engine speech rate</string>
+    <string name="tts_playback_rate">Hoshi playback speed</string>
+    <string name="tts_rate_value">%1$.2f×</string>
+    <string name="tts_title">TTS</string>
+    <string name="tts_dictionary">Text replacements</string>
+    <string name="tts_add_word">Add replacement</string>
+    <string name="tts_global">All books</string>
+    <string name="tts_book">This book</string>
+    <string name="tts_dictionary_empty">No text replacements yet.</string>
+    <string name="tts_use_ruby">Use Ruby readings</string>
+    <string name="tts_loading_voices">Loading voices…</string>
+    <string name="tts_refresh_voices">Refresh voices</string>
+    <string name="tts_source">Source</string>
+    <string name="tts_voice" comment="Label for the selected synthesis voice.">Voice</string>
+    <string name="tts_system_default" comment="Automatically choose an installed Japanese TTS engine or voice.">Automatic</string>
+    <string name="tts_offline">Offline</string>
+    <string name="tts_preview">Preview</string>
+    <string name="tts_preview_voice">Preview voice</string>
+    <string name="tts_retry" comment="Retry a failed text-to-speech engine request.">Retry</string>
+    <string name="tts_replace" comment="Native text-selection action that opens the TTS replacement editor.">Replace</string>
+    <string name="tts_regex_enabled">Regex</string>
+    <string name="tts_regex_pattern">Pattern</string>
+    <string name="tts_regex_help">RE2 syntax; use $1, $2… for captured text. Escape a literal dollar sign with a backslash. Empty matches are ignored.</string>
+    <string name="tts_invalid_regex">Invalid or unsupported regular expression.</string>
+    <string name="tts_invalid_regex_replacement">Invalid replacement: check group numbers ($1, $2…) and backslash escapes.</string>
+    <string name="tts_replacement_before">Before replacement</string>
+    <string name="tts_replacement_after">Text sent to TTS</string>
+    <string name="tts_replacement_sample">Preview text</string>
+    <string name="tts_replacement_sample_hint">Enter text to try this rule.</string>
+    <string name="tts_replacement_rule">Replacement rule</string>
+    <string name="tts_replacement_scope">Applies to</string>
+    <string name="tts_replacement_preview">Sentence preview</string>
+    <string name="tts_replacement_delete_hint">Leave empty to delete matching text</string>
+    <string name="tts_replacement_empty_preview">No text to read after replacement</string>
+    <string name="tts_replacement_pending_preview">Complete the rule to see the result</string>
+    <string name="tts_replacement_deleted">Remove matching text</string>
+    <string name="tts_replacement_title">TTS replacement</string>
+    <string name="tts_surface">Matching text</string>
+    <string name="tts_replacement">Replace with</string>
+    <string name="tts_invalid_surface">Enter the original text.</string>
+    <string name="tts_duplicate">This text already has a replacement in this scope. Edit the existing entry.</string>
+    <string name="tts_no_engine">No TTS engine is installed. Install an engine and Japanese voice data in system settings.</string>
+    <string name="tts_missing_japanese">Japanese voice data is unavailable. Choose another voice or install Japanese data in system settings.</string>
+    <string name="tts_engine_unavailable">The selected engine is unavailable. Choose another installed engine.</string>
+    <string name="tts_timeout">The speech engine did not respond in time. Check its connection and retry.</string>
+    <string name="tts_empty_text">No readable sentences were found.</string>
+    <string name="tts_failed">Unable to prepare or play the sentence audio. Please retry.</string>
+    <string name="tts_sample">こんにちは。日本語の読み上げを始めます。</string>
+    <string name="tts_dialogue_routing">Separate narration and dialogue</string>
+    <string name="tts_narration_voice">Narration voice</string>
+    <string name="tts_dialogue_voice">Dialogue voice</string>
+    <string name="tts_dialogue_sample">彼女は窓を開けた。「今日はいい天気ですね」と言って、微笑んだ。</string>
+    <string name="tts_storage_error">Could not save TTS changes. Please retry.</string>
+    <string name="anki_handlebar_sentence_audio">Sentence audio from the audiobook, or TTS when no audiobook is linked.</string>
+    <string name="tts_source_edge" comment="TTS online source configuration">Edge TTS</string>
+    <string name="tts_source_azure" comment="TTS online source configuration">Azure TTS</string>
+    <string name="tts_source_microsoft_translator" comment="TTS online source configuration">Microsoft Translator</string>
+    <string name="tts_source_google_cloud" comment="TTS online source configuration">Google Cloud TTS</string>
+    <string name="tts_source_google_translate" comment="TTS online source configuration">Google Translate</string>
+    <string name="tts_cloud_credentials_hint" comment="TTS online source configuration">Enter your own service credentials. Connection tests synthesize a short sample and may use your service quota.</string>
+    <string name="tts_unofficial_hint" comment="TTS online source configuration">Uses an unofficial online interface. Text is sent to this provider; availability may change.</string>
+    <string name="tts_cloud_source_hint" comment="TTS online source configuration">Uses your cloud account. Text is sent to this provider and usage may be billed.</string>
+    <string name="tts_azure_region" comment="TTS online source configuration">Speech resource region</string>
+    <string name="tts_azure_region_select" comment="Azure Speech resource region selection">Choose a region</string>
+    <string name="tts_azure_region_hint" comment="Azure Speech resource region selection">Choose the region of the Azure Speech resource that owns your API key.</string>
+    <string name="tts_api_key" comment="TTS online source configuration">Service API key</string>
+    <string name="tts_key_saved_hint" comment="TTS online source configuration">API key configured. Leave this field empty to keep it.</string>
+    <string name="tts_delete_key">Delete key</string>
+    <string name="tts_delete_key_title">Delete API key?</string>
+    <string name="tts_delete_key_message">Delete this service’s API key saved on this device? You will need to configure it again to use this service.</string>
+    <string name="tts_test_connection" comment="TTS online source configuration">Test connection</string>
+    <string name="tts_connection_success" comment="TTS online source configuration">Connection verified</string>
+    <string name="tts_rate_slow" comment="TTS online source configuration">Slow</string>
+    <string name="tts_rate_normal" comment="TTS online source configuration">Normal</string>
+    <string name="tts_configuration_error" comment="TTS online source configuration">Check the source configuration.</string>
+    <string name="tts_authentication_error" comment="TTS online source configuration">The service rejected access. Check credentials and API permissions, or try again later for an unofficial source.</string>
+    <string name="tts_rate_limit_error" comment="TTS online source configuration">The service quota or request limit was reached. Check your account or retry later.</string>
+    <string name="tts_network_error" comment="TTS online source configuration">Cannot reach the speech service. Check your connection and retry.</string>
+    <string name="tts_response_error" comment="TTS online source configuration">The service did not return usable audio or voices. Check the configuration or retry later.</string>
+    <string name="tts_pitch" comment="TTS synthesis pitch">Pitch</string>
+    <string name="tts_pitch_hz" comment="TTS synthesis pitch">%1$+d Hz</string>
+    <string name="tts_prefetch_sentences" comment="TTS playback buffering">Preload sentences</string>
+    <plurals name="tts_sentence_count">
+        <item quantity="one">%1$d sentence</item>
+        <item quantity="other">%1$d sentences</item>
+    </plurals>
+    <string name="tts_sentence_pause" comment="TTS synthesis parameter">Extra pause between sentences</string>
+    <string name="tts_sentence_pause_hint" comment="TTS synthesis parameter">Hoshi waits between sentences during continuous reading. This delay is not included in exported audio.</string>
+    <string name="tts_synthesis_volume" comment="TTS synthesis parameter">Synthesis volume</string>
+    <string name="tts_milliseconds" comment="TTS synthesis parameter">%1$d ms</string>
+    <string name="tts_decibels" comment="TTS synthesis parameter">%1$+d dB</string>
+    <string name="tts_relative_percent" comment="TTS synthesis parameter">%1$+d%%</string>
+    <string name="tts_speaking_style" comment="TTS synthesis parameter">Speaking style</string>
+    <string name="tts_style_degree" comment="TTS synthesis parameter">Style intensity</string>
+    <string name="tts_speaking_role" comment="TTS synthesis parameter">Speaking role</string>
+    <string name="tts_leading_pause" comment="TTS synthesis parameter">Leading silence</string>
+    <string name="tts_trailing_pause" comment="TTS synthesis parameter">Trailing silence</string>
+    <string name="tts_comma_pause" comment="TTS synthesis parameter">Comma pause</string>
+    <string name="tts_semicolon_pause" comment="TTS synthesis parameter">Semicolon pause</string>
+    <string name="tts_enumeration_pause" comment="TTS synthesis parameter">Enumeration comma pause</string>
+    <string name="tts_boundary_pause" comment="TTS synthesis parameter">Sentence boundary silence</string>
+    <string name="tts_provider_default" comment="TTS synthesis parameter">Voice default</string>
+    <string name="tts_pause_override" comment="TTS synthesis parameter">Override natural pause</string>
+    <string name="tts_output_format" comment="TTS synthesis parameter">Audio format</string>
+    <string name="tts_format_wav" comment="TTS synthesis parameter">WAV (PCM)</string>
+    <string name="tts_format_mp3" comment="TTS synthesis parameter">MP3</string>
+    <string name="tts_sample_rate" comment="TTS synthesis parameter">Sample rate</string>
+    <string name="tts_sample_rate_hz" comment="TTS synthesis parameter">%1$d Hz</string>
+    <string name="tts_audio_profile" comment="TTS synthesis parameter">Playback device profile</string>
+    <string name="tts_profile_none" comment="TTS synthesis parameter">No device effect</string>
+    <string name="tts_profile_wearable" comment="TTS synthesis parameter">Wearable</string>
+    <string name="tts_profile_handset" comment="TTS synthesis parameter">Phone speaker</string>
+    <string name="tts_profile_headphones" comment="TTS synthesis parameter">Headphones</string>
+    <string name="tts_profile_small_speaker" comment="TTS synthesis parameter">Small Bluetooth speaker</string>
+    <string name="tts_profile_medium_speaker" comment="TTS synthesis parameter">Medium Bluetooth speaker</string>
+    <string name="tts_profile_home" comment="TTS synthesis parameter">Home entertainment</string>
+    <string name="tts_profile_car" comment="TTS synthesis parameter">Car audio</string>
+    <string name="tts_profile_telephone" comment="TTS synthesis parameter">Telephone line</string>
+    <string name="tts_system_settings" comment="TTS voice settings">System TTS settings</string>
+    <string name="tts_choose_source" comment="TTS voice settings">Choose source</string>
+    <string name="tts_group_device" comment="TTS voice settings">Device engines</string>
+    <string name="tts_group_online" comment="TTS voice settings">Online services</string>
+    <string name="tts_group_cloud" comment="TTS voice settings">Cloud providers</string>
+    <string name="tts_group_other" comment="TTS voice settings">Other sources</string>
+    <string name="tts_system_preferred" comment="TTS voice settings">Use the system preferred engine</string>
+    <string name="tts_installed_engine" comment="TTS voice settings">Installed on this device</string>
+    <string name="tts_key_required" comment="TTS voice settings">API key required</string>
+    <string name="tts_no_account" comment="TTS voice settings">No account required</string>
+    <string name="tts_online" comment="TTS voice settings">Online</string>
+    <string name="tts_stop_preview" comment="TTS voice settings">Stop preview</string>
+    <string name="tts_configure_source" comment="TTS voice settings">Configure source</string>
+    <string name="tts_key_device_hint" comment="TTS online source configuration">No API key is configured on this device.</string>
+    <string name="tts_pitch_short" comment="TTS voice settings">%1$+d st</string>
+    <string name="tts_pitch_zero" comment="TTS voice settings">0 st</string>
+    <string name="tts_pitch_zero_hz" comment="TTS voice settings">0 Hz</string>
+    <string name="tts_voice_status" comment="Voice label with its network requirement">%1$s · %2$s</string>
+    <string name="tts_saved_source" comment="An unavailable saved source remains selectable by its raw ID">Saved source</string>
+    <string name="tts_protocol_openai">OpenAI Compatible</string>
+    <string name="tts_protocol_vits">VITS Simple API</string>
+    <string name="tts_private_http_error">Use a private network address for HTTP, or HTTPS for a remote server.</string>
+    <string name="tts_group_custom">Self-hosted services</string>
+    <string name="tts_add_service">Add service</string>
+    <string name="tts_edit_service">Edit service</string>
+    <string name="tts_service_name">Service name</string>
+    <string name="tts_service_protocol">Protocol</string>
+    <string name="tts_service_url">API base URL</string>
+    <string name="tts_service_url_openai">Include the API prefix, for example http://192.168.1.10:8088/v1</string>
+    <string name="tts_service_url_vits">Server root, for example http://192.168.1.10:23456</string>
+    <string name="tts_service_model">Model ID</string>
+    <string name="tts_service_voice_ids">Available voice IDs</string>
+    <string name="tts_service_voice_ids_hint">Optional, one ID per line. These appear in Voice alongside any server-provided voices.</string>
+    <string name="tts_service_preset">Reference preset</string>
+    <string name="tts_service_preset_hint">Use a preset already configured on the server, or leave blank for its default.</string>
+    <string name="tts_service_key_hint">Optional. Leave blank to keep the saved key.</string>
+    <string name="tts_service_clear_key">Remove saved key</string>
+    <string name="tts_service_no_models">No model list available. Enter the model ID manually.</string>
+    <string name="tts_service_delete_title">Delete service?</string>
+    <string name="tts_service_delete_message">Delete %1$s? Playback using this service will stop.</string>
+    <string name="profiles_update_failed">Could not update the profile.</string>
+    <string name="reader_appearance_font_delete_failed">Could not delete the font.</string>
+    <string name="sasayaki_transcription_error_unknown">Transcription failed.</string>
+    <string name="update_install_permission_required">Allow Hoshi Reader to install unknown apps, then tap Install again.</string>
+    <string name="update_install_permission_settings_failed">Allow Hoshi Reader to install unknown apps in Android settings, then tap Install again.</string>
+    <string name="update_installer_unavailable">No APK installer is available on this device.</string>
+    <string name="update_installer_blocked">Android blocked the package installer. Allow Hoshi Reader to install unknown apps, then tap Install again.</string>
+    <string name="diagnostics_load_failed">Unable to load diagnostics.</string>
+    <string name="diagnostics_share_failed">Unable to share diagnostics.</string>
+    <string name="reader_image_share_failed">Unable to share image.</string>
+    <string name="reader_image_copy_failed">Unable to copy image.</string>
+    <string name="bookshelf_update_failed">Could not update the bookshelf.</string>
+    <string name="anki_operation_failed">Anki operation failed.</string>
+    <string name="diagnostics_handled_errors">Runtime Errors</string>
+    <string name="diagnostics_runtime_time">Time: %1$s</string>
+    <string name="diagnostics_runtime_operation">Operation: %1$s</string>
+    <string name="diagnostics_runtime_exception">Exception: %1$s</string>
+    <string name="diagnostics_runtime_details">Details:</string>
+    <string name="diagnostics_runtime_trace">Stack trace:</string>
+    <string name="anki_sync_failed">The card was added, but Anki synchronization failed.</string>
+    <string name="diagnostics_no_handled_errors">No runtime errors recorded.</string>
+    <string name="diagnostics_package_name">Package name</string>
+    <string name="diagnostics_version_name">Version</string>
+    <string name="diagnostics_version_code">Build number</string>
+    <string name="diagnostics_android_sdk">Android SDK</string>
+    <string name="diagnostics_unavailable">Unavailable</string>
+    <string name="diagnostics_crash_records">Crash Records</string>
+    <string name="diagnostics_no_crashes">No captured crashes.</string>
+    <string name="diagnostics_captured_crash">Captured crash</string>
+    <string name="diagnostics_process_exits">Process Exit Records</string>
+    <string name="diagnostics_no_process_exits">No process exit records available.</string>
+    <string name="diagnostics_exit_anr">App not responding</string>
+    <string name="diagnostics_exit_java_crash">Java crash</string>
+    <string name="diagnostics_exit_native_crash">Native crash</string>
+    <string name="diagnostics_exit_low_memory">Low memory</string>
+    <string name="diagnostics_exit_resources">Excessive resource usage</string>
+    <string name="diagnostics_exit_initialization">Initialization failed</string>
+    <string name="diagnostics_exit_user_requested">Stopped by user or system</string>
+    <string name="diagnostics_exit_signaled">Terminated by signal</string>
+    <string name="diagnostics_exit_other">Other exit</string>
+    <string name="diagnostics_exit_unknown">Unknown exit</string>
+    <string name="diagnostics_webview" translatable="false">WebView</string>
+    <string name="sasayaki_nakuru_unavailable">Nakuru is not available on this device.</string>
+    <string name="sasayaki_legacy_resources_cleanup">Remove retired transcription resource: %1$s</string>
 </resources>

@@ -1,5 +1,8 @@
 package moe.antimony.hoshi.features.sync
 
+import moe.antimony.hoshi.R
+import moe.antimony.hoshi.ui.ErrorDiagnosticEvents
+import moe.antimony.hoshi.ui.UiText
 import android.content.Context
 import java.io.IOException
 import java.net.HttpURLConnection
@@ -93,12 +96,17 @@ class DeviceCodeDriveAuthorizer @Inject constructor(
         return when (error?.error) {
             "authorization_pending" -> DriveAuthorizationResult.Pending
             "slow_down" -> DriveAuthorizationResult.SlowDown
-            "access_denied" -> DriveAuthorizationResult.Failed("Google Drive authorization was denied.")
-            "expired_token" -> DriveAuthorizationResult.Failed("Google Drive authorization code expired.")
-            "invalid_client" -> DriveAuthorizationResult.Failed(
-                "Google OAuth client is invalid. Use a TVs and Limited Input devices client from the same project as ッツ/iOS sync.",
+            else -> oauthFailureResult(
+                statusCode = response.statusCode,
+                errorCode = error?.error,
+                errorDescription = error?.errorDescription,
+                summary = when (error?.error) {
+                    "access_denied" -> "Google Drive authorization was denied."
+                    "expired_token" -> "Google Drive authorization code expired."
+                    "invalid_client" -> "Google OAuth client is invalid. Use a TVs and Limited Input devices client from the same project as ッツ/iOS sync."
+                    else -> "Google Drive authorization failed."
+                },
             )
-            else -> DriveAuthorizationResult.Failed(response.oauthErrorMessage("Google Drive authorization failed."))
         }
     }
 
@@ -213,12 +221,10 @@ class DeviceCodeDriveAuthorizer @Inject constructor(
 
     private fun HttpResponse.oauthErrorMessage(fallback: String): String {
         val error = oauthError()
-        return error?.errorDescription
-            ?: error?.error
-            ?: runCatching {
-                DeviceCodeJson.parseToJsonElement(body.decodeToString()).jsonObject["error"]?.jsonPrimitive?.content
-            }.getOrNull()
-            ?: fallback
+        val code = error?.error ?: runCatching {
+            DeviceCodeJson.parseToJsonElement(body.decodeToString()).jsonObject["error"]?.jsonPrimitive?.content
+        }.getOrNull()
+        return oauthFailureMessage(statusCode, code, error?.errorDescription, fallback)
     }
 
     private fun HttpResponse.isPermanentRefreshTokenFailure(): Boolean =
@@ -294,3 +300,28 @@ private val DeviceCodeJson = Json {
 
 private fun String.formEncoded(): String =
     URLEncoder.encode(this, StandardCharsets.UTF_8.name())
+
+internal fun oauthFailureMessage(
+    statusCode: Int,
+    errorCode: String?,
+    errorDescription: String?,
+    summary: String,
+): String = listOfNotNull(
+    summary.takeIf(String::isNotBlank),
+    "HTTP $statusCode",
+    errorCode?.takeIf(String::isNotBlank),
+    errorDescription?.takeIf(String::isNotBlank),
+).distinct().joinToString("\n")
+
+internal fun oauthFailureResult(
+    statusCode: Int,
+    errorCode: String?,
+    errorDescription: String?,
+    summary: String,
+): DriveAuthorizationResult.Failed {
+    ErrorDiagnosticEvents.buffer.recordServiceFailure(
+        UiText.Resource(R.string.sync_google_drive_authorization_failed),
+        oauthFailureMessage(statusCode, errorCode, errorDescription, summary = ""),
+    )
+    return DriveAuthorizationResult.Failed(oauthFailureMessage(statusCode, errorCode, errorDescription, summary))
+}

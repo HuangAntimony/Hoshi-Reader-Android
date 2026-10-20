@@ -13,6 +13,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -23,6 +25,7 @@ import moe.antimony.hoshi.profiles.ProfileRepository
 
 interface AnkiSettingsRepository {
     val settings: Flow<AnkiSettings>
+    val profileIds: Flow<String> get() = flowOf("default")
     suspend fun update(transform: (AnkiSettings) -> AnkiSettings)
     suspend fun updateAllProfiles(transform: (AnkiSettings) -> AnkiSettings) {
         update(transform)
@@ -36,6 +39,10 @@ class DataStoreAnkiSettingsRepository(
 ) : AnkiSettingsRepository {
     private val profileSettingsVersion = MutableStateFlow(0)
     private val profileSettingsLock = Mutex()
+    override val profileIds: Flow<String> = profileRepository?.state
+        ?.map { it.effectiveProfile.id }
+        ?.distinctUntilChanged()
+        ?: flowOf("default")
 
     override val settings: Flow<AnkiSettings> =
         if (profileRepository == null) {

@@ -60,7 +60,7 @@ class DictionarySearchSessionTest {
         composeRule.runOnIdle { visible.value = true }
         composeRule.waitForIdle()
         composeRule.waitUntil(10_000) { evaluate(current, "document.getElementById('word')?.textContent") == "\"A\"" }
-        assertEquals("scroll position must survive leaving the Dictionary tab", "100", evaluate(current, "window.scrollY"))
+        assertEquals("scroll position must survive leaving the Dictionary tab", 100.0, evaluate(current, "window.scrollY").toDouble(), 1.0)
         assertEquals("history must survive leaving the Dictionary tab", "1", evaluate(current, "forward.length"))
         evaluate(current, "goForward(); true")
         assertEquals("\"B\"", evaluate(current, "document.getElementById('word').textContent"))

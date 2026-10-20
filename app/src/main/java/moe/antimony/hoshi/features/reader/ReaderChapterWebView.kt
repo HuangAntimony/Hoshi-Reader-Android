@@ -11,10 +11,12 @@ import android.net.Uri
 import android.os.SystemClock
 import android.view.ActionMode
 import android.view.Gravity
+import android.view.InputDevice
 import android.view.Menu
 import android.view.MenuItem
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.View.MeasureSpec
 import android.view.ViewGroup
 import android.webkit.JavascriptInterface
@@ -22,6 +24,7 @@ import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
+import moe.antimony.hoshi.ui.theme.HoshiWebView
 import android.webkit.WebViewClient
 import android.webkit.ValueCallback
 import android.widget.LinearLayout
@@ -37,6 +40,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import moe.antimony.hoshi.ui.theme.hoshiSurfaces
+import moe.antimony.hoshi.ui.theme.LocalHoshiDarkTheme
+import moe.antimony.hoshi.ui.theme.LocalHoshiEInkMode
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
@@ -95,6 +102,7 @@ internal fun ChapterWebView(
     onReaderInteraction: () -> Unit,
     onImageTapped: (String) -> Unit,
     onHighlightChanged: (HighlightColor, String, ReaderHighlightResult) -> Unit,
+    onTtsReplacementSelected: (ReaderSelectionData) -> Unit = {},
     readerPopupBridgeHolder: ReaderLookupPopupBridgeCallbackHolder,
     readerPopupResourceHandler: ReaderLookupPopupResourceHandler,
     readerPopupFrames: List<ReaderLookupPopupFramePayload>,
@@ -113,6 +121,7 @@ internal fun ChapterWebView(
     val currentOnReaderTapOutside = rememberUpdatedState(onReaderTapOutside)
     val currentOnReaderInteraction = rememberUpdatedState(onReaderInteraction)
     val currentOnImageTapped = rememberUpdatedState(onImageTapped)
+    val currentOnTtsReplacementSelected = rememberUpdatedState(onTtsReplacementSelected)
     val currentOnHighlightChanged = rememberUpdatedState(onHighlightChanged)
     val currentReaderPopupResourceHandler = rememberUpdatedState(readerPopupResourceHandler)
     val currentReaderPopupFrames = rememberUpdatedState(readerPopupFrames)
@@ -123,6 +132,9 @@ internal fun ChapterWebView(
     val currentOnRestoreStarted = rememberUpdatedState(onRestoreStarted)
     val currentOnRestoreCompleted = rememberUpdatedState(onRestoreCompleted)
     val currentOnBeforeRestoreVisible = rememberUpdatedState(onBeforeRestoreVisible)
+    val nativePopupSurfaces = hoshiSurfaces
+    val nativePopupDark = LocalHoshiDarkTheme.current
+    val nativePopupEInk = LocalHoshiEInkMode.current
     val context = LocalContext.current
     val readerWebAssets = remember(context) { ReaderWebAssets.load(context) }
     val viewportDensity = context.resources.displayMetrics.density.coerceAtLeast(1f)
@@ -269,6 +281,7 @@ internal fun ChapterWebView(
                 this.onHighlightChanged = { color, id, result ->
                     currentOnHighlightChanged.value(color, id, result)
                 }
+                this.onTtsReplacementSelected = { selection -> currentOnTtsReplacementSelected.value(selection) }
                 hideForReaderRestore()
                 setBackgroundColor(android.graphics.Color.TRANSPARENT)
                 addJavascriptInterface(
@@ -308,6 +321,7 @@ internal fun ChapterWebView(
         },
         update = { webView ->
             if (webView.isReleased) return@AndroidView
+            webView.updateNativePopupTheme(nativePopupDark, nativePopupEInk, nativePopupSurfaces.overlay.toArgb(), nativePopupSurfaces.outline.toArgb())
             fun selectAt(x: Float, y: Float, onBlankTap: () -> Unit) {
                 val density = webView.resources.displayMetrics.density
                 webView.evaluateJavascript(
@@ -325,7 +339,7 @@ internal fun ChapterWebView(
                 }
             }
             fun shouldIgnoreReaderGestureEvent(event: MotionEvent): Boolean {
-                if (currentIsWebViewRestoring.value || webView.isNativeSelectionActionModeActive()) {
+                if (currentIsWebViewRestoring.value || webView.isNativeSelectionActive()) {
                     return true
                 }
                 val density = webView.resources.displayMetrics.density
@@ -337,12 +351,12 @@ internal fun ChapterWebView(
             }
             when (readerSettings.viewMode) {
                 ReaderViewMode.Continuous -> {
-                    webView.setOnTouchListener(
+                    webView.bindReaderTouchListener(readerSettings to selectionScanLength) {
                         ContinuousScrollTouchListener(
                             settings = readerSettings,
                             shouldIgnoreReaderGesture = ::shouldIgnoreReaderGestureEvent,
                             onTap = { x, y -> selectAt(x, y) { currentOnReaderTapOutside.value() } },
-                            onScrollGesture = currentOnReaderInteraction.value,
+                            onScrollGesture = { currentOnReaderInteraction.value() },
                             onNextChapter = {
                                 currentOnReaderInteraction.value()
                                 currentOnClearLookupPopup.value()
@@ -357,9 +371,10 @@ internal fun ChapterWebView(
                                 if (changed) webView.hideForReaderRestore()
                                 changed
                             },
-                        ),
-                    )
-                    webView.setOnScrollChangeListener { _, _, _, _, _ ->
+                        )
+                    }
+                    webView.setOnScrollChangeListener(null)
+                    webView.onContinuousScroll = {
                         continuousScrollProgressScheduler.onScrollChanged(
                             isRestoring = currentIsWebViewRestoring.value,
                             restoreEpoch = currentWebViewRestoreEpoch.value,
@@ -410,7 +425,8 @@ internal fun ChapterWebView(
                     continuousScrollProgressScheduler.reset(webView::removeCallbacks)
                     readerPendingProgressSaveCallbacks.remove(webView)?.let(webView::removeCallbacks)
                     webView.setOnScrollChangeListener(null)
-                    webView.setOnTouchListener(
+                    webView.onContinuousScroll = null
+                    webView.bindReaderTouchListener(readerSettings to selectionScanLength) {
                         object : SwipePageTouchListener(
                             swipeDistance = readerSettings.pageSwipeThresholdPx.toFloat(),
                         ) {
@@ -466,8 +482,8 @@ internal fun ChapterWebView(
                                     onSaveProgress = currentOnSaveBookmark.value,
                                 )
                             }
-                        },
-                    )
+                        }
+                    }
                 }
             }
             webView.evaluateJavascript(readerAppearanceScript, null)
@@ -477,7 +493,7 @@ internal fun ChapterWebView(
                     currentOnRestoreStarted.value()
                     return@AndroidView
                 }
-                webView.tag = restoreToken
+                webView.prepareForDocument(restoreToken)
                 webView.hideForReaderRestore()
                 webView.webViewClient = EpubWebViewClient(
                     book = book,
@@ -597,7 +613,7 @@ internal fun readerSelectionMaxLength(settings: DictionarySettings): Int =
 internal fun WebView.readerNativeSelectionState(): StateFlow<Boolean>? =
     (this as? HoshiReaderWebView)?.nativeSelectionState
 
-private class HoshiReaderWebView(context: Context) : WebView(context) {
+internal class HoshiReaderWebView(context: Context) : HoshiWebView(context) {
     var isReleased = false
         private set
 
@@ -609,19 +625,104 @@ private class HoshiReaderWebView(context: Context) : WebView(context) {
     }
 
     var onHighlightChanged: (HighlightColor, String, ReaderHighlightResult) -> Unit = { _, _, _ -> }
-    private var nativeSelectionActionModeActive = false
+    var onTtsReplacementSelected: (ReaderSelectionData) -> Unit = {}
+    fun captureTtsReplacementSelection(mode: ActionMode) {
+        evaluateJavascript(ReaderSelectionCommand.NativeContext.source) { result ->
+            val selection = ReaderSelectionBridgePayload.fromJson(result.orEmpty()) ?: return@evaluateJavascript
+            mode.finish()
+            onTtsReplacementSelected(selection)
+        }
+    }
+    private var readerTouchListener: View.OnTouchListener? = null
+    private var readerTouchListenerKey: Any? = null
+    fun bindReaderTouchListener(key: Any, create: () -> View.OnTouchListener) {
+        if (readerTouchListenerKey == key) return
+        readerTouchListenerKey = key
+        readerTouchListener = create()
+        setOnTouchListener(readerTouchListener)
+    }
+    fun isCurrentReaderTouchListener(listener: View.OnTouchListener): Boolean = readerTouchListener === listener
+
+    var onContinuousScroll: (() -> Unit)? = null
+    private var documentHasSelection = false
     private val nativeSelectionActivity = MutableStateFlow(false)
     val nativeSelectionState: StateFlow<Boolean> get() = nativeSelectionActivity
     private var nativeSelectionActionMode: ActionMode? = null
     private var nativeSelectionContentRect: Rect? = null
+    private var nativeSelectionFallbackRect: Rect? = null
+    private var nativeSelectionAnchorRequested = false
+    private var nativeSelectionAnchorGeneration = 0
+    private data class SelectionMenuRecoveryRequest(val id: Int, val documentToken: String)
+    private data class SelectionMenuRecoveryTouch(val downTime: Long, val x: Float, val y: Float)
+    private var selectionMenuRecoveryRequest: SelectionMenuRecoveryRequest? = null
+    private var selectionMenuRecoveryTouch: SelectionMenuRecoveryTouch? = null
+    private val finishSelectionMenuRecoveryTouch = Runnable {
+        val touch = selectionMenuRecoveryTouch ?: return@Runnable
+        selectionMenuRecoveryTouch = null
+        dispatchSelectionMenuRecoveryTouch(touch, MotionEvent.ACTION_UP)
+    }
     private var highlightColorPopup: PopupWindow? = null
     private var selectionHighlightPending = false
 
-    fun isNativeSelectionActionModeActive(): Boolean = nativeSelectionActionModeActive
+    init {
+        addJavascriptInterface(ReaderContinuousScrollBridge(this), "HoshiReaderScroll")
+        addJavascriptInterface(object {
+            @JavascriptInterface
+            fun postMessage(active: Boolean, restoreToken: String) {
+                post {
+                    if (!isReleased && tag == restoreToken) {
+                        documentHasSelection = active
+                        if (!active) cancelSelectionMenuRecoveryTouch()
+                        updateNativeSelectionActivity()
+                    }
+                }
+            }
+            @JavascriptInterface
+            fun recoverMenu(request: Int, restoreToken: String) {
+                post {
+                    if (!isReleased && tag == restoreToken) recoverNativeSelectionMenu(request, restoreToken)
+                }
+            }
+
+            @JavascriptInterface
+            fun invalidateMenuAnchor(request: Int, restoreToken: String) {
+                post {
+                    if (!isReleased && tag == restoreToken && request == nativeSelectionAnchorGeneration) {
+                        nativeSelectionFallbackRect = null
+                        nativeSelectionAnchorGeneration++
+                        cancelSelectionMenuRecoveryTouch()
+                        // Do not remeasure while handles are moving. A new native
+                        // ActionMode may request a fresh anchor after the gesture.
+                        nativeSelectionActionMode?.invalidateContentRect()
+                    }
+                }
+            }
+        }, "HoshiNativeSelection")
+    }
+
+    fun isNativeSelectionActive(): Boolean = nativeSelectionActivity.value
+
+    fun prepareForDocument(restoreToken: String) {
+        tag = restoreToken
+        clearNativeSelectionState()
+    }
+
+    private fun clearNativeSelectionState() {
+        cancelSelectionMenuRecoveryTouch()
+        documentHasSelection = false
+        selectionHighlightPending = false
+        nativeSelectionActionMode?.finish()
+        setNativeSelectionActionMode(null)
+    }
+
+    fun clearNativeSelectionActionMode(mode: ActionMode) {
+        if (nativeSelectionActionMode === mode) setNativeSelectionActionMode(null)
+    }
     fun setNativeSelectionActionMode(mode: ActionMode?) {
         nativeSelectionActionMode = mode
-        nativeSelectionActionModeActive = mode != null
-        evaluateJavascript(ReaderPaginationScripts.nativeSelectionActiveInvocation(nativeSelectionActionModeActive), null)
+        nativeSelectionFallbackRect = null
+        nativeSelectionAnchorRequested = false
+        nativeSelectionAnchorGeneration++
         if (mode == null) {
             nativeSelectionContentRect = null
             dismissHighlightColorPopup()
@@ -631,11 +732,111 @@ private class HoshiReaderWebView(context: Context) : WebView(context) {
 
     private fun updateNativeSelectionActivity() {
         nativeSelectionActivity.value =
-            nativeSelectionActionModeActive || selectionHighlightPending || highlightColorPopup != null
+            documentHasSelection || nativeSelectionActionMode != null || selectionHighlightPending || highlightColorPopup != null
     }
 
     fun setNativeSelectionContentRect(rect: Rect) {
         nativeSelectionContentRect = Rect(rect)
+    }
+
+    fun resolveNativeSelectionContentRect(mode: ActionMode, rect: Rect) {
+        if (!rect.isEmpty && Rect.intersects(rect, Rect(0, 0, width, height))) return
+        nativeSelectionFallbackRect?.let { rect.set(it); return }
+        if (nativeSelectionAnchorRequested || nativeSelectionActionMode !== mode) return
+        nativeSelectionAnchorRequested = true
+        val documentToken = tag
+        val generation = nativeSelectionAnchorGeneration
+        // A fresh delegate read cannot repair Chromium's empty/offscreen bounds.
+        // Query the visible DOM selection once for this ActionMode instead.
+        evaluateJavascript(ReaderSelectionCommand.NativeMenuRect(generation).source) { result ->
+            if (tag != documentToken || nativeSelectionActionMode !== mode ||
+                generation != nativeSelectionAnchorGeneration) return@evaluateJavascript
+            val anchor = ReaderNativeSelectionMenuRect.fromJavascriptResult(result) ?: return@evaluateJavascript
+            val scale = width / anchor.viewportWidth
+            val fallback = Rect(
+                (anchor.left * scale).roundToInt(), (anchor.top * scale).roundToInt(),
+                (anchor.right * scale).roundToInt(), (anchor.bottom * scale).roundToInt(),
+            )
+            if (!fallback.intersect(0, 0, width, height)) return@evaluateJavascript
+            nativeSelectionFallbackRect = fallback
+            mode.invalidateContentRect()
+        }
+    }
+
+    private fun recoverNativeSelectionMenu(request: Int, documentToken: String) {
+        if (selectionMenuRecoveryTouch != null) return
+        val recoveryRequest = SelectionMenuRecoveryRequest(request, documentToken)
+        selectionMenuRecoveryRequest = recoveryRequest
+        fun discardRequest() {
+            if (selectionMenuRecoveryRequest === recoveryRequest) cancelSelectionMenuRecoveryTouch()
+        }
+        val mode = nativeSelectionActionMode
+        val generation = nativeSelectionAnchorGeneration
+        evaluateJavascript(ReaderSelectionCommand.TakeMenuRecovery(request, generation).source) { result ->
+            if (selectionMenuRecoveryRequest !== recoveryRequest ||
+                tag != documentToken || nativeSelectionActionMode !== mode ||
+                generation != nativeSelectionAnchorGeneration ||
+                selectionMenuRecoveryTouch != null ||
+                !isAttachedToWindow || !hasWindowFocus()) {
+                discardRequest()
+                return@evaluateJavascript
+            }
+            val point = ReaderNativeSelectionMenuPoint.fromJavascriptResult(result) ?: run {
+                discardRequest()
+                return@evaluateJavascript
+            }
+            val scale = width / point.viewportWidth
+            val x = (point.x * scale).toFloat()
+            val y = (point.y * scale).toFloat()
+            if (x !in 0f..<width.toFloat() || y !in 0f..<height.toFloat()) {
+                discardRequest()
+                return@evaluateJavascript
+            }
+            // A long press inside the selected range preserves it and lets WebView
+            // own its ActionMode. Mouse events instead open a separate dropdown on
+            // large screens, bypassing our Highlight/Replace ActionMode callback.
+            val touch = SelectionMenuRecoveryTouch(SystemClock.uptimeMillis(), x, y)
+            selectionMenuRecoveryTouch = touch
+            dispatchSelectionMenuRecoveryTouch(touch, MotionEvent.ACTION_DOWN)
+            // Chromium waits for tap timeout + long-press timeout. Ending at
+            // that threshold can race its timer and turn recovery into a tap.
+            val holdMillis = ViewConfiguration.getTapTimeout().toLong() + ViewConfiguration.getLongPressTimeout() + 100L
+            postDelayed(finishSelectionMenuRecoveryTouch, holdMillis)
+        }
+    }
+
+    private fun dispatchSelectionMenuRecoveryTouch(touch: SelectionMenuRecoveryTouch, action: Int) {
+        val event = MotionEvent.obtain(touch.downTime, SystemClock.uptimeMillis(), action, 1,
+            arrayOf(MotionEvent.PointerProperties().apply { id = 0; toolType = MotionEvent.TOOL_TYPE_FINGER }),
+            arrayOf(MotionEvent.PointerCoords().apply {
+                x = touch.x; y = touch.y
+                pressure = if (action == MotionEvent.ACTION_DOWN) 1f else 0f
+            }),
+            0, 0, 1f, 1f, 0, 0, InputDevice.SOURCE_TOUCHSCREEN, 0)
+        // Bypass the app's page/tap listener; this gesture belongs to WebView.
+        try { super.onTouchEvent(event) } finally { event.recycle() }
+    }
+
+    private fun cancelSelectionMenuRecoveryTouch() {
+        // Cancel queued JS replies as well as an already-started touch.
+        selectionMenuRecoveryRequest?.let { request ->
+            selectionMenuRecoveryRequest = null
+            if (!isReleased) evaluateJavascript(ReaderSelectionCommand.CancelMenuRecovery(request.id, request.documentToken).source, null)
+        }
+        val touch = selectionMenuRecoveryTouch ?: return
+        selectionMenuRecoveryTouch = null
+        removeCallbacks(finishSelectionMenuRecoveryTouch)
+        dispatchSelectionMenuRecoveryTouch(touch, MotionEvent.ACTION_CANCEL)
+    }
+
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        cancelSelectionMenuRecoveryTouch()
+        return super.onTouchEvent(event)
+    }
+
+    override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
+        if (!hasWindowFocus) cancelSelectionMenuRecoveryTouch()
+        super.onWindowFocusChanged(hasWindowFocus)
     }
 
     fun prepareHighlightColorPicker(mode: ActionMode) {
@@ -649,6 +850,21 @@ private class HoshiReaderWebView(context: Context) : WebView(context) {
         }
     }
 
+    private var nativePopupTheme: Pair<Boolean, Boolean>? = null
+    private var nativePopupBackground = AndroidColor.WHITE
+    private var nativePopupOutline = 0x22000000
+
+    fun updateNativePopupTheme(dark: Boolean, eInk: Boolean, background: Int, outline: Int) {
+        val next = dark to eInk
+        if (nativePopupTheme != null && (nativePopupTheme != next || nativePopupBackground != background || nativePopupOutline != outline)) {
+            nativeSelectionActionMode?.finish()
+            dismissHighlightColorPopup()
+        }
+        nativePopupTheme = next
+        nativePopupBackground = background
+        nativePopupOutline = outline
+    }
+
     fun showHighlightColorPicker(anchorRect: Rect? = nativeSelectionContentRect) {
         if (isReleased) return
         dismissHighlightColorPopup()
@@ -656,9 +872,9 @@ private class HoshiReaderWebView(context: Context) : WebView(context) {
         val popupContent = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             background = GradientDrawable().apply {
-                setColor(AndroidColor.WHITE)
+                setColor(nativePopupBackground)
                 cornerRadius = 20f * density
-                setStroke((1f * density).toInt().coerceAtLeast(1), 0x22000000)
+                setStroke((1f * density).toInt().coerceAtLeast(1), nativePopupOutline)
             }
             elevation = 8f * density
             val paddingHorizontal = (ReaderHighlightSelectionMenu.colorPickerHorizontalPaddingDp * density).toInt()
@@ -771,10 +987,13 @@ private class HoshiReaderWebView(context: Context) : WebView(context) {
 
     fun releaseForDestroy() {
         isReleased = true
-        selectionHighlightPending = false
-        nativeSelectionActionMode?.finish()
-        dismissHighlightColorPopup()
-        setNativeSelectionActionMode(null)
+        removeJavascriptInterface("HoshiNativeSelection")
+        removeJavascriptInterface("HoshiReaderScroll")
+        onContinuousScroll = null
+        readerTouchListener = null
+        readerTouchListenerKey = null
+        clearNativeSelectionState()
+        onTtsReplacementSelected = {}
         onHighlightChanged = { _, _, _ -> }
     }
 }
@@ -799,6 +1018,10 @@ private class ReaderHighlightActionModeCallback(
     }
 
     override fun onActionItemClicked(mode: ActionMode, item: MenuItem): Boolean {
+        if (item.itemId == 0x484920) {
+            webView.captureTtsReplacementSelection(mode)
+            return true
+        }
         if (item.itemId == ReaderHighlightSelectionMenu.parentItemId) {
             webView.prepareHighlightColorPicker(mode)
             return true
@@ -812,7 +1035,7 @@ private class ReaderHighlightActionModeCallback(
     }
 
     override fun onDestroyActionMode(mode: ActionMode) {
-        webView.setNativeSelectionActionMode(null)
+        webView.clearNativeSelectionActionMode(mode)
         delegate.onDestroyActionMode(mode)
     }
 
@@ -822,10 +1045,12 @@ private class ReaderHighlightActionModeCallback(
         } else {
             super.onGetContentRect(mode, view, outRect)
         }
+        webView.resolveNativeSelectionContentRect(mode, outRect)
         webView.setNativeSelectionContentRect(outRect)
     }
 
     private fun addHighlightMenu(menu: Menu) {
+        if (menu.findItem(0x484920) == null) menu.add(ReaderHighlightSelectionMenu.groupId, 0x484920, 1, R.string.tts_replace).setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM)
         if (menu.findItem(ReaderHighlightSelectionMenu.parentItemId) != null) return
         ReaderHighlightSelectionMenu.actionModeItems.forEach { item ->
             menu.add(
@@ -936,6 +1161,7 @@ private fun readerSetupScript(
           $selectionScript
           window.hoshiSelection.configure({
             bridge: 'android-reader',
+            nativeSelectionToken: ${readerJavaScriptStringLiteral(restoreToken)},
             language: $selectionLanguageId,
             linkTapResult: 'link',
             imageTapResult: 'image',
@@ -985,18 +1211,20 @@ internal fun readerViewportCssLayout(
     val width = viewportCssWidth.coerceAtLeast(1)
     val height = viewportCssHeight.coerceAtLeast(1)
     val generatedLayout = ReaderGeneratedLayout.from(settings)
+    val contentWidth = width * (1 - generatedLayout.viewportHorizontalPaddingRatio * 2)
+    val contentHeight = height * (1 - generatedLayout.viewportVerticalPaddingRatio * 2)
     val imageMaxWidth = max(
         1,
-        floor(width * generatedLayout.imageWidthViewportRatio).toInt() - generatedLayout.imageWidthReductionPx,
+        floor(contentWidth * generatedLayout.imageWidthViewportRatio).toInt() - generatedLayout.imageWidthReductionPx,
     )
     return ReaderViewportCssLayout(
         pageHeightPx = height,
-        visibleHeightPx = height,
+        visibleHeightPx = contentHeight.roundToInt(),
         pageWidthPx = width,
         verticalPaddingBlockPx = height * (settings.verticalPadding / 200.0),
         verticalPaddingGapPx = height * (settings.verticalPadding / 100.0),
         imageMaxWidthPx = imageMaxWidth,
-        imageMaxHeightPx = max(1, floor(height * generatedLayout.imageHeightViewportRatio).toInt()),
+        imageMaxHeightPx = max(1, floor(contentHeight * generatedLayout.imageHeightViewportRatio).toInt()),
     )
 }
 
@@ -1087,7 +1315,7 @@ internal fun WebView.navigatePage(
                     },
                 )
             }
-            ReaderNavigationResult.Revealed -> {
+            ReaderNavigationResult.Revealed, ReaderNavigationResult.Blocked -> {
                 readerPageTurnProgressRequestIds.remove(this)
             }
             ReaderNavigationResult.Limit -> {
@@ -1123,7 +1351,7 @@ internal fun WebView.flushPendingProgressSave() {
     progressCallback.run()
 }
 
-private class ContinuousScrollTouchListener(
+internal class ContinuousScrollTouchListener(
     private val settings: ReaderSettings,
     private val shouldIgnoreReaderGesture: (MotionEvent) -> Boolean,
     private val onTap: (Float, Float) -> Unit,
@@ -1134,17 +1362,20 @@ private class ContinuousScrollTouchListener(
     private var downX = 0f
     private var downY = 0f
     private var downTime = 0L
+    private var gestureGeneration = 0
     private var currentGestureIgnored = false
     private val focusTracker = ReaderContinuousScrollFocusTracker()
 
     override fun onTouch(view: View, event: MotionEvent): Boolean {
         val webView = view as? WebView ?: return false
         if (shouldIgnoreReaderGesture(event)) {
+            gestureGeneration++
             currentGestureIgnored = true
             return false
         }
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                gestureGeneration++
                 downX = event.x
                 downY = event.y
                 downTime = event.eventTime
@@ -1152,6 +1383,7 @@ private class ContinuousScrollTouchListener(
                 focusTracker.onDown()
             }
             MotionEvent.ACTION_CANCEL -> {
+                gestureGeneration++
                 currentGestureIgnored = false
                 focusTracker.onCancel()
             }
@@ -1186,17 +1418,23 @@ private class ContinuousScrollTouchListener(
 
     private fun handleBoundarySwipe(webView: WebView, dx: Float, dy: Float) {
         val threshold = settings.chapterSwipeDistance * webView.resources.displayMetrics.density
-        if (settings.verticalWriting) {
+        val direction = if (settings.verticalWriting) {
             if (abs(dx) < threshold || abs(dx) < abs(dy)) return
-            when {
-                dx > 0 && !webView.canScrollHorizontally(-1) -> onNextChapter()
-                dx < 0 && !webView.canScrollHorizontally(1) -> onPreviousChapter()
-            }
+            if (dx > 0) ReaderNavigationDirection.Forward else ReaderNavigationDirection.Backward
         } else {
             if (abs(dy) < threshold || abs(dy) < abs(dx)) return
-            when {
-                dy < 0 && !webView.canScrollVertically(1) -> onNextChapter()
-                dy > 0 && !webView.canScrollVertically(-1) -> onPreviousChapter()
+            if (dy < 0) ReaderNavigationDirection.Forward else ReaderNavigationDirection.Backward
+        }
+        val generation = gestureGeneration
+        val documentToken = webView.tag
+        webView.evaluateJavascript("window.hoshiReader.isAtChapterBoundary('${direction.jsValue}')") { result ->
+            val readerView = webView as? HoshiReaderWebView ?: return@evaluateJavascript
+            if (readerView.isReleased || !readerView.isCurrentReaderTouchListener(this) ||
+                readerView.tag != documentToken || generation != gestureGeneration ||
+                readerView.isNativeSelectionActive()
+            ) return@evaluateJavascript
+            if (result == "true") {
+                if (direction == ReaderNavigationDirection.Forward) onNextChapter() else onPreviousChapter()
             }
         }
     }
@@ -1336,6 +1574,15 @@ internal class ReaderContinuousScrollFocusTracker {
         if (abs(dx) < CONTINUOUS_READER_TAP_SLOP && abs(dy) < CONTINUOUS_READER_TAP_SLOP) return false
         scrollGestureStarted = true
         return true
+    }
+}
+
+internal class ReaderContinuousScrollBridge(private val webView: HoshiReaderWebView) {
+    @JavascriptInterface
+    fun postMessage(restoreToken: String) {
+        webView.post {
+            if (!webView.isReleased && webView.tag == restoreToken) webView.onContinuousScroll?.invoke()
+        }
     }
 }
 

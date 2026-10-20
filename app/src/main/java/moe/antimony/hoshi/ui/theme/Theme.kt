@@ -140,6 +140,7 @@ private fun pureColorScheme(
 @Composable
 fun HoshiReaderTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
+    systemDarkTheme: Boolean = isSystemInDarkTheme(),
     eInkMode: Boolean = false,
     useDarkSystemBarIcons: Boolean = !darkTheme,
     // Dynamic color is available on Android 12+
@@ -164,6 +165,7 @@ fun HoshiReaderTheme(
     }
 
     CompositionLocalProvider(
+        LocalSystemDarkTheme provides systemDarkTheme,
         LocalHoshiEInkMode provides eInkMode,
         LocalHoshiDarkTheme provides darkTheme,
         LocalOverscrollFactory provides null,

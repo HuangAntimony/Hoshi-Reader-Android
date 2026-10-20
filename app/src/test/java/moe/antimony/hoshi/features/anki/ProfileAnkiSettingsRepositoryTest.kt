@@ -10,6 +10,7 @@ import kotlinx.coroutines.runBlocking
 import moe.antimony.hoshi.profiles.ProfileRepository
 import moe.antimony.hoshi.testing.CountingCoroutineDispatcher
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -18,6 +19,28 @@ import org.junit.rules.TemporaryFolder
 class ProfileAnkiSettingsRepositoryTest {
     @get:Rule
     val tempFolder = TemporaryFolder()
+
+    @Test
+    fun accidentalDuplicatePreferencePersistsPerProfileWhileAllowDuplicatesIsOff() = runBlocking {
+        val profiles = ProfileRepository(tempFolder.newFolder("duplicate-settings"))
+        val repository = repository(profiles)
+        assertFalse(repository.settings.first().preventAccidentalDuplicates)
+        repository.update { it.copy(allowDupes = true, preventAccidentalDuplicates = true) }
+
+        val english = profiles.createProfile("English", "en")
+        profiles.activateGlobal(english.id)
+        repository.update { it.copy(preventAccidentalDuplicates = false) }
+        profiles.activateGlobal(profiles.state.value.defaultProfileId)
+        repository.update { it.copy(allowDupes = false) }
+        val restored = repository(profiles).settings.first()
+        assertFalse(restored.allowDupes)
+        assertTrue(restored.preventAccidentalDuplicates)
+
+        repository.update { it.copy(allowDupes = true) }
+        assertTrue(repository(profiles).settings.first().preventAccidentalDuplicates)
+        profiles.activateGlobal(english.id)
+        assertFalse(repository(profiles).settings.first().preventAccidentalDuplicates)
+    }
 
     @Test
     fun freshProfileStartsWithHoshiAndPreservesExplicitlyClearedTags() = runBlocking {

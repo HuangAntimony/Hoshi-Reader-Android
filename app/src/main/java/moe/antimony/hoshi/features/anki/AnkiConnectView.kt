@@ -60,10 +60,10 @@ fun AnkiConnectView(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val enabled = uiState.settings.backendKind == AnkiBackendKind.AnkiConnect
     val showSetupWarning = shouldShowAnkiConnectSetupWarning(uiState.settings.backendKind)
-    var editingAddress by remember { mutableStateOf(false) }
-    var addressInput by remember { mutableStateOf("") }
-    var editingApiKey by remember { mutableStateOf(false) }
-    var apiKeyInput by remember { mutableStateOf("") }
+    var editingAddress by remember(uiState.profileId) { mutableStateOf(false) }
+    var addressInput by remember(uiState.profileId) { mutableStateOf("") }
+    var editingApiKey by remember(uiState.profileId) { mutableStateOf(false) }
+    var apiKeyInput by remember(uiState.profileId) { mutableStateOf("") }
 
     if (editingAddress) {
         val addressScrollState = rememberScrollState()
@@ -140,10 +140,12 @@ fun AnkiConnectView(
     }
 
     SettingsDetailScaffold(
+        state = uiState.settingsPageState,
+        onRetry = viewModel::retrySettings,
         title = stringResource(R.string.anki_connect_use),
         onClose = onClose,
         modifier = modifier,
-    ) { innerPadding ->
+    ) { innerPadding, uiState ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()

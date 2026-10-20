@@ -35,6 +35,8 @@
     <string name="action_copy_code">复制代码</string>
     <string name="action_scan">扫描</string>
     <string name="loading">正在加载...</string>
+    <string name="settings_load_failed">无法加载设置，请重试。</string>
+    <string name="settings_retry" comment="Retry loading persisted settings.">重试</string>
     <string name="none" comment="Generic empty value label, intentionally matching bookshelf_no_shelf.">无</string>
     <string name="dialog_error_title">错误</string>
     <string name="import_select_epub_book">请选择 .epub EPUB 书籍文件。</string>
@@ -234,7 +236,7 @@
     <string name="dictionary_download_item_format">%1$s（%2$s）</string>
     <string name="dictionary_type_term">词条</string>
     <string name="dictionary_type_frequency">词频</string>
-    <string name="dictionary_type_pitch">音调</string>
+    <string name="dictionary_type_pitch" comment="Dictionary type: Japanese pitch accent, distinct from TTS acoustic pitch">音调</string>
     <string name="dictionary_type_kanji">汉字</string>
     <string name="dictionary_category_none" comment="Dictionary category for uncategorized term dictionaries, intentionally matching generic none.">无</string>
     <string name="dictionary_category_monolingual">单语</string>
@@ -300,7 +302,7 @@
     <string name="bookshelf_profile_automatic_uses_format">将使用 %1$s</string>
     <string name="reader_behavior_volume_keys_turn_pages">音量键翻页</string>
     <string name="reader_behavior_volume_keys_navigate_popup_terms">音量键跳转弹窗词条</string>
-    <string name="reader_behavior_volume_keys_seek_sasayaki">音量键跳转有声书</string>
+    <string name="reader_behavior_volume_keys_seek_sasayaki">音量键控制有声书 / TTS</string>
     <string name="reader_behavior_reverse_volume_key_direction">反转音量键方向</string>
     <string name="reader_behavior_keep_screen_on">保持屏幕常亮</string>
     <string name="reader_behavior_lock_current_orientation">锁定当前屏幕方向</string>
@@ -356,7 +358,7 @@
     <string name="reader_statistics_sync_behaviour">同步行为</string>
     <string name="reader_statistics_sync_behaviour_hint">决定同步时统计数据是逐条合并，还是完全替换。</string>
     <string name="reader_statistics_sync_mode_merge">合并</string>
-    <string name="reader_statistics_sync_mode_replace">替换</string>
+    <string name="reader_statistics_sync_mode_replace" comment="Reader statistics synchronization mode that replaces local statistics.">替换</string>
     <string name="reader_statistics_settings_hint">可从阅读器菜单访问统计。</string>
     <string name="reader_appearance_text">文本</string>
     <string name="reader_appearance_layout">布局</string>
@@ -395,7 +397,7 @@
     <string name="reader_appearance_font_category_sans">黑体／无衬线</string>
     <string name="reader_appearance_font_category_rounded">圆体</string>
     <string name="reader_appearance_font_category_handwriting">楷书／手写正文</string>
-    <string name="reader_appearance_font_retry">重试</string>
+    <string name="reader_appearance_font_retry" comment="Retry a downloadable reader font.">重试</string>
     <string name="reader_appearance_import_font">导入字体</string>
     <string name="reader_appearance_importing" comment="Generic import progress label, intentionally shared with ッツ backup import.">正在导入...</string>
     <string name="reader_appearance_font_size">字号</string>
@@ -445,7 +447,7 @@
     <string name="reader_appearance_show_statistics_toggle">显示统计开关</string>
     <string name="reader_appearance_show_reading_speed">显示阅读速度</string>
     <string name="reader_appearance_show_reading_time">显示阅读时间</string>
-    <string name="reader_appearance_show_sasayaki_toggle">显示有声书开关</string>
+    <string name="reader_appearance_show_sasayaki_toggle">显示有声书 / TTS 开关</string>
     <string name="reader_appearance_width">宽度</string>
     <string name="reader_appearance_height">高度</string>
     <string name="reader_appearance_scale">缩放</string>
@@ -529,9 +531,8 @@
     <string name="backup_restoring">正在恢复...</string>
     <string name="backup_exporting">正在导出...</string>
     <string name="backup_importing" comment="ッツ backup import progress label, intentionally matching the generic importing progress text.">正在导入...</string>
-    <string name="advanced_audio">音频</string>
+    <string name="advanced_audio">单词音频</string>
     <string name="advanced_sasayaki_audiobooks">有声书</string>
-    <string name="advanced_sasayaki_subtitle">配合已匹配的有声书字幕阅读</string>
     <string name="audio_sources">来源</string>
     <string name="audio_add_source">添加来源</string>
     <string name="audio_name">名称</string>
@@ -566,6 +567,7 @@
     <string name="anki_deck" comment="Anki deck selector label, intentionally matching duplicate scope deck label.">牌组</string>
     <string name="anki_model">模板</string>
     <string name="anki_allow_duplicates">允许重复</string>
+    <string name="anki_prevent_accidental_duplicates">制卡后禁用按钮</string>
     <string name="anki_check_duplicates_all_models">跨所有模板检查重复</string>
     <string name="anki_duplicate_check_scope">重复检查范围</string>
     <string name="anki_compact_glossaries">紧凑释义</string>
@@ -730,7 +732,6 @@
     <string name="sasayaki_no_file_selected">未选择文件</string>
     <string name="sasayaki_matching">正在匹配...</string>
     <string name="settings_book_cover_wallpaper">书籍封面锁屏</string>
-    <string name="settings_book_cover_wallpaper_subtitle">锁屏或休眠时显示当前书籍封面</string>
     <string name="book_cover_wallpaper_lock_screen">更新锁屏壁纸</string>
     <string name="book_cover_wallpaper_lock_screen_summary">每次打开书籍时，将当前封面设为 Android 锁屏壁纸。部分墨水屏设备可能不生效。</string>
     <string name="book_cover_wallpaper_not_supported">此设备不支持锁屏壁纸。</string>
@@ -863,7 +864,7 @@
     <string name="sasayaki_transcription_start">开始转写</string>
     <string name="sasayaki_transcription_resume">继续转写</string>
     <string name="sasayaki_transcription_realign">重新匹配</string>
-    <string name="sasayaki_transcription_pause">暂停</string>
+    <string name="sasayaki_transcription_pause" comment="Pause on-device audiobook transcription.">暂停</string>
     <string name="sasayaki_transcription_preparing">正在准备转写…</string>
     <string name="sasayaki_transcription_downloading">正在下载转写文件… %1$d%%</string>
     <string name="sasayaki_transcription_progress">正在转写并匹配…</string>
@@ -882,13 +883,11 @@
     <string name="sasayaki_transcription_clear_message">仅清除转写数据，保留当前匹配结果。</string>
     <string name="sasayaki_transcription_error_audio">无法读取此音频。请确认文件完整、可访问且格式受支持，然后重试。</string>
     <string name="sasayaki_transcription_error_resources">无法下载或校验转写文件。请检查网络连接和可用存储空间后重试。</string>
+    <string name="sasayaki_transcription_download_details">文件：%1$s\n下载地址：%2$s\n已接收：%3$d/%4$d 字节\n尝试次数：%5$d</string>
     <string name="sasayaki_transcription_error_recognition">日语语音识别无法启动或完成。请重启应用后重试；若仍失败，可切换为“轻量”模式。</string>
     <string name="sasayaki_transcription_error_match">无法将转写内容与此书匹配。请确认书籍可正常打开且内容与音频相符。</string>
     <string name="sasayaki_transcription_error_storage">无法保存转写进度。请检查可用存储空间，并确认书籍仍可访问。</string>
     <string name="sasayaki_transcription_busy">正在转写另一本书。</string>
-    <string name="about_ffmpeg_license" translatable="false">FFmpeg 9.0.2 · LGPL 2.1+</string>
-    <string name="about_ffmpeg_source">FFmpeg 源代码</string>
-    <string name="about_transcription_license">转写组件许可证</string>
     <string name="sasayaki_transcription_speed">转录速度</string>
     <string name="sasayaki_transcription_light">轻量</string>
     <string name="sasayaki_transcription_balanced">均衡</string>
@@ -923,4 +922,208 @@
     </plurals>
     <string name="sync_delete_local">删除本地副本</string>
     <string name="sync_delete_everywhere">在所有设备上删除</string>
+    <string name="tts_tab_voice" comment="TTS panel tab containing source, voice and rate controls.">音源</string>
+    <string name="tts_tab_dictionary">文本替换</string>
+    <string name="tts_rate_label">引擎语速</string>
+    <string name="tts_playback_rate">Hoshi 播放速度</string>
+    <string name="tts_rate_value">%1$.2f×</string>
+    <string name="tts_title">TTS</string>
+    <string name="tts_dictionary">文本替换规则</string>
+    <string name="tts_add_word">添加替换</string>
+    <string name="tts_global">全局</string>
+    <string name="tts_book">本书</string>
+    <string name="tts_dictionary_empty">尚未添加文本替换规则。</string>
+    <string name="tts_use_ruby">使用 Ruby 读音</string>
+    <string name="tts_loading_voices">正在加载音色…</string>
+    <string name="tts_refresh_voices">刷新音色列表</string>
+    <string name="tts_source">来源</string>
+    <string name="tts_voice" comment="Label for the selected synthesis voice.">音色</string>
+    <string name="tts_system_default" comment="Automatically choose an installed Japanese TTS engine or voice.">自动选择</string>
+    <string name="tts_offline">离线</string>
+    <string name="tts_preview">试听</string>
+    <string name="tts_preview_voice">试听音色</string>
+    <string name="tts_retry" comment="Retry a failed text-to-speech engine request.">重试</string>
+    <string name="tts_replace" comment="Native text-selection action that opens the TTS replacement editor.">替换</string>
+    <string name="tts_regex_enabled">正则表达式</string>
+    <string name="tts_regex_pattern">匹配表达式</string>
+    <string name="tts_regex_help">使用 RE2 语法；$1、$2… 表示捕获的文本。字面美元符号需用反斜杠转义。忽略空匹配。</string>
+    <string name="tts_invalid_regex">正则表达式无效或使用了不支持的语法。</string>
+    <string name="tts_invalid_regex_replacement">替换文本无效，请检查分组编号（$1、$2…）和反斜杠转义。</string>
+    <string name="tts_replacement_before">替换前</string>
+    <string name="tts_replacement_after">送入 TTS 的文本</string>
+    <string name="tts_replacement_sample">预览文本</string>
+    <string name="tts_replacement_sample_hint">输入文本以测试这条规则。</string>
+    <string name="tts_replacement_rule">替换规则</string>
+    <string name="tts_replacement_scope">应用范围</string>
+    <string name="tts_replacement_preview">句子预览</string>
+    <string name="tts_replacement_delete_hint">留空则删除匹配内容</string>
+    <string name="tts_replacement_empty_preview">替换后无可朗读文本</string>
+    <string name="tts_replacement_pending_preview">填写规则后查看结果</string>
+    <string name="tts_replacement_deleted">删除匹配内容</string>
+    <string name="tts_replacement_title">TTS 文本替换</string>
+    <string name="tts_surface">匹配文本</string>
+    <string name="tts_replacement">替换为</string>
+    <string name="tts_invalid_surface">请输入原文本。</string>
+    <string name="tts_duplicate">此作用范围内已存在相同原文本，请编辑已有规则。</string>
+    <string name="tts_no_engine">设备未安装 TTS 引擎，请在系统设置中安装引擎及日语语音数据。</string>
+    <string name="tts_missing_japanese">日语音色不可用，请选择其他音色或在系统设置中安装日语语音数据。</string>
+    <string name="tts_engine_unavailable">所选引擎不可用，请选择其他已安装的引擎。</string>
+    <string name="tts_timeout">语音引擎响应超时，请检查连接后重试。</string>
+    <string name="tts_empty_text">未找到可朗读的句子。</string>
+    <string name="tts_failed">无法生成或播放句子音频，请重试。</string>
+    <string name="tts_sample">こんにちは。日本語の読み上げを始めます。</string>
+    <string name="tts_dialogue_routing">区分旁白与对白</string>
+    <string name="tts_narration_voice">旁白音色</string>
+    <string name="tts_dialogue_voice">对白音色</string>
+    <string name="tts_dialogue_sample">彼女は窓を開けた。「今日はいい天気ですね」と言って、微笑んだ。</string>
+    <string name="tts_storage_error">无法保存 TTS 更改，请重试。</string>
+    <string name="anki_handlebar_sentence_audio">句子音频：使用有声书；未关联有声书时使用 TTS。</string>
+    <string name="tts_source_edge" comment="TTS online source configuration">Edge TTS</string>
+    <string name="tts_source_azure" comment="TTS online source configuration">Azure TTS</string>
+    <string name="tts_source_microsoft_translator" comment="TTS online source configuration">微软翻译</string>
+    <string name="tts_source_google_cloud" comment="TTS online source configuration">Google Cloud TTS</string>
+    <string name="tts_source_google_translate" comment="TTS online source configuration">Google 翻译</string>
+    <string name="tts_cloud_credentials_hint" comment="TTS online source configuration">填写你自己的服务凭据。测试连接会合成一段示例，可能消耗服务配额。</string>
+    <string name="tts_unofficial_hint" comment="TTS online source configuration">使用非官方在线接口，朗读文本会发送至该服务；可用性可能变化。</string>
+    <string name="tts_cloud_source_hint" comment="TTS online source configuration">使用你的云服务账户，朗读文本会发送至该服务，并可能产生费用。</string>
+    <string name="tts_azure_region" comment="TTS online source configuration">语音资源区域</string>
+    <string name="tts_azure_region_select" comment="Azure Speech resource region selection">请选择区域</string>
+    <string name="tts_azure_region_hint" comment="Azure Speech resource region selection">请选择 API 密钥对应的 Azure Speech 资源区域。</string>
+    <string name="tts_api_key" comment="TTS online source configuration">服务 API 密钥</string>
+    <string name="tts_key_saved_hint" comment="TTS online source configuration">密钥已配置；留空可保留现有密钥。</string>
+    <string name="tts_delete_key">删除密钥</string>
+    <string name="tts_delete_key_title">删除 API 密钥？</string>
+    <string name="tts_delete_key_message">删除此设备保存的该服务 API 密钥？删除后需要重新配置才能使用该服务。</string>
+    <string name="tts_test_connection" comment="TTS online source configuration">测试连接</string>
+    <string name="tts_connection_success" comment="TTS online source configuration">连接已验证</string>
+    <string name="tts_rate_slow" comment="TTS online source configuration">慢速</string>
+    <string name="tts_rate_normal" comment="TTS online source configuration">普通</string>
+    <string name="tts_configuration_error" comment="TTS online source configuration">请检查此来源的配置。</string>
+    <string name="tts_authentication_error" comment="TTS online source configuration">服务拒绝访问。请检查凭据与 API 权限；非官方来源可稍后重试。</string>
+    <string name="tts_rate_limit_error" comment="TTS online source configuration">已达到服务配额或请求上限，请检查账户或稍后重试。</string>
+    <string name="tts_network_error" comment="TTS online source configuration">无法连接语音服务，请检查网络后重试。</string>
+    <string name="tts_response_error" comment="TTS online source configuration">服务未返回可用音频或音色，请检查配置或稍后重试。</string>
+    <string name="tts_pitch" comment="TTS synthesis pitch">音高</string>
+    <string name="tts_pitch_hz" comment="TTS synthesis pitch">%1$+d Hz</string>
+    <string name="tts_prefetch_sentences" comment="TTS playback buffering">预加载句数</string>
+    <plurals name="tts_sentence_count">
+        <item quantity="one">%1$d 句</item>
+        <item quantity="other">%1$d 句</item>
+    </plurals>
+    <string name="tts_sentence_pause" comment="TTS synthesis parameter">句间额外停顿</string>
+    <string name="tts_sentence_pause_hint" comment="TTS synthesis parameter">连续朗读时由 Hoshi 在两句间等待，此时长不会加入导出的音频。</string>
+    <string name="tts_synthesis_volume" comment="TTS synthesis parameter">合成音量</string>
+    <string name="tts_milliseconds" comment="TTS synthesis parameter">%1$d 毫秒</string>
+    <string name="tts_decibels" comment="TTS synthesis parameter">%1$+d dB</string>
+    <string name="tts_relative_percent" comment="TTS synthesis parameter">%1$+d%%</string>
+    <string name="tts_speaking_style" comment="TTS synthesis parameter">语气</string>
+    <string name="tts_style_degree" comment="TTS synthesis parameter">语气强度</string>
+    <string name="tts_speaking_role" comment="TTS synthesis parameter">朗读角色</string>
+    <string name="tts_leading_pause" comment="TTS synthesis parameter">开头静音</string>
+    <string name="tts_trailing_pause" comment="TTS synthesis parameter">结尾静音</string>
+    <string name="tts_comma_pause" comment="TTS synthesis parameter">逗号停顿</string>
+    <string name="tts_semicolon_pause" comment="TTS synthesis parameter">分号停顿</string>
+    <string name="tts_enumeration_pause" comment="TTS synthesis parameter">顿号停顿</string>
+    <string name="tts_boundary_pause" comment="TTS synthesis parameter">句子边界静音</string>
+    <string name="tts_provider_default" comment="TTS synthesis parameter">音色默认值</string>
+    <string name="tts_pause_override" comment="TTS synthesis parameter">替换自然停顿</string>
+    <string name="tts_output_format" comment="TTS synthesis parameter">音频格式</string>
+    <string name="tts_format_wav" comment="TTS synthesis parameter">WAV（PCM）</string>
+    <string name="tts_format_mp3" comment="TTS synthesis parameter">MP3</string>
+    <string name="tts_sample_rate" comment="TTS synthesis parameter">采样率</string>
+    <string name="tts_sample_rate_hz" comment="TTS synthesis parameter">%1$d Hz</string>
+    <string name="tts_audio_profile" comment="TTS synthesis parameter">播放设备音效</string>
+    <string name="tts_profile_none" comment="TTS synthesis parameter">无设备音效</string>
+    <string name="tts_profile_wearable" comment="TTS synthesis parameter">可穿戴设备</string>
+    <string name="tts_profile_handset" comment="TTS synthesis parameter">手机扬声器</string>
+    <string name="tts_profile_headphones" comment="TTS synthesis parameter">耳机</string>
+    <string name="tts_profile_small_speaker" comment="TTS synthesis parameter">小型蓝牙音箱</string>
+    <string name="tts_profile_medium_speaker" comment="TTS synthesis parameter">中型蓝牙音箱</string>
+    <string name="tts_profile_home" comment="TTS synthesis parameter">家庭影音</string>
+    <string name="tts_profile_car" comment="TTS synthesis parameter">车载音响</string>
+    <string name="tts_profile_telephone" comment="TTS synthesis parameter">电话线路</string>
+    <string name="tts_system_settings" comment="TTS voice settings">系统 TTS 设置</string>
+    <string name="tts_choose_source" comment="TTS voice settings">选择来源</string>
+    <string name="tts_group_device" comment="TTS voice settings">设备引擎</string>
+    <string name="tts_group_online" comment="TTS voice settings">在线服务</string>
+    <string name="tts_group_cloud" comment="TTS voice settings">云服务</string>
+    <string name="tts_group_other" comment="TTS voice settings">其他来源</string>
+    <string name="tts_system_preferred" comment="TTS voice settings">使用系统首选引擎</string>
+    <string name="tts_installed_engine" comment="TTS voice settings">已安装到此设备</string>
+    <string name="tts_key_required" comment="TTS voice settings">需要 API 密钥</string>
+    <string name="tts_no_account" comment="TTS voice settings">无需账户</string>
+    <string name="tts_online" comment="TTS voice settings">在线</string>
+    <string name="tts_stop_preview" comment="TTS voice settings">停止试听</string>
+    <string name="tts_configure_source" comment="TTS voice settings">配置来源</string>
+    <string name="tts_key_device_hint" comment="TTS online source configuration">此设备尚未配置 API 密钥。</string>
+    <string name="tts_pitch_short" comment="TTS voice settings">%1$+d 半音</string>
+    <string name="tts_pitch_zero" comment="TTS voice settings">0 半音</string>
+    <string name="tts_pitch_zero_hz" comment="TTS voice settings">0 Hz</string>
+    <string name="tts_voice_status" comment="Voice label with its network requirement">%1$s · %2$s</string>
+    <string name="tts_saved_source" comment="An unavailable saved source remains selectable by its raw ID">已保存的来源</string>
+    <string name="tts_protocol_openai">OpenAI 兼容</string>
+    <string name="tts_protocol_vits">VITS Simple API</string>
+    <string name="tts_private_http_error">HTTP 请使用局域网地址；远程服务器请使用 HTTPS。</string>
+    <string name="tts_group_custom">自建服务</string>
+    <string name="tts_add_service">添加服务</string>
+    <string name="tts_edit_service">编辑服务</string>
+    <string name="tts_service_name">服务名称</string>
+    <string name="tts_service_protocol">协议</string>
+    <string name="tts_service_url">API 基础地址</string>
+    <string name="tts_service_url_openai">包含 API 前缀，例如 http://192.168.1.10:8088/v1</string>
+    <string name="tts_service_url_vits">服务根地址，例如 http://192.168.1.10:23456</string>
+    <string name="tts_service_model">模型 ID</string>
+    <string name="tts_service_voice_ids">可用音色 ID</string>
+    <string name="tts_service_voice_ids_hint">选填，每行一个 ID。将在音色列表中与服务器提供的音色一起显示。</string>
+    <string name="tts_service_preset">参考音频预设</string>
+    <string name="tts_service_preset_hint">填写服务器中已有的预设，留空使用服务器默认配置。</string>
+    <string name="tts_service_key_hint">可选。留空保留已保存的密钥。</string>
+    <string name="tts_service_clear_key">移除已保存的密钥</string>
+    <string name="tts_service_no_models">模型列表不可用，请手动填写模型 ID。</string>
+    <string name="tts_service_delete_title">删除服务？</string>
+    <string name="tts_service_delete_message">删除 %1$s？使用此服务的播放将停止。</string>
+    <string name="profiles_update_failed">无法更新配置。</string>
+    <string name="reader_appearance_font_delete_failed">无法删除字体。</string>
+    <string name="sasayaki_transcription_error_unknown">转录失败。</string>
+    <string name="update_install_permission_required">允许 Hoshi Reader 安装未知应用，然后再次点按“安装”。</string>
+    <string name="update_install_permission_settings_failed">在 Android 设置中允许 Hoshi Reader 安装未知应用，然后再次点按“安装”。</string>
+    <string name="update_installer_unavailable">此设备上没有可用的 APK 安装程序。</string>
+    <string name="update_installer_blocked">Android 阻止了安装程序。请允许 Hoshi Reader 安装未知应用，然后再次点按“安装”。</string>
+    <string name="diagnostics_load_failed">无法加载诊断信息。</string>
+    <string name="diagnostics_share_failed">无法分享诊断信息。</string>
+    <string name="reader_image_share_failed">无法分享图片。</string>
+    <string name="reader_image_copy_failed">无法复制图片。</string>
+    <string name="bookshelf_update_failed">无法更新书库。</string>
+    <string name="anki_operation_failed">Anki 操作失败。</string>
+    <string name="diagnostics_handled_errors">报错记录</string>
+    <string name="diagnostics_runtime_time">时间：%1$s</string>
+    <string name="diagnostics_runtime_operation">操作：%1$s</string>
+    <string name="diagnostics_runtime_exception">异常：%1$s</string>
+    <string name="diagnostics_runtime_details">详情：</string>
+    <string name="diagnostics_runtime_trace">堆栈：</string>
+    <string name="anki_sync_failed">卡片已添加，但 Anki 同步失败。</string>
+    <string name="diagnostics_no_handled_errors">暂无运行错误记录。</string>
+    <string name="diagnostics_package_name">包名</string>
+    <string name="diagnostics_version_name">版本号</string>
+    <string name="diagnostics_version_code">构建号</string>
+    <string name="diagnostics_android_sdk">Android SDK</string>
+    <string name="diagnostics_unavailable">不可用</string>
+    <string name="diagnostics_crash_records">崩溃记录</string>
+    <string name="diagnostics_no_crashes">暂无崩溃记录。</string>
+    <string name="diagnostics_captured_crash">捕获的崩溃</string>
+    <string name="diagnostics_process_exits">进程退出记录</string>
+    <string name="diagnostics_no_process_exits">暂无可用的进程退出记录。</string>
+    <string name="diagnostics_exit_anr">应用无响应</string>
+    <string name="diagnostics_exit_java_crash">Java 崩溃</string>
+    <string name="diagnostics_exit_native_crash">原生崩溃</string>
+    <string name="diagnostics_exit_low_memory">内存不足</string>
+    <string name="diagnostics_exit_resources">资源占用过高</string>
+    <string name="diagnostics_exit_initialization">初始化失败</string>
+    <string name="diagnostics_exit_user_requested">由用户或系统停止</string>
+    <string name="diagnostics_exit_signaled">被信号终止</string>
+    <string name="diagnostics_exit_other">其他退出</string>
+    <string name="diagnostics_exit_unknown">未知退出</string>
+    <string name="diagnostics_webview" translatable="false">WebView</string>
+    <string name="sasayaki_nakuru_unavailable">此设备不支持 Nakuru。</string>
+    <string name="sasayaki_legacy_resources_cleanup">清理已停用的转录资源：%1$s</string>
 </resources>

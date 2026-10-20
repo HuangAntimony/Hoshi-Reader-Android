@@ -3,7 +3,7 @@ package moe.antimony.hoshi.features.display
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
+import moe.antimony.hoshi.ui.theme.LocalSystemDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -41,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import moe.antimony.hoshi.R
+import moe.antimony.hoshi.ui.ErrorDetailsText
 import moe.antimony.hoshi.features.reader.ReaderBottomPanel
 import moe.antimony.hoshi.features.reader.ReaderColorPickerDialog
 import moe.antimony.hoshi.features.reader.ReaderColorSettingRow
@@ -53,6 +53,7 @@ import moe.antimony.hoshi.features.reader.toReaderColorHexInput
 import moe.antimony.hoshi.features.reader.withReaderColorBlue
 import moe.antimony.hoshi.features.reader.withReaderColorGreen
 import moe.antimony.hoshi.features.reader.withReaderColorRed
+import moe.antimony.hoshi.features.settings.SettingsContent
 import moe.antimony.hoshi.features.settings.SettingsDetailScaffold
 import moe.antimony.hoshi.features.settings.GroupDivider
 import moe.antimony.hoshi.ui.HoshiAlertDialog
@@ -71,13 +72,18 @@ internal fun DisplaySettingsScreen(
     modifier: Modifier = Modifier,
     viewModel: DisplaySettingsViewModel = hiltViewModel(),
 ) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
     SettingsDetailScaffold(
+        state = state.loadState,
         title = stringResource(R.string.settings_display),
         onClose = onClose,
         modifier = modifier,
-    ) { padding ->
+        onRetry = viewModel::retryLoad,
+    ) { padding, settings ->
         DisplaySettingsContent(
             viewModel = viewModel,
+            state = state,
+            settings = settings,
             contentPadding = PaddingValues(
                 start = 20.dp,
                 top = padding.calculateTopPadding() + 12.dp,
@@ -94,51 +100,54 @@ internal fun DisplaySettingsSheet(
     onDismiss: () -> Unit,
     viewModel: DisplaySettingsViewModel = hiltViewModel(),
 ) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
     ReaderBottomPanel(
         sheetStyle = readerSheetStyle(),
         onDismiss = onDismiss,
     ) {
-        DisplaySettingsContent(
-            viewModel = viewModel,
-            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
-            header = {
-                Text(
-                    text = stringResource(R.string.settings_display),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(vertical = 8.dp),
-                )
-            },
-        )
+        SettingsContent(
+            state = state.loadState,
+            modifier = Modifier.fillMaxWidth().weight(1f),
+            onRetry = viewModel::retryLoad,
+        ) { settings ->
+            DisplaySettingsContent(
+                viewModel = viewModel,
+                state = state,
+                settings = settings,
+                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp),
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                header = {
+                    Text(
+                        text = stringResource(R.string.settings_display),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(vertical = 8.dp),
+                    )
+                },
+            )
+        }
     }
 }
 
 @Composable
 private fun DisplaySettingsContent(
     viewModel: DisplaySettingsViewModel,
+    state: DisplaySettingsUiState,
+    settings: AppDisplaySettings,
     contentPadding: PaddingValues,
     modifier: Modifier = Modifier,
     header: (@Composable () -> Unit)? = null,
 ) {
-    val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val settings = state.settings
-    val systemDark = isSystemInDarkTheme()
+    val systemDark = LocalSystemDarkTheme.current
 
     val scrollState = rememberScrollState()
     Column(
         modifier = modifier
-            .then(if (settings != null) Modifier.verticalScroll(scrollState) else Modifier)
+            .verticalScroll(scrollState)
             .padding(contentPadding),
     ) {
         header?.invoke()
-        if (settings == null) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                if (state.error == null) CircularProgressIndicator()
-            }
-        } else Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             DisplaySettingsGroup {
                 DisplaySwitchRow(
                     label = stringResource(R.string.display_settings_auto_switch),
@@ -231,7 +240,7 @@ private fun DisplaySettingsContent(
     state.accentDraft?.let { draft ->
         AccentEditorDialog(
             draft = draft,
-            systemDark = settings?.let { resolveDisplaySettings(it, systemDark).isDark } ?: systemDark,
+            systemDark = resolveDisplaySettings(settings, systemDark).isDark,
             isSaving = state.isSaving,
             onUpdate = viewModel::updateAccentDraft,
             onSave = viewModel::saveAccentDraft,
@@ -240,18 +249,14 @@ private fun DisplaySettingsContent(
     }
     state.error?.let { error ->
         HoshiAlertDialog(
-            onDismissRequest = {
-                if (settings != null) viewModel.dismissError()
-            },
+            onDismissRequest = viewModel::dismissError,
             title = { Text(stringResource(R.string.dialog_error_title)) },
-            text = { Text(error.asString()) },
+            text = { ErrorDetailsText(error.asString()) },
             confirmButton = {
                 TextButton(
-                    onClick = {
-                        if (settings == null) viewModel.retryLoad() else viewModel.dismissError()
-                    },
+                    onClick = viewModel::dismissError,
                 ) {
-                    Text(stringResource(if (settings == null) R.string.reader_appearance_font_retry else R.string.action_ok))
+                    Text(stringResource(R.string.action_ok))
                 }
             },
         )

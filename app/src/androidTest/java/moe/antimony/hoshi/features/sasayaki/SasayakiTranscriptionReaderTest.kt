@@ -238,6 +238,6 @@ class SasayakiTranscriptionReaderTest {
         override suspend fun load(root: File) = saved
         override suspend fun save(root: File, transcript: SasayakiTranscript) { saved = transcript }
         override suspend fun clear(root: File) { saved = null }
-        override suspend fun openAlignment(root: File) = SasayakiTranscriptionAlignment { _, _ -> SasayakiMatchData(emptyList(), 0) }
+        override suspend fun openAlignment(root: File) = SasayakiTranscriptionAlignment { _ -> SasayakiMatchData(emptyList(), 0) }
     }
 }

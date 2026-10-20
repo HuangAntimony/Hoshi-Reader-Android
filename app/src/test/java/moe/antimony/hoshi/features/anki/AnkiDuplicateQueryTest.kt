@@ -1,5 +1,7 @@
 package moe.antimony.hoshi.features.anki
 
+import java.net.URI
+import java.net.URLDecoder
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -128,22 +130,27 @@ class AnkiDuplicateQueryTest {
     }
 
     @Test
-    fun ankiDroidBrowserSearchIgnoresLastDeckAndPreservesRequestedScope() {
-        val query = "\"Expression:食べる + &\" \"note:Lapis\" \"deck:Mining::日本語\""
+    fun ankiDroidBrowserDeepLinkPreservesSearchScopeAndSpecialCharacters() {
+        val query = "\"Expression:食べる + & % # ?\" \"note:Lapis\" \"deck:Mining::日本語\""
         val spec = ankiDroidBrowserIntentSpec(query)
+        val uri = URI(spec.uri)
 
-        assertEquals("com.ichi2.anki.CardBrowser", spec.activityClassName)
+        assertEquals("android.intent.action.VIEW", spec.action)
         assertEquals("com.ichi2.anki", spec.packageName)
-        assertEquals(mapOf("search_query" to query), spec.stringExtras)
-        assertEquals(mapOf("all_decks" to true), spec.booleanExtras)
+        assertEquals("anki", uri.scheme)
+        assertEquals("x-callback-url", uri.host)
+        assertEquals("/browser", uri.path)
+        val parameter = uri.rawQuery.split('&').single().split('=', limit = 2)
+        assertEquals("search", parameter[0])
+        assertEquals(query, URLDecoder.decode(parameter[1], "UTF-8"))
+        assertEquals(null, uri.fragment)
         assertTrue(spec.newTask)
     }
 
     @Test
-    fun ankiDroidBrowserSearchUsesDetectedPackageWithOriginalActivityClass() {
+    fun ankiDroidBrowserDeepLinkTargetsDetectedPackage() {
         val spec = ankiDroidBrowserIntentSpec("食べる", packageName = "com.ichi2.anki.debug")
 
         assertEquals("com.ichi2.anki.debug", spec.packageName)
-        assertEquals("com.ichi2.anki.CardBrowser", spec.activityClassName)
     }
 }

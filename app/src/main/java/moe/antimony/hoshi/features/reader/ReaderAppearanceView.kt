@@ -70,7 +70,11 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import moe.antimony.hoshi.R
+import moe.antimony.hoshi.ui.ErrorDetailsText
+import moe.antimony.hoshi.features.settings.SettingsContent
+import moe.antimony.hoshi.features.settings.combineSettingsLoadStates
 import moe.antimony.hoshi.features.settings.SettingsDetailScaffold
+import moe.antimony.hoshi.features.settings.SettingsLoadState
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettings
 import moe.antimony.hoshi.importing.FileImportContent
 import moe.antimony.hoshi.importing.ImportFileType
@@ -83,11 +87,13 @@ import kotlin.math.round
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ReaderAppearanceScreen(
-    settings: ReaderSettings,
+    settings: SettingsLoadState<ReaderSettings>,
+    onRetrySettings: () -> Unit,
     profileName: String,
     onSettingsChange: ((ReaderSettings) -> ReaderSettings) -> Unit,
-    sasayakiSettings: SasayakiSettings,
-    onSasayakiSettingsChange: (SasayakiSettings) -> Unit,
+    sasayakiSettings: SettingsLoadState<SasayakiSettings>,
+    onRetrySasayakiSettings: () -> Unit,
+    onSasayakiSettingsChange: ((SasayakiSettings) -> SasayakiSettings) -> Unit,
     fontManager: ReaderFontManager,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
@@ -95,6 +101,8 @@ internal fun ReaderAppearanceScreen(
 ) {
     val palette = appearancePalette()
     SettingsDetailScaffold(
+        state = combineSettingsLoadStates(settings, sasayakiSettings) { reader, sasayaki -> reader to sasayaki },
+        onRetry = { onRetrySettings(); onRetrySasayakiSettings() },
         title = stringResource(R.string.reader_settings_profile_title, profileName),
         onClose = {
             viewModel.cancelDownload()
@@ -103,12 +111,12 @@ internal fun ReaderAppearanceScreen(
         modifier = modifier.fillMaxSize(),
         containerColor = palette.background,
         contentColor = palette.onBackground,
-    ) { padding ->
+    ) { padding, (confirmedSettings, confirmedSasayakiSettings) ->
         ReaderAppearanceContent(
-            settings = settings,
+            settings = confirmedSettings,
             profileName = profileName,
             onSettingsChange = onSettingsChange,
-            sasayakiSettings = sasayakiSettings,
+            sasayakiSettings = confirmedSasayakiSettings,
             onSasayakiSettingsChange = onSasayakiSettingsChange,
             fontManager = fontManager,
             viewModel = viewModel,
@@ -130,8 +138,9 @@ internal fun ReaderAppearanceSheet(
     profileName: String,
     progressDisplay: ReaderProgressDisplay = ReaderProgressDisplay.characters(),
     onSettingsChange: ((ReaderSettings) -> ReaderSettings) -> Unit,
-    sasayakiSettings: SasayakiSettings,
-    onSasayakiSettingsChange: (SasayakiSettings) -> Unit,
+    sasayakiSettings: SettingsLoadState<SasayakiSettings>,
+    onRetrySasayakiSettings: () -> Unit,
+    onSasayakiSettingsChange: ((SasayakiSettings) -> SasayakiSettings) -> Unit,
     fontManager: ReaderFontManager,
     onDismiss: () -> Unit,
     viewModel: ReaderAppearanceViewModel = hiltViewModel(),
@@ -149,23 +158,23 @@ internal fun ReaderAppearanceSheet(
         sheetStyle = sheetStyle,
         onDismiss = dismissWithDownloadCancel,
     ) {
-        ReaderAppearanceContent(
-            settings = settings,
-            profileName = profileName,
-            progressDisplay = progressDisplay,
-            onSettingsChange = onSettingsChange,
-            sasayakiSettings = sasayakiSettings,
-            onSasayakiSettingsChange = onSasayakiSettingsChange,
-            fontManager = fontManager,
-            viewModel = viewModel,
-            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp),
-            showTitle = true,
-            showDone = true,
-            onDone = dismissWithDownloadCancel,
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
-        )
+        SettingsContent(sasayakiSettings, Modifier.fillMaxWidth().weight(1f), onRetrySasayakiSettings) { confirmedSasayakiSettings ->
+            ReaderAppearanceContent(
+                settings = settings,
+                profileName = profileName,
+                progressDisplay = progressDisplay,
+                onSettingsChange = onSettingsChange,
+                sasayakiSettings = confirmedSasayakiSettings,
+                onSasayakiSettingsChange = onSasayakiSettingsChange,
+                fontManager = fontManager,
+                viewModel = viewModel,
+                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp),
+                showTitle = true,
+                showDone = true,
+                onDone = dismissWithDownloadCancel,
+                modifier = Modifier.fillMaxWidth().weight(1f),
+            )
+        }
     }
 }
 
@@ -177,7 +186,7 @@ private fun ReaderAppearanceContent(
     progressDisplay: ReaderProgressDisplay = ReaderProgressDisplay.characters(),
     onSettingsChange: ((ReaderSettings) -> ReaderSettings) -> Unit,
     sasayakiSettings: SasayakiSettings,
-    onSasayakiSettingsChange: (SasayakiSettings) -> Unit,
+    onSasayakiSettingsChange: ((SasayakiSettings) -> SasayakiSettings) -> Unit,
     fontManager: ReaderFontManager,
     viewModel: ReaderAppearanceViewModel,
     contentPadding: PaddingValues,
@@ -739,13 +748,13 @@ private fun ReaderAppearanceContent(
                             },
                         )
                     }
-                    readerAppearanceSasayakiRows(sasayakiSettings).forEach { labelRes ->
+                    readerAppearancePlaybackRows().forEach { labelRes ->
                         AppearanceDivider(palette)
                         SwitchRow(
                             label = stringResource(labelRes),
                             checked = sasayakiSettings.showReaderToggle,
                             onCheckedChange = {
-                                onSasayakiSettingsChange(sasayakiSettings.copy(showReaderToggle = it))
+                                onSasayakiSettingsChange { current -> current.copy(showReaderToggle = it) }
                             },
                         )
                     }
@@ -914,7 +923,7 @@ private fun ReaderAppearanceContent(
                 viewModel.clearError()
             },
             title = { Text(stringResource(R.string.reader_appearance_font)) },
-            text = { Text(requireNotNull(fontUiState.error).asString()) },
+            text = { ErrorDetailsText(requireNotNull(fontUiState.error).asString()) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -951,8 +960,8 @@ private fun ReaderAppearanceContent(
     }
 }
 
-internal fun readerAppearanceSasayakiRows(settings: SasayakiSettings): List<Int> =
-    if (settings.enabled) listOf(R.string.reader_appearance_show_sasayaki_toggle) else emptyList()
+internal fun readerAppearancePlaybackRows(): List<Int> =
+    listOf(R.string.reader_appearance_show_sasayaki_toggle)
 
 internal fun readerAppearanceFontOptions(importedFontNames: List<String>, selectedFont: String): List<String> =
     (listOf(ReaderFontManager.publisherFont) + ReaderFontManager.defaultFonts + importedFontNames + selectedFont)

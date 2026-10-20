@@ -179,7 +179,6 @@ jobs:
           version_code="${{ needs.resolve-release.outputs.version_code }}"
           build_tools="${ANDROID_HOME}/build-tools/36.0.0"
           apk_assets=()
-          mkdir -p transcription-runtime-assets
 
           for abi in arm64-v8a armeabi-v7a; do
             rm -rf app/build/jniLibs/release app/build/outputs/apk/release
@@ -230,13 +229,6 @@ jobs:
             "${build_tools}/apksigner" verify --print-certs "${apk_source}"
             cp "${apk_source}" "${apk_asset}"
             apk_assets+=("${apk_asset}")
-            # Keep the exact hash-named payloads outside app/build across the next clean.
-            cp app/build/generated/sherpa/distribution/*.so transcription-runtime-assets/
-            cp app/build/generated/sherpa/assets/transcription-runtime.json transcription-runtime-assets/
-            if zipinfo -1 "${apk_source}" | grep -Eq 'lib(onnxruntime|sherpa-onnx).*\.so$'; then
-              echo "Inference runtimes must not be bundled in the base APK" >&2
-              exit 1
-            fi
             if zipinfo -1 "${apk_source}" | grep -q "libhoshiaudio_jni.so"; then
               echo "FFmpeg must not be bundled in the base APK" >&2
               exit 1
@@ -245,18 +237,13 @@ jobs:
 
           echo "apk_assets=${apk_assets[*]}" >> "${GITHUB_OUTPUT}"
 
-      - name: Publish pinned transcription components
+      - name: Verify pinned transcription audio components
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
           python3 tools/build-transcription-audio.py --check
-          python3 tools/publish-transcription-components.py \
-            --catalog transcription-runtime-assets/transcription-runtime.json \
-            --directory transcription-runtime-assets \
-            --notice app/src/main/assets/transcription-runtime-NOTICES.txt \
-            --target "${GITHUB_SHA}"
           python3 tools/publish-transcription-components.py \
             --catalog app/src/main/assets/transcription-audio-runtime.json --remote-check
 

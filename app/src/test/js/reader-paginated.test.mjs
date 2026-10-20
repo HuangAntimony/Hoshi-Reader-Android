@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
+import { TextRangeFixture } from './dom-range-fixture.mjs';
 
 const readerPaginatedUrl = new URL('../../main/assets/hoshi-web/reader/reader-paginated.js', import.meta.url);
 const readerContinuousUrl = new URL('../../main/assets/hoshi-web/reader/reader-continuous.js', import.meta.url);
@@ -37,6 +38,8 @@ function readerSource(url, options = {}) {
             options.layoutSemanticsScript ?? 'window.hoshiReaderLayoutSemantics = { sanitizeInlineBlocks: function() {} };',
         )
         .replaceAll('__HOSHI_RESTORE_TOKEN_LITERAL__', JSON.stringify('restore-token'))
+        .replaceAll('__HOSHI_CONTINUOUS_HORIZONTAL_PADDING_RATIO__', String(options.horizontalPaddingRatio ?? 0))
+        .replaceAll('__HOSHI_CONTINUOUS_VERTICAL_PADDING_RATIO__', String(options.verticalPaddingRatio ?? 0))
         .replaceAll('__HOSHI_VERTICAL_PADDING_BLOCK_RATIO__', '0')
         .replaceAll('__HOSHI_VERTICAL_PADDING_GAP_RATIO__', '0')
         .replaceAll('__HOSHI_IMAGE_WIDTH_VIEWPORT_RATIO__', '1')
@@ -182,7 +185,19 @@ class TestElement extends TestNode {
         this.parentNode?.removeChild(this);
     }
 
-    addEventListener() {}
+    addEventListener(name, callback) {
+        this.listeners ??= new Map();
+        this.listeners.set(name, callback);
+    }
+
+    scrollTo(options) {
+        if (Number.isFinite(options.left)) this.scrollLeft = options.left;
+        if (Number.isFinite(options.top)) this.scrollTop = options.top;
+    }
+
+    scrollBy(options) {
+        this.scrollTo({ left: this.scrollLeft + (options.left || 0), top: this.scrollTop + (options.top || 0) });
+    }
 
     scrollIntoView(options) {
         this.scrollIntoViewCalls = this.scrollIntoViewCalls ?? [];
@@ -266,8 +281,9 @@ class TestFragment extends TestNode {
     }
 }
 
-class TestRange {
+class TestRange extends TextRangeFixture {
     constructor() {
+        super();
         this.node = null;
         this.startNode = null;
         this.startOffset = 0;
@@ -363,6 +379,7 @@ class TestRange {
     }
 
     getClientRects() {
+        if (this.node?.rangeRects) return this.node.rangeRects(this.startOffset, this.endOffset);
         return this.node?.rects ?? [];
     }
 
@@ -417,6 +434,11 @@ function queryTagSelectorList(selector) {
 }
 
 function loadReader(body, sourceUrl = readerPaginatedUrl, options = {}) {
+    body.scrollLeft ??= 0;
+    body.scrollTop ??= 0;
+    body.clientWidth ??= 480;
+    body.clientHeight ??= 800;
+    body.rect ??= testRect(0, 800, 0, 480);
     const head = new TestElement('head');
     const documentElement = new TestElement('html');
     documentElement.appendChild(head);
@@ -447,11 +469,11 @@ function loadReader(body, sourceUrl = readerPaginatedUrl, options = {}) {
                 node.childNodes?.forEach(visit);
             };
             visit(root);
-            let index = 0;
+            let index = -1;
             return {
-                nextNode() {
-                    return nodes[index++] ?? null;
-                },
+                get currentNode() { return nodes[index] ?? root; },
+                set currentNode(node) { index = nodes.indexOf(node); },
+                nextNode() { return nodes[++index] ?? null; },
             };
         },
         querySelector(selector) {
@@ -492,6 +514,9 @@ function loadReader(body, sourceUrl = readerPaginatedUrl, options = {}) {
             return { writingMode: options.writingMode ?? 'vertical-rl', getPropertyValue: () => '' };
         },
     };
+    if (options.scrollMessages) {
+        window.HoshiReaderScroll = { postMessage: token => options.scrollMessages.push(token) };
+    }
     if (options.restoreMessages) {
         window.HoshiReaderRestore = {
             postMessage(message) {
@@ -715,7 +740,7 @@ test('paged and continuous readers use actual viewport height', () => {
 
     assert.equal(continuous.document.documentElement.style.getPropertyValue('--hoshi-continuous-height'), '800px');
     assert.equal(continuous.document.documentElement.style.getPropertyValue('--hoshi-reader-visible-height'), '800px');
-    assert.equal(continuous.document.documentElement.style.getPropertyValue('--page-height'), '');
+    assert.equal(continuous.document.documentElement.style.getPropertyValue('--page-height'), '800px');
 });
 
 test('paginated restoreProgress at chapter start avoids eager pagination metrics', async () => {
@@ -855,22 +880,102 @@ test('continuous Korean restore lands inside the target text after a supplementa
     second.appendChild(new TestText('ㄱㆎ한'));
     body.appendChild(first);
     body.appendChild(second);
-    const { reader, document } = loadReader(body, readerContinuousUrl, { writingMode: 'horizontal-tb' });
-    const createElement = document.createElement;
-    const landings = [];
-    document.createElement = (tag) => {
-        const element = createElement(tag);
-        element.scrollIntoView = () => {
-            landings.push({ parent: element.parentNode, precedingText: element.previousSibling?.textContent });
-        };
-        return element;
+    const { reader, window } = loadReader(body, readerContinuousUrl, { writingMode: 'horizontal-tb' });
+    second.firstChild.rangeRects = (start, end) => {
+        assert.equal(start, 1);
+        assert.equal(end, 2);
+        return [testRect(120, 147)];
     };
 
     await reader.restoreProgress(0.6);
 
-    assert.deepEqual(landings, [{ parent: second, precedingText: 'ㄱ' }]);
+    assert.equal(body.scrollTop, 120);
+    assert.equal(window.scrollY, 0);
     assert.equal(second.textContent, 'ㄱㆎ한');
 });
+
+for (const vertical of [true, false]) {
+    test(`continuous progress ignores a clipped sliver of the preceding ${vertical ? 'column' : 'line'}`, () => {
+        const body = new TestElement('body');
+        const text = new TestText('前後');
+        body.appendChild(text);
+        text.rangeRects = (start, end) => {
+            const rects = vertical
+                ? [testRect(0, 20, 479, 499), testRect(0, 20, 450, 470)]
+                : [testRect(-19, 1), testRect(10, 30)];
+            return rects.slice(start, end);
+        };
+        const { reader } = loadReader(body, readerContinuousUrl, {
+            writingMode: vertical ? 'vertical-rl' : 'horizontal-tb',
+        });
+
+        assert.equal(reader.calculateProgress(), 0.5);
+    });
+
+    test(`continuous restore aligns the actual ${vertical ? 'column' : 'line'} without splitting text nodes`, async () => {
+        const body = new TestElement('body');
+        const text = new TestText('前𠮟가後');
+        body.appendChild(text);
+        const restoreMessages = [];
+        const { reader, window } = loadReader(body, readerContinuousUrl, {
+            writingMode: vertical ? 'vertical-rl' : 'horizontal-tb',
+            restoreMessages,
+        });
+        body.scrollLeft = vertical ? -800 : 0;
+        body.scrollTop = vertical ? 0 : 800;
+        text.rangeRects = (start, end) => {
+            assert.equal(start, 1);
+            assert.equal(end, 3);
+            return [vertical ? testRect(50, 77, 100, 139) : testRect(120, 159)];
+        };
+
+        await reader.restoreProgress(0.25);
+
+        assert.equal(body.scrollLeft, vertical ? -1141 : 0);
+        assert.equal(body.scrollTop, vertical ? 0 : 920);
+        assert.equal(window.scrollX, 0);
+        assert.equal(window.scrollY, 0);
+        assert.equal(body.firstChild, text);
+        assert.equal(text.textContent, '前𠮟가後');
+        assert.deepEqual(restoreMessages, ['restore-token']);
+    });
+
+    test(`continuous restore includes ruby elsewhere in the same ${vertical ? 'column' : 'line'}`, async () => {
+        const body = new TestElement('body');
+        const text = new TestText('前𠮟가後');
+        body.appendChild(text);
+        for (const [baseText, reading, baseRect, annotationRect] of [
+            ['字', 'じ', vertical ? testRect(80, 107, 100, 139) : testRect(120, 159, 40, 60),
+                vertical ? testRect(80, 107, 130, 150) : testRect(110, 130, 40, 60)],
+            ['次', 'つぎ', vertical ? testRect(80, 107, 200, 239) : testRect(220, 259, 40, 60),
+                vertical ? testRect(80, 107, 230, 250) : testRect(210, 230, 40, 60)],
+            ['語', 'ご', vertical ? testRect(120, 147, 100, 139) : testRect(120, 159, 80, 100),
+                vertical ? testRect(120, 147, 155, 175) : testRect(85, 105, 80, 100)],
+            ['重', 'かさね', vertical ? testRect(120, 147, 135, 174) : testRect(155, 194, 80, 100),
+                vertical ? testRect(120, 147, 190, 210) : testRect(30, 50, 80, 100)],
+        ]) {
+            const ruby = new TestElement('ruby');
+            const base = new TestText(baseText);
+            base.rects = [baseRect];
+            ruby.appendChild(base);
+            const rt = new TestElement('rt');
+            const annotation = new TestText(reading);
+            annotation.rects = [annotationRect];
+            rt.appendChild(annotation);
+            ruby.appendChild(rt);
+            body.appendChild(ruby);
+        }
+        const { reader, window } = loadReader(body, readerContinuousUrl, {
+            writingMode: vertical ? 'vertical-rl' : 'horizontal-tb',
+        });
+        text.rangeRects = () => [vertical ? testRect(50, 77, 100, 139) : testRect(120, 159)];
+
+        await reader.restoreProgress(1 / 8);
+
+        assert.equal(body.scrollLeft, vertical ? -305 : 0);
+        assert.equal(body.scrollTop, vertical ? 0 : 85);
+    });
+}
 
 test('continuous restoreProgress zero resets every WebView scroll surface', async () => {
     const body = new TestElement('body');
@@ -1305,8 +1410,8 @@ test('continuous vertical Sasayaki chapter-end media stop plan follows forward s
     body.appendChild(imgAt(0, 500, 120, 420));
     body.appendChild(imgAt(0, 500, -520, -220));
     const { reader, document } = loadReader(body, readerContinuousUrl, { writingMode: 'vertical-rl' });
-    document.documentElement.scrollWidth = 3_000;
-    document.documentElement.scrollLeft = -480;
+    body.scrollWidth = 3_000;
+    body.scrollLeft = -480;
 
     const stops = reader.sasayakiMediaStopsToChapterEnd();
 
@@ -1483,6 +1588,39 @@ test('Sasayaki includes ruby base punctuation without reading annotation text or
 
 
 for (const sourceUrl of [readerPaginatedUrl, readerContinuousUrl]) {
+    test(`${sourceUrl.pathname.split('/').pop()} highlights body text when a saved selection starts or ends inside ruby`, () => {
+        for (const annotationAtStart of [true, false]) {
+            const body = new TestElement('body');
+            body.appendChild(new TestText('前'));
+            const ruby = new TestElement('ruby');
+            const first = new TestText('瑞');
+            const rt = new TestElement('rt');
+            const reading = new TestText('みず');
+            rt.appendChild(reading);
+            const second = new TestText('々');
+            ruby.appendChild(first); ruby.appendChild(rt); ruby.appendChild(second);
+            body.appendChild(ruby);
+            const { reader, window, document } = loadReader(body, sourceUrl, {
+                highlightsScript: fs.readFileSync(new URL('../../main/assets/hoshi-web/reader/highlights.js', import.meta.url), 'utf8'),
+            });
+            reader.buildNodeOffsets();
+            const range = document.createRange();
+            range.setStart(annotationAtStart ? reading : first, 0);
+            range.setEnd(annotationAtStart ? second : reading, annotationAtStart ? 1 : 2);
+            window.getSelection = () => ({ rangeCount: 1, getRangeAt: () => range });
+            const highlights = window.hoshiHighlights;
+            assert.equal(highlights.prepareHighlightSelection(), true);
+            window.getSelection = () => null;
+            const result = highlights.createHighlight('yellow', 'ruby-boundary');
+            assert.equal(result?.action, 'created');
+            assert.equal(result.text, annotationAtStart ? '々' : '瑞');
+            assert.equal(result.offset, annotationAtStart ? 2 : 1);
+            assert.equal(result.start, annotationAtStart ? 2 : 1);
+            assert.equal(highlights.highlights.get('ruby-boundary').wrappers.map(node => node.textContent).join(''), result.text);
+            assert.equal(reading.textContent, 'みず');
+        }
+    });
+
     test(`${sourceUrl.pathname.split('/').pop()} persists ruby and edits exact raw ranges through pending selection`, () => {
         const body = new TestElement('body');
         body.appendChild(new TestText('あ 、𠮟'));
@@ -1581,3 +1719,68 @@ for (const sourceUrl of [readerPaginatedUrl, readerContinuousUrl]) {
         assert.equal(text(), '');
     });
 }
+
+
+for (const vertical of [true, false]) {
+    test(`continuous ${vertical ? 'vertical' : 'horizontal'} navigation scrolls only the inset body viewport`, () => {
+        const body = new TestElement('body');
+        body.rect = vertical ? testRect(0, 800, 48, 432) : testRect(80, 720, 0, 480);
+        body.clientWidth = vertical ? 384 : 480;
+        body.clientHeight = vertical ? 800 : 640;
+        body.scrollWidth = vertical ? 2_000 : 480;
+        body.scrollHeight = vertical ? 800 : 2_000;
+        const { reader, window } = loadReader(body, readerContinuousUrl, {
+            writingMode: vertical ? 'vertical-rl' : 'horizontal-tb',
+        });
+
+        assert.equal(reader.paginate('forward'), 'scrolled');
+        assert.equal(body.scrollLeft, vertical ? -384 : 0);
+        assert.equal(body.scrollTop, vertical ? 0 : 640);
+        assert.equal(window.scrollX, 0);
+        assert.equal(window.scrollY, 0);
+        assert.equal(reader.sasayakiScrollTargetForRect(testRect(100, 120, 400, 420)), vertical ? -396 : 660);
+        assert.equal(reader.sasayakiCueRectIsVisible(testRect(10, 30, 440, 460)), false);
+        assert.equal(reader.sasayakiCueRectIsVisible(testRect(100, 120, 100, 120)), true);
+    });
+
+    test(`continuous ${vertical ? 'vertical' : 'horizontal'} chapter boundaries use body scroll extent`, () => {
+        const body = new TestElement('body');
+        body.scrollWidth = vertical ? 1_480 : 480;
+        body.scrollHeight = vertical ? 800 : 1_800;
+        const { reader } = loadReader(body, readerContinuousUrl, {
+            writingMode: vertical ? 'vertical-rl' : 'horizontal-tb',
+        });
+        assert.equal(reader.isAtChapterBoundary('backward'), true);
+        assert.equal(reader.isAtChapterBoundary('forward'), false);
+        body.scrollLeft = vertical ? -500 : 0;
+        body.scrollTop = vertical ? 0 : 500;
+        assert.equal(reader.isAtChapterBoundary('backward'), false);
+        assert.equal(reader.isAtChapterBoundary('forward'), false);
+        body.scrollLeft = vertical ? -1_000 : 0;
+        body.scrollTop = vertical ? 0 : 1_000;
+        assert.equal(reader.isAtChapterBoundary('forward'), true);
+    });
+
+    test(`continuous progress measures the inset ${vertical ? 'right' : 'top'} content edge`, () => {
+        const body = new TestElement('body');
+        body.rect = vertical ? testRect(0, 800, 48, 432) : testRect(80, 720, 0, 480);
+        const text = new TestText('前後');
+        text.rangeRects = (start, end) => (vertical
+            ? [testRect(0, 20, 440, 460), testRect(0, 20, 400, 420)]
+            : [testRect(50, 70), testRect(100, 120)]).slice(start, end);
+        body.appendChild(text);
+        const { reader } = loadReader(body, readerContinuousUrl, {
+            writingMode: vertical ? 'vertical-rl' : 'horizontal-tb',
+        });
+        assert.equal(reader.calculateProgress(), 0.5);
+    });
+}
+
+test('continuous body scroll reports the current document token', () => {
+    const messages = [];
+    const body = new TestElement('body');
+    const { reader } = loadReader(body, readerContinuousUrl, { scrollMessages: messages });
+    reader.initialize();
+    body.listeners?.get('scroll')?.();
+    assert.deepEqual(messages, ['restore-token']);
+});

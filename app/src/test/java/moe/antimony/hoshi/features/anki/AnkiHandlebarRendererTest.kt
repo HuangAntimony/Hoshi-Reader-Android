@@ -6,6 +6,48 @@ import org.junit.Test
 
 class AnkiHandlebarRendererTest {
     @Test
+    fun excludedDictionaryRemainsAvailableToExplicitAndSelectedGlossaryHandlebars() {
+        val excluded = """<li data-dictionary="Excluded"><i>(Excluded)</i> <span>definition</span></li>"""
+        val payload = AnkiMiningPayload(
+            expression = "言葉",
+            singleGlossaries = mapOf("Excluded" to excluded),
+            selectedDictionary = "Excluded",
+        )
+        val rendered = AnkiHandlebarRenderer.render(
+            template = "{glossary-first}|{monolingual-definition-fallback}|{bilingual-definition-fallback}|" +
+                "{single-glossary-Excluded}|{single-glossary-Excluded-brief}|{single-glossary-Excluded-no-dictionary}|" +
+                "{selected-glossary}|{selected-glossary-brief}|{selected-glossary-no-dictionary}",
+            payload = payload,
+            context = AnkiMiningContext(sentence = ""),
+            selectedGlossaryFallback = "{glossary-first}",
+            termDictionaries = listOf(AnkiTermDictionary("Excluded", DictionaryCategory.Exclude)),
+        )
+        val brief = """<li data-dictionary="Excluded"><span>definition</span></li>"""
+        assertEquals(listOf("", "", "", excluded, brief, brief, excluded, brief, brief).joinToString("|"), rendered)
+    }
+
+    @Test
+    fun selectedGlossaryFallbackOnlyAppliesWhenTheSelectedDictionaryIsMissing() {
+        for ((selected, expected) in listOf(null to "fallback", "" to "", " " to " ")) {
+            val payload = AnkiMiningPayload(
+                expression = "fallback",
+                selectedDictionary = "Selected",
+                singleGlossaries = selected?.let { mapOf("Selected" to it) }.orEmpty(),
+            )
+            assertEquals(
+                "selected=$selected",
+                expected,
+                AnkiHandlebarRenderer.render(
+                    template = "{selected-glossary}",
+                    payload = payload,
+                    context = AnkiMiningContext(sentence = ""),
+                    selectedGlossaryFallback = "{expression}",
+                ),
+            )
+        }
+    }
+
+    @Test
     fun glossarySelectionUsesPersistedDictionaryOrderCategoriesAndAllCategoryVariants() {
         val excluded =
             """<li data-dictionary="Excluded"><i>(Excluded)</i> <span>excluded</span></li>"""

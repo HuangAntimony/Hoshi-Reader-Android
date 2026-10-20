@@ -1,6 +1,5 @@
 package moe.antimony.hoshi.features.anki
 
-import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -10,10 +9,12 @@ import com.ichi2.anki.FlashCardsContract
 import com.ichi2.anki.api.AddContentApi
 import java.lang.SecurityException
 import java.math.BigInteger
+import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.text.Normalizer
 import java.util.Locale
+import kotlinx.coroutines.CancellationException
 import javax.inject.Inject
 
 class AndroidAnkiContentApi @Inject constructor(
@@ -90,37 +91,24 @@ class AndroidAnkiContentApi @Inject constructor(
             if (mimeType.startsWith("audio/")) "audio" else "image",
         )
 
-    override fun sync(): Boolean =
-        runCatching {
-            appContext.startActivity(ankiDroidSyncIntent())
-            true
-        }.recoverCatching { error ->
-            when (error) {
-                is ActivityNotFoundException -> logAnkiApiFailure("AnkiDroid sync activity is unavailable.", error)
-                else -> logAnkiApiFailure("Unable to start AnkiDroid sync.", error)
-            }
-            false
-        }.getOrDefault(false)
+    override fun sync(): Boolean {
+        appContext.startActivity(ankiDroidSyncIntent())
+        return true
+    }
 
-    override fun openNotes(query: String): Boolean =
-        runCatching {
-            val spec = ankiDroidBrowserIntentSpec(
-                query = query,
-                packageName = AddContentApi.getAnkiDroidPackageName(appContext) ?: "com.ichi2.anki",
-            )
-            appContext.startActivity(
-                Intent().apply {
-                    setClassName(spec.packageName, spec.activityClassName)
-                    spec.stringExtras.forEach { (key, value) -> putExtra(key, value) }
-                    spec.booleanExtras.forEach { (key, value) -> putExtra(key, value) }
-                    if (spec.newTask) addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                },
-            )
-            true
-        }.recoverCatching { error ->
-            logAnkiApiFailure("Unable to open the AnkiDroid card browser.", error)
-            false
-        }.getOrDefault(false)
+    override fun openNotes(query: String): Boolean {
+        val spec = ankiDroidBrowserIntentSpec(
+            query = query,
+            packageName = AddContentApi.getAnkiDroidPackageName(appContext) ?: "com.ichi2.anki",
+        )
+        appContext.startActivity(
+            Intent(spec.action, Uri.parse(spec.uri)).apply {
+                setPackage(spec.packageName)
+                if (spec.newTask) addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            },
+        )
+        return true
+    }
 
     override fun isAvailable(): Boolean =
         AddContentApi.getAnkiDroidPackageName(appContext) != null
@@ -129,6 +117,8 @@ class AndroidAnkiContentApi @Inject constructor(
         if (!isAvailable()) throw AnkiFetchException(AnkiFetchFailure.ApiUnavailable)
         return try {
             block()
+        } catch (error: CancellationException) {
+            throw error
         } catch (error: AnkiFetchException) {
             throw error
         } catch (error: SecurityException) {
@@ -199,9 +189,8 @@ internal fun ankiDroidSyncIntentSpec(): AnkiDroidSyncIntentSpec =
     )
 
 internal data class AnkiDroidBrowserIntentSpec(
-    val activityClassName: String,
-    val stringExtras: Map<String, String>,
-    val booleanExtras: Map<String, Boolean>,
+    val action: String,
+    val uri: String,
     val packageName: String,
     val newTask: Boolean,
 )
@@ -211,11 +200,9 @@ internal fun ankiDroidBrowserIntentSpec(
     packageName: String = "com.ichi2.anki",
 ): AnkiDroidBrowserIntentSpec =
     AnkiDroidBrowserIntentSpec(
-        activityClassName = "com.ichi2.anki.CardBrowser",
-        // A URI search takes precedence over these extras and retains the last deck filter.
-        // Keep the requested duplicate scope in the query, not in the browser selection.
-        stringExtras = mapOf("search_query" to query),
-        booleanExtras = mapOf("all_decks" to true),
+        action = Intent.ACTION_VIEW,
+        uri = "anki://x-callback-url/browser?search=" +
+            URLEncoder.encode(query, StandardCharsets.UTF_8.name()),
         packageName = packageName,
         newTask = true,
     )

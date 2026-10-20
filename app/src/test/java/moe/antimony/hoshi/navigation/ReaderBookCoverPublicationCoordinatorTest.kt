@@ -11,6 +11,21 @@ import org.junit.Test
 
 class ReaderBookCoverPublicationCoordinatorTest {
     @Test
+    fun publicationErrorsKeepOriginalDetailsAndDeduplicateRepeatedCauses() {
+        val result = BookCoverPublishResult(
+            lockScreen = BookCoverTargetResult.Failed(BookCoverPublishFailure.WallpaperUpdateFailed, "Wallpaper service disconnected"),
+            export = BookCoverTargetResult.Failed(BookCoverPublishFailure.ExportWriteFailed, "Storage full"),
+            iReader = BookCoverTargetResult.Failed(BookCoverPublishFailure.IReaderWriteFailed, "Storage full"),
+        )
+        val message = bookCoverPublishFailureMessage(result, "Unable to publish book cover.")
+        assertTrue(message.startsWith("Unable to publish book cover."))
+        assertTrue(message.contains("Wallpaper service disconnected"))
+        assertFalse(message.contains("ExportWriteFailed"))
+        assertFalse(message.contains("IReaderWriteFailed"))
+        assertEquals(1, message.lineSequence().count { it == "Storage full" })
+    }
+
+    @Test
     fun iReaderSystemOptionFailureUsesSetupGuidance() {
         assertEquals(
             R.string.book_cover_wallpaper_ireader_not_selected_error,

@@ -1,7 +1,7 @@
 package moe.antimony.hoshi.features.audio
 
-import moe.antimony.hoshi.ui.theme.hoshiSurfaces
-import moe.antimony.hoshi.ui.theme.hoshiContainerBorder
+import moe.antimony.hoshi.ui.asString
+
 import android.text.format.Formatter
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -19,6 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
@@ -26,7 +26,6 @@ import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.Delete
 import moe.antimony.hoshi.ui.HoshiButton as Button
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -34,13 +33,11 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -53,14 +50,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.LocalHoshiUiDependencies
 import moe.antimony.hoshi.R
-import moe.antimony.hoshi.features.settings.collectAsLoadedSettings
+import moe.antimony.hoshi.features.settings.SettingsDetailScaffold
+import moe.antimony.hoshi.features.settings.rememberSettingsLoader
 import moe.antimony.hoshi.features.settings.GroupCard
 import moe.antimony.hoshi.features.settings.GroupDivider
 import moe.antimony.hoshi.features.settings.SectionTitle
@@ -82,7 +79,7 @@ fun AudioSettingsView(
     val appContainer = LocalHoshiUiDependencies.current
     val scope = rememberCoroutineScope()
     val audioSettingsRepository = appContainer.audioSettingsRepository
-    val settings = audioSettingsRepository.settings.collectAsLoadedSettings()
+    val settingsLoader = audioSettingsRepository.settings.rememberSettingsLoader()
     val repository = appContainer.localAudioRepository
     var nameInput by remember { mutableStateOf("") }
     var urlInput by remember { mutableStateOf("") }
@@ -182,26 +179,13 @@ fun AudioSettingsView(
         }
     }
     val colorScheme = MaterialTheme.colorScheme
-    Scaffold(
-        modifier = modifier.fillMaxSize(),
-        containerColor = hoshiSurfaces.page,
-        topBar = {
-            CenterAlignedTopAppBar(
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = hoshiSurfaces.page,
-                    scrolledContainerColor = hoshiSurfaces.page,
-                ),
-                title = { Text(stringResource(R.string.advanced_audio), fontWeight = FontWeight.SemiBold) },
-                navigationIcon = {
-                    BackIconButton {
-                        if (!isImporting) {
-                            onClose()
-                        }
-                    }
-                },
-            )
-        },
-    ) { innerPadding ->
+    SettingsDetailScaffold(
+        state = settingsLoader.state,
+        title = stringResource(R.string.advanced_audio),
+        onClose = { if (!isImporting) onClose() },
+        onRetry = settingsLoader.retry,
+        modifier = modifier,
+    ) { innerPadding, loadedSettings ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -214,7 +198,6 @@ fun AudioSettingsView(
                 verticalArrangement = Arrangement.spacedBy(18.dp),
             ) {
                 item {
-                    val loadedSettings = settings ?: return@item
                     SectionTitle(stringResource(R.string.audio_sources))
                     GroupCard {
                         loadedSettings.audioSources.forEachIndexed { index, source ->
@@ -237,7 +220,6 @@ fun AudioSettingsView(
                     }
                 }
                 item {
-                    val loadedSettings = settings ?: return@item
                     SectionTitle(stringResource(R.string.audio_add_source))
                     GroupCard {
                         TextInputRow(label = stringResource(R.string.audio_name), value = nameInput, onValueChange = { nameInput = it })
@@ -275,7 +257,6 @@ fun AudioSettingsView(
                     )
                 }
                 item {
-                    val loadedSettings = settings ?: return@item
                     GroupCard {
                         ListItem(
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
@@ -316,7 +297,6 @@ fun AudioSettingsView(
                     }
                 }
                 item {
-                    val loadedSettings = settings ?: return@item
                     SectionTitle(stringResource(R.string.audio_local_audio))
                     GroupCard {
                         ListItem(
@@ -358,7 +338,7 @@ fun AudioSettingsView(
                                     ListItem(
                                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                                         headlineContent = { Text(stringResource(R.string.audio_import_failed)) },
-                                        supportingContent = { Text(message) },
+                                        supportingContent = { SelectionContainer { Text(message) } },
                                     )
                                 }
                             }
@@ -405,12 +385,14 @@ fun AudioSettingsView(
                                                 )
                                             }
                                             if (localAudioSourceState.saveFailed) {
-                                                Text(
-                                                    text = stringResource(R.string.audio_local_source_save_failed),
-                                                    color = MaterialTheme.colorScheme.error,
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    modifier = Modifier.padding(top = 8.dp),
-                                                )
+                                                SelectionContainer {
+                                                    Text(
+                                                        text = localAudioSourceState.errorMessage?.asString() ?: stringResource(R.string.audio_local_source_save_failed),
+                                                        color = MaterialTheme.colorScheme.error,
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        modifier = Modifier.padding(top = 8.dp),
+                                                    )
+                                                }
                                             }
                                         }
                                     },

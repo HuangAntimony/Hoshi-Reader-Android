@@ -42,9 +42,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
+import moe.antimony.hoshi.ui.withErrorDetails
 import moe.antimony.hoshi.LocalHoshiUiDependencies
 import moe.antimony.hoshi.R
-import moe.antimony.hoshi.features.settings.SettingsDetailScaffold
+import moe.antimony.hoshi.ui.ErrorDetailsText
+import moe.antimony.hoshi.ui.HoshiAlertDialog
+import androidx.compose.material3.TextButton
+import moe.antimony.hoshi.features.settings.StaticSettingsDetailScaffold
 import moe.antimony.hoshi.importing.FileImportContent
 import moe.antimony.hoshi.importing.ImportFileType
 import moe.antimony.hoshi.importing.UnsupportedImportFileTypeException
@@ -64,6 +69,19 @@ fun BackupSettingsView(
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     var operation by remember { mutableStateOf<BackupOperation?>(null) }
+    var operationError by remember { mutableStateOf<String?>(null) }
+    suspend fun showOperationMessage(message: String, isError: Boolean) {
+        if (isError) operationError = message else snackbarHostState.showSnackbar(message)
+    }
+    operationError?.let { message ->
+        HoshiAlertDialog(
+            onDismissRequest = { operationError = null },
+            text = { ErrorDetailsText(message) },
+            confirmButton = {
+                TextButton(onClick = { operationError = null }) { Text(stringResource(R.string.action_ok)) }
+            },
+        )
+    }
     val booksBackupSaved = stringResource(R.string.backup_books_saved)
     val booksBackupSaveFailed = stringResource(R.string.backup_books_save_failed)
     val dictionariesBackupSaved = stringResource(R.string.backup_dictionaries_saved)
@@ -86,12 +104,13 @@ fun BackupSettingsView(
                 repository.exportBooks(context.contentResolver, uri)
             }
             operation = null
-            snackbarHostState.showSnackbar(
+            showOperationMessage(
                 if (result.isSuccess) {
                     booksBackupSaved
                 } else {
-                    result.exceptionOrNull()?.message ?: booksBackupSaveFailed
+                    result.exceptionOrNull().stableBackupFailureMessage(booksBackupSaveFailed)
                 },
+                isError = result.isFailure,
             )
         }
     }
@@ -103,12 +122,13 @@ fun BackupSettingsView(
                 repository.exportDictionaries(context.contentResolver, uri)
             }
             operation = null
-            snackbarHostState.showSnackbar(
+            showOperationMessage(
                 if (result.isSuccess) {
                     dictionariesBackupSaved
                 } else {
-                    result.exceptionOrNull()?.message ?: dictionariesBackupSaveFailed
+                    result.exceptionOrNull().stableBackupFailureMessage(dictionariesBackupSaveFailed)
                 },
+                isError = result.isFailure,
             )
         }
     }
@@ -120,12 +140,13 @@ fun BackupSettingsView(
                 repository.exportTtuBookData(context.contentResolver, uri)
             }
             operation = null
-            snackbarHostState.showSnackbar(
+            showOperationMessage(
                 if (result.isSuccess) {
                     ttuExported
                 } else {
                     result.exceptionOrNull().stableBackupFailureMessage(ttuExportFailed)
                 },
+                isError = result.isFailure,
             )
         }
     }
@@ -145,12 +166,13 @@ fun BackupSettingsView(
             if (result.isSuccess) {
                 onBooksRestored()
             }
-            snackbarHostState.showSnackbar(
+            showOperationMessage(
                 if (result.isSuccess) {
                     booksRestored
                 } else {
                     result.exceptionOrNull().stableBackupFailureMessage(booksRestoreFailed, hoshiBackupUnsupported)
                 },
+                isError = result.isFailure,
             )
         }
     }
@@ -164,12 +186,13 @@ fun BackupSettingsView(
                 appContainer.dictionaryRepository.rebuildLookupQuery()
             }
             operation = null
-            snackbarHostState.showSnackbar(
+            showOperationMessage(
                 if (result.isSuccess) {
                     dictionariesRestored
                 } else {
                     result.exceptionOrNull().stableBackupFailureMessage(dictionariesRestoreFailed, hoshiBackupUnsupported)
                 },
+                isError = result.isFailure,
             )
         }
     }
@@ -186,17 +209,18 @@ fun BackupSettingsView(
             if (restoredCount > 0) {
                 onBooksRestored()
             }
-            snackbarHostState.showSnackbar(
+            showOperationMessage(
                 when {
                     result.isSuccess && restoredCount > 0 -> ttuImported
                     result.isSuccess -> ttuImportFailed
                     else -> result.exceptionOrNull().stableBackupFailureMessage(ttuImportFailed, ttuBackupUnsupported)
                 },
+                isError = result.isFailure || restoredCount <= 0,
             )
         }
     }
 
-    SettingsDetailScaffold(
+    StaticSettingsDetailScaffold(
         title = stringResource(R.string.settings_backup),
         onClose = {
             if (operation == null) {
@@ -332,8 +356,10 @@ internal fun Throwable?.stableBackupFailureMessage(
     fallback: String,
     unsupportedImportMessage: String? = null,
 ): String =
-    if (this is UnsupportedImportFileTypeException && unsupportedImportMessage != null) {
-        unsupportedImportMessage
-    } else {
-        fallback
+    when {
+        this is CancellationException -> throw this
+        this is UnsupportedImportFileTypeException && unsupportedImportMessage != null ->
+            unsupportedImportMessage.withErrorDetails(this)
+        this != null -> fallback.withErrorDetails(this)
+        else -> fallback
     }

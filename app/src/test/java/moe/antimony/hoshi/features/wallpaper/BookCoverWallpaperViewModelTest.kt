@@ -5,6 +5,14 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.runCurrent
+import moe.antimony.hoshi.ui.resolve
+import moe.antimony.hoshi.R
+import moe.antimony.hoshi.ui.ErrorDiagnosticEvents
+import moe.antimony.hoshi.ui.UiText
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -89,7 +97,9 @@ class BookCoverWallpaperViewModelTest {
 
         val result = viewModel.publishCurrentCover(File("cover.jpg"))
 
-        val failure = BookCoverTargetResult.Failed(BookCoverPublishFailure.UnexpectedFailure)
+        val failure = result.lockScreen as BookCoverTargetResult.Failed
+        assertEquals(BookCoverPublishFailure.UnexpectedFailure, failure.reason)
+        assertTrue(failure.details.orEmpty().contains("publisher failed"))
         assertEquals(failure, result.lockScreen)
         assertEquals(failure, result.export)
         assertEquals(failure, result.iReader)
@@ -115,10 +125,56 @@ class BookCoverWallpaperViewModelTest {
 
         val result = viewModel.publishCurrentCover(null)
 
-        val failure = BookCoverTargetResult.Failed(BookCoverPublishFailure.SettingsUnavailable)
+        val failure = result.lockScreen as BookCoverTargetResult.Failed
+        assertEquals(BookCoverPublishFailure.SettingsUnavailable, failure.reason)
+        assertTrue(failure.details.orEmpty().contains("settings unavailable"))
         assertEquals(failure, result.lockScreen)
         assertEquals(failure, result.export)
         assertEquals(failure, result.iReader)
+    }
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    @Test
+    fun failedSettingsWriteExposesItsSpecificReason() = runTest {
+        val viewModel = BookCoverWallpaperViewModel(
+            settings = MutableStateFlow(BookCoverWallpaperSettings()),
+            updateSettings = { throw java.io.IOException("wallpaper preferences storage is read only") },
+            capabilityProvider = BookCoverWallpaperCapabilityProvider {
+                BookCoverWallpaperCapability(isSupported = true, isSetAllowed = true)
+            },
+            iReaderCapabilityProvider = IReaderBookCoverCapabilityProvider {
+                IReaderBookCoverCapability(isSupported = true, isBookCoverScreenSaverSelected = true)
+            },
+            publisher = FakePublisher(),
+            coroutineScope = backgroundScope,
+        )
+        viewModel.setExportEnabled(true)
+        runCurrent()
+        val message = viewModel.error.value?.resolve({ _, _ -> "Save failed" }, { _, _, _ -> "" }).orEmpty()
+        assertTrue(message.contains("wallpaper preferences storage is read only"))
+    }
+
+    @Test
+    fun unexpectedPublisherFailurePublishesTheOriginalCauseForDiagnostics() = runBlocking {
+        ErrorDiagnosticEvents.buffer.drain()
+        val cause = java.io.IOException("disk quota exceeded")
+        val error = IllegalStateException("Wallpaper renderer unavailable", cause)
+        val viewModel = viewModel(
+            BookCoverWallpaperSettings(updateLockScreen = true),
+            object : BookCoverPublisher {
+                override suspend fun publish(coverFile: File): BookCoverPublishResult = throw error
+            },
+        )
+
+        val result = viewModel.publishCurrentCover(File("cover.jpg"))
+        val event = ErrorDiagnosticEvents.buffer.drain().singleOrNull()
+
+        assertTrue(result.hasFailures)
+        assertNotNull("The ViewModel's fallback must retain a diagnostic event", event)
+        assertSame(error, event!!.error)
+        assertSame(cause, requireNotNull(event.error).cause)
+        assertEquals("Wallpaper renderer unavailable", requireNotNull(event.error).message)
+        assertEquals(UiText.Resource(R.string.book_cover_wallpaper_publish_failed), event.operation)
     }
 
     @Test

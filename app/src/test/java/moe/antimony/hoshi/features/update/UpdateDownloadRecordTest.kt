@@ -4,6 +4,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlinx.coroutines.test.runTest
+import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 
 class UpdateDownloadRecordTest {
     private val update = AvailableUpdate(
@@ -13,6 +15,42 @@ class UpdateDownloadRecordTest {
         downloadUrl = "https://example.com/Hoshi-Reader-v0.3.5.apk",
         sha256 = "7977f9e95adec03fce35ef0640fdd2fe662c6521d625dc12242df5b66fb2254b",
     )
+
+    @Test
+    fun failedDownloadPersistsActualReasonAndRetryClearsIt() = runTest {
+        val directory = java.nio.file.Files.createTempDirectory("hoshi-update-error").toFile()
+        try {
+            val dataStore = PreferenceDataStoreFactory.create(
+                scope = backgroundScope,
+                produceFile = { directory.resolve("downloads.preferences_pb") },
+            )
+            val store = UpdateDownloadStore(dataStore)
+            store.saveDownloading(update, "update.apk", 42L, update.downloadUrl)
+            store.markFailed(42L, "DownloadManager reason=403")
+            val record = requireNotNull(store.load())
+            assertEquals("DownloadManager reason=403", record.failureDetails)
+            assertTrue(record.failureMessage("Download failed.").contains("DownloadManager reason=403"))
+            store.saveDownloading(update, "update.apk", 43L, update.downloadUrl)
+            org.junit.Assert.assertNull(store.load()?.failureDetails)
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun failedApkValidationRetainsExpectedAndActualChecksum() = runTest {
+        val file = kotlin.io.path.createTempFile("hoshi-update", ".apk").toFile()
+        try {
+            file.writeText("apk bytes")
+            val expected = "0".repeat(64)
+            val failure = runCatching { validateDownloadedUpdate(file, expected) }.exceptionOrNull()
+            assertTrue(failure is java.io.IOException)
+            assertTrue(failure?.message.orEmpty().contains("expected $expected"))
+            assertTrue(failure?.message.orEmpty().contains("actual "))
+        } finally {
+            file.delete()
+        }
+    }
 
     @Test
     fun updateApkUsesStableFileName() {

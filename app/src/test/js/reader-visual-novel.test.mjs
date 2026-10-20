@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
+import { TextRangeFixture } from './dom-range-fixture.mjs';
 
 const readerVisualNovelUrl = new URL('../../main/assets/hoshi-web/reader/reader-visual-novel.js', import.meta.url);
 const readerViewportUrl = new URL('../../main/assets/hoshi-web/reader/reader-viewport.js', import.meta.url);
@@ -474,8 +475,9 @@ class TestFragment extends TestNode {
     }
 }
 
-class TestRange {
+class TestRange extends TextRangeFixture {
     constructor(document) {
+        super();
         this.document = document;
         this.node = null;
         this.startNode = null;

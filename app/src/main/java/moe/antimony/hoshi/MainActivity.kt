@@ -12,10 +12,11 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.view.KeyEvent
-import androidx.activity.ComponentActivity
+import androidx.appcompat.app.AppCompatActivity
+import moe.antimony.hoshi.ui.theme.SystemThemeObserver
+import moe.antimony.hoshi.ui.theme.nativeThemeReady
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -34,7 +35,7 @@ import moe.antimony.hoshi.navigation.AppShell
 import moe.antimony.hoshi.ui.theme.HoshiReaderTheme
 
 @AndroidEntryPoint
-class MainActivity : ComponentActivity() {
+class MainActivity : AppCompatActivity() {
     @Inject internal lateinit var uiDependencies: HoshiUiDependencies
 
     private var pendingImportUri by mutableStateOf<Uri?>(null)
@@ -42,6 +43,8 @@ class MainActivity : ComponentActivity() {
     private var pendingDictionaryLookupRequest by mutableStateOf<PendingDictionaryLookupRequest?>(null)
     private var dictionaryLookupRequestId = 0L
     private var readerKeyEventHandler: ((KeyEvent) -> Boolean)? = null
+
+    @Inject lateinit var systemThemeObserver: SystemThemeObserver
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -56,22 +59,25 @@ class MainActivity : ComponentActivity() {
             val settingsViewModel: ReaderSettingsHostViewModel = hiltViewModel()
             val settingsState by settingsViewModel.uiState.collectAsStateWithLifecycle()
             val readerSettings = settingsState.settings
-            val systemDark = isSystemInDarkTheme()
+            val systemDark by systemThemeObserver.dark.collectAsStateWithLifecycle()
             val loadedReaderSettings = readerSettings
             LaunchedEffect(loadedReaderSettings?.lockCurrentOrientation) {
                 val settings = loadedReaderSettings ?: return@LaunchedEffect
                 requestedOrientation = requestedOrientationForLockCurrentOrientation(settings.lockCurrentOrientation)
             }
+            val nativeReady = nativeThemeReady(loadedReaderSettings?.displaySettings, systemDark)
             val darkTheme = loadedReaderSettings?.usesDarkInterface(systemDark) ?: systemDark
             val useDarkSystemBarIcons = loadedReaderSettings?.usesDarkSystemBarIcons(systemDark) ?: !systemDark
             CompositionLocalProvider(LocalHoshiUiDependencies provides uiDependencies) {
                 HoshiReaderTheme(
+                    systemDarkTheme = systemDark,
                     darkTheme = darkTheme,
                     eInkMode = loadedReaderSettings?.eInkMode ?: false,
                     useDarkSystemBarIcons = useDarkSystemBarIcons,
                     accentSeed = loadedReaderSettings?.displaySettings?.takeIf { it.accentSource == DisplayAccentSource.Custom }?.accentSeed,
                 ) {
                     ReaderSettingsHostError(settingsState, settingsViewModel)
+                    if (!nativeReady) return@HoshiReaderTheme
                     val loadedReaderSettings = readerSettings ?: return@HoshiReaderTheme
                     AppShell(
                         pendingImportUri = pendingImportUri,
@@ -81,6 +87,8 @@ class MainActivity : ComponentActivity() {
                         pendingDictionaryLookupRequest = pendingDictionaryLookupRequest,
                         onPendingDictionaryLookupConsumed = { pendingDictionaryLookupRequest = null },
                         readerSettings = loadedReaderSettings,
+                        readerSettingsLoadState = settingsState.loadState,
+                        onRetryReaderSettings = settingsViewModel::retry,
                         onReaderSettingsChange = settingsViewModel::update,
                         onReaderKeyEventHandlerChange = { handler ->
                             readerKeyEventHandler = handler

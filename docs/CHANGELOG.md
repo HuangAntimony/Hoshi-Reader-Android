@@ -28,12 +28,203 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   rate-limited or failed requests are retried.
   Background sync waits for a network connection and retries temporary failures.
   Renaming a shelf preserves its order and book memberships.
+- Keep the latest 100 runtime errors in Diagnostics, including the operation,
+  time, original error details and cause stack; retain them across restarts,
+  and copy or export them with crash history.
+  Show app/WebView information on the Diagnostics overview with separate entries
+  for crash, error and process-exit records, opening full details from compact lists.
+  Input validation, including unfinished regex replacement drafts, stays inline
+  without entering runtime error history.
+- Add Disable Button After Mining under Anki's Allow Duplicates: disable each term/format
+  after successful mining until the popup is reopened.
+- Read Japanese books aloud using installed Android TTS engines or Edge, Azure,
+  Microsoft Translator, Google Cloud and Google Translate online sources, plus multiple named
+  self-hosted OpenAI Compatible and VITS Simple API servers, with a separate
+  TTS panel styled like Sasayaki, with compact playback controls and Voice,
+  Replacements and Settings tabs. Source and Voice share a compact card with grouped,
+  scrolling bottom selection panels. Voices retain their original names and show their
+  online/offline requirement; installed third-party engines remain available. Source selection
+  includes cloud credential configuration, with system TTS settings always available as
+  a separate action above the Device engines group. Advanced settings label
+  dictionary pronunciation settings as Word audio to distinguish them from narration,
+  and give TTS its own speaking-person icon.
+  Omit subtitles for Sasayaki and Book Cover Lock Screen. Add independent Hoshi
+  playback speed from 0.5× to 3.0× alongside engine speech rate; it applies to narration
+  and preview without re-synthesizing audio, shifting pitch, or resuming paused playback. Rate and pitch sliders
+  keep their steps without dense tick marks or endpoint labels, and preview can be canceled or stopped from
+  its theme-colored button fixed above the bottom system inset. Synthesis parameters appear
+  directly in Voice without a separate heading or toggle; audio format is selected there
+  rather than duplicated in Source configuration.
+  Provider pause switches, audio format and sample rate use plain settings rows, while
+  remaining parameter cards have tighter vertical padding; slider row heights stay unchanged.
+  Configurable sources default to MP3, retaining saved WAV/MP3 selections.
+  Each Source can optionally use separate narration and dialogue voices, remembered
+  independently and selected from the existing voice picker. Paired Japanese quotes
+  route dialogue across sentences and paragraphs; reading, replacement preview and
+  Anki sentence audio share this behavior while keeping sentence navigation unchanged.
+  Cloud credentials use a matching configuration sheet; connection testing and its
+  success/error feedback stay visible in a fixed footer for cloud and self-hosted sources,
+  without requiring another scroll after testing. Saved cloud API keys can be deleted
+  immediately after confirmation, preserving other source settings. Saving or deleting
+  another source's cloud credentials keeps the active voice list and preview unchanged.
+  Azure regions use a compact dropdown of region codes with no default selection. Source errors
+  stay beside the voice card instead of leaking into other tabs. Online voice lists remain
+  available across panel openings and app restarts without automatic network refresh;
+  the Voice picker provides a manual refresh action at the top for every source,
+  retaining known voices during loading or refresh failure; slow self-hosted refreshes
+  do not block reuse of the previous list.
+  E-ink shows readable loading text instead of a solid black progress line.
+  Add, edit and delete self-hosted servers from Source; saving a new server selects it
+  immediately without starting playback, and each retains its model, voice,
+  engine rate and WAV/MP3 format, with optional encrypted credentials and draft connection
+  testing. Choose voices separately under Voice: VITS shows server-provided character names,
+  while OpenAI Compatible can list manually configured voice IDs alongside voices discovered
+  from the server. Changing available IDs keeps the chosen voice and playback intact.
+  Editing another server or renaming the current one leaves playback running.
+  OpenAI model IDs use one editable field with an integrated list button; returned
+  models open a nearby menu for selection, including lists with a single result.
+  TTS Settings offers a global Use Ruby readings switch, enabled by default; disabling it
+  sends original base text to the engine while preserving custom replacements for reading,
+  preview and Anki sentence audio.
+  Read XHTML books containing self-closing script/style tags without losing their
+  body text during TTS preparation.
+  Book text is prepared by chapter when TTS is used, avoiding full-book TTS parsing
+  when opening Reader. Edit shared reading behavior directly in either panel,
+  preserving consecutive changes to different controls,
+  with independent Japanese voice/rate controls, sentence navigation, background playback,
+  and shared Reader highlighting, page following, lookup pause, and image holds.
+  Control narration from lookup popups: replay the selected sentence once, toggle
+  playback, or close the popup and continue from that sentence.
+  Microsoft Translator needs no user API key, discovers regional Japanese voices,
+  and refreshes its temporary authorization automatically.
+  Linking an audiobook hides TTS and preserves Sasayaki's audiobook controls.
+  Reopening or switching books after narration keeps playback idle until explicitly started.
+  The shared Volume Keys Control Audiobook / TTS setting enables audiobook seeking and
+  TTS sentence navigation after starting narration in the current book session; popup term
+  navigation takes priority over narration, then page turns.
+  Previous/next sentence navigation preserves paused playback instead of starting audio.
+  Lookup pauses survive switching directly to another word without a brief playback
+  restart, and closing the popup resumes correctly when the sentence ended during the pause.
+  The Reader’s top-right playback button also controls TTS after manually starting narration
+  in the current book session, like the bottom controls. It remains available while paused
+  and shares the Show Audiobook / TTS Toggle preference with Sasayaki.
+  Recognizes Samsung's Japanese voices and refreshes available voices when returning
+  from system settings. Configure cloud credentials and test synthesis in the current
+  panel. Adjust supported pitch, volume, Azure/Microsoft Translator speaking styles/roles/intensity and
+  punctuation silence, cloud audio format/sample rate with compact dropdown rows
+  anchored at the right-side control, Google device profiles, and
+  extra playback pauses between sentences. Pause sliders use 10 ms increments, with
+  a normal range of 0–1000 ms for provider silence and 0–2000 ms for extra sentence
+  pauses. Changing extra
+  sentence pause takes effect at the next boundary without stopping narration or
+  regenerating cached audio. Independent setting edits preserve other saved preferences.
+  MP3 sources retain MP3 for playback and Anki.
+  Ready sentence audio plays without waiting for later network synthesis, including
+  installed Android engines using separate narration/dialogue voices. Installed-engine
+  voice lists are reused during playback and refreshed manually or when returning to the
+  panel. Continuous playback keeps ongoing prefetch when moving to the next sentence. Configure 1–20
+  upcoming sentences to preload in Voice (default 5); changes adjust
+  buffering without interrupting narration or regenerating cached audio.
+  Replayed sentence audio remains reusable while upcoming sentences are preloaded,
+  including sentences with multiple audio fragments.
+  While narration is paused, chapter navigation and returning to Reader keep the selected
+  reading position instead of jumping back to the narrated sentence. TTS shares
+  Sasayaki's image holds and chapter presentation, keeping images visible for the
+  configured duration before continuing; manual sentence jumps skip intervening images.
+- Customize TTS text replacements for one book or all books from text selection or
+  Settings. Selected text has line breaks removed before filling Matching text, keeping
+  the single-line field consistent with the actual rule. Replacement text accepts readings,
+  other text and punctuation; leaving it empty
+  deletes the matching text from speech. Fully deleted sentences are skipped during continuous
+  playback without sending empty synthesis requests. Supported substitutions include
+  dashes or ellipses replaced with commas/periods for engine-controlled pauses. Add an opt-in
+  regular-expression switch to replacement creation/editing, with capture-group substitution,
+  book/global scope and validation. Explicit literal entries and available ruby take priority
+  over regex rules. Both modes show the original and actual TTS input before preview; rules
+  created from Settings can be tested with editable sample text. The editor opens with
+  its initial preview/validation content ready, avoiding an opening
+  size jump, and retains the preview area while edits are recalculated. The compact editor
+  groups the rule, scope and sentence preview, using matching body text sizes with distinct headings, labels and colors,
+  a secondary Preview button and a primary Save action. Scope choices share the dialog
+  background when unselected; preview recalculation keeps actions stable and queues Preview
+  for the current draft instead of briefly disabling it. Empty results are clearly identified, remain saveable and disable Preview.
+  Replacements affect only synthesized speech; original text, sentence navigation,
+  highlighting and Anki sentence text stay unchanged.
+  The selection menu offers a compact Replace action; its TTS replacement dialog
+  defaults new entries to all books, with a theme-colored selected scope and stable centered labels,
+  and a full-width theme-colored preview button, with
+  a destructive Delete action aligned beside Cancel and Save when editing an entry.
+  Replace also opens when a ruby-adjacent selection begins inside an annotation,
+  using only selected body text and preserving native selection handles.
+  Text-selection creation previews the full original sentence; both fields request
+  Japanese keyboard input; the replacement field offers Done to dismiss the keyboard
+  before saving.
+  EPUB ruby remains the fallback reading.
+  Image-backed characters with ruby are read without freezing or exhausting memory.
+- Add the opt-in Anki `{sentence-audio}` handlebar for audiobook or TTS sentence audio;
+  `{sasayaki-audio}` and existing field mappings keep their audiobook-only behavior.
+
+- Add LINE Seed JP to the rounded recommended reader fonts, with Thin, Regular, Bold,
+  and ExtraBold variants.
 
 ### Changed
 
+- Replace BIZ UDPGothic with BIZ UDGothic in the recommended reader fonts.
 - Edit individual reading sessions in Statistics. Session deletions persist across
   sync, and daily totals follow the selected reset time. If another device deletes
   the session being edited, its editor closes without restoring the deleted session.
+
+### Fixed
+
+- Keep full-width lookup popups independent of continuous reader padding in both
+  vertical and horizontal writing.
+- Restore continuous reading to the text line or column edge when reopening a
+  book, keeping text and furigana visible without half-line clipping or position drift.
+- Preserve specific error details and underlying causes across imports, settings,
+  Reader, dictionaries, Anki, audio, TTS, Sasayaki, sync, backups, updates and
+  statistics, alongside the localized operation or category description.
+  Failed update checks retain each attempted URL, original response and
+  rate-limit details instead of showing only the last source's error.
+- Stop using a file-download proxy that redirects release API requests to its
+  homepage; reject HTML responses before parsing update information as JSON.
+- Keep Japanese names containing middle dots intact when scanning text for lookup.
+- Clear the Dictionary tab's search when opening a book, preventing old word audio
+  from replaying when the book's profile is activated or restored.
+- Show saved settings before their controls appear, preventing switches and
+  selections from briefly showing defaults when opening settings pages or panels.
+- Keep dictionaries marked `Exclude` in Anki Advanced available for lookup;
+  omit them from aggregate and first-definition fields while preserving explicit
+  single-dictionary and selected-definition mappings.
+- Apply the selected-glossary fallback only when the selected dictionary has no
+  glossary, preserving empty glossary values.
+- Keep the audio-source menu beside its speaker button and fully inside lookup
+  popups when popup scale is above 1, including narrow popups.
+- Restore the text-selection menu after handle drags in paginated paragraphs,
+  with or without ruby, and keep it near visible text when WebView reports empty
+  or offscreen menu coordinates. Keep Highlight and TTS Replace available after
+  menu recovery on large-screen devices, and prevent repeated recovery from
+  hiding the menu or a selection handle in reverse selections across paragraphs.
+  Recover inside the selection away from its handles, including fragmented text
+  starting immediately after ruby, and avoid pressing a handle again when
+  recovering single-character vertical selections. Keep menus available on the
+  first long press and after successive handle drags, without unexpectedly
+  clearing the selected text. Keep recovered menus near the selection handles
+  when the range includes a paragraph's final punctuation across columns.
+- Create, recolor and remove highlights when native selections begin or end
+  inside ruby annotations or at element boundaries, using only selected body text.
+- Keep text selection from unexpectedly turning pages or chapters when the
+  native selection menu disappears or is recreated.
+- Reduce text-selection flicker in paginated reading by preventing selection
+  autoscroll while dragging selection handles.
+- Use Nakuru for Japanese audiobook transcription, with model and runtime downloads
+  on first use for arm64 and 32-bit ARM devices. Update matched reading cues during
+  transcription so reading and playback can continue without pausing transcription.
+  Automatically retry interrupted component downloads and resume saved partial files,
+  including after reopening the app. Download failures show the affected file, URL,
+  received byte count and original cause in error details and Diagnostics.
+  Automatically remove retired ReazonSpeech models and inference libraries to free
+  storage while keeping existing transcripts, matches and audiobook files.
+  Remove the separate component license buttons from About.
 
 ## [v1.4.0] - 2026-09-24
 
@@ -54,6 +245,13 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 - Optionally hide thumbnails in collapsed shelves; this setting is off by default.
 - Add global Theme settings with system or manual light/dark palettes, separate custom
   light and dark reading colors, interface accents, and app-wide E-ink optimization.
+  Native text menus, highlight palettes and all lookup popups follow the chosen App
+  theme even when the system differs; switching preserves lookup contents and history.
+  Lookup pages use a transparent background to show their containing App surface.
+  Lookup action buttons use solid black/white when available and distinct gray
+  when disabled, in both ordinary and E-ink modes.
+  Dictionary colors and custom CSS now share iOS semantic variables and light/dark
+  media-query behavior, including tables and monochrome images.
 - Archive deleted-book reading statistics, restore them on reimport, and edit daily
   records. Deleting all records requires confirmation.
 - Add calendar and all-time Statistics views with period comparisons, averages, goal
@@ -112,12 +310,13 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ### Fixed
 
+- Keep Sasayaki paused when replacing a lookup popup by tapping another word, avoiding
+  brief audio playback or automatic page turns between lookups.
 - Preserve Dictionary results and Back/Forward history when switching tabs, including
   after following a definition link and swiping back.
 - Recognize existing AnkiDroid cards with equivalent Unicode spellings to prevent
   duplicate cards.
-- Open matching AnkiDroid cards regardless of its previously selected deck, while
-  honoring the duplicate-search setting.
+- Restore duplicate-note search in AnkiDroid 2.25 through its public browser link.
 - Report failed dictionary imports by filename and reason, then continue the batch.
 - Show a localized Reader message and Close action for missing or unreadable books.
 - Recover Reader after a crash while preserving reading position, highlights, and

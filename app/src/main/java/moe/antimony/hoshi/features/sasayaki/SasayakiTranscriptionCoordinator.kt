@@ -138,10 +138,10 @@ internal class SasayakiTranscriptionCoordinator @Inject constructor(
         var alignment: SasayakiTranscriptionAlignment? = null
         var alignedCount = -1
         val requests = Channel<List<SasayakiToken>>(Channel.CONFLATED)
-        suspend fun align(snapshot: List<SasayakiToken>, complete: Boolean) {
+        suspend fun align(snapshot: List<SasayakiToken>) {
             try {
                 val active = alignment ?: repository.openAlignment(root).also { alignment = it }
-                val matched = active.align(snapshot, complete)
+                val matched = active.align(snapshot)
                 if (deleted.get()) return
                 alignedCount = snapshot.size
                 result = matched
@@ -164,7 +164,7 @@ internal class SasayakiTranscriptionCoordinator @Inject constructor(
                 val snapshot = requests.tryReceive().getOrNull() ?: pending
                 lastMatchAt = clock.nowNanos()
                 try {
-                    align(snapshot, complete = false)
+                    align(snapshot)
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (error: Exception) {
@@ -209,7 +209,7 @@ internal class SasayakiTranscriptionCoordinator @Inject constructor(
             if (saved?.isComplete != true) {
                 failureStage = "transcription"
                 backend.transcribe(source, through, parallelism = preset.parallelism,
-                    previousTokens = tokens.takeLastWhile { it.end >= through - 1.0 }, onDownloadRequired = { bytes ->
+                    onDownloadRequired = { bytes ->
                     val approval = CompletableDeferred<Unit>()
                     downloadApproval = approval
                     try {
@@ -282,7 +282,7 @@ internal class SasayakiTranscriptionCoordinator @Inject constructor(
                         repository.save(root, checkpoint())
                         if (tokens.isNotEmpty() && !deleted.get() && (completed || alignedCount != tokens.size)) {
                             mutableState.update { it.copy(stage = SasayakiTranscriptionStage.Aligning) }
-                            align(tokens, complete = completed)
+                            align(tokens)
                         }
                     } catch (failure: Exception) { error = reportSasayakiFailure("transcription_finalize", failure, SasayakiFailureKind.Storage) }
                 }

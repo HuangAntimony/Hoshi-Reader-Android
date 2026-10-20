@@ -109,6 +109,9 @@ internal data class ReaderLookupPopupFramePayload(
     val contentKey: String? = null,
     val sourceText: String? = null,
     val sourceSentenceOffset: Int? = null,
+    val ttsVisible: Boolean = false,
+    val ttsWasPaused: Boolean = false,
+    val ttsIsPlaying: Boolean = false,
 ) {
     companion object {
         fun fromPopup(
@@ -123,6 +126,9 @@ internal data class ReaderLookupPopupFramePayload(
             iframeUrl: String = readerLookupPopupIframeUrl(),
             includeInitialEntryJson: Boolean = true,
             sourceText: String? = null,
+            ttsAvailable: Boolean = false,
+            ttsWasPaused: Boolean = false,
+            ttsIsPlaying: Boolean = false,
         ): ReaderLookupPopupFramePayload {
             val state = popup.state
             val selectionRect = state.selection.rect
@@ -160,6 +166,9 @@ internal data class ReaderLookupPopupFramePayload(
                 backCount = backCount,
                 forwardCount = forwardCount,
                 sasayakiVisible = hasSasayakiCue,
+                ttsVisible = ttsAvailable && !hasSasayakiCue && popup.readerChapterIndex != null && state.selection.normalizedOffset != null,
+                ttsWasPaused = ttsWasPaused,
+                ttsIsPlaying = ttsIsPlaying,
                 sasayakiWasPaused = sasayakiWasPaused,
                 sasayakiIsPlaying = sasayakiIsPlaying,
                 darkMode = state.darkMode,
@@ -309,6 +318,12 @@ internal sealed class ReaderLookupPopupBridgeMessage {
         override val messageId: String?,
     ) : ReaderLookupPopupBridgeMessage()
 
+    data class TtsReplaySentence(override val popupId: String, override val messageId: String?) : ReaderLookupPopupBridgeMessage()
+
+    data class TtsTogglePlayback(override val popupId: String, override val messageId: String?) : ReaderLookupPopupBridgeMessage()
+
+    data class TtsPlayForward(override val popupId: String, override val messageId: String?) : ReaderLookupPopupBridgeMessage()
+
     data class SasayakiReplayCue(
         override val popupId: String,
         override val messageId: String?,
@@ -413,6 +428,9 @@ internal sealed class ReaderLookupPopupBridgeMessage {
                 }
                 "navigateBack" -> NavigateBack(popupId, messageId)
                 "navigateForward" -> NavigateForward(popupId, messageId)
+                "ttsReplaySentence" -> TtsReplaySentence(popupId, messageId)
+                "ttsTogglePlayback" -> TtsTogglePlayback(popupId, messageId)
+                "ttsPlayForward" -> TtsPlayForward(popupId, messageId)
                 "sasayakiReplayCue" -> SasayakiReplayCue(popupId, messageId)
                 "sasayakiTogglePlayback" -> SasayakiTogglePlayback(popupId, messageId)
                 "sasayakiPlayForward" -> SasayakiPlayForward(popupId, messageId)
@@ -586,6 +604,7 @@ internal data class LookupPopupAssetResponse(
 internal fun lookupPopupAssetResponse(name: String, assets: LookupPopupAssets): LookupPopupAssetResponse? {
     val content = when (name) {
         "popup.css" -> assets.popupCss
+        "popup-theme.css" -> assets.popupThemeCss
         "language-ja.js" -> assets.languageJapaneseJs
         "selection-ja.js" -> assets.selectionJapaneseJs
         "selection-en.js" -> assets.selectionEnglishJs
@@ -595,7 +614,7 @@ internal fun lookupPopupAssetResponse(name: String, assets: LookupPopupAssets): 
         "reader-popup-host.js" -> assets.readerPopupHostJs
         else -> return null
     }
-    val mimeType = if (name == "popup.css") "text/css" else "application/javascript"
+    val mimeType = if (name.endsWith(".css")) "text/css" else "application/javascript"
     return LookupPopupAssetResponse(mimeType, content)
 }
 

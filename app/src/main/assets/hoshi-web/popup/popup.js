@@ -136,7 +136,10 @@ window.createPopupGeometry = function({
     }
 
     function visualViewportPointToLayout(x, y) {
-        const scale = bridgeRectScale();
+        // Fixed CSS positions use unzoomed layout pixels, even when Chromium
+        // already includes HTML zoom in DOM rects and needs no bridge correction.
+        const zoom = Number.parseFloat(computedStyle(documentRef.documentElement).zoom);
+        const scale = Number.isFinite(zoom) && zoom > 0 ? zoom : 1;
         return {
             x: x / scale,
             y: y / scale,
@@ -761,6 +764,9 @@ function constructGlossaryHtml(entryIndex) {
 
     entry.glossaries.forEach(g => {
         const dictName = g.dictionary;
+        if (window.excludedDictionaries?.includes(dictName)) {
+            return;
+        }
 
         const tempDiv = document.createElement('div');
         try {
@@ -1089,6 +1095,7 @@ function createDefinitionImageCanvas(imageUrl, alt, onLoad) {
 }
 
 function renderDefinitionImageToCanvas(canvas, image, usedWidth, invAspectRatio, appearance) {
+    canvas.hoshiRedraw = () => renderDefinitionImageToCanvas(canvas, image, usedWidth, invAspectRatio, appearance);
     const emSize = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
     const scaleFactor = Math.ceil(window.devicePixelRatio * 2);
     const pixelWidth = Math.round(usedWidth * emSize * scaleFactor);
@@ -1115,7 +1122,8 @@ function renderDefinitionImageToCanvas(canvas, image, usedWidth, invAspectRatio,
 
     if (appearance === 'monochrome') {
         context.globalCompositeOperation = 'source-in';
-        context.fillStyle = window.matchMedia?.('(prefers-color-scheme: dark)')?.matches ? '#ffffff' : '#000000';
+        context.fillStyle = getComputedStyle(canvas).getPropertyValue('--text-color').trim()
+            || getComputedStyle(document.body).getPropertyValue('--text-color').trim() || '#000000';
         context.fillRect(0, 0, canvas.width, canvas.height);
         context.globalCompositeOperation = 'source-over';
     }
@@ -1801,6 +1809,9 @@ async function showAudioCandidateMenu(entryIndex, anchor) {
             const availableHeight = openBelow ? spaceBelow : spaceAbove;
             // Keep the trigger uncovered as asynchronous candidates grow the menu.
             menu.style.maxHeight = `${availableHeight}px`;
+            const availableWidth = Math.max(0, viewport.x - 16);
+            menu.style.minWidth = `${Math.min(180, availableWidth)}px`;
+            menu.style.maxWidth = `${Math.min(280, availableWidth)}px`;
             const menuWidth = menu.offsetWidth || 220;
             const menuHeight = menu.offsetHeight || Math.min(Math.max(1, sources.length) * 40, availableHeight);
             menu.style.left = `${Math.max(8, Math.min(anchorPoint.x - menuWidth, viewport.x - menuWidth - 8))}px`;
@@ -1936,7 +1947,8 @@ function getButtonSlot(kind, entryIndex, formatId = null) {
 }
 
 function updateButtonSlot(slot, changes) {
-    if (!slot || !slot.isConnected) { return; }
+    // History retains detached result nodes, including completed Anki actions.
+    if (!slot) { return; }
     if ('state' in changes) { slot.dataset.state = changes.state; }
     if ('enabled' in changes) { slot.dataset.enabled = String(changes.enabled); }
     applyButtonSlotVisualState(slot);
@@ -1951,8 +1963,11 @@ function setButtonSlotHidden(slot, hidden) {
 function applyButtonSlotVisualState(slot) {
     if (!slot) { return; }
     const kind = slot.dataset.kind;
-    const state = slot.dataset.state || 'default';
-    const enabled = slot.dataset.enabled !== 'false';
+    const mined = kind === 'mine' && window.allowDupes && window.preventAccidentalDuplicates && slot.dataset.mined === 'true';
+    const state = mined ? 'duplicate' : (slot.dataset.state || 'default');
+    const enabled = slot.dataset.enabled !== 'false' && !mined && slot.dataset.mining !== 'true';
+    slot.dataset.state = state;
+    slot.dataset.enabled = String(enabled);
     const formatIcon = (slot.dataset.formatIcon || 'square').replace('-small', '');
     const iconName = kind === 'audio'
         ? (state === 'error' ? 'volume_off' : 'volume_up')
@@ -2008,19 +2023,39 @@ async function mineEntryAtIndex(entryIndex, formatId, buttonsContainer = null) {
     const { expression, reading, frequencies, pitches, rules, matched } = entry;
     const formats = Array.isArray(window.ankiFormats) ? window.ankiFormats : [];
     const mineSlot = buttonSlotInContainer(buttonsContainer, 'mine', entryIndex, formatId);
+    if (!mineSlot || mineSlot.disabled) return;
+    buttonsContainer ??= mineSlot.parentElement?.parentElement;
+    const preventAccidentalDuplicates = window.allowDupes && window.preventAccidentalDuplicates;
+    const mineSlots = formats.map(format => buttonSlotInContainer(buttonsContainer, 'mine', entryIndex, format.id)).filter(Boolean);
+    const previousStates = mineSlots.map(slot => ({ slot, state: slot.dataset.state, enabled: !slot.disabled }));
 
     lastSelection = getPopupSelectionText();
-    formats.forEach((format) => updateButtonSlot(
-        buttonSlotInContainer(buttonsContainer, 'mine', entryIndex, format.id),
-        { enabled: false },
-    ));
+    mineSlots.forEach(slot => {
+        slot.dataset.mining = 'true';
+        updateButtonSlot(slot, { enabled: false });
+    });
 
-    const mined = await mineEntry(expression, reading, frequencies, pitches, rules, matched, entryIndex, lastSelection, formatId);
+    let mined = false;
+    try {
+        mined = await mineEntry(expression, reading, frequencies, pitches, rules, matched, entryIndex, lastSelection, formatId);
+    } catch {
+        mined = false;
+    }
+    mineSlots.forEach(slot => { delete slot.dataset.mining; });
+    if (mined && preventAccidentalDuplicates) {
+        mineSlot.dataset.mined = 'true';
+        updateButtonSlot(mineSlot, { state: 'duplicate', enabled: false });
+    }
     if (!mined) {
-        updateButtonSlot(mineSlot, { state: 'error', enabled: false });
+        if (preventAccidentalDuplicates) {
+            // Backend recovery must not depend on a second request to the same failing backend.
+            previousStates.forEach(({ slot, state, enabled }) => updateButtonSlot(slot, { state, enabled }));
+        } else {
+            updateButtonSlot(mineSlot, { state: 'error', enabled: false });
+        }
         return;
     }
-    const checkDuplicate = () => refreshAnkiDuplicateStates(entryIndex, buttonsContainer);
+    const checkDuplicate = () => refreshAnkiDuplicateStates(entryIndex, buttonsContainer, entry);
 
     if (window.useAnkiConnect) {
         await checkDuplicate();
@@ -2092,8 +2127,7 @@ function syncShowNotesButton(container, entryIndex, format, visible) {
     setButtonSlotHidden(existing, !visible);
 }
 
-async function refreshAnkiDuplicateStates(entryIndex, buttonsContainer) {
-    const entry = window.lookupEntries?.[entryIndex];
+async function refreshAnkiDuplicateStates(entryIndex, buttonsContainer, entry = window.lookupEntries?.[entryIndex]) {
     const formats = Array.isArray(window.ankiFormats) ? window.ankiFormats : [];
     if (!entry) return false;
     let states;
@@ -2203,9 +2237,9 @@ function createGlossarySection(dictName, contents, isFirst, entryIdx) {
     const dictStyle = window.dictionaryStyles?.[dictName] ?? '';
     dictWrapper.appendChild(el('style', {
         textContent: `
-            [data-dictionary="${dictName}"] {
+            :where(div)[data-dictionary="${dictName}"] {
+                color: var(--text-color);
                 ${dictStyle}
-                color: var(--text-color) !important;
             }
         `.trim()
     }));
@@ -2300,6 +2334,7 @@ function appendPendingHistoryRestore(flush = false) {
     if (chunk.length) {
         pending.container.append(...chunk);
         observePendingDictionaryMedia(pending.container);
+        applyHoshiPopupThemeOverrides(pending.container);
         popupTermNavigator.entryRendered();
     }
     if (!pending.nodes.length) {
@@ -2547,21 +2582,15 @@ function navigate(origin, destination) {
 window.navigateBack = () => navigate(backStack, forwardStack);
 window.navigateForward = () => navigate(forwardStack, backStack);
 
+window.setHoshiPopupTheme = ({darkMode, eInkMode}) => {
+    const root = document.documentElement;
+    root.dataset.hoshiColorScheme = darkMode ? 'dark' : 'light';
+    root.dataset.hoshiEinkMode = String(!!eInkMode);
+    applyHoshiPopupThemeOverrides();
+};
+
 function applyHoshiPopupThemeOverrides(root = document) {
-    const colorScheme = document.documentElement.dataset.hoshiColorScheme;
-    const buttonColor = colorScheme === 'dark' ? 'rgba(235, 235, 245, 0.92)' : 'rgba(60, 60, 67, 0.86)';
-    const tableHeaderBackgroundColor = colorScheme === 'dark' ? '#333333' : '#eeeeee';
-    const tableHeaderTextColor = colorScheme === 'dark' ? '#ffffff' : '#000000';
-    root.querySelectorAll('button.button-slot').forEach(button => {
-        button.style.setProperty('color', buttonColor, 'important');
-    });
-    root.querySelectorAll('table[data-sc-content="formsTable"] th, table[data-sc-content="formsTable"] .gloss-sc-th').forEach(header => {
-        header.style.setProperty('background-color', tableHeaderBackgroundColor, 'important');
-        header.style.setProperty('color', tableHeaderTextColor, 'important');
-        header.querySelectorAll('*').forEach(child => {
-            child.style.setProperty('color', 'inherit', 'important');
-        });
-    });
+    root.querySelectorAll('canvas.gloss-image').forEach(canvas => canvas.hoshiRedraw?.());
 }
 
 function popupEventTarget(event) {

@@ -7,6 +7,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -80,9 +81,12 @@ class IReaderBookCoverTargetTest {
             ioDispatcher = Dispatchers.Unconfined,
         )
 
-        val failure = target.publish(File(tempFolder.root, "missing.png"))
+        val failure = runCatching { target.publish(File(tempFolder.root, "missing.png")) }
+            .exceptionOrNull() as BookCoverTargetException
 
-        assertEquals(BookCoverPublishFailure.IReaderWriteFailed, failure)
+        assertEquals(BookCoverPublishFailure.IReaderWriteFailed, failure.reason)
+        assertTrue(failure.cause is java.io.FileNotFoundException)
+        assertTrue(failure.cause?.message.orEmpty().contains("missing.png"))
         assertTrue(previous.exists())
         assertEquals(listOf("previous.png"), directory.list()?.toList())
         assertEquals(0, notifications)
@@ -109,6 +113,23 @@ class IReaderBookCoverTargetTest {
         assertEquals(BookCoverPublishFailure.IReaderWriteFailed, failure)
         assertEquals(0, notifications)
         assertTrue(directory.resolve("hoshi-new.png").exists())
+    }
+
+    @Test
+    fun refreshFailureRetainsTheDeviceDiagnosticCause() = runBlocking {
+        val cause = java.io.IOException("iReader SystemUI broadcast rejected")
+        val target = IReaderBookCoverFileTarget(
+            directory = tempFolder.newFolder("book"),
+            isBookCoverScreenSaverSelected = { true },
+            notifier = IReaderBookCoverNotifier { throw cause },
+            outputName = { "hoshi-new.png" },
+            ioDispatcher = Dispatchers.Unconfined,
+        )
+        val result = runCatching {
+            target.publish(tempFolder.newFile("rendered.png").apply { writeBytes(PngBytes) })
+        }
+        assertTrue("A failed refresh must preserve its exception for the publisher", result.isFailure)
+        assertSame(cause, result.exceptionOrNull()?.cause)
     }
 
     @Test

@@ -78,6 +78,10 @@ import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.epub.SasayakiMatchData
 import moe.antimony.hoshi.epub.SasayakiPlaybackData
+import moe.antimony.hoshi.features.reader.ReaderSheetSwitchRow
+import moe.antimony.hoshi.features.reader.ReaderSheetCard
+import moe.antimony.hoshi.features.reader.ReaderSheetTabs
+import moe.antimony.hoshi.features.reader.ReaderSheetSliderRow
 import moe.antimony.hoshi.features.reader.ReaderBottomPanel
 import moe.antimony.hoshi.features.reader.ReaderColorPickerDialog
 import moe.antimony.hoshi.features.reader.ReaderColorSettingRow
@@ -110,7 +114,7 @@ internal fun SasayakiSheet(
     selectedTab: SasayakiSheetTab,
     onSelectedTabChange: (SasayakiSheetTab) -> Unit,
     onSubtitleMatchUpdated: (SasayakiMatchData) -> Unit,
-    onSettingsChange: (SasayakiSettings) -> Unit,
+    onSettingsChange: (SasayakiSettingsUpdate) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
     transcriptionState: SasayakiTranscriptionUiState,
@@ -258,7 +262,7 @@ internal fun SasayakiSheet(
             initialColor = row.color(settings),
             defaultColor = row.defaultColor,
             onColorChange = { color ->
-                onSettingsChange(row.updated(settings, color))
+                onSettingsChange { current -> row.updated(current, color) }
                 colorDialogRow = null
             },
             onDismiss = { colorDialogRow = null },
@@ -485,44 +489,12 @@ private fun SasayakiSheetTabs(
     onSelectedTabChange: (SasayakiSheetTab) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .selectableGroup()
-            .background(hoshiSurfaces.nested, RoundedCornerShape(12.dp))
-            .hoshiContainerOutline(RoundedCornerShape(12.dp))
-            .padding(3.dp),
-        horizontalArrangement = Arrangement.spacedBy(3.dp),
-    ) {
-        SasayakiSheetTab.entries.forEach { tab ->
-            val selected = tab == selectedTab
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .background(
-                        color = if (selected) hoshiSurfaces.selected else Color.Transparent,
-                        shape = RoundedCornerShape(10.dp),
-                    )
-                    .then(if (selected) Modifier.hoshiContainerOutline(RoundedCornerShape(10.dp)) else Modifier)
-                    .selectable(
-                        selected = selected,
-                        role = SasayakiSheetTabRole,
-                        onClick = { onSelectedTabChange(tab) },
-                    )
-                    .padding(vertical = 7.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = stringResource(tab.labelRes),
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                    color = if (selected) hoshiSurfaces.onSelected else hoshiSurfaces.muted,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-    }
+    ReaderSheetTabs(
+        labels = SasayakiSheetTab.entries.map { stringResource(it.labelRes) },
+        selectedIndex = selectedTab.ordinal,
+        onSelected = { onSelectedTabChange(SasayakiSheetTab.entries[it]) },
+        modifier = modifier,
+    )
 }
 
 @Composable
@@ -546,7 +518,7 @@ private fun SasayakiResourcesTab(
     onDismissClearTranscription: () -> Unit,
     onConfirmClearTranscription: () -> Unit,
     onAudioAction: () -> Unit,
-    onSettingsChange: (SasayakiSettings) -> Unit,
+    onSettingsChange: (SasayakiSettingsUpdate) -> Unit,
     onSubtitleMatchUpdated: (SasayakiMatchData) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -608,7 +580,7 @@ private fun SasayakiResourcesTab(
             SasayakiMatchMode.Transcription -> SasayakiTranscriptionSection(
                 state = transcriptionState,
                 preset = settings.transcriptionPreset,
-                onPresetChange = { onSettingsChange(settings.copy(transcriptionPreset = it)) },
+                onPresetChange = { onSettingsChange { current -> current.copy(transcriptionPreset = it) } },
                 enabled = !isImporting && !subtitleMatching,
                 onStart = onStartTranscription,
                 onPause = onPauseTranscription,
@@ -627,7 +599,7 @@ private fun SasayakiAudiobookResourceCard(
     settings: SasayakiSettings,
     isImporting: Boolean,
     enabled: Boolean,
-    onSettingsChange: (SasayakiSettings) -> Unit,
+    onSettingsChange: (SasayakiSettingsUpdate) -> Unit,
     onAction: () -> Unit,
 ) {
     SasayakiResourceCard {
@@ -678,7 +650,7 @@ private fun SasayakiAudiobookResourceCard(
             Switch(
                 checked = settings.copyAudiobookToPrivateStorage,
                 enabled = enabled && !isImporting,
-                onCheckedChange = { onSettingsChange(settings.copy(copyAudiobookToPrivateStorage = it)) },
+                onCheckedChange = { onSettingsChange { current -> current.copy(copyAudiobookToPrivateStorage = it) } },
             )
         }
     }
@@ -801,7 +773,7 @@ private fun SasayakiSettingsTab(
     settings: SasayakiSettings,
     skipActionMenuExpanded: Boolean,
     onSkipActionMenuExpandedChange: (Boolean) -> Unit,
-    onSettingsChange: (SasayakiSettings) -> Unit,
+    onSettingsChange: (SasayakiSettingsUpdate) -> Unit,
     onColorRowClick: (SasayakiColorRow) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -811,7 +783,7 @@ private fun SasayakiSettingsTab(
             .verticalScroll(rememberScrollState())
             .padding(bottom = 28.dp),
     ) {
-        SliderRow(
+        ReaderSheetSliderRow(
             label = stringResource(R.string.sasayaki_delay),
             valueText = String.format(Locale.US, "%+.2fs", player.delay),
             value = player.delay.toFloat(),
@@ -819,7 +791,7 @@ private fun SasayakiSettingsTab(
             steps = 159,
             onValueChange = { player.setDelay(it.toDouble()) },
         )
-        SliderRow(
+        ReaderSheetSliderRow(
             label = stringResource(R.string.sasayaki_speed),
             valueText = String.format(Locale.US, "%.2fx", player.rate),
             value = player.rate,
@@ -827,26 +799,46 @@ private fun SasayakiSettingsTab(
             steps = SasayakiSpeedSliderSteps,
             onValueChange = { player.setRate(it) },
         )
-        HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
-        Text(
-            text = stringResource(R.string.sasayaki_reader_controls),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+        SharedReaderPlaybackSettings(
+            settings, onSettingsChange, onColorRowClick,
+            includeAudiobookControls = true,
+            skipActionMenuExpanded = skipActionMenuExpanded,
+            onSkipActionMenuExpandedChange = onSkipActionMenuExpandedChange,
         )
-        SasayakiSettingsSwitchRow(
-            label = stringResource(R.string.sasayaki_show_bottom_playback_controls),
-            checked = settings.showReaderBottomPlaybackControls,
-            onCheckedChange = { onSettingsChange(settings.copy(showReaderBottomPlaybackControls = it)) },
+    }
+}
+
+/** Common reading behavior; TTS never exposes audiobook timing or source controls. */
+@Composable
+internal fun SharedReaderPlaybackSettings(
+    settings: SasayakiSettings,
+    onSettingsChange: (SasayakiSettingsUpdate) -> Unit,
+    onColorRowClick: (SasayakiColorRow) -> Unit,
+    includeAudiobookControls: Boolean = false,
+    skipActionMenuExpanded: Boolean = false,
+    onSkipActionMenuExpandedChange: (Boolean) -> Unit = {},
+) {
+    HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
+    Text(
+        text = stringResource(R.string.sasayaki_reader_controls),
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.SemiBold,
+        modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+    )
+    ReaderSheetSwitchRow(
+        label = stringResource(R.string.sasayaki_show_bottom_playback_controls),
+        checked = settings.showReaderBottomPlaybackControls,
+        onCheckedChange = { onSettingsChange { current -> current.copy(showReaderBottomPlaybackControls = it) } },
+    )
+    if (settings.showReaderBottomPlaybackControls) {
+        ReaderSheetSwitchRow(
+            label = stringResource(R.string.sasayaki_reverse_vertical_skip_buttons),
+            checked = settings.reverseVerticalReaderSkipButtons,
+            onCheckedChange = { onSettingsChange { current -> current.copy(reverseVerticalReaderSkipButtons = it) } },
         )
-        if (settings.showReaderBottomPlaybackControls) {
-            SasayakiSettingsSwitchRow(
-                label = stringResource(R.string.sasayaki_reverse_vertical_skip_buttons),
-                checked = settings.reverseVerticalReaderSkipButtons,
-                onCheckedChange = { onSettingsChange(settings.copy(reverseVerticalReaderSkipButtons = it)) },
-            )
-        }
+    }
+    if (includeAudiobookControls) {
         SasayakiSettingsActionRow(
             label = stringResource(R.string.sasayaki_skip_action),
             selected = settings.readerSkipButtonAction,
@@ -854,52 +846,53 @@ private fun SasayakiSettingsTab(
             onExpandedChange = onSkipActionMenuExpandedChange,
             onSelected = { action ->
                 onSkipActionMenuExpandedChange(false)
-                onSettingsChange(settings.copy(readerSkipButtonAction = action))
+                onSettingsChange { current -> current.copy(readerSkipButtonAction = action) }
             },
-        )
-        HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
-        Text(
-            text = stringResource(R.string.sasayaki_playback),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
-        )
-        SasayakiSettingsSwitchRow(
-            label = stringResource(R.string.sasayaki_auto_scroll),
-            checked = settings.autoScroll,
-            onCheckedChange = { onSettingsChange(settings.copy(autoScroll = it)) },
-        )
-        SliderRow(
-            label = stringResource(R.string.sasayaki_image_hold),
-            valueText = sasayakiImageHoldText(settings.imageHoldSeconds),
-            value = normalizeSasayakiImageHoldSeconds(settings.imageHoldSeconds),
-            range = SasayakiImageHoldMinSeconds..SasayakiImageHoldMaxSeconds,
-            steps = SasayakiImageHoldSliderSteps,
-            onValueChange = {
-                onSettingsChange(settings.copy(imageHoldSeconds = normalizeSasayakiImageHoldSeconds(it)))
-            },
-        )
-        SasayakiSettingsSwitchRow(
-            label = stringResource(R.string.sasayaki_auto_pause_on_lookup),
-            checked = settings.autoPause,
-            onCheckedChange = { onSettingsChange(settings.copy(autoPause = it)) },
-        )
-        HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
-        SasayakiColorSheetSection(
-            title = stringResource(R.string.sasayaki_light_theme),
-            rows = SasayakiColorRow.lightRows,
-            settings = settings,
-            onRowClick = onColorRowClick,
-        )
-        HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
-        SasayakiColorSheetSection(
-            title = stringResource(R.string.sasayaki_dark_theme),
-            rows = SasayakiColorRow.darkRows,
-            settings = settings,
-            onRowClick = onColorRowClick,
         )
     }
+    HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
+    Text(
+        text = stringResource(R.string.sasayaki_playback),
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.SemiBold,
+        modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+    )
+    ReaderSheetSwitchRow(
+        label = stringResource(R.string.sasayaki_auto_scroll),
+        checked = settings.autoScroll,
+        onCheckedChange = { onSettingsChange { current -> current.copy(autoScroll = it) } },
+    )
+    ReaderSheetSliderRow(
+        label = stringResource(R.string.sasayaki_image_hold),
+        valueText = sasayakiImageHoldText(settings.imageHoldSeconds),
+        value = normalizeSasayakiImageHoldSeconds(settings.imageHoldSeconds),
+        range = SasayakiImageHoldMinSeconds..SasayakiImageHoldMaxSeconds,
+        steps = SasayakiImageHoldSliderSteps,
+        onValueChange = {
+            onSettingsChange { current -> current.copy(imageHoldSeconds = normalizeSasayakiImageHoldSeconds(it)) }
+        },
+    )
+    ReaderSheetSwitchRow(
+        label = stringResource(R.string.sasayaki_auto_pause_on_lookup),
+        checked = settings.autoPause,
+        onCheckedChange = { onSettingsChange { current -> current.copy(autoPause = it) } },
+    )
+    HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
+    SasayakiColorSheetSection(
+        title = stringResource(R.string.sasayaki_light_theme),
+        rows = SasayakiColorRow.lightRows,
+        settings = settings,
+        onRowClick = onColorRowClick,
+    )
+    HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
+    SasayakiColorSheetSection(
+        title = stringResource(R.string.sasayaki_dark_theme),
+        rows = SasayakiColorRow.darkRows,
+        settings = settings,
+        onRowClick = onColorRowClick,
+    )
+
 }
 
 @Composable
@@ -927,45 +920,8 @@ private fun SasayakiColorSheetSection(
 }
 
 @Composable
-private fun SliderRow(
-    label: String,
-    valueText: String,
-    value: Float,
-    range: ClosedFloatingPointRange<Float>,
-    steps: Int,
-    onValueChange: (Float) -> Unit,
-) {
-    val metrics = readerSheetDensityMetrics()
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = metrics.sasayakiSliderVerticalPaddingDp.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(label, modifier = Modifier.weight(1f))
-            Text(valueText, fontWeight = FontWeight.SemiBold)
-        }
-        Slider(value = value, onValueChange = onValueChange, valueRange = range, steps = steps)
-    }
-}
-
-@Composable
 internal fun SasayakiResourceCard(content: @Composable () -> Unit) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 6.dp),
-        shape = RoundedCornerShape(8.dp),
-        color = hoshiSurfaces.group,
-        border = hoshiContainerBorder(),
-        tonalElevation = 0.dp,
-    ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-        ) {
-            content()
-        }
-    }
+    ReaderSheetCard { content() }
 }
 
 @Composable
@@ -1030,28 +986,6 @@ private fun SasayakiSettingsActionRow(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun SasayakiSettingsSwitchRow(
-    label: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-) {
-    val metrics = readerSheetDensityMetrics()
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = metrics.sasayakiRowVerticalPaddingDp.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(label, style = MaterialTheme.typography.bodyLarge)
-        Switch(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-        )
     }
 }
 

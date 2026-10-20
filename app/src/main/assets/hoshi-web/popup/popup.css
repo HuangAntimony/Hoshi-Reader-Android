@@ -23,11 +23,6 @@ body {
     --line-height: 1.4;
     --list-padding1: 1.4em;
     --list-padding2: var(--list-padding1);
-    --text-color-light1: #555555;
-    --text-color-light2: #666666;
-    --text-color-light3: #777777;
-    --text-color-light4: #888888;
-    --background-color-dark1: #eeeeee;
     color: var(--text-color);
     background-color: transparent;
     font-family: Arial, var(--hoshi-content-font-family, "Noto Sans CJK JP", "NotoSansCJKJP-Regular", sans-serif) !important;
@@ -159,19 +154,17 @@ button.button-slot {
     border: 0;
     border-radius: 14px;
     background: transparent;
-    color: rgba(60, 60, 67, 0.86);
     padding: 4px;
     vertical-align: middle;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
 }
 
-button.button-slot:active {
+button.button-slot:not(:disabled):active {
     background: rgba(128, 128, 128, 0.16);
 }
 
 button.button-slot:disabled {
-    opacity: 0.38;
     cursor: default;
 }
 
@@ -387,14 +380,9 @@ a {
 }
 
 .gloss-image-link[data-appearance="monochrome"] img.gloss-image {
-    filter: brightness(0);
+    filter: var(--hoshi-monochrome-filter);
 }
 
-@media (prefers-color-scheme: dark) {
-    .gloss-image-link[data-appearance="monochrome"] img.gloss-image {
-        filter: brightness(0) invert(1);
-    }
-}
 
 .gloss-image-link[data-size-units=em] .gloss-image-container {
     font-size: 1em;
@@ -615,42 +603,4 @@ html[data-hoshi-eink-mode="true"] .pronunciation-nasal-indicator {
 ::highlight(hoshi-selection) {
     background-color: rgba(160, 160, 160, 0.4) !important;
     color: inherit;
-}
-
-@media (prefers-color-scheme: light) {
-    
-    html,
-    body {
-        --background-color: #fff;
-        --background-color-light: #fff;
-        --text-color: #000;
-    }
-}
-
-@media (prefers-color-scheme: dark) {
-    
-    html,
-    body {
-        --background-color: #000;
-        --background-color-light: #000;
-        --text-color: #fff;
-        --text-color-light1: #aaaaaa;
-        --text-color-light2: #999999;
-        --text-color-light3: #888888;
-        --text-color-light4: #777777;
-        --background-color-dark1: #333333;
-    }
-    
-    .overlay {
-        background: #222;
-    }
-
-    button.button-slot:not(:disabled) {
-        color: rgba(235, 235, 245, 0.92);
-    }
-
-    .audio-candidate-menu {
-        border-color: rgba(235, 235, 245, 0.28);
-        background: var(--background-color-dark1, #222);
-    }
 }

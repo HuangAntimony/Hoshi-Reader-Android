@@ -14,6 +14,7 @@ import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.Cloud
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Link
+import androidx.compose.material.icons.rounded.RecordVoiceOver
 import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.material.icons.rounded.Wallpaper
 import androidx.compose.material3.Icon
@@ -36,17 +37,15 @@ import moe.antimony.hoshi.R
 import moe.antimony.hoshi.features.anki.AnkiConnectView
 import moe.antimony.hoshi.features.audio.AudioSettingsView
 import moe.antimony.hoshi.features.backup.BackupSettingsView
-import moe.antimony.hoshi.features.reader.ReaderSettings
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettingsView
 import moe.antimony.hoshi.features.sync.SyncSettingsView
 import moe.antimony.hoshi.features.wallpaper.BookCoverWallpaperSettingsView
 
 @Composable
 fun AdvancedSettingsView(
-    readerSettings: ReaderSettings,
-    onReaderSettingsChange: ((ReaderSettings) -> ReaderSettings) -> Unit,
     onClose: () -> Unit,
     onBooksRestored: () -> Unit = {},
+    onOpenTts: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var destination by remember { mutableStateOf<AdvancedDestination?>(null) }
@@ -95,7 +94,7 @@ fun AdvancedSettingsView(
     }
 
     val colorScheme = MaterialTheme.colorScheme
-    SettingsDetailScaffold(
+    StaticSettingsDetailScaffold(
         title = stringResource(R.string.settings_advanced),
         onClose = onClose,
         modifier = modifier.fillMaxSize(),
@@ -116,8 +115,7 @@ fun AdvancedSettingsView(
                                 colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                                 leadingContent = { Icon(row.icon.imageVector(), contentDescription = null) },
                                 headlineContent = { Text(stringResource(row.titleRes)) },
-                                supportingContent = row.subtitleRes?.let { subtitleRes -> { Text(stringResource(subtitleRes)) } },
-                                modifier = Modifier.clickable { destination = row.destination },
+                                modifier = Modifier.clickable { if (row.destination == AdvancedDestination.Tts) onOpenTts() else destination = row.destination },
                             )
                             if (index != section.rows.lastIndex) {
                                 GroupDivider()
@@ -144,6 +142,7 @@ fun AdvancedSettingsView(
 internal enum class AdvancedDestination {
     Audio,
     Sasayaki,
+    Tts,
     Backup,
     Syncing,
     AnkiConnect,
@@ -152,6 +151,7 @@ internal enum class AdvancedDestination {
 
 internal enum class AdvancedSettingsIcon {
     Speaker,
+    Voice,
     Waveform,
     Cloud,
     AnkiConnect,
@@ -163,7 +163,6 @@ internal data class AdvancedSettingsRow(
     @param:StringRes val titleRes: Int,
     val destination: AdvancedDestination,
     val icon: AdvancedSettingsIcon,
-    @param:StringRes val subtitleRes: Int? = null,
 )
 
 internal data class AdvancedSettingsSection(
@@ -179,11 +178,11 @@ internal fun advancedSettingsSections(): List<AdvancedSettingsSection> =
                     destination = AdvancedDestination.Audio,
                     icon = AdvancedSettingsIcon.Speaker,
                 ),
+                AdvancedSettingsRow(titleRes = R.string.tts_title, destination = AdvancedDestination.Tts, icon = AdvancedSettingsIcon.Voice),
                 AdvancedSettingsRow(
                     titleRes = R.string.advanced_sasayaki_audiobooks,
                     destination = AdvancedDestination.Sasayaki,
                     icon = AdvancedSettingsIcon.Waveform,
-                    subtitleRes = R.string.advanced_sasayaki_subtitle,
                 ),
             ),
         ),
@@ -207,7 +206,6 @@ internal fun advancedSettingsSections(): List<AdvancedSettingsSection> =
                     titleRes = R.string.settings_book_cover_wallpaper,
                     destination = AdvancedDestination.BookCoverWallpaper,
                     icon = AdvancedSettingsIcon.Wallpaper,
-                    subtitleRes = R.string.settings_book_cover_wallpaper_subtitle,
                 ),
             ),
         ),
@@ -225,6 +223,7 @@ internal fun advancedSettingsSections(): List<AdvancedSettingsSection> =
 private fun AdvancedSettingsIcon.imageVector(): ImageVector =
     when (this) {
         AdvancedSettingsIcon.Speaker -> Icons.AutoMirrored.Rounded.VolumeUp
+        AdvancedSettingsIcon.Voice -> Icons.Rounded.RecordVoiceOver
         AdvancedSettingsIcon.Waveform -> Icons.Rounded.GraphicEq
         AdvancedSettingsIcon.Cloud -> Icons.Rounded.Cloud
         AdvancedSettingsIcon.AnkiConnect -> Icons.Rounded.Link

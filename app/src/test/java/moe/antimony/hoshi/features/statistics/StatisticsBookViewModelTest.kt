@@ -7,6 +7,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import moe.antimony.hoshi.epub.ReadingSession
+import moe.antimony.hoshi.ui.resolve
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -44,6 +45,24 @@ class StatisticsBookViewModelTest {
         model.saveSession()
         runCurrent()
         assertEquals(1500, repository.storedBook!!.sessions.getValue("2026-09-17").value!!.charactersRead)
+    }
+
+    @Test
+    fun loadFailurePreservesUnderlyingDiagnosticCause() = runTest {
+        val repository = object : StatisticsRepositoryFake() {
+            override suspend fun loadBookStatistics(folder: String): StatisticsBookRecords? =
+                throw java.io.IOException("Statistics read failed", IllegalStateException("Malformed daily record"))
+        }
+        val model = StatisticsBookViewModel(repository, backgroundScope)
+        model.load("book")
+        runCurrent()
+        val message = requireNotNull(model.uiState.value.error).resolve(
+            getString = { _, _ -> "Unable to update statistics." },
+            getQuantityString = { _, _, _ -> "" },
+        )
+        assertTrue(message.startsWith("Unable to update statistics."))
+        assertTrue(message.contains("Statistics read failed"))
+        assertTrue(message.contains("Malformed daily record"))
     }
 
     @Test

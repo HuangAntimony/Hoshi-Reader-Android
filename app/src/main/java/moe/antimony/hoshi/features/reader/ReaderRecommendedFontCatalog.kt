@@ -60,7 +60,7 @@ object ReaderRecommendedFontCatalog {
                 sha256 = "c2f3b4d463500a2ddcd3849cded1fceeb9fd6d1c32e6cbecd568453ba50fc68f",
                 range = 100..900,
             ),
-            staticFamily("bizudpgothic", "BIZ UDPGothic", ReaderFontCategory.SANS_SERIF, listOf(
+            staticFamily("bizudgothic", "BIZ UDGothic", ReaderFontCategory.SANS_SERIF, listOf(
                 named(400, "Regular"), named(700, "Bold"),
             )),
             staticFamily("zenkakugothicnew", "Zen Kaku Gothic New", ReaderFontCategory.SANS_SERIF, listOf(
@@ -89,6 +89,9 @@ object ReaderRecommendedFontCatalog {
             staticFamily("kiwimaru", "Kiwi Maru", ReaderFontCategory.ROUNDED, listOf(
                 named(300, "Light"), named(400, "Regular"), named(500, "Medium"),
             )),
+            staticFamily("lineseedjp", "LINE Seed JP", ReaderFontCategory.ROUNDED, listOf(
+                named(100, "Thin"), named(400, "Regular"), named(700, "Bold"), named(800, "ExtraBold"),
+            )),
             staticFamily("kleeone", "Klee One", ReaderFontCategory.HANDWRITING, listOf(
                 named(400, "Regular"), named(600, "SemiBold"),
             )),
@@ -110,8 +113,12 @@ object ReaderRecommendedFontCatalog {
         "zenoldmincho/SemiBold" to StaticMetadata(5_521_388, "d98b9783652081f7f9e662b0568bddeaf6462962dd39edf68781268eb60ea3a0"),
         "zenoldmincho/Bold" to StaticMetadata(5_436_460, "d6b95c1ff45c8dac153d28961e4c37d7d03b648330c71f884d124dc652a13c0d"),
         "zenoldmincho/Black" to StaticMetadata(5_416_348, "84a80d8bca79d7d9478935045b216ed003ad40fdea5fd9116d524eb26e872cdc"),
-        "bizudpgothic/Regular" to StaticMetadata(4_669_688, "258d7156c165f2ff774b6efee637c22c3b950de0d8a10e501137061bc8085d01"),
-        "bizudpgothic/Bold" to StaticMetadata(4_640_596, "30eba52fc837e8b62c97d4b82e6706583149fb7294e3712dd71a655eaea80a90"),
+        "bizudgothic/Regular" to StaticMetadata(4_667_376, "709fcd41e3209fb765da750472f55ccdf925653e9fa7e1eb007cb65c8f749c75"),
+        "bizudgothic/Bold" to StaticMetadata(4_638_128, "98a528b6b638463041968783cc0f63adaf4cdc26f5398afed68bab712d1113f3"),
+        "lineseedjp/Thin" to StaticMetadata(3_747_104, "e59cfc7cde710b0968e850b5fae4714d719e39d9bb731f7aa8c957f661c6bbec"),
+        "lineseedjp/Regular" to StaticMetadata(3_673_280, "04a6c0077ddb8ba5af3638bd76b4600708dde7b38df047b40fbe6f3af358d3c3"),
+        "lineseedjp/Bold" to StaticMetadata(3_786_144, "67aec2dc10b3ad210d6f7d53b33bbfea42ea28e32fa3834624eee699a638d5ff"),
+        "lineseedjp/ExtraBold" to StaticMetadata(3_603_732, "e310cf97ddae9e9deb15f769fd2f68a2ff24bd0a19953c5191df941cc7952c95"),
         "zenkakugothicnew/Light" to StaticMetadata(2_181_020, "ad4e9733f96397ed0c99c295d9b3b56e39a0e0bc02b0ac56ce3ade7793a1eef1"),
         "zenkakugothicnew/Regular" to StaticMetadata(2_360_248, "b840cd07a67d89cacca44249ae49aa99ee7640eb5ce623be8d8983d6aabac801"),
         "zenkakugothicnew/Medium" to StaticMetadata(2_328_176, "651a3f7280b7f36262601ee76d8388a8dc4372dcc67aff025a608939a562b525"),
@@ -166,7 +173,8 @@ object ReaderRecommendedFontCatalog {
         val fileName = when (slug) {
             "mplusrounded1c" -> "MPLUSRounded1c-${variant.displayName}.ttf"
             "bizudmincho" -> "BIZUDMincho-${variant.displayName}.ttf"
-            "bizudpgothic" -> "BIZUDPGothic-${variant.displayName}.ttf"
+            "bizudgothic" -> "BIZUDGothic-${variant.displayName}.ttf"
+            "lineseedjp" -> "LINESeedJP-${variant.displayName}.ttf"
             "kiwimaru" -> "KiwiMaru-${variant.displayName}.ttf"
             "kleeone" -> "KleeOne-${variant.displayName}.ttf"
             "shipporimincho" -> "ShipporiMincho-${variant.displayName}.ttf"

@@ -4,7 +4,8 @@ import android.content.ContextWrapper
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
@@ -13,9 +14,16 @@ import kotlinx.coroutines.test.setMain
 import java.nio.file.Files
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import moe.antimony.hoshi.dictionary.DictionaryCategory
+import moe.antimony.hoshi.R
 import moe.antimony.hoshi.ui.UiText
+import moe.antimony.hoshi.ui.resolve
+import moe.antimony.hoshi.ui.ErrorDiagnosticEvents
 import moe.antimony.hoshi.features.audio.LocalAudioRepository
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -23,6 +31,194 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AnkiRepositoryBackendSelectionTest {
+    @Test fun addingNoteServiceFailureReachesPopupAndDiagnostics() = runBlocking {
+        assertTerminalServiceFailureVisible("addNote", expectedAdded = false)
+    }
+
+    @Test fun openingNotesServiceFailureReachesPopupAndDiagnostics() = runBlocking {
+        assertTerminalServiceFailureVisible("guiBrowse", expectedAdded = false)
+    }
+
+    @Test fun requestedSentenceMediaFailureReachesPopupAndDiagnostics() = runBlocking {
+        assertTerminalServiceFailureVisible("storeMediaFile", expectedAdded = false)
+    }
+
+    @Test fun synchronizationFailureKeepsAddedResultAndShowsOriginalWarning() = runBlocking {
+        assertTerminalServiceFailureVisible("sync", expectedAdded = true)
+    }
+
+    @Test fun optionalCoverFailureKeepsAddedResultAndRecordsCause() = runBlocking {
+        assertTerminalServiceFailureVisible("storeMediaFile", expectedAdded = true, mediaTemplate = "{book-cover}", expectVisible = false)
+    }
+
+    @Test fun optionalSasayakiAudioFailureKeepsAddedResultAndRecordsCause() = runBlocking {
+        assertTerminalServiceFailureVisible("storeMediaFile", expectedAdded = true, mediaTemplate = "{sasayaki-audio}", expectVisible = false)
+    }
+
+    @Test fun optionalAudioFailureCannotHideRequiredSentenceAudioFailure() = runBlocking {
+        assertTerminalServiceFailureVisible("storeMediaFile", expectedAdded = false, mediaTemplate = "{sasayaki-audio} {sentence-audio}")
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test fun cancelledAutomaticDuplicateChecksDoNotPublishFallbackResults() = runBlocking {
+        Dispatchers.setMain(Dispatchers.Unconfined)
+        val deck = AnkiDeck(1L, "Mining")
+        val noteType = AnkiNoteType(2L, "Basic", listOf("Front"))
+        val original = kotlinx.coroutines.CancellationException("duplicate lookup cancelled")
+        val backend = RecordingBackend(decks = listOf(deck), noteTypes = listOf(noteType), duplicateError = original)
+        val settings = InMemoryAnkiSettingsRepository(AnkiSettings(
+            selectedDeckId = deck.id, selectedNoteTypeId = noteType.id,
+            availableDecks = listOf(deck), availableNoteTypes = listOf(noteType),
+            cardFormats = listOf(AnkiCardFormat("fixture", "Fixture", selectedDeckId = deck.id,
+                selectedNoteTypeId = noteType.id, fieldMappings = mapOf("Front" to "{expression}"))),
+        ))
+        val viewModel = AnkiViewModel(repository(backend = backend, settingsRepository = settings))
+        try {
+            var callbacks = 0
+            val parent = viewModel.viewModelScope.coroutineContext[Job]!!
+            val previous = parent.children.toSet()
+            viewModel.duplicateStatesAsync(mapOf("{expression}" to "猫")) { callbacks++ }
+            parent.children.filter { it !in previous }.toList().forEach { it.join() }
+            val previousSingle = parent.children.toSet()
+            viewModel.duplicateCheckAsync("猫") { callbacks++ }
+            parent.children.filter { it !in previousSingle }.toList().forEach { it.join() }
+
+            assertEquals(2, backend.duplicateCalls)
+            assertEquals(0, callbacks)
+        } finally {
+            viewModel.viewModelScope.coroutineContext[Job]!!.cancelAndJoin()
+            Dispatchers.resetMain()
+        }
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private suspend fun assertTerminalServiceFailureVisible(
+        failedAction: String,
+        expectedAdded: Boolean,
+        mediaTemplate: String = "{sentence-audio}",
+        expectVisible: Boolean = true,
+    ) {
+        Dispatchers.setMain(Dispatchers.Unconfined)
+        val deck = AnkiDeck(1L, "Mining")
+        val noteType = AnkiNoteType(2L, "Basic", listOf("Front", "Audio"))
+        val mappings = if (failedAction == "storeMediaFile") mapOf("Front" to "{expression}", "Audio" to mediaTemplate) else mapOf("Front" to "{expression}")
+        val settings = InMemoryAnkiSettingsRepository(AnkiSettings(
+            backendKind = AnkiBackendKind.AnkiConnect,
+            ankiConnectUrl = "https://anki.example.com",
+            ankiConnectForceSync = failedAction == "sync",
+            availableDecks = listOf(deck), availableNoteTypes = listOf(noteType),
+            cardFormats = listOf(AnkiCardFormat("fixture", "Fixture", selectedDeckId = deck.id, selectedNoteTypeId = noteType.id, fieldMappings = mappings)),
+        ))
+        val backend = AnkiConnectBackend("https://anki.example.com", AnkiConnectTransport { _, body, _ ->
+            val action = kotlinx.serialization.json.Json.parseToJsonElement(body).jsonObject.getValue("action").jsonPrimitive.content
+            if (action == failedAction) """{"result":null,"error":"collection database is locked"}"""
+            else when (action) {
+                "version" -> """{"result":6,"error":null}"""
+                "deckNames" -> """{"result":["Mining"],"error":null}"""
+                "modelNames" -> """{"result":["Basic"],"error":null}"""
+                "modelFieldNames" -> """{"result":["Front","Audio"],"error":null}"""
+                else -> """{"result":123,"error":null}"""
+            }
+        })
+        val viewModel = AnkiViewModel(repository(settingsRepository = settings, ankiConnectBackendFactory = { _, _ -> backend }))
+        try {
+            ErrorDiagnosticEvents.buffer.drain()
+            val errors = mutableListOf<Throwable>()
+            val warnings = mutableListOf<Throwable>()
+            val result = kotlinx.coroutines.CompletableDeferred<Boolean>()
+            if (failedAction == "guiBrowse") {
+                viewModel.showNotesAsync("fixture", mapOf("{expression}" to "猫"), onError = { errors += it }) { result.complete(it) }
+            } else {
+                val file = Files.createTempFile("hoshi-sentence-audio", ".mp3").toFile().apply { writeBytes(byteArrayOf(1, 2)) }
+                viewModel.mineEntryAsync("fixture", """{"expression":"猫"}""",
+                    AnkiMiningContext("猫", coverPath = file.path, sasayakiAudioPath = file.path, sentenceAudioPath = file.path),
+                    onError = { errors += it }, onWarning = { warnings += it }) { result.complete(it) }
+            }
+
+            assertEquals(expectedAdded, kotlinx.coroutines.withTimeout(5_000) { result.await() })
+            assertEquals(if (expectVisible && failedAction != "sync") 1 else 0, errors.size)
+            assertEquals(if (failedAction == "sync") 1 else 0, warnings.size)
+            val visible = viewModel.uiState.value.errorMessage?.resolve({ id, _ ->
+                if (id == R.string.anki_sync_failed) "Anki sync" else "Anki action"
+            }, { _, _, _ -> "" })
+            if (expectVisible) {
+                assertEquals("${if (failedAction == "sync") "Anki sync" else "Anki action"}\ncollection database is locked", visible)
+                val original = (errors + warnings).single()
+                org.junit.Assert.assertSame(original, ErrorDiagnosticEvents.buffer.drain().firstOrNull { it.error === original }?.error)
+            } else {
+                org.junit.Assert.assertNull(visible)
+                assertTrue(ErrorDiagnosticEvents.buffer.drain().any { it.error?.message == "collection database is locked" })
+            }
+        } finally {
+            viewModel.viewModelScope.coroutineContext[Job]!!.cancelAndJoin()
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun miningCallbackKeepsBackendDiagnosticInVisibleState() = runBlocking {
+        assertPopupBackendFailureIsVisible(showNotes = false)
+    }
+
+    @Test
+    fun showNotesCallbackKeepsBackendDiagnosticInVisibleState() = runBlocking {
+        assertPopupBackendFailureIsVisible(showNotes = true)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private suspend fun assertPopupBackendFailureIsVisible(showNotes: Boolean) {
+        Dispatchers.setMain(Dispatchers.Unconfined)
+        val settings = InMemoryAnkiSettingsRepository(AnkiSettings(cardFormats = listOf(AnkiCardFormat(id = "fixture", name = "Fixture"))))
+        val viewModel = AnkiViewModel(repository(backend = RecordingBackend(
+            availabilityError = java.io.IOException("HTTP 403 Forbidden", java.io.IOException("API key rejected")),
+        ), settingsRepository = settings))
+        try {
+            val result = kotlinx.coroutines.CompletableDeferred<Boolean>()
+            if (showNotes) viewModel.showNotesAsync("fixture", mapOf("{expression}" to "猫"), onError = {}) { result.complete(it) }
+            else viewModel.mineEntryAsync("fixture", """{"expression":"猫"}""", AnkiMiningContext(sentence = "猫"), onError = {}) { result.complete(it) }
+
+            assertFalse(kotlinx.coroutines.withTimeout(5_000) { result.await() })
+            assertEquals("Anki failed\nHTTP 403 Forbidden\nAPI key rejected", viewModel.uiState.value.errorMessage?.resolve({ _, _ -> "Anki failed" }, { _, _, _ -> "" }))
+        } finally {
+            viewModel.viewModelScope.coroutineContext[Job]!!.cancelAndJoin()
+            Dispatchers.resetMain()
+        }
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test(timeout = 10_000)
+    fun popupExclusionsRefreshAfterCategoryChangesAndSettingsReload() = runBlocking {
+        Dispatchers.setMain(Dispatchers.Unconfined)
+        val changes = MutableStateFlow(0L)
+        val settings = InMemoryAnkiSettingsRepository()
+        var dictionaries = listOf(
+            AnkiTermDictionary("Excluded [2026]", DictionaryCategory.Exclude),
+            AnkiTermDictionary("Included", DictionaryCategory.Monolingual),
+        )
+        val viewModel = AnkiViewModel(repository(
+            settingsRepository = settings,
+            loadTermDictionaries = { dictionaries },
+            dictionaryChangeVersions = changes,
+        ))
+        try {
+            val initial = viewModel.uiState.first { it.excludedDictionaries == listOf("Excluded [2026]") }
+            assertEquals(listOf("Excluded [2026]"), initial.popupSettings.excludedDictionaries)
+
+            dictionaries = listOf(AnkiTermDictionary("Included", DictionaryCategory.Exclude))
+            changes.value = 1L
+            val changed = viewModel.uiState.first { it.excludedDictionaries == listOf("Included") }
+            assertEquals(listOf("Included"), changed.popupSettings.excludedDictionaries)
+
+            dictionaries = emptyList()
+            settings.update { it.copy(selectedGlossaryFallback = "{glossary-first}") }
+            val reloaded = viewModel.uiState.first { it.excludedDictionaries.isEmpty() }
+            assertEquals(emptyList<String>(), reloaded.popupSettings.excludedDictionaries)
+        } finally {
+            viewModel.viewModelScope.coroutineContext[Job]!!.cancelAndJoin()
+            Dispatchers.resetMain()
+        }
+    }
+
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun addingAFormatDefaultsToHoshiWithoutChangingExistingTags() = runTest {
@@ -37,7 +233,7 @@ class AnkiRepositoryBackendSelectionTest {
             runCurrent()
             assertEquals(listOf("", "hoshi"), settings.current.cardFormats.map { it.tags })
         } finally {
-            viewModel.viewModelScope.cancel()
+            viewModel.viewModelScope.coroutineContext[Job]!!.cancelAndJoin()
             Dispatchers.resetMain()
         }
     }
@@ -203,7 +399,7 @@ class AnkiRepositoryBackendSelectionTest {
         )
 
         assertEquals(
-            AnkiFetchResult.Error(UiText.Literal("Public AnkiConnect HTTP URLs are blocked. Use HTTPS for internet hosts.")),
+            AnkiFetchResult.Error(UiText.Joined(listOf(UiText.Resource(R.string.anki_fetch_configure_failed), UiText.Literal("Public AnkiConnect HTTP URLs are blocked. Use HTTPS for internet hosts.")))),
             repository.fetchConfiguration(),
         )
         assertEquals(0, ankiConnect.fetchDecksCalls)
@@ -793,6 +989,7 @@ class AnkiRepositoryBackendSelectionTest {
                     sentence = "パンを食べる。",
                     coverPath = cover.toString(),
                     sasayakiAudioPath = sasayaki.toString(),
+                    sentenceAudioPath = sasayaki.toString(),
                 ),
                 decks = emptyList(),
                 noteTypes = emptyList(),
@@ -821,7 +1018,7 @@ class AnkiRepositoryBackendSelectionTest {
                     selectedNoteTypeName = noteType.name,
                     availableDecks = listOf(deck),
                     availableNoteTypes = listOf(noteType),
-                    fieldMappings = mapOf("Media" to "{audio} {sasayaki-audio}"),
+                    fieldMappings = mapOf("Media" to "{audio} {sasayaki-audio} {sentence-audio}"),
                 ),
             ),
             ankiConnectBackendFactory = { _, _ -> ankiConnect },
@@ -833,6 +1030,7 @@ class AnkiRepositoryBackendSelectionTest {
                 context = AnkiMiningContext(
                     sentence = "パンを食べる。",
                     sasayakiAudioPath = sasayaki.toString(),
+                    sentenceAudioPath = sasayaki.toString(),
                 ),
                 decks = emptyList(),
                 noteTypes = emptyList(),
@@ -887,6 +1085,7 @@ class AnkiRepositoryBackendSelectionTest {
         settingsRepository: InMemoryAnkiSettingsRepository = InMemoryAnkiSettingsRepository(),
         ankiConnectBackendFactory: (String, String) -> AnkiBackend = { _, _ -> RecordingBackend() },
         loadTermDictionaries: () -> List<AnkiTermDictionary> = { emptyList() },
+        dictionaryChangeVersions: Flow<Long> = flowOf(0L),
     ): AnkiRepository {
         val cacheDir = Files.createTempDirectory("hoshi-anki-cache").toFile()
         return AnkiRepository(
@@ -898,6 +1097,7 @@ class AnkiRepositoryBackendSelectionTest {
             localAudioRepository = LocalAudioRepository(Files.createTempDirectory("hoshi-anki-test").toFile()),
             ankiConnectBackendFactory = ankiConnectBackendFactory,
             loadTermDictionaries = loadTermDictionaries,
+            dictionaryChangeVersions = dictionaryChangeVersions,
         )
     }
 
@@ -923,6 +1123,8 @@ class AnkiRepositoryBackendSelectionTest {
         private val duplicateKeys: Set<String> = emptySet(),
         private val addNoteResult: Boolean = true,
         private val onFetchDecks: () -> Unit = {},
+        private val availabilityError: Throwable? = null,
+        private val duplicateError: Throwable? = null,
     ) : AnkiBackend {
         var fetchDecksCalls = 0
             private set
@@ -950,6 +1152,7 @@ class AnkiRepositoryBackendSelectionTest {
             private set
 
         override fun isAvailable(): Boolean = available
+        override fun checkAvailability(): Boolean = availabilityError?.let { throw it } ?: available
 
         override fun fetchDecks(): List<AnkiDeck> {
             fetchDecksCalls += 1
@@ -967,6 +1170,7 @@ class AnkiRepositoryBackendSelectionTest {
             checkDuplicatesAcrossAllModels: Boolean,
         ): Boolean {
             duplicateCalls += 1
+            duplicateError?.let { throw it }
             return duplicate || key in duplicateKeys
         }
 

@@ -12,11 +12,33 @@ import org.junit.Test
 
 class DictionaryImportBatchTest {
     @Test
+    fun classifiedNativeFailureRetainsItsOriginalDiagnosticInTheBatchResult() = runBlocking {
+        val result = runDictionaryImportBatch(listOf(DictionaryImportItem("broken.zip")), {}) {
+            throw DictionaryImportException.fromNative("failed to parse index.json")
+        }
+
+        assertEquals(
+            UiText.Joined(listOf(UiText.Resource(R.string.dictionary_import_index_error), UiText.Literal("failed to parse index.json"))),
+            result.failed.single().reason,
+        )
+    }
+
+    @Test
+    fun importFailureRetainsNestedFileSystemReason() {
+        val error = java.io.IOException("cannot copy dictionary", java.io.IOException("No space left on device"))
+
+        assertEquals(
+            UiText.Joined(listOf(UiText.Resource(R.string.dictionary_import_io_error), UiText.Literal("cannot copy dictionary\nNo space left on device"))),
+            dictionaryImportErrorText(error),
+        )
+    }
+
+    @Test
     fun knownNativeDiagnosticsUseLocalizedReasonsWithoutLosingDetails() {
         val error = DictionaryImportException.fromNative("failed to parse index.json")
         assertEquals("failed to parse index.json", error.detail)
-        assertEquals(UiText.Resource(R.string.dictionary_import_index_error), dictionaryImportErrorText(error))
-        assertEquals(UiText.Resource(R.string.dictionary_import_archive_error), dictionaryImportErrorText(DictionaryImportException.fromNative("failed to open zip")))
+        assertEquals(UiText.Joined(listOf(UiText.Resource(R.string.dictionary_import_index_error), UiText.Literal("failed to parse index.json"))), dictionaryImportErrorText(error))
+        assertEquals(UiText.Joined(listOf(UiText.Resource(R.string.dictionary_import_archive_error), UiText.Literal("failed to open zip"))), dictionaryImportErrorText(DictionaryImportException.fromNative("failed to open zip")))
     }
 
     @Test
@@ -33,7 +55,7 @@ class DictionaryImportBatchTest {
         assertEquals(items, visited)
         assertEquals(listOf(items[1]), result.imported)
         assertEquals(listOf(items[0], items[2]), result.failed.map { it.item })
-        assertEquals(UiText.Resource(R.string.dictionary_import_native_error_format, "index.json: 無効𠮟"), result.failed[0].reason)
+        assertEquals(UiText.Joined(listOf(UiText.Resource(R.string.dictionary_import_failed), UiText.Literal("index.json: 無効𠮟"))), result.failed[0].reason)
         assertEquals(UiText.Resource(R.string.dictionary_import_failed), result.failed[1].reason)
     }
 
@@ -46,7 +68,7 @@ class DictionaryImportBatchTest {
         }
         assertTrue(result.imported.isEmpty())
         assertEquals(items, result.failed.map { it.item })
-        assertEquals(listOf(UiText.Resource(R.string.dictionary_import_index_error), UiText.Resource(R.string.dictionary_import_file_access_error)), result.failed.map { it.reason })
+        assertEquals(listOf(UiText.Joined(listOf(UiText.Resource(R.string.dictionary_import_index_error), UiText.Literal("could not find index.json"))), UiText.Joined(listOf(UiText.Resource(R.string.dictionary_import_file_access_error), UiText.Literal("denied")))), result.failed.map { it.reason })
     }
 
     @Test
@@ -64,10 +86,10 @@ class DictionaryImportBatchTest {
     }
 
     @Test
-    fun knownFailuresHaveLocalizedReasonsAndUnexpectedExceptionsDoNotLeak() {
-        assertEquals(UiText.Resource(R.string.dictionary_import_file_access_error), dictionaryImportErrorText(SecurityException("secret")))
-        assertEquals(UiText.Resource(R.string.dictionary_import_archive_error), dictionaryImportErrorText(java.util.zip.ZipException("bad zip")))
+    fun knownAndUnexpectedFailuresKeepLocalizedSummaryAndSpecificDiagnostic() {
+        assertEquals(UiText.Joined(listOf(UiText.Resource(R.string.dictionary_import_file_access_error), UiText.Literal("secret"))), dictionaryImportErrorText(SecurityException("secret")))
+        assertEquals(UiText.Joined(listOf(UiText.Resource(R.string.dictionary_import_archive_error), UiText.Literal("bad zip"))), dictionaryImportErrorText(java.util.zip.ZipException("bad zip")))
         assertEquals(UiText.Resource(R.string.dictionary_import_index_error), dictionaryImportErrorText(DictionaryImportException(DictionaryImportFailureKind.InvalidIndex)))
-        assertEquals(UiText.Resource(R.string.dictionary_import_failed), dictionaryImportErrorText(IllegalStateException("secret")))
+        assertEquals(UiText.Joined(listOf(UiText.Resource(R.string.dictionary_import_failed), UiText.Literal("secret"))), dictionaryImportErrorText(IllegalStateException("secret")))
     }
 }

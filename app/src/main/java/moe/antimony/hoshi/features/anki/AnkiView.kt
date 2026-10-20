@@ -49,7 +49,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -73,12 +72,15 @@ import androidx.compose.material.icons.filled.UnfoldMore
 import androidx.core.content.ContextCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import moe.antimony.hoshi.LocalHoshiUiDependencies
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.dictionary.DictionaryType
 import moe.antimony.hoshi.dictionary.DictionaryCategory
 import moe.antimony.hoshi.features.dictionary.DictionaryViewModel
+import moe.antimony.hoshi.features.dictionary.DictionaryUiState
 import moe.antimony.hoshi.features.settings.SettingsDetailScaffold
+import moe.antimony.hoshi.features.settings.combineSettingsLoadStates
+import moe.antimony.hoshi.features.settings.SettingsLoadState
+import moe.antimony.hoshi.features.settings.map
 import moe.antimony.hoshi.ui.asString
 import moe.antimony.hoshi.ui.hoshiOutlinedTextFieldColors
 import moe.antimony.hoshi.ui.hoshiSingleLineTextFieldLineLimits
@@ -95,8 +97,8 @@ fun AnkiView(
     val viewModel: AnkiViewModel = hiltViewModel()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val nextFormatName = stringResource(R.string.anki_format_default_name, uiState.settings.cardFormats.size + 1)
-    var confirmFetch by remember { mutableStateOf(false) }
-    var pendingDelete by remember { mutableStateOf<AnkiFormatDeleteRequest?>(null) }
+    var confirmFetch by remember(uiState.profileId) { mutableStateOf(false) }
+    var pendingDelete by remember(uiState.profileId) { mutableStateOf<AnkiFormatDeleteRequest?>(null) }
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted ->
@@ -124,10 +126,12 @@ fun AnkiView(
     }
 
     SettingsDetailScaffold(
+        state = uiState.settingsPageState,
+        onRetry = viewModel::retrySettings,
         title = stringResource(R.string.settings_anki),
         onClose = onClose,
         modifier = modifier,
-    ) { innerPadding ->
+    ) { innerPadding, uiState ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -225,6 +229,14 @@ fun AnkiView(
                         checked = uiState.settings.allowDupes,
                         onCheckedChange = viewModel::updateAllowDupes,
                     )
+                    if (uiState.settings.allowDupes) {
+                        AnkiDivider()
+                        AnkiSwitchRow(
+                            label = stringResource(R.string.anki_prevent_accidental_duplicates),
+                            checked = uiState.settings.preventAccidentalDuplicates,
+                            onCheckedChange = viewModel::updatePreventAccidentalDuplicates,
+                        )
+                    }
                     AnkiDivider()
                     AnkiSwitchRow(
                         label = stringResource(R.string.anki_disable_show_notes),
@@ -311,23 +323,25 @@ fun AnkiCardFormatView(
     onDuplicated: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    val appContainer = LocalHoshiUiDependencies.current
     val viewModel: AnkiViewModel = hiltViewModel()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val dictionaryViewModel: DictionaryViewModel = hiltViewModel()
+    val dictionaryUiState by dictionaryViewModel.uiState.collectAsStateWithLifecycle()
+    LaunchedEffect(dictionaryViewModel) { dictionaryViewModel.reload() }
     val format = uiState.settings.cardFormats.firstOrNull { it.id == formatId }
     val duplicateName = stringResource(R.string.anki_format_default_name, uiState.settings.cardFormats.size + 1)
-    val handlebarOptions by produceState(
-        initialValue = AnkiHandlebarOptions.forTermDictionaries(emptyList(), uiState.settings.showAllHandlebars),
-        key1 = appContainer.dictionaryRepository,
-        key2 = uiState.settings.showAllHandlebars,
-    ) {
-        value = AnkiHandlebarOptions.forTermDictionaries(
-            appContainer.dictionaryRepository.loadDictionaries(DictionaryType.Term).map { it.index.title },
+    SettingsDetailScaffold(
+        state = ankiDictionarySettingsState(uiState, dictionaryUiState),
+        title = format?.name ?: stringResource(R.string.anki_format),
+        onClose = onClose,
+        modifier = modifier,
+        onRetry = { viewModel.retrySettings(); dictionaryViewModel.retrySettings() },
+    ) { padding, (uiState, dictionaryState) ->
+        val format = uiState.settings.cardFormats.firstOrNull { it.id == formatId } ?: return@SettingsDetailScaffold
+        val handlebarOptions = AnkiHandlebarOptions.forTermDictionaries(
+            dictionaryState.dictionaries[DictionaryType.Term].orEmpty().map { it.index.title },
             uiState.settings.showAllHandlebars,
         )
-    }
-    SettingsDetailScaffold(title = format?.name ?: stringResource(R.string.anki_format), onClose = onClose, modifier = modifier) { padding ->
-        if (format == null) return@SettingsDetailScaffold
         val noteType = uiState.availableNoteTypes.firstOrNull { it.id == format.selectedNoteTypeId || it.name == format.selectedNoteTypeName }
         LazyColumn(modifier = Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(16.dp)) {
             item {
@@ -390,8 +404,14 @@ fun AnkiAdvancedView(onClose: () -> Unit, modifier: Modifier = Modifier) {
         dictionaryViewModel.reload()
     }
     val sections = ankiAdvancedSections()
-    val termDictionaries = dictionaryUiState.dictionaries[DictionaryType.Term].orEmpty()
-    SettingsDetailScaffold(title = stringResource(R.string.settings_advanced), onClose = onClose, modifier = modifier) { padding ->
+    SettingsDetailScaffold(
+        state = ankiDictionarySettingsState(uiState, dictionaryUiState),
+        title = stringResource(R.string.settings_advanced),
+        onClose = onClose,
+        modifier = modifier,
+        onRetry = { viewModel.retrySettings(); dictionaryViewModel.retrySettings() },
+    ) { padding, (uiState, dictionaryState) ->
+        val termDictionaries = dictionaryState.dictionaries[DictionaryType.Term].orEmpty()
         LazyColumn(modifier = Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(16.dp)) {
             sections.forEach { section ->
                 when (section) {
@@ -461,6 +481,20 @@ fun AnkiAdvancedView(onClose: () -> Unit, modifier: Modifier = Modifier) {
                     }
                 }
             }
+        }
+    }
+}
+
+internal fun ankiDictionarySettingsState(
+    anki: AnkiUiState,
+    dictionary: DictionaryUiState,
+): SettingsLoadState<Pair<AnkiUiState, DictionaryUiState>> = when (val state = anki.settingsPageState) {
+    is SettingsLoadState.Failed -> state
+    else -> if (anki.profileId != dictionary.profileId) {
+        SettingsLoadState.Loading
+    } else {
+        combineSettingsLoadStates(state, dictionary.dictionariesLoadState) { _, _ ->
+            anki to dictionary
         }
     }
 }
@@ -881,6 +915,7 @@ internal object AnkiHandlebarOptions {
         "{document-title}",
         "{book-cover}",
         "{sasayaki-audio}",
+        "{sentence-audio}",
     )
 
     private val AdvancedOptions = listOf(

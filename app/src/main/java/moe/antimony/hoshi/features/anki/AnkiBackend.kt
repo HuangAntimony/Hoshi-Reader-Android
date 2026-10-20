@@ -3,8 +3,10 @@ package moe.antimony.hoshi.features.anki
 import androidx.annotation.StringRes
 import javax.inject.Inject
 import moe.antimony.hoshi.R
+import moe.antimony.hoshi.ui.diagnosticMessage
 
 interface AnkiBackend {
+    fun checkAvailability(): Boolean = isAvailable()
     fun isAvailable(): Boolean
     fun fetchDecks(): List<AnkiDeck>
     fun fetchNoteTypes(): List<AnkiNoteType>
@@ -102,11 +104,14 @@ class AnkiDroidBackendAdapter @Inject constructor(
 
     override fun fetchNoteTypes(): List<AnkiNoteType> {
         val unreadableModels = mutableListOf<String>()
+        val unreadableCauses = mutableListOf<Throwable>()
         val noteTypes = api.modelList().mapNotNull { (id, name) ->
             val fields = runCatching { api.fieldList(id) }
                 .getOrElse { error ->
                     if (error is AnkiFetchException && error.failure == AnkiFetchFailure.ModelFieldsUnavailable) {
                         unreadableModels += name
+                        if (error.message != error.failure.userMessage) unreadableCauses += error
+                        else if (error.cause != null) unreadableCauses += error.cause!!
                         return@mapNotNull null
                     }
                     throw error
@@ -124,7 +129,12 @@ class AnkiDroidBackendAdapter @Inject constructor(
             } else {
                 "Unable to read fields for AnkiDroid note types: ${unreadableModels.joinToString()}."
             }
-            throw AnkiFetchException(AnkiFetchFailure.ModelFieldsUnavailable, message)
+            val cause = unreadableCauses.takeIf { it.isNotEmpty() }?.let { causes ->
+                IllegalStateException(causes.joinToString("\n") { it.diagnosticMessage() }).apply {
+                    causes.forEach(::addSuppressed)
+                }
+            }
+            throw AnkiFetchException(AnkiFetchFailure.ModelFieldsUnavailable, message, cause)
         }
         return noteTypes
     }

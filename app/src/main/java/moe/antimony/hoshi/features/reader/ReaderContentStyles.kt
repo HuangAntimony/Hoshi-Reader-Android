@@ -212,36 +212,47 @@ internal object ReaderContentStyles {
         val generatedLayout = ReaderGeneratedLayout.from(settings)
         val layoutCss = when (settings.viewMode) {
             ReaderViewMode.Continuous -> {
-                val hiddenOverflowAxis = if (settings.verticalWriting) "overflow-y" else "overflow-x"
-                val viewportConstraintCss = if (settings.verticalWriting) {
-                    "height: var(--hoshi-continuous-height, 100vh) !important;"
-                } else {
-                    """
-                    width: 100vw !important;
-                    min-height: 100vh !important;
-                    """.trimIndent()
-                }
+                val horizontalInset = generatedLayout.viewportHorizontalPaddingRatio * 100
+                val verticalInset = generatedLayout.viewportVerticalPaddingRatio * 100
                 """
                 html, body {
-                    $hiddenOverflowAxis: hidden !important;
                     margin: 0 !important;
                     padding: 0 !important;
                     background: var(--hoshi-background-color) !important;
                     color: var(--hoshi-text-color) !important;
                     writing-mode: ${settings.writingModeCss} !important;
                 }
+                html {
+                    overflow: hidden !important;
+                    width: var(--page-width, 100vw) !important;
+                    height: var(--page-height, 100vh) !important;
+                }
                 body {
+                    position: fixed !important;
+                    left: var(--hoshi-continuous-left, ${horizontalInset.cssNumber()}vw) !important;
+                    top: var(--hoshi-continuous-top, ${verticalInset.cssNumber()}vh) !important;
+                    width: var(--hoshi-continuous-width, ${(100 - horizontalInset * 2).cssNumber()}vw) !important;
+                    height: var(--hoshi-continuous-height, ${(100 - verticalInset * 2).cssNumber()}vh) !important;
+                    min-width: 0 !important;
+                    min-height: 0 !important;
+                    max-width: none !important;
+                    max-height: none !important;
+                    overflow-x: ${if (settings.verticalWriting) "auto" else "hidden"} !important;
+                    overflow-y: ${if (settings.verticalWriting) "hidden" else "auto"} !important;
+                    scrollbar-width: none;
                     $bodyFontFamilyCss
                     $bodyFontVariantCss
                     font-size: ${settings.fontSize}px !important;
                     -webkit-text-size-adjust: none !important;
                     $textSpacingCss
                     box-sizing: border-box !important;
-                    $viewportConstraintCss
                     padding: ${generatedLayout.continuousBodyPaddingCss} !important;
                     padding-bottom: ${generatedLayout.continuousBodyBottomPaddingCss} !important;
                     $gridCss
                     text-orientation: mixed;
+                }
+                body::-webkit-scrollbar {
+                    display: none;
                 }
                 """.trimIndent()
             }
@@ -334,6 +345,15 @@ internal object ReaderContentStyles {
                 body, body * {
                     orphans: 1 !important;
                     widows: 1 !important;
+                }
+                html.hoshi-paged-selection {
+                    overflow: clip !important;
+                }
+                html.hoshi-paged-selection body {
+                    overflow: visible !important;
+                    position: relative !important;
+                    left: var(--hoshi-selection-page-x) !important;
+                    top: var(--hoshi-selection-page-y) !important;
                 }
                 """.trimIndent()
             }

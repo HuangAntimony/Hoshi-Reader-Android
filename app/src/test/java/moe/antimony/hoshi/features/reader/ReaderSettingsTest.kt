@@ -398,12 +398,15 @@ class ReaderSettingsTest {
     fun continuousReaderCssUsesScrollableIosLayoutInsteadOfPagedColumns() {
         val css = ReaderContentStyles.styleTag(ReaderSettings(viewMode = ReaderViewMode.Continuous))
 
-        assertTrue(css.contains("overflow-y: hidden !important;"))
-        assertTrue(css.lines().any { it.trim() == "height: var(--hoshi-continuous-height, 100vh) !important;" })
-        assertFalse(css.contains("overflow: hidden !important;"))
-        assertFalse(css.contains("height: var(--page-height, 100vh) !important;"))
-        assertFalse(css.contains("column-width: var(--page-width, 100vw) !important;"))
-        assertFalse(css.contains("column-gap:"))
+        val body = cssDeclarationsForSelector(css, "body")
+        val root = cssDeclarationsForSelector(css, "html")
+        assertEquals("fixed !important", body["position"])
+        assertEquals("auto !important", body["overflow-x"])
+        assertEquals("hidden !important", body["overflow-y"])
+        assertEquals("var(--hoshi-continuous-height, 100.0vh) !important", body["height"])
+        assertEquals("hidden !important", root["overflow"])
+        assertFalse(body.containsKey("column-width"))
+        assertFalse(body.containsKey("column-gap"))
     }
 
     @Test
@@ -886,19 +889,11 @@ class ReaderSettingsTest {
         assertEquals(Color.Black, colors.unselectedContent)
     }
 
-    private fun cssDeclarationsForSelector(css: String, selector: String): Map<String, String> {
-        val block = Regex("""([^{}]+)\{([^{}]*)}""")
+    private fun cssDeclarationsForSelector(css: String, selector: String): Map<String, String> =
+        Regex("""([^{}]+)\{([^{}]*)}""")
             .findAll(css)
-            .firstOrNull { match ->
-                match.groupValues[1]
-                    .split(",")
-                    .any { it.trim() == selector }
-            }
-            ?.groupValues
-            ?.get(2)
-            ?: return emptyMap()
-        return block
-            .split(";")
+            .filter { match -> match.groupValues[1].split(",").any { it.trim() == selector } }
+            .flatMap { it.groupValues[2].split(";").asSequence() }
             .mapNotNull { declaration ->
                 val separator = declaration.indexOf(":")
                 if (separator < 0) return@mapNotNull null
@@ -906,8 +901,12 @@ class ReaderSettingsTest {
                 val value = declaration.substring(separator + 1).trim()
                 if (name.isEmpty() || value.isEmpty()) null else name to value
             }
-            .toMap()
-    }
+            .fold(mutableMapOf<String, String>()) { declarations, (name, value) ->
+                if (declarations[name]?.endsWith("!important") != true || value.endsWith("!important")) {
+                    declarations[name] = value
+                }
+                declarations
+            }
 
     private fun cssCustomProperty(css: String, property: String): String? =
         Regex("""${Regex.escape(property)}\s*:\s*([^;]+);""")

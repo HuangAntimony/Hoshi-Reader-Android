@@ -71,7 +71,7 @@ class BookStatisticsStoreTest {
         assertTrue(archive.resolve("metadata.json").isFile)
         assertFalse(archive.resolve("cover.jpg").exists())
         assertTrue(repository.loadSessions(archive).values.all { it.value == null })
-        assertEquals(0, repository.statisticsStore.loadArchiveSummary())
+        assertEquals(0, repository.statisticsStore.loadArchiveSummary().bookCount)
     }
 
     @Test fun requiredArchiveWriteFailurePreservesBook() = runBlocking {

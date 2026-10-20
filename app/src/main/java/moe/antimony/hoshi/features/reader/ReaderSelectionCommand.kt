@@ -28,6 +28,22 @@ internal sealed interface ReaderSelectionCommand {
             "JSON.stringify(window.hoshiSelection.selectionRects($count))"
     }
 
+    data class NativeMenuRect(val request: Int) : ReaderSelectionCommand {
+        override val source = "window.hoshiSelection.nativeSelectionMenuRect($request)"
+    }
+
+    data class TakeMenuRecovery(val request: Int, val generation: Int) : ReaderSelectionCommand {
+        override val source = "window.hoshiSelection.takeNativeMenuRecovery($request, $generation)"
+    }
+
+    data class CancelMenuRecovery(val request: Int, val documentToken: String) : ReaderSelectionCommand {
+        override val source = "window.hoshiSelection.cancelNativeMenuRecoveryReplay($request, ${documentToken.javaScriptDoubleQuotedString()})"
+    }
+
+    data object NativeContext : ReaderSelectionCommand {
+        override val source = "window.hoshiSelection.nativeSelectionContext()"
+    }
+
     data object ClearSelection : ReaderSelectionCommand {
         override val source: String =
             "window.hoshiSelection.clearSelection()"

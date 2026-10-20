@@ -6,7 +6,20 @@ import androidx.compose.material.icons.automirrored.rounded.Undo
 import androidx.compose.ui.graphics.vector.ImageVector
 import moe.antimony.hoshi.features.display.DisplayPalettePreset
 import moe.antimony.hoshi.features.display.resolveDisplaySettings
+import moe.antimony.hoshi.features.sasayaki.SasayakiSettings
 import java.util.Locale
+
+internal data class ReaderTopPlaybackControl(
+    val isPlaying: Boolean,
+    val onToggle: () -> Unit,
+)
+
+internal fun readerTopPlaybackControl(
+    settings: SasayakiSettings,
+    tts: ReaderTopPlaybackControl?,
+    sasayaki: ReaderTopPlaybackControl?,
+): ReaderTopPlaybackControl? =
+    if (!settings.showReaderToggle) null else tts ?: sasayaki.takeIf { settings.enabled }
 
 data class ReaderChromeState(
     val title: String,
@@ -132,6 +145,7 @@ enum class ReaderMenuDestination {
     GoTo,
     Statistics,
     Sasayaki,
+    Tts,
 }
 
 data class ReaderSasayakiBottomPlaybackControls(
@@ -342,7 +356,9 @@ private fun readerTopJumpHistoryIconSizeDp(topSafeAreaDp: Int): Int =
 fun readerBottomMenuVisualOrder(
     showStatistics: Boolean,
     showSasayaki: Boolean,
+    showTts: Boolean = false,
 ): List<ReaderMenuDestination> = buildList {
+    if (showTts) add(ReaderMenuDestination.Tts)
     if (showSasayaki) add(ReaderMenuDestination.Sasayaki)
     if (showStatistics) add(ReaderMenuDestination.Statistics)
     add(ReaderMenuDestination.GoTo)

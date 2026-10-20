@@ -34,14 +34,21 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.R
+import moe.antimony.hoshi.ui.HoshiAlertDialog
+import moe.antimony.hoshi.ui.ErrorDetailsText
+import moe.antimony.hoshi.ui.UiText
+import moe.antimony.hoshi.ui.asString
+import moe.antimony.hoshi.ui.withErrorDetails
 import moe.antimony.hoshi.features.settings.GroupCard
 import moe.antimony.hoshi.features.settings.GroupDivider
 import moe.antimony.hoshi.features.settings.SectionTitle
 import moe.antimony.hoshi.features.settings.SettingsDetailScaffold
-import moe.antimony.hoshi.features.settings.collectAsLoadedSettings
+import moe.antimony.hoshi.features.settings.SettingsLoadState
+import moe.antimony.hoshi.features.settings.rememberSettingsLoader
 
 @Composable
 internal fun BookCoverWallpaperSettingsView(
@@ -51,12 +58,24 @@ internal fun BookCoverWallpaperSettingsView(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val settings = viewModel.settings.collectAsLoadedSettings()
+    val settingsLoader = viewModel.settings.rememberSettingsLoader()
+    val settings = (settingsLoader.state as? SettingsLoadState.Loaded)?.value
     val capability = viewModel.capability()
     var iReaderCapability by remember(viewModel) {
         mutableStateOf(viewModel.iReaderCapability())
     }
-    var targetSelectionFailed by remember { mutableStateOf(false) }
+    var targetSelectionError by remember { mutableStateOf<UiText?>(null) }
+    val error by viewModel.error.collectAsStateWithLifecycle()
+    error?.let { message ->
+        HoshiAlertDialog(
+            onDismissRequest = viewModel::dismissError,
+            title = { Text(stringResource(R.string.dialog_error_title)) },
+            text = { ErrorDetailsText(message.asString()) },
+            confirmButton = {
+                TextButton(onClick = viewModel::dismissError) { Text(stringResource(R.string.action_ok)) }
+            },
+        )
+    }
     DisposableEffect(lifecycleOwner, viewModel) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
@@ -76,7 +95,7 @@ internal fun BookCoverWallpaperSettingsView(
         runCatching {
             context.contentResolver.takePersistableUriPermission(uri, flags)
         }.onSuccess {
-            targetSelectionFailed = false
+            targetSelectionError = null
             val previousTarget = settings?.exportTargetUri
                 ?.takeIf { it != uri.toString() }
                 ?.let(Uri::parse)
@@ -87,8 +106,8 @@ internal fun BookCoverWallpaperSettingsView(
                     }
                 }
             }
-        }.onFailure {
-            targetSelectionFailed = true
+        }.onFailure { error ->
+            targetSelectionError = UiText.Resource(R.string.book_cover_wallpaper_export_file_failed).withErrorDetails(error)
         }
     }
     val exportTargetName by produceState<String?>(
@@ -104,10 +123,12 @@ internal fun BookCoverWallpaperSettingsView(
     }
 
     SettingsDetailScaffold(
+        state = settingsLoader.state,
         title = stringResource(R.string.settings_book_cover_wallpaper),
         onClose = onClose,
         modifier = modifier.fillMaxSize(),
-    ) { innerPadding ->
+        onRetry = settingsLoader.retry,
+    ) { innerPadding, current ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -125,7 +146,7 @@ internal fun BookCoverWallpaperSettingsView(
                     bookCoverScaleModeOptions().forEachIndexed { index, option ->
                         if (index > 0) GroupDivider()
                         ListItem(
-                            modifier = Modifier.clickable(enabled = settings != null) {
+                            modifier = Modifier.clickable {
                                 viewModel.setScaleMode(option.mode)
                             },
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
@@ -133,8 +154,7 @@ internal fun BookCoverWallpaperSettingsView(
                             supportingContent = { Text(stringResource(option.summaryRes)) },
                             leadingContent = {
                                 RadioButton(
-                                    selected = settings?.scaleMode == option.mode,
-                                    enabled = settings != null,
+                                    selected = current.scaleMode == option.mode,
                                     onClick = { viewModel.setScaleMode(option.mode) },
                                 )
                             },
@@ -157,8 +177,8 @@ internal fun BookCoverWallpaperSettingsView(
                         },
                         trailingContent = {
                             Switch(
-                                checked = settings?.updateLockScreen == true,
-                                enabled = isLockScreenSwitchEnabled(settings, capability),
+                                checked = current.updateLockScreen,
+                                enabled = isLockScreenSwitchEnabled(current, capability),
                                 onCheckedChange = viewModel::setUpdateLockScreen,
                             )
                         },
@@ -173,8 +193,7 @@ internal fun BookCoverWallpaperSettingsView(
                         supportingContent = { Text(stringResource(R.string.book_cover_wallpaper_export_summary)) },
                         trailingContent = {
                             Switch(
-                                checked = settings?.exportEnabled == true,
-                                enabled = settings != null,
+                                checked = current.exportEnabled,
                                 onCheckedChange = { enabled ->
                                     if (!enabled) {
                                         viewModel.setExportEnabled(false)
@@ -184,7 +203,7 @@ internal fun BookCoverWallpaperSettingsView(
                                                 .filter { it.isWritePermission }
                                                 .map { it.uri.toString() }
                                                 .toSet(),
-                                            settings?.exportTargetUri,
+                                            current.exportTargetUri,
                                         )
                                     ) {
                                         viewModel.setExportEnabled(true)
@@ -202,13 +221,11 @@ internal fun BookCoverWallpaperSettingsView(
                         supportingContent = {
                             Text(
                                 when {
-                                    targetSelectionFailed -> stringResource(
-                                        R.string.book_cover_wallpaper_export_file_failed,
-                                    )
+                                    targetSelectionError != null -> requireNotNull(targetSelectionError).asString()
                                     exportTargetName != null -> exportTargetName.orEmpty()
                                     else -> stringResource(R.string.book_cover_wallpaper_export_file_none)
                                 },
-                                color = if (targetSelectionFailed) {
+                                color = if (targetSelectionError != null) {
                                     MaterialTheme.colorScheme.error
                                 } else {
                                     MaterialTheme.colorScheme.onSurfaceVariant
@@ -251,8 +268,8 @@ internal fun BookCoverWallpaperSettingsView(
                             },
                             trailingContent = {
                                 Switch(
-                                    checked = settings?.updateIReaderBookCover == true,
-                                    enabled = settings != null && iReaderCapability.isSupported,
+                                    checked = current.updateIReaderBookCover,
+                                    enabled = iReaderCapability.isSupported,
                                     onCheckedChange = viewModel::setUpdateIReaderBookCover,
                                 )
                             },

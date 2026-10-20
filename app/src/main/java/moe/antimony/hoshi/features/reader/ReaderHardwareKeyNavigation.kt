@@ -10,6 +10,7 @@ internal enum class PopupTermNavigationDirection {
 internal sealed interface ReaderHardwareKeyAction {
     data class ReaderNavigation(val direction: ReaderNavigationDirection) : ReaderHardwareKeyAction
     data class PopupTermNavigation(val direction: PopupTermNavigationDirection) : ReaderHardwareKeyAction
+    data class TtsSentenceNavigation(val direction: ReaderNavigationDirection) : ReaderHardwareKeyAction
     data object SasayakiSeekForward : ReaderHardwareKeyAction
     data object SasayakiSeekBackward : ReaderHardwareKeyAction
 }
@@ -42,6 +43,7 @@ internal fun readerHardwareKeyActionForKeyEvent(
     sasayakiEnabled: Boolean,
     hasSasayakiAudio: Boolean,
     hasLookupPopup: Boolean = false,
+    hasStartedTts: Boolean = false,
 ): ReaderHardwareKeyAction? =
     readerHardwareKeyEventForKeyEvent(
         keyCode = keyCode,
@@ -51,6 +53,7 @@ internal fun readerHardwareKeyActionForKeyEvent(
         sasayakiEnabled = sasayakiEnabled,
         hasSasayakiAudio = hasSasayakiAudio,
         hasLookupPopup = hasLookupPopup,
+        hasStartedTts = hasStartedTts,
     ).action
 
 internal fun readerHardwareKeyEventForKeyEvent(
@@ -61,6 +64,7 @@ internal fun readerHardwareKeyEventForKeyEvent(
     sasayakiEnabled: Boolean,
     hasSasayakiAudio: Boolean,
     hasLookupPopup: Boolean = false,
+    hasStartedTts: Boolean = false,
 ): ReaderHardwareKeyEventResult {
     return when (keyCode) {
         KeyEvent.KEYCODE_PAGE_DOWN -> pageKeyResult(
@@ -82,6 +86,7 @@ internal fun readerHardwareKeyEventForKeyEvent(
             sasayakiEnabled = sasayakiEnabled,
             hasSasayakiAudio = hasSasayakiAudio,
             hasLookupPopup = hasLookupPopup,
+            hasStartedTts = hasStartedTts,
         )
         else -> ReaderHardwareKeyEventResult(consumed = false)
     }
@@ -108,6 +113,7 @@ private fun volumeKeyResult(
     sasayakiEnabled: Boolean,
     hasSasayakiAudio: Boolean,
     hasLookupPopup: Boolean,
+    hasStartedTts: Boolean,
 ): ReaderHardwareKeyEventResult {
     val keyAction = readerVolumeKeyAction(
         keyCode = keyCode,
@@ -115,6 +121,7 @@ private fun volumeKeyResult(
         sasayakiEnabled = sasayakiEnabled,
         hasSasayakiAudio = hasSasayakiAudio,
         hasLookupPopup = hasLookupPopup,
+        hasStartedTts = hasStartedTts,
     ) ?: return ReaderHardwareKeyEventResult(consumed = false)
     return ReaderHardwareKeyEventResult(
         consumed = true,
@@ -128,6 +135,7 @@ private fun readerVolumeKeyAction(
     sasayakiEnabled: Boolean,
     hasSasayakiAudio: Boolean,
     hasLookupPopup: Boolean,
+    hasStartedTts: Boolean,
 ): ReaderHardwareKeyAction? {
     if (settings.volumeKeysNavigatePopupTerms && hasLookupPopup) {
         return ReaderHardwareKeyAction.PopupTermNavigation(
@@ -141,6 +149,11 @@ private fun readerVolumeKeyAction(
         return sasayakiSeekActionForVolumeKey(
             keyCode = keyCode,
             reverseDirection = settings.reverseVolumeKeyDirection,
+        )
+    }
+    if (settings.volumeKeysSeekSasayaki && hasStartedTts) {
+        return ReaderHardwareKeyAction.TtsSentenceNavigation(
+            volumePageTurnDirectionForKey(keyCode, settings.reverseVolumeKeyDirection),
         )
     }
     if (!settings.volumeKeysTurnPages) return null

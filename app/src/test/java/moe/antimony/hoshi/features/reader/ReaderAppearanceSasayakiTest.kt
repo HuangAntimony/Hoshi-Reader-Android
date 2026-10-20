@@ -1,6 +1,5 @@
 package moe.antimony.hoshi.features.reader
 
-import moe.antimony.hoshi.features.sasayaki.SasayakiSettings
 import moe.antimony.hoshi.R
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -57,16 +56,11 @@ class ReaderAppearanceSasayakiTest {
     }
 
     @Test
-    fun appearanceShowsSasayakiToggleWhenSasayakiIsEnabled() {
+    fun appearanceAlwaysOffersSharedPlaybackToggle() {
         assertEquals(
             listOf(R.string.reader_appearance_show_sasayaki_toggle),
-            readerAppearanceSasayakiRows(SasayakiSettings(enabled = true)),
+            readerAppearancePlaybackRows(),
         )
-    }
-
-    @Test
-    fun appearanceHidesSasayakiToggleWhenSasayakiIsDisabled() {
-        assertTrue(readerAppearanceSasayakiRows(SasayakiSettings(enabled = false)).isEmpty())
     }
 
     @Test

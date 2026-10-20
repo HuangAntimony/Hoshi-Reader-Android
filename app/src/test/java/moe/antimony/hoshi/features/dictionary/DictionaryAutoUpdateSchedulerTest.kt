@@ -31,8 +31,25 @@ import org.junit.Assert.fail
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import moe.antimony.hoshi.R
+import moe.antimony.hoshi.ui.ErrorDiagnosticEvents
+import moe.antimony.hoshi.ui.UiText
+import org.junit.Assert.assertSame
 
 class DictionaryAutoUpdateSchedulerTest {
+    @Test
+    fun workerRetryRecordsTheOriginalFailure() = runBlocking {
+        val original = java.io.IOException("dictionary settings are unreadable")
+        ErrorDiagnosticEvents.buffer.drain()
+
+        val result = runDictionaryAutoUpdateWork { throw original }
+        val event = ErrorDiagnosticEvents.buffer.drain().firstOrNull { it.error === original }
+
+        assertEquals(androidx.work.ListenableWorker.Result.retry(), result)
+        assertSame(original, event?.error)
+        assertEquals(UiText.Resource(R.string.dictionary_update_failed), event?.operation)
+    }
+
     @get:Rule
     val temporaryFolder = TemporaryFolder()
 

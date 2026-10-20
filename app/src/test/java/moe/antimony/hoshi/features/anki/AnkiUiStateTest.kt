@@ -8,6 +8,16 @@ import kotlinx.serialization.json.Json
 
 class AnkiUiStateTest {
     @Test
+    fun popupPreventsAccidentalDuplicatesOnlyWhileDuplicatesAreAllowed() {
+        val settings = AnkiSettings(allowDupes = true, preventAccidentalDuplicates = true)
+
+        assertTrue(AnkiUiState(settings = settings).popupSettings.preventAccidentalDuplicates)
+        assertFalse(AnkiUiState(settings = settings.copy(allowDupes = false)).popupSettings.preventAccidentalDuplicates)
+        assertFalse(AnkiUiState(settings = settings.copy(preventAccidentalDuplicates = false)).popupSettings.preventAccidentalDuplicates)
+        assertFalse(AnkiUiState().popupSettings.preventAccidentalDuplicates)
+    }
+
+    @Test
     fun restoresEditableNoteTypeFromPersistedSettingsAfterProcessRestart() {
         val lapis = AnkiNoteType(
             id = 7L,

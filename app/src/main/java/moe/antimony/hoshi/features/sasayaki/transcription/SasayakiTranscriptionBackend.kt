@@ -18,6 +18,5 @@ interface SasayakiTranscriptionBackend {
         onDownload: suspend (Double) -> Unit,
         onBatch: suspend (SasayakiTranscriptionBatch) -> Unit,
         parallelism: Int = 2,
-        previousTokens: List<SasayakiToken> = emptyList(),
     )
 }

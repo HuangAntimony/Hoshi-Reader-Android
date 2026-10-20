@@ -36,17 +36,17 @@ class SasayakiAudioAvailabilityStateTest {
         state.markRestoreFailed(IllegalStateException("bad audio"))
 
         assertFalse(state.hasAudio)
-        assertEquals(UiText.Literal("bad audio"), state.errorMessage)
+        assertEquals(UiText.Joined(listOf(UiText.Resource(R.string.sasayaki_import_audiobook_failed), UiText.Literal("bad audio"))), state.errorMessage)
     }
 
     @Test
     fun restoreFailureUsesFallbackMessageWhenErrorHasNoMessage() {
         val state = SasayakiAudioAvailabilityState()
 
-        state.markRestoreFailed(object : Throwable() {})
+        state.markRestoreFailed(IllegalStateException())
 
         assertFalse(state.hasAudio)
-        assertEquals(UiText.Resource(R.string.sasayaki_import_audiobook_failed), state.errorMessage)
+        assertEquals(UiText.Joined(listOf(UiText.Resource(R.string.sasayaki_import_audiobook_failed), UiText.Literal("IllegalStateException"))), state.errorMessage)
     }
 
     @Test
@@ -57,7 +57,7 @@ class SasayakiAudioAvailabilityStateTest {
         state.markAudioUnavailable()
 
         assertFalse(state.hasAudio)
-        assertEquals(UiText.Literal("still visible"), state.errorMessage)
+        assertEquals(UiText.Joined(listOf(UiText.Resource(R.string.sasayaki_import_audiobook_failed), UiText.Literal("still visible"))), state.errorMessage)
 
         state.markAudioCleared()
 

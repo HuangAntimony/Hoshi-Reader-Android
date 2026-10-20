@@ -8,19 +8,31 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.dictionary.DictionaryRepository
+import moe.antimony.hoshi.dictionary.DictionaryCategory
 import moe.antimony.hoshi.dictionary.DictionaryType
 import moe.antimony.hoshi.features.audio.LocalAudioFile
 import moe.antimony.hoshi.features.audio.LocalAudioRepository
 import moe.antimony.hoshi.features.audio.LocalAudioResolver
+import moe.antimony.hoshi.features.dictionary.DictionaryMutationCoordinator
 import moe.antimony.hoshi.ui.UiText
+import moe.antimony.hoshi.ui.ErrorDiagnosticEvents
+import moe.antimony.hoshi.ui.withErrorDetails
 import java.io.File
 import java.net.URL
 import java.security.MessageDigest
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import kotlin.coroutines.coroutineContext
 
 @Singleton
 internal class AnkiRepository(
@@ -31,6 +43,7 @@ internal class AnkiRepository(
     private val ankiConnectBackendFactory: (String, String) -> AnkiBackend,
     private val loadDictionaryMedia: (DictionaryMedia) -> ByteArray?,
     private val loadTermDictionaries: () -> List<AnkiTermDictionary>,
+    dictionaryChangeVersions: Flow<Long> = flowOf(0L),
 ) {
     @Inject
     constructor(
@@ -39,6 +52,7 @@ internal class AnkiRepository(
         settingsRepository: AnkiSettingsRepository,
         localAudioRepository: LocalAudioRepository,
         dictionaryRepository: DictionaryRepository,
+        dictionaryMutationCoordinator: DictionaryMutationCoordinator,
     ) : this(
         context = context,
         backend = backend,
@@ -56,6 +70,7 @@ internal class AnkiRepository(
                 )
             }
         },
+        dictionaryChangeVersions = dictionaryMutationCoordinator.state.map { it.completedChangeVersion }.distinctUntilChanged(),
     )
 
     internal constructor(
@@ -67,6 +82,7 @@ internal class AnkiRepository(
             AnkiConnectBackend(endpoint, apiKey = apiKey)
         },
         loadTermDictionaries: () -> List<AnkiTermDictionary> = { emptyList() },
+        dictionaryChangeVersions: Flow<Long> = flowOf(0L),
     ) : this(
         context = context,
         backend = backend,
@@ -75,9 +91,15 @@ internal class AnkiRepository(
         ankiConnectBackendFactory = ankiConnectBackendFactory,
         loadDictionaryMedia = { null },
         loadTermDictionaries = loadTermDictionaries,
+        dictionaryChangeVersions = dictionaryChangeVersions,
     )
 
     val settings: Flow<AnkiSettings> = settingsRepository.settings
+    val profileIds: Flow<String> = settingsRepository.profileIds
+
+    val excludedDictionaries: Flow<List<String>> = combine(settings, dictionaryChangeVersions) { _, _ ->
+        loadTermDictionaries().filter { it.category == DictionaryCategory.Exclude }.map { it.name }
+    }.flowOn(Dispatchers.IO).distinctUntilChanged()
 
     suspend fun updateSettings(transform: (AnkiSettings) -> AnkiSettings) {
         settingsRepository.update(transform)
@@ -89,11 +111,11 @@ internal class AnkiRepository(
         val currentSettings = settings.first()
         val activeBackend = activeBackendOrError(currentSettings).getOrElse { error ->
             return@withContext AnkiFetchResult.Error(
-                error.message?.let(UiText::Literal) ?: UiText.Resource(R.string.anki_fetch_configure_failed),
+                UiText.Resource(R.string.anki_fetch_configure_failed).withErrorDetails(error),
             )
         }
         val fetched = runCatching {
-            if (!activeBackend.isAvailable()) {
+            if (!activeBackend.checkAvailability()) {
                 return@withContext AnkiFetchResult.Error(
                     message = if (currentSettings.backendKind == AnkiBackendKind.AnkiDroid) {
                         UiText.Resource(AnkiFetchFailure.ApiUnavailable.userMessageRes)
@@ -109,25 +131,24 @@ internal class AnkiRepository(
             }
             activeBackend.fetchDecks() to activeBackend.fetchNoteTypes()
         }.getOrElse { error ->
+            if (error is kotlinx.coroutines.CancellationException) throw error
             if (error is AnkiFetchException) {
                 logAnkiFetchFailure("Unable to fetch Anki configuration: ${error.failure}", error)
                 return@withContext AnkiFetchResult.Error(
-                    message = if (error.message != error.failure.userMessage) {
-                        UiText.Literal(error.message)
-                    } else {
-                        UiText.Resource(error.failure.userMessageRes)
+                    message = UiText.Resource(error.failure.userMessageRes).let { summary ->
+                        if (error.message == error.failure.userMessage && error.cause == null) summary
+                        else summary.withErrorDetails(if (error.message == error.failure.userMessage) error.cause!! else error)
                     },
                     failure = error.failure,
                 )
             }
             logAnkiFetchFailure("Unable to fetch Anki configuration.", error)
             return@withContext AnkiFetchResult.Error(
-                if (currentSettings.backendKind == AnkiBackendKind.AnkiDroid) {
+                (if (currentSettings.backendKind == AnkiBackendKind.AnkiDroid) {
                     UiText.Resource(AnkiFetchFailure.ProviderFailure.userMessageRes)
                 } else {
-                    error.message?.let(UiText::Literal)
-                        ?: UiText.Resource(R.string.anki_fetch_ankiconnect_provider_failure)
-                },
+                    UiText.Resource(R.string.anki_fetch_ankiconnect_provider_failure)
+                }).withErrorDetails(error),
             )
         }
         val (decks, noteTypes) = fetched
@@ -149,6 +170,7 @@ internal class AnkiRepository(
                 },
             )
         }
+        coroutineContext.ensureActive()
         settingsRepository.update { current ->
             val selectedDeck = decks.firstOrNull { !it.name.equals("Default", ignoreCase = true) }
                 ?: decks.first()
@@ -184,13 +206,19 @@ internal class AnkiRepository(
             AnkiConnectUrlValidator.requireValidEndpoint(currentSettings.ankiConnectUrl).toString()
         }.getOrElse { error ->
             return@withContext AnkiConnectConnectionResult.Error(
-                error.message?.let(UiText::Literal) ?: UiText.Resource(R.string.anki_connect_invalid_url),
+                UiText.Resource(R.string.anki_connect_invalid_url).withErrorDetails(error),
             )
         }
-        if (ankiConnectBackendFactory(endpoint, currentSettings.ankiConnectApiKey).isAvailable()) {
-            AnkiConnectConnectionResult.Connected
-        } else {
-            AnkiConnectConnectionResult.Error(UiText.Resource(R.string.anki_fetch_connect_ankiconnect_failed))
+        try {
+            if (ankiConnectBackendFactory(endpoint, currentSettings.ankiConnectApiKey).checkAvailability()) {
+                AnkiConnectConnectionResult.Connected
+            } else {
+                AnkiConnectConnectionResult.Error(UiText.Resource(R.string.anki_fetch_connect_ankiconnect_failed))
+            }
+        } catch (error: kotlinx.coroutines.CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            AnkiConnectConnectionResult.Error(UiText.Resource(R.string.anki_fetch_connect_ankiconnect_failed).withErrorDetails(error))
         }
     }
 
@@ -200,12 +228,15 @@ internal class AnkiRepository(
         decks: List<AnkiDeck>,
         noteTypes: List<AnkiNoteType>,
         formatId: String? = null,
+        onSynchronizationFailure: (Throwable) -> Unit = { error ->
+            ErrorDiagnosticEvents.buffer.record(UiText.Resource(R.string.anki_sync_failed), error)
+        },
     ): Boolean = withContext(Dispatchers.IO) {
         val settings = settings.first()
         val termDictionaries = loadTermDictionaries()
         val format = settings.resolveAnkiCardFormat(formatId) ?: return@withContext false
-        val activeBackend = activeBackendOrError(settings).getOrElse { return@withContext false }
-        if (!activeBackend.isAvailable()) return@withContext false
+        val activeBackend = activeBackendOrError(settings).getOrThrow()
+        if (!activeBackend.checkAvailability()) return@withContext false
         val availableDecks = decks.ifEmpty { activeBackend.fetchDecks() }
         val availableNoteTypes = noteTypes.ifEmpty { activeBackend.fetchNoteTypes() }
         val deck = availableDecks.firstOrNull { it.id == format.selectedDeckId }
@@ -219,18 +250,32 @@ internal class AnkiRepository(
             ?: return@withContext false
         val needsCover = fieldMappings.referencesAnkiHandlebar("{book-cover}")
         val needsSasayakiAudio = fieldMappings.referencesAnkiHandlebar("{sasayaki-audio}")
+        val needsSentenceAudio = fieldMappings.referencesAnkiHandlebar("{sentence-audio}")
+        val uploadedAudio = mutableMapOf<String, Result<String?>>()
+        fun uploadSentence(path: String, required: Boolean): String? {
+            val uploaded = uploadedAudio.getOrPut(path) {
+                runCatching { addHashedMediaFile(path, "hoshi_sasayaki", activeBackend, settings.backendKind) }
+            }
+            return uploaded.getOrElse { error ->
+                if (error is CancellationException || required) throw error
+                ErrorDiagnosticEvents.buffer.record(UiText.Resource(R.string.anki_operation_failed), error)
+                null
+            }
+        }
         val needsAudio = fieldMappings.referencesAnkiHandlebar("{audio}")
         val mediaContext = AnkiMiningContext(
             sentence = context.sentence,
             documentTitle = context.documentTitle,
             coverPath = context.coverPath?.takeIf { needsCover }?.let {
-                addHashedMediaFile(it, "hoshi_cover", activeBackend, settings.backendKind)
+                optionalMedia { addHashedMediaFile(it, "hoshi_cover", activeBackend, settings.backendKind) }
             },
             sasayakiAudioPath = context.sasayakiAudioPath?.takeIf { needsSasayakiAudio }?.let {
-                addHashedMediaFile(it, "hoshi_sasayaki", activeBackend, settings.backendKind)
+                uploadSentence(it, required = false)
             },
+            sentenceAudioPath = context.sentenceAudioPath?.takeIf { needsSentenceAudio }?.let { uploadSentence(it, required = true) },
             sentenceOffset = context.sentenceOffset,
         )
+        if (needsSentenceAudio && mediaContext.sentenceAudioPath.isNullOrBlank()) return@withContext false
         val mediaPayload = payload.copy(
             audio = payload.audio.takeIf { needsAudio && it.isNotBlank() }
                 ?.let { addRemoteAudio(it, activeBackend, settings.backendKind) }
@@ -268,9 +313,15 @@ internal class AnkiRepository(
             checkDuplicatesAcrossAllModels = settings.checkDuplicatesAcrossAllModels,
         )
         if (added) {
-            when (settings.backendKind) {
-                AnkiBackendKind.AnkiConnect -> if (settings.ankiConnectForceSync) activeBackend.sync()
-                AnkiBackendKind.AnkiDroid -> if (settings.ankiDroidForceSync) activeBackend.sync()
+            try {
+                when (settings.backendKind) {
+                    AnkiBackendKind.AnkiConnect -> if (settings.ankiConnectForceSync) activeBackend.sync()
+                    AnkiBackendKind.AnkiDroid -> if (settings.ankiDroidForceSync) activeBackend.sync()
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                onSynchronizationFailure(error)
             }
         }
         added
@@ -285,7 +336,7 @@ internal class AnkiRepository(
         val activeBackend = activeBackendOrError(settings).getOrElse {
             return@withContext emptyMap()
         }
-        if (!activeBackend.isAvailable()) return@withContext emptyMap()
+        if (!activeBackend.checkAvailability()) return@withContext emptyMap()
         val availableDecks = decks.ifEmpty { activeBackend.fetchDecks() }
         val availableNoteTypes = noteTypes.ifEmpty { activeBackend.fetchNoteTypes() }
         settings.cardFormats.associate { format ->
@@ -318,8 +369,8 @@ internal class AnkiRepository(
     ): Boolean = withContext(Dispatchers.IO) {
         val settings = settings.first()
         val format = settings.resolveAnkiCardFormat(formatId) ?: return@withContext false
-        val activeBackend = activeBackendOrError(settings).getOrElse { return@withContext false }
-        if (!activeBackend.isAvailable()) return@withContext false
+        val activeBackend = activeBackendOrError(settings).getOrThrow()
+        if (!activeBackend.checkAvailability()) return@withContext false
         val availableDecks = decks.ifEmpty { activeBackend.fetchDecks() }
         val availableNoteTypes = noteTypes.ifEmpty { activeBackend.fetchNoteTypes() }
         val deck = availableDecks.firstOrNull { it.id == format.selectedDeckId }
@@ -367,28 +418,36 @@ internal class AnkiRepository(
     }
 
     private fun addRemoteAudio(url: String, activeBackend: AnkiBackend, backendKind: AnkiBackendKind): String? =
-        runCatching {
+        optionalMedia {
             val data = readAnkiAudioBytes(
                 url = url,
                 readLocalAudio = localAudioRepository::loadAudio,
                 readRemoteAudio = { remoteUrl -> URL(remoteUrl).openStream().use { it.readBytes() } },
             )
-                ?: return null
+                ?: return@optionalMedia null
             val media = ankiAudioMediaFile(url, data)
             val file = mediaCacheFile(media.preferredName)
             file.writeBytes(data)
             addMediaFile(file.absolutePath, file.name, media.mimeType, activeBackend, backendKind)
-        }.getOrNull()
+        }
 
     private fun addDictionaryMedia(media: DictionaryMedia, activeBackend: AnkiBackend, backendKind: AnkiBackendKind): String? =
-        runCatching {
-            val data = loadDictionaryMedia(media) ?: return null
+        optionalMedia {
+            val data = loadDictionaryMedia(media) ?: return@optionalMedia null
             val file = mediaCacheFile("hoshi_dict_${sha1Hex(data)}.${media.path.substringAfterLast('.', "bin")}")
             file.writeBytes(data)
             addMediaFile(file.absolutePath, file.name, mimeTypeForPath(media.path), activeBackend, backendKind)
                 ?.let(::ankiInlineMediaReference)
-        }.onFailure { Log.w(TAG, "Failed to add dictionary media ${media.path}", it) }
-            .getOrNull()
+        }
+
+    private inline fun <T> optionalMedia(block: () -> T?): T? = try {
+        block()
+    } catch (error: CancellationException) {
+        throw error
+    } catch (error: Exception) {
+        ErrorDiagnosticEvents.buffer.record(UiText.Resource(R.string.anki_operation_failed), error)
+        null
+    }
 
     private fun addHashedMediaFile(
         path: String,
@@ -409,16 +468,12 @@ internal class AnkiRepository(
         backendKind: AnkiBackendKind,
     ): String? {
         val file = File(path).takeIf { it.isFile } ?: return null
-        return runCatching {
-            if (backendKind == AnkiBackendKind.AnkiConnect) {
-                return@runCatching activeBackend.addMediaFromBytes(file.readBytes(), preferredName, mimeType)
-            }
-            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-            context.grantUriPermission("com.ichi2.anki", uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            activeBackend.addMediaFromUri(uri.toString(), preferredName, mimeType)
+        if (backendKind == AnkiBackendKind.AnkiConnect) {
+            return activeBackend.addMediaFromBytes(file.readBytes(), preferredName, mimeType)
         }
-            .onFailure { Log.w(TAG, "Failed to add Anki media $preferredName", it) }
-            .getOrNull()
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        context.grantUriPermission("com.ichi2.anki", uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        return activeBackend.addMediaFromUri(uri.toString(), preferredName, mimeType)
     }
 
     private fun mediaCacheFile(name: String): File {

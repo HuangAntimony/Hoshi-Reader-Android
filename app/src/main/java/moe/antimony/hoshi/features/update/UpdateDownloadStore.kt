@@ -21,6 +21,7 @@ internal data class UpdateDownloadRecord(
     val downloadUrl: String? = null,
     val fallbackDownloadUrls: List<String> = emptyList(),
     val status: UpdateDownloadRecordStatus,
+    val failureDetails: String? = null,
 ) {
     fun matches(update: AvailableUpdate): Boolean =
         versionName == update.versionName &&
@@ -75,6 +76,7 @@ internal class UpdateDownloadStore(
             preferences[KEY_DOWNLOAD_URL] = downloadUrl
             preferences[KEY_FALLBACK_DOWNLOAD_URLS] = update.fallbackDownloadUrls.joinToString(separator = "\n")
             preferences[KEY_STATUS] = UpdateDownloadRecordStatus.Downloading.name
+            preferences.remove(KEY_FAILURE_DETAILS)
             update.sha256?.let { preferences[KEY_SHA256] = it } ?: preferences.remove(KEY_SHA256)
         }
     }
@@ -89,6 +91,7 @@ internal class UpdateDownloadStore(
             preferences[KEY_DOWNLOAD_URL] = update.downloadUrl
             preferences[KEY_FALLBACK_DOWNLOAD_URLS] = update.fallbackDownloadUrls.joinToString(separator = "\n")
             preferences[KEY_STATUS] = UpdateDownloadRecordStatus.Available.name
+            preferences.remove(KEY_FAILURE_DETAILS)
             update.sha256?.let { preferences[KEY_SHA256] = it } ?: preferences.remove(KEY_SHA256)
         }
     }
@@ -103,6 +106,7 @@ internal class UpdateDownloadStore(
             preferences[KEY_DOWNLOAD_URL] = update.downloadUrl
             preferences[KEY_FALLBACK_DOWNLOAD_URLS] = update.fallbackDownloadUrls.joinToString(separator = "\n")
             preferences[KEY_STATUS] = UpdateDownloadRecordStatus.Skipped.name
+            preferences.remove(KEY_FAILURE_DETAILS)
             update.sha256?.let { preferences[KEY_SHA256] = it } ?: preferences.remove(KEY_SHA256)
         }
     }
@@ -111,14 +115,16 @@ internal class UpdateDownloadStore(
         dataStore.edit { preferences ->
             if (preferences[KEY_DOWNLOAD_ID] == downloadId) {
                 preferences[KEY_STATUS] = UpdateDownloadRecordStatus.Downloaded.name
+                preferences.remove(KEY_FAILURE_DETAILS)
             }
         }
     }
 
-    suspend fun markFailed(downloadId: Long) {
+    suspend fun markFailed(downloadId: Long, details: String? = null) {
         dataStore.edit { preferences ->
             if (preferences[KEY_DOWNLOAD_ID] == downloadId) {
                 preferences[KEY_STATUS] = UpdateDownloadRecordStatus.Failed.name
+                details?.takeIf(String::isNotBlank)?.let { preferences[KEY_FAILURE_DETAILS] = it }
             }
         }
     }
@@ -134,6 +140,7 @@ internal class UpdateDownloadStore(
             preferences.remove(KEY_FALLBACK_DOWNLOAD_URLS)
             preferences.remove(KEY_SHA256)
             preferences.remove(KEY_STATUS)
+            preferences.remove(KEY_FAILURE_DETAILS)
         }
     }
 
@@ -158,6 +165,7 @@ internal class UpdateDownloadStore(
                 ?.toList()
                 .orEmpty(),
             status = status,
+            failureDetails = this[KEY_FAILURE_DETAILS],
         )
     }
 
@@ -170,6 +178,7 @@ internal class UpdateDownloadStore(
         private val KEY_DOWNLOAD_URL = stringPreferencesKey("downloadUrl")
         private val KEY_FALLBACK_DOWNLOAD_URLS = stringPreferencesKey("fallbackDownloadUrls")
         private val KEY_SHA256 = stringPreferencesKey("sha256")
+        private val KEY_FAILURE_DETAILS = stringPreferencesKey("failureDetails")
         private val KEY_STATUS = stringPreferencesKey("status")
     }
 }

@@ -10,13 +10,14 @@ import moe.antimony.hoshi.di.IoDispatcher
 import moe.antimony.hoshi.epub.BookStatisticsStore
 import moe.antimony.hoshi.epub.ReadingSession
 import moe.antimony.hoshi.epub.ReadingSessions
+import moe.antimony.hoshi.epub.StatisticsArchiveSummary
 
 internal interface StatisticsRepository {
     suspend fun loadSnapshot(): StatisticsSnapshot
     suspend fun loadBookStatistics(folder: String): StatisticsBookRecords?
     suspend fun editSession(folder: String, id: String, characters: Int?, readingTime: Double?)
     suspend fun deleteSessions(folder: String, ids: Collection<String>)
-    suspend fun loadArchiveSummary(): Int
+    suspend fun loadArchiveSummary(): StatisticsArchiveSummary
     suspend fun clearArchive()
 }
 
@@ -31,6 +32,7 @@ internal data class StatisticsSnapshot(
     val days: List<StatisticsDayAggregate>,
     val availableYears: List<Int>,
     val skippedCorruptBookIds: Set<String> = emptySet(),
+    val readErrors: Map<String, Throwable> = emptyMap(),
 )
 
 @Singleton
@@ -41,6 +43,7 @@ internal class AndroidStatisticsRepository @Inject constructor(
     override suspend fun loadSnapshot(): StatisticsSnapshot = withContext(ioDispatcher) {
         val stored = statisticsStore.loadSnapshot()
         val contributionsByDate = linkedMapOf<LocalDate, MutableList<StatisticsBookContribution>>()
+        val readErrors = stored.readErrors.toMutableMap()
         stored.books.forEach { book ->
             book.days.forEach { day ->
                 val date = day.date
@@ -65,7 +68,7 @@ internal class AndroidStatisticsRepository @Inject constructor(
                 bookContributions = contributions.sortedBy { it.title.lowercase() },
             )
         }
-        StatisticsSnapshot(days, days.map { it.date.year }.distinct().sortedDescending(), stored.corruptBookIds)
+        StatisticsSnapshot(days, days.map { it.date.year }.distinct().sortedDescending(), stored.corruptBookIds + readErrors.keys, readErrors)
     }
 
     override suspend fun loadBookStatistics(folder: String): StatisticsBookRecords? =
@@ -77,6 +80,6 @@ internal class AndroidStatisticsRepository @Inject constructor(
         statisticsStore.edit(id, folder, characters, readingTime)
 
     override suspend fun deleteSessions(folder: String, ids: Collection<String>) = statisticsStore.delete(ids, folder)
-    override suspend fun loadArchiveSummary(): Int = statisticsStore.loadArchiveSummary()
+    override suspend fun loadArchiveSummary(): StatisticsArchiveSummary = statisticsStore.loadArchiveSummary()
     override suspend fun clearArchive() = statisticsStore.clearArchive()
 }

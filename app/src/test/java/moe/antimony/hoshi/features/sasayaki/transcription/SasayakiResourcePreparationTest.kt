@@ -13,7 +13,7 @@ class SasayakiResourcePreparationTest {
             val requests = mutableListOf<Long>()
             val progress = mutableListOf<Double>()
             val stores = listOf("runtime", "model").map { name ->
-                SasayakiModelStore(File(root, name), SasayakiModelTransport {
+                SasayakiModelStore(File(root, name), SasayakiModelTransport { _, _ ->
                     assertEquals(listOf(6L), requests)
                     SasayakiDownloadResponse("abc".byteInputStream(), 3)
                 }, Dispatchers.Unconfined, listOf(SasayakiModelFile(name, "https://example.org/$name", 3,
@@ -31,7 +31,7 @@ class SasayakiResourcePreparationTest {
     @Test fun decliningCombinedDownloadNeverOpensNetwork() = runBlocking<Unit> {
         val root = Files.createTempDirectory("sasayaki-resources").toFile()
         try {
-            val store = SasayakiModelStore(root, SasayakiModelTransport { error("Network before consent") },
+            val store = SasayakiModelStore(root, SasayakiModelTransport { _, _ -> error("Network before consent") },
                 Dispatchers.Unconfined, listOf(SasayakiModelFile("runtime", "https://example.org", 3, "unused")))
             try {
                 prepareSasayakiResources(listOf(store), { throw CancellationException() }, {})

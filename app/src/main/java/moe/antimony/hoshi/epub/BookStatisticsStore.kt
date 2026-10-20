@@ -8,6 +8,7 @@ import java.util.UUID
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -41,7 +42,16 @@ internal data class StoredBookStatistics(
 internal data class StoredStatisticsSnapshot(
     val books: List<StoredBookStatistics>,
     val corruptBookIds: Set<String>,
+    val readErrors: Map<String, Throwable> = emptyMap(),
 )
+
+internal data class StatisticsArchiveSummary(
+    val bookCount: Int,
+    val readErrors: Map<String, Throwable> = emptyMap(),
+) {
+    val hasArchivedData: Boolean get() = bookCount > 0 || readErrors.isNotEmpty()
+    val totalBookCount: Int get() = bookCount + readErrors.size
+}
 
 @Singleton
 class BookStatisticsStore private constructor(
@@ -154,6 +164,7 @@ class BookStatisticsStore private constructor(
 
     internal suspend fun loadSnapshot(): StoredStatisticsSnapshot = locked {
         val corrupt = linkedSetOf<String>()
+        val readErrors = linkedMapOf<String, Throwable>()
         val activeRoots = booksDirectory.listFiles().orEmpty()
             .filter { it.isDirectory && !it.name.startsWith('.') && it.name != STATISTICS_ARCHIVE_DIRECTORY }
             .associateBy { it.name.normalizedBookFolder() }
@@ -166,12 +177,15 @@ class BookStatisticsStore private constructor(
                 val metadata = readMetadata(root)
                 id = metadata.id
                 storedBook(folder, root, metadata, folder !in activeRoots)
-            } catch (_: Exception) {
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
                 corrupt += id
+                readErrors[id] = error
                 null
             }
         }
-        StoredStatisticsSnapshot(books, corrupt)
+        StoredStatisticsSnapshot(books, corrupt, readErrors)
     }
 
     internal suspend fun loadBook(folder: String): StoredBookStatistics? = locked {
@@ -199,16 +213,31 @@ class BookStatisticsStore private constructor(
         }
     }
 
-    suspend fun loadArchiveSummary(): Int = locked {
-        archiveDirectory.listFiles().orEmpty().count { root ->
-            root.isDirectory && !root.name.startsWith('.') && runCatching { readSessions(root).values.any { it.value != null } }.getOrDefault(false)
-        }
+    internal suspend fun loadArchiveSummary(): StatisticsArchiveSummary = locked {
+        var bookCount = 0
+        val readErrors = linkedMapOf<String, Throwable>()
+        archiveDirectory.listFiles().orEmpty()
+            .filter { it.isDirectory && !it.name.startsWith('.') }
+            .forEach { root ->
+                try {
+                    readMetadata(root)
+                    if (readSessions(root).values.any { it.value != null }) bookCount++
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    readErrors[root.name] = error
+                }
+            }
+        StatisticsArchiveSummary(bookCount, readErrors)
     }
 
     suspend fun clearArchive() {
         val folders = locked { archiveDirectory.listFiles().orEmpty().filter { it.isDirectory }.map { it.name } }
         for (folder in folders) {
-            val ids = locked { runCatching { readSessions(archiveRoot(folder)).keys }.getOrNull() } ?: continue
+            val ids = locked {
+                val root = archiveRoot(folder)
+                runCatching { readSessions(root).keys }.getOrElse { removeArchive(root); null }
+            } ?: continue
             delete(ids, folder)
         }
     }

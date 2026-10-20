@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -71,6 +72,7 @@ import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.R
+import moe.antimony.hoshi.ui.withErrorDetails
 import moe.antimony.hoshi.epub.EpubBook
 import moe.antimony.hoshi.epub.ReaderHighlight
 import moe.antimony.hoshi.ui.hoshiSingleLineTextFieldLineLimits
@@ -121,16 +123,16 @@ internal fun ReaderGoToSheet(
             return@LaunchedEffect
         }
         searchState.searching = true
-        searchState.failed = false
+        searchState.failure = null
         when (val searchResult = loadReaderSearchResults { withContext(Dispatchers.IO) { searchEngine.search(captured) } }) {
             is ReaderSearchLoadResult.Success -> {
                 searchState.results = searchResult.value
                 searchState.searching = false
             }
-            ReaderSearchLoadResult.Failure -> {
+            is ReaderSearchLoadResult.Failure -> {
                 searchState.results = emptyList()
                 searchState.searching = false
-                searchState.failed = true
+                searchState.failure = searchResult.cause
             }
         }
     }
@@ -200,7 +202,7 @@ internal class ReaderSearchSheetState {
     var submittedQuery by mutableStateOf("")
     var results by mutableStateOf(emptyList<ReaderSearchResult>())
     var searching by mutableStateOf(false)
-    var failed by mutableStateOf(false)
+    var failure by mutableStateOf<Throwable?>(null)
     var searchNonce by mutableStateOf(0)
     var handledSearchNonce by mutableStateOf(0)
 
@@ -224,7 +226,7 @@ internal class ReaderSearchSheetState {
         submittedQuery = ""
         results = emptyList()
         searching = false
-        failed = false
+        failure = null
     }
 }
 
@@ -314,7 +316,7 @@ private fun ReaderSearchTab(
         ReaderSearchResultsContent(
             query = searchState.submittedQuery,
             searching = searchState.searching,
-            failed = searchState.failed,
+            failure = searchState.failure,
             results = searchState.results,
             progressDisplay = progressDisplay,
             totalCharacters = totalCharacters,
@@ -415,7 +417,7 @@ private fun ReaderCompactSearchInput(
 private fun ReaderSearchResultsContent(
     query: String,
     searching: Boolean,
-    failed: Boolean,
+    failure: Throwable?,
     results: List<ReaderSearchResult>,
     progressDisplay: ReaderProgressDisplay,
     totalCharacters: Int,
@@ -430,9 +432,9 @@ private fun ReaderSearchResultsContent(
             modifier = modifier,
         )
         searching -> ReaderGoToLoadingState(modifier = modifier)
-        failed -> ReaderGoToEmptyState(
+        failure != null -> ReaderGoToEmptyState(
             icon = Icons.Rounded.Search,
-            text = stringResource(R.string.reader_search_failed),
+            text = stringResource(R.string.reader_search_failed).withErrorDetails(failure),
             modifier = modifier,
         )
         results.isEmpty() -> ReaderGoToEmptyState(
@@ -637,7 +639,7 @@ private fun ReaderGoToEmptyState(
             text = text,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(top = 8.dp),
+            modifier = Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()).padding(top = 8.dp),
         )
     }
 }

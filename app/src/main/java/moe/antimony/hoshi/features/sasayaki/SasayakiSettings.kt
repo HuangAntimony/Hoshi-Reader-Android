@@ -246,3 +246,5 @@ class SasayakiSettingsRepository(
 
 internal fun Color.toSasayakiColorLong(): Long =
     toArgb().toLong() and 0xFFFFFFFF
+
+internal typealias SasayakiSettingsUpdate = (SasayakiSettings) -> SasayakiSettings

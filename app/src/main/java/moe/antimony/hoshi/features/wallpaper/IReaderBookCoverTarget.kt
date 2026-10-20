@@ -59,9 +59,9 @@ class IReaderBookCoverFileTarget(
         } catch (exception: CancellationException) {
             temporary.delete()
             throw exception
-        } catch (_: Exception) {
+        } catch (error: Exception) {
             temporary.delete()
-            return@withContext BookCoverPublishFailure.IReaderWriteFailed
+            throw BookCoverTargetException(BookCoverPublishFailure.IReaderWriteFailed, error)
         }
 
         val staleFiles = directory.listFiles()
@@ -77,8 +77,10 @@ class IReaderBookCoverFileTarget(
         try {
             notifier.notifyChanged()
             null
-        } catch (_: Exception) {
-            BookCoverPublishFailure.IReaderRefreshFailed
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            throw BookCoverTargetException(BookCoverPublishFailure.IReaderRefreshFailed, error)
         }
     }
 }

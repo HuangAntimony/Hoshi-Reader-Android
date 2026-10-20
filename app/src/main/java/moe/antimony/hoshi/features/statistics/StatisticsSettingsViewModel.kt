@@ -13,21 +13,56 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import moe.antimony.hoshi.R
+import moe.antimony.hoshi.epub.StatisticsArchiveSummary
+import moe.antimony.hoshi.ui.diagnosticMessage
+import moe.antimony.hoshi.features.settings.SettingsLoadState
+import moe.antimony.hoshi.features.settings.map
 import moe.antimony.hoshi.features.reader.ReaderSettings
 import moe.antimony.hoshi.features.reader.ReaderSettingsRepository
 import moe.antimony.hoshi.features.sync.SyncStorage
 import moe.antimony.hoshi.ui.UiText
+import moe.antimony.hoshi.ui.ErrorDiagnosticEvents
+import moe.antimony.hoshi.ui.withErrorDetails
+
+internal data class StatisticsSettingsValues(
+    val settings: ReaderSettings,
+    val archiveSummary: StatisticsArchiveSummary,
+) {
+    val archivedBookCount: Int get() = archiveSummary.bookCount
+}
 
 internal data class StatisticsSettingsUiState(
-    val settings: ReaderSettings? = null,
-    val archivedBookCount: Int = 0,
+    val preferences: SettingsLoadState<ReaderSettings> = SettingsLoadState.Loading,
+    val archive: SettingsLoadState<StatisticsArchiveSummary> = SettingsLoadState.Loading,
     val isWorking: Boolean = false,
     val error: UiText? = null,
-)
+) {
+    val loadState: SettingsLoadState<StatisticsSettingsValues>
+        get() {
+            val currentPreferences = preferences
+            val currentArchive = archive
+            return when {
+                currentPreferences is SettingsLoadState.Failed -> currentPreferences
+                currentArchive is SettingsLoadState.Failed -> currentArchive
+                currentPreferences is SettingsLoadState.Loaded -> currentArchive.map { summary ->
+                    StatisticsSettingsValues(
+                        settings = currentPreferences.value,
+                        archiveSummary = summary,
+                    )
+                }
+                else -> SettingsLoadState.Loading
+            }
+        }
+
+    val settings: ReaderSettings?
+        get() = (preferences as? SettingsLoadState.Loaded)?.value
+    val archivedBookCount: Int
+        get() = (archive as? SettingsLoadState.Loaded)?.value?.bookCount ?: 0
+}
 
 @HiltViewModel
 internal class StatisticsSettingsViewModel internal constructor(
-    readerSettings: Flow<ReaderSettings>,
+    private val readerSettings: Flow<ReaderSettings>,
     private val updateSettings: suspend ((ReaderSettings) -> ReaderSettings) -> Unit,
     private val repository: StatisticsRepository,
     private val coroutineScope: CoroutineScope?,
@@ -53,13 +88,33 @@ internal class StatisticsSettingsViewModel internal constructor(
     private val scope get() = coroutineScope ?: viewModelScope
     private val _uiState = MutableStateFlow(StatisticsSettingsUiState())
     val uiState = _uiState.asStateFlow()
+    private var settingsJob: Job? = null
     private var reloadJob: Job? = null
     private var generation = 0
 
     init {
-        scope.launch {
-            readerSettings.collect { settings -> _uiState.update { it.copy(settings = settings) } }
+        retryLoad()
+    }
+
+    fun retryLoad() {
+        settingsJob?.cancel()
+        _uiState.update {
+            it.copy(preferences = SettingsLoadState.Loading, archive = SettingsLoadState.Loading)
         }
+        settingsJob = scope.launch {
+            try {
+                readerSettings.collect { settings ->
+                    _uiState.update { it.copy(preferences = SettingsLoadState.Loaded(settings)) }
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                _uiState.update {
+                    it.copy(preferences = SettingsLoadState.Failed(UiText.Resource(R.string.settings_load_failed).withErrorDetails(error)))
+                }
+            }
+        }
+        reload()
     }
 
     fun reload() {
@@ -67,41 +122,61 @@ internal class StatisticsSettingsViewModel internal constructor(
         reloadJob?.cancel()
         reloadJob = scope.launch {
             try {
-                val count = repository.loadArchiveSummary()
-                if (request == generation) _uiState.update { it.copy(archivedBookCount = count) }
+                val summary = repository.loadArchiveSummary()
+                if (request == generation) _uiState.update { current ->
+                    val readError = summary.readErrors.takeIf { it.isNotEmpty() }?.let { errors ->
+                        UiText.Joined(listOf(UiText.Resource(R.string.statistics_partial_unavailable)) + errors.map { (folder, error) ->
+                            ErrorDiagnosticEvents.buffer.record(
+                                UiText.Joined(listOf(UiText.Resource(R.string.statistics_partial_unavailable), UiText.Literal(folder))),
+                                error,
+                            )
+                            UiText.Literal("$folder: ${error.diagnosticMessage()}")
+                        })
+                    }
+                    current.copy(archive = SettingsLoadState.Loaded(summary), error = current.error ?: readError)
+                }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
-                if (request == generation) showError()
+            } catch (error: Exception) {
+                if (request == generation) {
+                    if (_uiState.value.archive is SettingsLoadState.Loaded) {
+                        showError(error)
+                    } else {
+                        _uiState.update {
+                            it.copy(archive = SettingsLoadState.Failed(UiText.Resource(R.string.settings_load_failed).withErrorDetails(error)))
+                        }
+                    }
+                }
             }
         }
     }
 
     fun update(transform: (ReaderSettings) -> ReaderSettings) {
+        if (_uiState.value.loadState !is SettingsLoadState.Loaded) return
         scope.launch {
             try {
                 updateSettings(transform)
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
-                showError()
+            } catch (error: Exception) {
+                showError(error)
             }
         }
     }
 
     fun clearArchive() {
-        if (_uiState.value.isWorking) return
+        if (_uiState.value.isWorking || _uiState.value.loadState !is SettingsLoadState.Loaded) return
         ++generation
         reloadJob?.cancel()
         _uiState.update { it.copy(isWorking = true) }
         scope.launch {
             try {
                 repository.clearArchive()
-                _uiState.update { it.copy(archivedBookCount = 0) }
+                _uiState.update { it.copy(archive = SettingsLoadState.Loaded(StatisticsArchiveSummary(0)), error = null) }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
-                showError()
+            } catch (error: Exception) {
+                showError(error)
             } finally {
                 _uiState.update { it.copy(isWorking = false) }
                 reload()
@@ -111,7 +186,7 @@ internal class StatisticsSettingsViewModel internal constructor(
 
     fun dismissError() = _uiState.update { it.copy(error = null) }
 
-    private fun showError() = _uiState.update {
-        it.copy(error = UiText.Resource(R.string.statistics_operation_failed))
+    private fun showError(error: Throwable) = _uiState.update {
+        it.copy(error = UiText.Resource(R.string.statistics_operation_failed).withErrorDetails(error))
     }
 }
