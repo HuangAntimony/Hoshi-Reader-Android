@@ -692,7 +692,12 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   network-restored passes, immutable upload/download and stale-file cleanup. Process lifecycle state
   and sync settings jointly gate polling, including cold background launches;
   a Hilt WorkManager job performs the final background pass
-  with a connected-network constraint. State and file failures propagate to the
+  with a connected-network constraint. A state task owns its file-work handoff,
+  and the file task includes the follow-up state publication and any resulting
+  file passes. Publication requires a fresh full state pass after upload, even
+  when another pass is running or a reader-open sync supersedes it; the worker
+  waits for this chain to finish before returning success.
+  State and file failures, including post-upload publication failures, propagate to the
   worker: temporary network/server failures and HTTP 403/429 rate limits retry,
   even when another book or file has a permanent failure, while authorization and format
   failures wait for user action. Foreground run/book/file failures retain original

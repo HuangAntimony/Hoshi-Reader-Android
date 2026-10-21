@@ -1244,6 +1244,15 @@ Validate relevant sync/update/Sasayaki changes with:
   `GoogleDriveSyncManagerTest`, and `GoogleDriveSyncWorkerTest` cover draft
   invalidation, persisted shelf order, transient failure/recovery and worker
   outcomes; authorization/format failures must not loop on automatic retries.
+  For new-book uploads, delay the state publication after the EPUB transfer:
+  background work must stay active until the cloud state references the file.
+  Fail that publication and confirm temporary failures retry with the original
+  diagnostic cause, permanent failures remain visible without automatic retry,
+  and a later successful pass makes the book downloadable. Cover work begun in
+  both the foreground and background, a foreground state pass overlapping the
+  upload, a reader-open sync replacing the publication pass, plus cancellation
+  and stopping sync. Joining an older or targeted pass alone must not count as
+  publishing new file references.
 - Hoshi sync errors: fail a foreground sync, open/download a cloud book, and each
   library-merge choice. Error details and Diagnostics must retain the original
   message, nested cause and HTTP status when present. Batch failures retain every

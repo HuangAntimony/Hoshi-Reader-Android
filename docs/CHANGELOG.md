@@ -29,7 +29,9 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   Books sync eight at a time using far fewer Google Drive requests, and
   rate-limited or failed requests are retried.
   Background sync waits for a network connection and retries temporary failures,
-  including sustained Drive rate limits; background launches do not start foreground polling.
+  including sustained Drive rate limits. It finishes only after uploaded files'
+  references are published so other devices can download them; failures at this
+  final step also follow the retry policy. Background launches do not start foreground polling.
   Renaming a shelf preserves its order and book memberships.
 - Keep the latest 100 runtime errors in Diagnostics, including the operation,
   time, original error details and cause stack; retain them across restarts,
