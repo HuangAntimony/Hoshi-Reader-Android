@@ -184,8 +184,9 @@ including empty environment values. Protocol and activity tests live under
 `DriveFileTransferTest` covers resumable protocol recovery and persistence with
 MockWebServer. `BookTransferSchedulerTest` and `SyncTransferTrackerTest` cover
 concurrency and monotonic-clock effective speed measurement without real network timing.
-`SyncQueueViewTest` renders isolated upload/download rows without accessing the
-book repository or account; its screenshot is in target cache
+`SyncQueueViewTest` renders isolated upload/download rows and checks that active
+row reordering/completion preserves the queue head or the user's manually scrolled
+position without accessing the book repository or account; its screenshot is in target cache
 `sync-queue-fixture.png`.
 
 For device restart recovery, build/install the debug and androidTest APKs under

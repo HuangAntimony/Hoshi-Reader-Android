@@ -3,12 +3,19 @@ package moe.antimony.hoshi.features.sync
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -35,6 +42,19 @@ internal fun SyncQueueSheet(state: GoogleDriveSyncState, onDismiss: () -> Unit, 
 @Composable
 internal fun SyncQueueContent(state: GoogleDriveSyncState, onError: (UiText) -> Unit) {
     val colors = MaterialTheme.colorScheme
+    val listState = rememberLazyListState()
+    val queueKeys = remember(state.queue) { state.queue.map { it.key } }
+    var previousKeys by remember { mutableStateOf<List<String>?>(null) }
+    val atTop by remember { derivedStateOf { !listState.canScrollBackward } }
+    // Capture before LazyColumn can anchor the old first-visible key at its new index.
+    // Follow the queue head only while already at the top; preserve deliberate scrolling.
+    val followHead = (previousKeys.isNullOrEmpty() || atTop) && !listState.isScrollInProgress
+    SideEffect {
+        if (previousKeys != queueKeys) {
+            if (previousKeys != null && followHead) listState.requestScrollToItem(0)
+            previousKeys = queueKeys
+        }
+    }
     Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text(stringResource(R.string.sync_queue), style = MaterialTheme.typography.titleLarge)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -44,7 +64,7 @@ internal fun SyncQueueContent(state: GoogleDriveSyncState, onError: (UiText) -> 
         if (state.queue.isEmpty()) {
             Text(stringResource(R.string.sync_queue_all_synced), color = colors.onSurfaceVariant)
         } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 items(state.queue, key = { it.key }) { item ->
                     val transfer = state.activeTransfers[item.key]
                     Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
