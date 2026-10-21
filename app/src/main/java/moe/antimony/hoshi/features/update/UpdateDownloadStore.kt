@@ -22,9 +22,13 @@ internal data class UpdateDownloadRecord(
     val fallbackDownloadUrls: List<String> = emptyList(),
     val status: UpdateDownloadRecordStatus,
     val failureDetails: String? = null,
+    val previewCommitSha: String? = null,
+    val previewTag: String? = null,
+    val previewPublishedAt: String? = null,
 ) {
     fun matches(update: AvailableUpdate): Boolean =
-        versionName == update.versionName &&
+        previewCommitSha == update.previewCommitSha &&
+            versionName == update.versionName &&
             assetName == update.assetName &&
             sha256 == update.sha256
 
@@ -37,6 +41,9 @@ internal data class UpdateDownloadRecord(
             downloadUrl = url,
             fallbackDownloadUrls = fallbackDownloadUrls,
             sha256 = sha256,
+            previewCommitSha = previewCommitSha,
+            previewTag = previewTag,
+            previewPublishedAt = previewPublishedAt,
         )
     }
 }
@@ -48,6 +55,10 @@ internal enum class UpdateDownloadRecordStatus {
     Downloaded,
     Failed,
 }
+
+private val Context.previewDownloadDataStore by preferencesDataStore(name = "preview-downloads")
+
+internal fun Context.previewDownloadStore(): UpdateDownloadStore = UpdateDownloadStore(previewDownloadDataStore)
 
 private val Context.updateDownloadDataStore by preferencesDataStore(name = "update-downloads")
 
@@ -68,6 +79,9 @@ internal class UpdateDownloadStore(
         downloadUrl: String,
     ) {
         dataStore.edit { preferences ->
+            update.previewCommitSha?.let { preferences[KEY_PREVIEW_SHA] = it } ?: preferences.remove(KEY_PREVIEW_SHA)
+            update.previewTag?.let { preferences[KEY_PREVIEW_TAG] = it } ?: preferences.remove(KEY_PREVIEW_TAG)
+            update.previewPublishedAt?.let { preferences[KEY_PREVIEW_PUBLISHED] = it } ?: preferences.remove(KEY_PREVIEW_PUBLISHED)
             preferences[KEY_VERSION_NAME] = update.versionName
             preferences[KEY_RELEASE_URL] = update.releaseUrl
             preferences[KEY_ASSET_NAME] = update.assetName
@@ -83,6 +97,9 @@ internal class UpdateDownloadStore(
 
     suspend fun saveAvailable(update: AvailableUpdate) {
         dataStore.edit { preferences ->
+            update.previewCommitSha?.let { preferences[KEY_PREVIEW_SHA] = it } ?: preferences.remove(KEY_PREVIEW_SHA)
+            update.previewTag?.let { preferences[KEY_PREVIEW_TAG] = it } ?: preferences.remove(KEY_PREVIEW_TAG)
+            update.previewPublishedAt?.let { preferences[KEY_PREVIEW_PUBLISHED] = it } ?: preferences.remove(KEY_PREVIEW_PUBLISHED)
             preferences[KEY_VERSION_NAME] = update.versionName
             preferences[KEY_RELEASE_URL] = update.releaseUrl
             preferences[KEY_ASSET_NAME] = update.assetName
@@ -98,6 +115,9 @@ internal class UpdateDownloadStore(
 
     suspend fun skip(update: AvailableUpdate) {
         dataStore.edit { preferences ->
+            update.previewCommitSha?.let { preferences[KEY_PREVIEW_SHA] = it } ?: preferences.remove(KEY_PREVIEW_SHA)
+            update.previewTag?.let { preferences[KEY_PREVIEW_TAG] = it } ?: preferences.remove(KEY_PREVIEW_TAG)
+            update.previewPublishedAt?.let { preferences[KEY_PREVIEW_PUBLISHED] = it } ?: preferences.remove(KEY_PREVIEW_PUBLISHED)
             preferences[KEY_VERSION_NAME] = update.versionName
             preferences[KEY_RELEASE_URL] = update.releaseUrl
             preferences[KEY_ASSET_NAME] = update.assetName
@@ -131,6 +151,9 @@ internal class UpdateDownloadStore(
 
     suspend fun clear() {
         dataStore.edit { preferences ->
+            preferences.remove(KEY_PREVIEW_SHA)
+            preferences.remove(KEY_PREVIEW_TAG)
+            preferences.remove(KEY_PREVIEW_PUBLISHED)
             preferences.remove(KEY_VERSION_NAME)
             preferences.remove(KEY_RELEASE_URL)
             preferences.remove(KEY_ASSET_NAME)
@@ -166,10 +189,16 @@ internal class UpdateDownloadStore(
                 .orEmpty(),
             status = status,
             failureDetails = this[KEY_FAILURE_DETAILS],
+            previewCommitSha = this[KEY_PREVIEW_SHA],
+            previewTag = this[KEY_PREVIEW_TAG],
+            previewPublishedAt = this[KEY_PREVIEW_PUBLISHED],
         )
     }
 
     companion object {
+        private val KEY_PREVIEW_SHA = stringPreferencesKey("previewCommitSha")
+        private val KEY_PREVIEW_TAG = stringPreferencesKey("previewTag")
+        private val KEY_PREVIEW_PUBLISHED = stringPreferencesKey("previewPublishedAt")
         private val KEY_VERSION_NAME = stringPreferencesKey("versionName")
         private val KEY_RELEASE_URL = stringPreferencesKey("releaseUrl")
         private val KEY_ASSET_NAME = stringPreferencesKey("assetName")

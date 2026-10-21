@@ -190,7 +190,7 @@ def publish_preview(api, *, directory, sha, build_id, changelog, run_url, built_
         "> It replaces your existing app and keeps your data. Data changes may affect "
         "compatibility with older builds.\n"
         ">\n"
-        "> New previews must be downloaded manually from GitHub Releases. Updates to "
+        "> Get new previews manually from About or GitHub Releases. Updates to "
         "newer stable releases remain available as usual.\n\n"
         f"- Commit: [{sha}](https://github.com/{REPOSITORY}/tree/{sha})\n"
         f"- Built at (UTC): {built_at}\n"

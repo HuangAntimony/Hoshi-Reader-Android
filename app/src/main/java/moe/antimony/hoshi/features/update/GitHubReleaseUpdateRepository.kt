@@ -55,6 +55,9 @@ internal data class AvailableUpdate(
     val downloadUrl: String,
     val fallbackDownloadUrls: List<String> = emptyList(),
     val sha256: String?,
+    val previewCommitSha: String? = null,
+    val previewTag: String? = null,
+    val previewPublishedAt: String? = null,
 )
 
 internal fun AvailableUpdate.downloadUrlCandidates(): List<String> =
@@ -117,7 +120,7 @@ private object AndroidSupportedAbis {
         runCatching { Build.SUPPORTED_ABIS.toList() }.getOrDefault(emptyList())
 }
 
-private fun GitHubReleaseAsset.normalizedSha256(): String? =
+internal fun GitHubReleaseAsset.normalizedSha256(): String? =
     digest
         ?.removePrefix("sha256:")
         ?.takeIf { it.matches(Regex("[A-Fa-f0-9]{64}")) }
@@ -161,37 +164,10 @@ internal class GitHubReleaseUpdateRepository private constructor(
     )
 
     override suspend fun latestRelease(): GitHubRelease {
-        val headers = mapOf(
-            "Accept" to "application/vnd.github+json",
-            "User-Agent" to "Hoshi-Reader-Android",
-        )
-        val failures = mutableListOf<Pair<String, Throwable>>()
-        latestReleaseCandidates().forEachIndexed { index, url ->
-            val preferMirrors = index > 0
-            runCatching {
-                GitHubReleaseJson
-                    .parse(httpClient.get(url, headers))
-                    .withDownloadMirrors(downloadMirrorPrefixes, preferMirrors)
-            }.onSuccess { release ->
-                return release
-            }.onFailure { error ->
-                if (error is CancellationException) throw error
-                failures += url to error
-            }
-        }
-        if (failures.size == 1) {
-            val (url, error) = failures.single()
-            throw GitHubReleaseException(url, error)
-        }
-        throw GitHubReleaseException(
-            failures.joinToString("\n\n") { (url, error) -> "$url\n${error.diagnosticMessage()}" },
-        ).apply {
-            failures.forEach { (_, error) -> addSuppressed(error) }
+        return readGitHubApi(latestReleaseUrl, apiMirrorPrefixes, httpClient) { body, preferMirrors ->
+            GitHubReleaseJson.parse(body).withDownloadMirrors(downloadMirrorPrefixes, preferMirrors)
         }
     }
-
-    private fun latestReleaseCandidates(): List<String> =
-        (listOf(latestReleaseUrl) + apiMirrorPrefixes.map { prefix -> prefix + latestReleaseUrl }).distinct()
 
     private fun GitHubRelease.withDownloadMirrors(
         mirrorPrefixes: List<String>,
@@ -251,11 +227,11 @@ internal object UrlConnectionGitHubHttpClient : GitHubHttpClient {
     }
 }
 
-private val DefaultApiMirrorPrefixes = listOf(
+internal val DefaultApiMirrorPrefixes = listOf(
     "https://ghproxy.vip/",
 )
 
-private val DefaultDownloadMirrorPrefixes = listOf(
+internal val DefaultDownloadMirrorPrefixes = listOf(
     "https://gh-proxy.com/",
     "https://gh.llkk.cc/",
     "https://ghpull.com/",
@@ -303,3 +279,25 @@ private inline fun <T : HttpURLConnection, R> T.use(block: (T) -> R): R =
     } finally {
         disconnect()
     }
+
+internal fun <T> readGitHubApi(
+    url: String,
+    mirrorPrefixes: List<String>,
+    client: GitHubHttpClient,
+    parse: (String, Boolean) -> T,
+): T {
+    val headers = mapOf("Accept" to "application/vnd.github+json", "User-Agent" to "Hoshi-Reader-Android")
+    val failures = mutableListOf<Pair<String, Throwable>>()
+    (listOf(url) + mirrorPrefixes.map { it + url }).distinct().forEachIndexed { index, candidate ->
+        try {
+            return parse(client.get(candidate, headers), index > 0)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            failures += candidate to error
+        }
+    }
+    if (failures.size == 1) throw GitHubReleaseException(failures.single().first, failures.single().second)
+    throw GitHubReleaseException(failures.joinToString("\n\n") { (source, error) -> "$source\n${error.diagnosticMessage()}" })
+        .apply { failures.forEach { (_, error) -> addSuppressed(error) } }
+}

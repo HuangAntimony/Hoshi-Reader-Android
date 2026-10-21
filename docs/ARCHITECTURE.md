@@ -84,8 +84,17 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
 - Formal tag releases and post-CI main previews share the signed APK build
   workflow. APK previews use unique `apk-preview-<sha>-<run>-<attempt>` annotated
   tags and prereleases, publishing verified ARM APKs before retiring previous
-  workflow-owned previews. App updates continue to use only the latest full
+  workflow-owned previews. Automatic App update checks use only the latest full
   GitHub release; optional transcription component releases are independent.
+- About offers a manual preview action through a Hilt ViewModel. It selects only
+  workflow-owned published APK previews, resolves the annotated tag to a full
+  commit SHA, and compares that identity instead of semantic versions. Preview
+  records use a separate DataStore and a `previews` download subdirectory; the
+  shared DownloadManager implementation and receiver handle both stores without
+  sharing files or version comparison. Only the confirmed, foreground About
+  session can automatically open the system installer. Background completion or
+  restored downloads require tapping Install. Preview cleanup compares commit
+  SHA, so equal-version APKs remain available until that commit is installed.
 - Settings and small persisted preferences are stored behind DataStore-backed
   repositories.
 - Persisted settings controls are composed through the required

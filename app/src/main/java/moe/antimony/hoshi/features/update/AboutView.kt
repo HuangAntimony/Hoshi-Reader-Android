@@ -1,5 +1,6 @@
 package moe.antimony.hoshi.features.update
 
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import moe.antimony.hoshi.ui.theme.hoshiSurfaces
 import moe.antimony.hoshi.ui.theme.hoshiContainerBorder
 import android.content.Intent
@@ -68,6 +69,8 @@ fun AboutScreen(
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val previewModel: PreviewUpdateViewModel = hiltViewModel()
+    PreviewUpdateEffects(previewModel)
     val context = LocalContext.current
     val resources = LocalResources.current
     val appContainer = LocalHoshiUiDependencies.current
@@ -423,6 +426,7 @@ fun AboutScreen(
                                 }
                             }
                         }
+                        PreviewUpdateControls(previewModel)
                     }
                 }
             }

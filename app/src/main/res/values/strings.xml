@@ -1146,4 +1146,15 @@
     <string name="sync_file_epub">EPUB content</string>
     <string name="sync_file_cover">cover image</string>
     <string name="sync_file_sasayaki">Sasayaki matches</string>
+    <string name="preview_get_latest">Get latest preview</string>
+    <string name="preview_install_title">Install preview</string>
+    <string name="preview_warning">Try features still in development. Previews may contain bugs or breaking changes. Installing replaces the current app and keeps your data; data changes may affect compatibility with older builds.\n\nGet new previews manually from About. Stable release updates remain available as usual.</string>
+    <string name="preview_download_install">Download and install</string>
+    <string name="preview_up_to_date">You already have the latest preview.</string>
+    <string name="preview_unavailable">No preview build is currently available.</string>
+    <string name="preview_check_failed">Unable to check preview builds</string>
+    <string name="preview_download_failed">Unable to prepare the preview APK</string>
+    <string name="preview_download_title">Hoshi Reader Preview %1$s</string>
+    <string name="preview_downloading">Downloading preview…</string>
+    <string name="preview_downloaded">Preview downloaded and ready to install.</string>
 </resources>

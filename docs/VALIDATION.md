@@ -144,6 +144,22 @@ transient per-book failures. Worker tests require original failure diagnostics.
 Also verify real Custom Tab sign-in, Back/close cancellation and return to Sync
 settings on a device without Play Services.
 
+## Manual Preview Installation
+
+- In About, Get latest preview queries only published APK previews. Check that
+  an identical full commit reports current, while a different commit with the
+  same app version reaches confirmation. Cancel must not download anything.
+- Confirm download while About remains resumed: after verification the system
+  installer opens once. Dismiss it and verify Install remains available. Without
+  install-source permission, grant permission in Android settings and return to
+  install manually. Never uninstall or clear app data for these checks.
+- Leave About or background the app before completion, then return: show an
+  Install action without automatically opening the installer. Restart the app
+  before installing an equal-version preview and confirm its APK remains.
+- Check release lookup, download/checksum and installer failures retain original
+  details in both visible errors and Diagnostics. Verify stable update records,
+  downloads, prompts and background checks remain independent of previews.
+
 ## Nakuru
 
 - Install a debug APK with `adb install -r`, open Resources >

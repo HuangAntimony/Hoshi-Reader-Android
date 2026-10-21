@@ -8,6 +8,10 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ### Added
 
+- Get the latest development preview from About after a confirmation, with APK
+  download and installation based on the full build commit rather than the version number.
+  Stable release update checks remain unchanged.
+
 - Add Hoshi Google Drive sync alongside TTU, sharing books, reading position,
   highlights, shelves, reading sessions and Sasayaki playback with iOS. Cloud
   books download when opened; choose Delete Local to keep the cloud copy or

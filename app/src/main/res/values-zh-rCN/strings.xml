@@ -1143,4 +1143,15 @@
     <string name="sync_file_epub">EPUB 正文</string>
     <string name="sync_file_cover">封面图片</string>
     <string name="sync_file_sasayaki">Sasayaki 匹配结果</string>
+    <string name="preview_get_latest">获取最新预览版</string>
+    <string name="preview_install_title">安装预览版</string>
+    <string name="preview_warning">预览版可提前体验开发中的功能，但仍可能存在 bug 或不兼容变更。安装会替换当前应用并保留数据，数据变更可能影响旧版兼容性。\n\n新的预览版需要在关于页手动获取，正式版更新仍照常提供。</string>
+    <string name="preview_download_install">下载并安装</string>
+    <string name="preview_up_to_date">已是最新预览版。</string>
+    <string name="preview_unavailable">当前没有可用的预览版。</string>
+    <string name="preview_check_failed">无法查询预览版</string>
+    <string name="preview_download_failed">无法准备预览版 APK</string>
+    <string name="preview_download_title">Hoshi Reader 预览版 %1$s</string>
+    <string name="preview_downloading">正在下载预览版…</string>
+    <string name="preview_downloaded">预览版已下载，可以安装。</string>
 </resources>
