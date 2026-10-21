@@ -94,6 +94,21 @@ adb -s "$hoshi_serial" shell am instrument -w -r \
 Report tested API/WebView versions, commands, results, artifact paths and any
 unexecuted checks in the current task.
 
+## Drive metadata timeout isolation
+
+Run `python3 tools/drive-metadata-isolation-fixture.py` on the host and
+`adb -s "$hoshi_serial" reverse tcp:18766 tcp:18766`, then explicitly run
+`moe.antimony.hoshi.features.sync.DriveMetadataIsolationDeviceTest` with
+`-e driveIsolationUrl http://127.0.0.1:18766`. Build/install debug and test APKs
+using the data-preserving procedure above. Restart the fixture server for each run.
+The opt-in test owns scratch stores/settings and generated files (one 60 MiB,
+seven 24 MiB); no production credentials or library files are used. It waits for
+all eight server sessions to receive payload bytes before arming a real 60-second
+metadata read timeout, then drops subsequent metadata responses to exhaust retries.
+Assertions require all eight payloads to advance and remain active after failure,
+then finish and publish references after recovery. Expect roughly two minutes.
+Stop the fixture and remove only this reverse mapping after testing.
+
 ## WebView and UI automation pitfalls
 
 - Cold launch normally lands on Bookshelf; open a book before testing Reader.

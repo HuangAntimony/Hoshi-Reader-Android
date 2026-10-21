@@ -201,7 +201,9 @@ class GoogleDriveClient internal constructor(
         unavailable { checkInternet() }
         val connection = connectionId
         val token = unavailable { auth.accessToken() }
-        val timeout = if (provider() == SyncProvider.Ttu) 10_000 else 60_000
+        val currentProvider = provider()
+        val metadataRequest = currentProvider == SyncProvider.Gdrive && limited
+        val timeout = if (currentProvider == SyncProvider.Ttu) 10_000 else 60_000
         val request = openConnection(url).apply {
             requestMethod = method
             connectTimeout = timeout
@@ -209,8 +211,8 @@ class GoogleDriveClient internal constructor(
             setRequestProperty("Authorization", "Bearer $token")
             contentType?.let { setRequestProperty("Content-Type", it) }
         }
-        val (status, data) = limit.withPermitIf(limited) { coroutineScope {
-            suspendCancellableCoroutine { continuation ->
+        val (status, data) = try { limit.withPermitIf(limited) { coroutineScope {
+            suspendCancellableCoroutine<Pair<Int, ByteArray>> { continuation ->
                 val job = launch(ioDispatcher) {
                     continuation.resumeWith(runCatching {
                         connections.add(request)
@@ -221,7 +223,7 @@ class GoogleDriveClient internal constructor(
                             val status = request.responseCode
                             status to if (status >= 400) request.errorStream?.use { it.readBytes() } ?: byteArrayOf() else read(request)
                         } catch (error: IOException) {
-                            throw GoogleDriveUnavailableException(error)
+                            throw if (metadataRequest) GoogleDriveMetadataNetworkException(error) else GoogleDriveUnavailableException(error)
                         } finally {
                             connections.remove(request)
                             request.disconnect()
@@ -233,7 +235,16 @@ class GoogleDriveClient internal constructor(
                     job.cancel()
                 }
             }
-        } }
+        } } } catch (error: GoogleDriveMetadataNetworkException) {
+            checkConnection(connection)
+            currentCoroutineContext().ensureActive()
+            // A create may already have succeeded. Reconcile it in the next sync pass,
+            // rather than replaying a POST and creating a duplicate folder/state file.
+            if (attempt >= 4 || method !in setOf("GET", "HEAD", "PATCH", "PUT", "DELETE")) throw error
+            delay(1_000L * (1L shl attempt) + Random.nextLong(1_000))
+            checkConnection(connection)
+            return perform(url, method, contentType, retry, attempt + 1, limited, configure, read)
+        }
         checkConnection(connection)
         currentCoroutineContext().ensureActive()
         if (status == 401 && retry) {
