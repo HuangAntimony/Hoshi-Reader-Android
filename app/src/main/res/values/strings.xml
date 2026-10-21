@@ -1135,4 +1135,12 @@
     <string name="diagnostics_webview" translatable="false">WebView</string>
     <string name="sasayaki_nakuru_unavailable">Nakuru is not available on this device.</string>
     <string name="sasayaki_legacy_resources_cleanup">Remove retired transcription resource: %1$s</string>
+    <string name="sync_error_details">View sync error</string>
+    <string name="sync_book_failed_format">Could not sync “%1$s”.</string>
+    <string name="sync_download_book_failed_format">Could not download “%1$s”.</string>
+    <string name="sync_file_failed_format">Could not sync “%1$s”: %2$s.</string>
+    <string name="sync_cleanup_failed_format">Could not clean up old cloud files for “%1$s”.</string>
+    <string name="sync_file_epub">EPUB content</string>
+    <string name="sync_file_cover">cover image</string>
+    <string name="sync_file_sasayaki">Sasayaki matches</string>
 </resources>

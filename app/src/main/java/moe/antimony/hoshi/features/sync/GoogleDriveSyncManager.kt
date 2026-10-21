@@ -102,7 +102,8 @@ private class Listing {
     var published = false
 }
 
-class GoogleDriveSyncException(val text: UiText) : Exception()
+/** [text] contains either a user-facing precondition or already-recorded failure details. */
+class GoogleDriveSyncException(val text: UiText, cause: Throwable? = null) : Exception(cause)
 
 private class AttachPending : Exception()
 
@@ -525,21 +526,32 @@ class GoogleDriveSyncManager internal constructor(
     }
 
     private suspend fun syncFiles(key: String, listing: Listing) {
-        var failure: Throwable? = null
-        suspend fun attempt(action: suspend () -> Unit) {
+        val failures = mutableListOf<Pair<UiText, Throwable>>()
+        suspend fun attempt(operation: (String) -> UiText, action: suspend () -> Unit) {
             val error = runCatching { action() }.exceptionOrNull() ?: return
             if (error.stopsRun) throw error
-            if (failure == null) failure = error
+            val title = bookTitle(key, store.state.books[key]?.deleted == true)
+            failures += error.syncMessage(operation(title)) to error
         }
         for (type in SyncFileType.entries) {
             currentCoroutineContext().ensureActive()
-            attempt {
+            val label = UiText.Resource(when (type) {
+                SyncFileType.epub -> R.string.sync_file_epub
+                SyncFileType.cover -> R.string.sync_file_cover
+                SyncFileType.sasayaki -> R.string.sync_file_sasayaki
+            })
+            attempt({ title -> UiText.Resource(R.string.sync_file_failed_format, title, label) }) {
                 uploadFile(key, type, listing)
                 if (type != SyncFileType.epub) downloadFile(key, type, listing)
             }
         }
-        attempt { cleanupFiles(key, listing) }
-        failure?.let { throw it }
+        attempt({ title -> UiText.Resource(R.string.sync_cleanup_failed_format, title) }) { cleanupFiles(key, listing) }
+        if (failures.isNotEmpty()) {
+            val cause = failures.firstOrNull { it.second.isRetryableBackgroundSyncFailure() }?.second ?: failures.first().second
+            throw GoogleDriveSyncException(UiText.Joined(failures.map { it.first }, "\n\n"), cause).apply {
+                failures.map { it.second }.filter { it !== cause }.forEach(::addSuppressed)
+            }
+        }
     }
 
     private fun finishTransfer(key: String, finished: Boolean) {
@@ -558,7 +570,7 @@ class GoogleDriveSyncManager internal constructor(
         currentCoroutineContext().ensureActive()
         if (error.stopsRun) throw error
         val title = bookTitle(key, store.state.books[key]?.deleted == true)
-        bookErrors = bookErrors + ((key to phase) to BookError(title, error.message?.let(UiText::Literal) ?: error.syncMessage(), error))
+        bookErrors = bookErrors + ((key to phase) to BookError(title, error.syncMessage(UiText.Resource(R.string.sync_book_failed_format, title)), error))
     }
 
     private suspend fun bookTitle(key: String, deleted: Boolean): String =
@@ -575,7 +587,9 @@ class GoogleDriveSyncManager internal constructor(
         for ((id, error) in bookErrors.entries.sortedWith(compareBy({ it.key.first }, { it.key.second }))) {
             val index = queue.indexOfFirst { it.key == id.first }
             if (index < 0) queue += SyncQueueItem(id.first, error.title, null, error.message)
-            else if (queue[index].error == null) queue[index] = queue[index].copy(error = error.message)
+            else queue[index] = queue[index].copy(error = queue[index].error?.let {
+                UiText.Joined(listOf(it, error.message), "\n\n")
+            } ?: error.message)
         }
         return queue
     }
@@ -594,13 +608,19 @@ class GoogleDriveSyncManager internal constructor(
         )
     }
 
+    suspend fun syncOrThrow(): Unit = withContext(mainDispatcher) {
+        sync()
+        runError?.let { throw it }
+    }
+
     suspend fun downloadBook(book: BookMetadata, onProgress: (Double) -> Unit): BookMetadata = withContext(mainDispatcher) {
         scope.async {
             val key = book.folder!!.syncKey()
             try {
                 sync(book)
                 if (unsupportedFormat) throw SyncFormatError()
-                (state.value.errorMessage ?: bookErrors[key to SyncPhase.State]?.message)?.let { throw GoogleDriveSyncException(it) }
+                runError?.let { throw it }
+                bookErrors[key to SyncPhase.State]?.cause?.let { throw it }
                 currentCoroutineContext().ensureActive()
                 if (store.state.books[key]?.deleted == true) throw GoogleDriveSyncException(UiText.Resource(R.string.sync_book_deleted))
                 if (enabled() && store.state.books[key]?.files?.get(SyncFileType.epub)?.value != null) {
@@ -1014,14 +1034,6 @@ class GoogleDriveSyncManager internal constructor(
     private suspend fun saveCache() = withContext(ioDispatcher) {
         writeBookJson(filesDir.resolve("drive-sync.json"), SyncFormat.encode(cache))
     }
-}
-
-fun Throwable.syncMessage(): UiText = when (this) {
-    is GoogleDriveUnavailableException -> cause.syncMessage()
-    is SyncFormatError -> UiText.Resource(R.string.sync_unsupported_format)
-    is GoogleDriveSyncException -> text
-    is DriveAuthorizationRequiredException -> UiText.Resource(R.string.sync_connect_google_drive)
-    else -> UiText.Resource(R.string.bookshelf_sync_failed)
 }
 
 private val Throwable.stopsRun: Boolean

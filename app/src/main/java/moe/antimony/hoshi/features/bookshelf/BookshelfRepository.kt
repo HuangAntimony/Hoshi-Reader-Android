@@ -25,7 +25,6 @@ import moe.antimony.hoshi.epub.EpubBookParser
 import moe.antimony.hoshi.epub.LegacyBookMigrationProgress
 import moe.antimony.hoshi.epub.isUuidString
 import moe.antimony.hoshi.features.sync.GoogleDriveSyncManager
-import moe.antimony.hoshi.features.sync.GoogleDriveSyncException
 import moe.antimony.hoshi.features.sync.syncKey
 import moe.antimony.hoshi.features.sync.StatisticsSyncMode
 import moe.antimony.hoshi.features.sync.DriveAuthStatus
@@ -138,8 +137,7 @@ internal class AndroidBookshelfRepository @Inject constructor(
 
     override suspend fun syncLibrary() {
         if (syncSettingsRepository.settings.first().provider != SyncProvider.Gdrive) return
-        hoshiSync.sync()
-        hoshiSync.state.value.errorMessage?.let { throw GoogleDriveSyncException(it) }
+        hoshiSync.syncOrThrow()
     }
 
     override suspend fun loadRemoteBooks(localEntries: List<BookEntry>): RemoteBookshelfLoadResult = withContext(ioDispatcher) {

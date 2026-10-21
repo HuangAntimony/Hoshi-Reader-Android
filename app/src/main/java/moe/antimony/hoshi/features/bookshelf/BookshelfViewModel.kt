@@ -155,7 +155,12 @@ internal class BookshelfViewModel : ViewModel {
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
-                _uiState.update { it.copy(errorMessage = if (cloud) error.syncMessage() else UiText.Resource(R.string.bookshelf_open_failed).withErrorDetails(error)) }
+                val message = if (cloud) {
+                    error.syncMessage(UiText.Resource(R.string.sync_download_book_failed_format, entry.metadata.displayTitle))
+                } else {
+                    UiText.Resource(R.string.bookshelf_open_failed).withErrorDetails(error)
+                }
+                _uiState.update { it.copy(errorMessage = message) }
             } finally {
                 if (openingBookId == entry.metadata.id) openingBookId = null
             }
@@ -166,8 +171,13 @@ internal class BookshelfViewModel : ViewModel {
         val previous = menuDownloads
         menuDownloads = workScope.launch {
             previous?.join()
+            val failures = mutableListOf<UiText>()
+            _uiState.update { it.copy(errorMessage = null) }
             for (entry in entries) {
-                download(entry).await().onFailure { error -> _uiState.update { it.copy(errorMessage = error.syncMessage()) } }
+                download(entry).await().onFailure { error ->
+                    failures += error.syncMessage(UiText.Resource(R.string.sync_download_book_failed_format, entry.metadata.displayTitle))
+                    _uiState.update { it.copy(errorMessage = UiText.Joined(failures.toList(), "\n\n")) }
+                }
             }
             reloadBookEntriesSync()
         }
@@ -816,7 +826,6 @@ internal class BookshelfViewModel : ViewModel {
                 hasLoadedBooks = true,
                 isLoading = false,
                 blockingProgressMessage = null,
-                errorMessage = null,
             )
         }
         reloadRemoteBookEntries(result.entries, generation, suppressTransientNetworkErrors = true)

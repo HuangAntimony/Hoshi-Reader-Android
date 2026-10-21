@@ -17,6 +17,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import moe.antimony.hoshi.LocalHoshiUiDependencies
+import moe.antimony.hoshi.ui.UiText
+import moe.antimony.hoshi.ui.ErrorDetailsText
+import moe.antimony.hoshi.ui.asString
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.ui.HoshiAlertDialog as AlertDialog
 
@@ -27,7 +30,7 @@ internal fun SyncAttachPrompt() {
     val scope = rememberCoroutineScope()
     var attaching by remember { mutableStateOf(false) }
     var confirmation by remember { mutableStateOf<AttachChoice?>(null) }
-    var error by remember { mutableStateOf<String?>(null) }
+    var error by remember { mutableStateOf<UiText?>(null) }
 
     fun attach(choice: AttachChoice) {
         confirmation = null
@@ -35,26 +38,32 @@ internal fun SyncAttachPrompt() {
         error = null
         scope.launch {
             try {
-                manager.attach(choice)
-            } catch (exception: Exception) {
-                error = exception.message
+                error = syncOperationError { manager.attach(choice) }
+            } finally {
+                attaching = false
             }
-            attaching = false
         }
     }
 
-    if (!state.attachPending || state.attachDismissed || attaching) return
+    if (attaching) return
+    error?.let { details ->
+        AlertDialog(
+            onDismissRequest = { error = null },
+            title = { Text(stringResource(R.string.dialog_error_title)) },
+            text = { ErrorDetailsText(details.asString()) },
+            confirmButton = {
+                TextButton(onClick = { error = null }) { Text(stringResource(R.string.action_ok)) }
+            },
+        )
+        return
+    }
+    if (!state.attachPending || state.attachDismissed) return
     val choice = confirmation
     if (choice == null) {
         AlertDialog(
             onDismissRequest = {},
             title = { Text(stringResource(R.string.sync_attach_title)) },
-            text = {
-                Column {
-                    Text(stringResource(R.string.sync_attach_message))
-                    error?.let { Text(it, color = colorScheme.error) }
-                }
-            },
+            text = { Text(stringResource(R.string.sync_attach_message)) },
             confirmButton = {
                 Column(Modifier.fillMaxWidth()) {
                     TextButton(onClick = { attach(AttachChoice.Merge) }, modifier = Modifier.fillMaxWidth()) {

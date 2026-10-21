@@ -1132,4 +1132,12 @@
     <string name="diagnostics_webview" translatable="false">WebView</string>
     <string name="sasayaki_nakuru_unavailable">此设备不支持 Nakuru。</string>
     <string name="sasayaki_legacy_resources_cleanup">清理已停用的转录资源：%1$s</string>
+    <string name="sync_error_details">查看同步错误</string>
+    <string name="sync_book_failed_format">无法同步“%1$s”。</string>
+    <string name="sync_download_book_failed_format">无法下载“%1$s”。</string>
+    <string name="sync_file_failed_format">无法同步“%1$s”的%2$s。</string>
+    <string name="sync_cleanup_failed_format">无法清理“%1$s”的旧云端文件。</string>
+    <string name="sync_file_epub">EPUB 正文</string>
+    <string name="sync_file_cover">封面图片</string>
+    <string name="sync_file_sasayaki">Sasayaki 匹配结果</string>
 </resources>

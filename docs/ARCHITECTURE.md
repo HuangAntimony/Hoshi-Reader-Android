@@ -694,8 +694,11 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   a Hilt WorkManager job performs the final background pass
   with a connected-network constraint. State and file failures propagate to the
   worker: temporary network/server failures and HTTP 403/429 rate limits retry,
-  even when another book has a permanent failure, while authorization and format
-  failures wait for user action.
+  even when another book or file has a permanent failure, while authorization and format
+  failures wait for user action. Foreground run/book/file failures retain original
+  causes in error details and diagnostic history; file aggregates record each original
+  error before selecting a retryable cause for the worker. Cloud-book opening and
+  manual library refresh preserve the original exception across repository boundaries.
   Hoshi cloud books are local metadata placeholders: tapping downloads the EPUB,
   Delete Local retains their cloud state, and Delete Everywhere archives sessions
   and publishes deletion. Covers and Sasayaki match data download automatically.

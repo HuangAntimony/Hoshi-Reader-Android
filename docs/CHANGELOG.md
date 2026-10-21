@@ -14,8 +14,9 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   Delete Everywhere to remove it across devices while retaining reading history.
   Book deletion actions stack vertically, and cloud icons sit inline on the first
   title line.
-  Failed Google Drive sign-ins show their original error details in a dialog and
-  Diagnostics; canceling sign-in stays quiet.
+  Google Drive sign-in, foreground sync, cloud-book download and library-merge
+  failures retain original error details in error views and Diagnostics; batches
+  keep each failed book and file category, and canceling stays quiet.
   Connecting through the Google account picker resets pending sync operations so
   books deleted before sign-in do not delete existing cloud copies.
   Devices without Google Play Services can connect through their browser.

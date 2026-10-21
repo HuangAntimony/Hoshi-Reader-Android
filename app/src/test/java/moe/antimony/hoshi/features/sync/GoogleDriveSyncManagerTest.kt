@@ -34,6 +34,12 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import moe.antimony.hoshi.ui.ErrorDiagnosticEvents
+import moe.antimony.hoshi.ui.UiText
+import moe.antimony.hoshi.ui.resolve
+import org.junit.Before
+import org.junit.After
+import moe.antimony.hoshi.R
 import moe.antimony.hoshi.BuildConfig
 import moe.antimony.hoshi.epub.BookMetadata
 import moe.antimony.hoshi.epub.BookRepository
@@ -47,6 +53,111 @@ import org.junit.rules.TemporaryFolder
 class GoogleDriveSyncManagerTest {
     @get:Rule val temporary = TemporaryFolder()
     private val remoteBook get() = SyncBook(1, false, Timestamped(1000, SyncMetadata("Remote")), characterCount = 20)
+
+    @Before fun clearDiagnostics() { ErrorDiagnosticEvents.buffer.drain() }
+    @After fun drainDiagnostics() { ErrorDiagnosticEvents.buffer.drain() }
+
+    private fun UiText?.details(): String = this?.resolve(
+        { id, args -> when (id) {
+            R.string.sync_file_cover -> "cover image"
+            R.string.sync_file_sasayaki -> "Sasayaki matches"
+            else -> args.joinToString()
+        } },
+        { _, _, _ -> "" },
+    ).orEmpty()
+
+    @Test fun foregroundRunFailurePublishesAndRecordsOriginalCause() = runTest {
+        val f = fixture()
+        f.remote.addState("a", "book-a.json", SyncFormat.encode(remoteBook))
+        val error = GoogleDriveUnavailableException(IOException("Network unavailable", IOException("DNS lookup failed")))
+        f.remote.failRead = { error }
+        f.manager.sync()
+        runCurrent()
+        val message = f.manager.state.value.errorMessage.details()
+        assertTrue(message, message.contains("Network unavailable"))
+        assertTrue(message, message.contains("DNS lookup failed"))
+        assertSame(error, ErrorDiagnosticEvents.buffer.drain().single().error)
+    }
+
+    @Test fun foregroundBookFailureKeepsHttpStatusCauseAndBookContext() = runTest {
+        val f = fixture()
+        f.remote.addState("a", "book-a.json", SyncFormat.encode(remoteBook))
+        val error = GoogleDriveApiException("Drive rejected the state file", 403).apply {
+            initCause(IOException("Storage quota exhausted"))
+        }
+        f.remote.failRead = { error }
+        f.manager.sync()
+        runCurrent()
+        val message = f.manager.state.value.queue.single().error.details()
+        for (detail in listOf("book-a", "403", "Drive rejected the state file", "Storage quota exhausted")) {
+            assertTrue(message, message.contains(detail))
+        }
+        assertSame(error, ErrorDiagnosticEvents.buffer.drain().single().error)
+    }
+
+    @Test fun fileFailuresKeepEveryFileAndRetryALaterRateLimit() = runTest {
+        val f = fixture()
+        f.remote.addState("a", "book-a.json", SyncFormat.encode(remoteBook.copy(files = mapOf(
+            SyncFileType.cover to Timestamped(1000, "cover.jpg"),
+            SyncFileType.sasayaki to Timestamped(1000, "matches.json"),
+        ))))
+        f.remote.folder("book-folder", "book-a", "b")
+        f.remote.folder("generation-folder", "1", "book-folder")
+        for ((id, name) in listOf("cover" to "cover.jpg", "matches" to "matches.json")) {
+            f.remote.entries[id] = DriveService.Entry(GoogleDriveFile(id, name, "application/octet-stream", "1", size = "4", parents = listOf("generation-folder"), createdTime = ""), "data")
+        }
+        val denied = GoogleDriveApiException("Cover permission denied", 403)
+        val limited = GoogleDriveApiException("Matches rate limited", 403, reasons = setOf("userRateLimitExceeded"))
+        f.remote.failRead = { when (it) { "cover" -> denied; "matches" -> limited; else -> null } }
+        val result = backgroundSyncResult(f.manager::syncInBackground)
+        assertEquals(f.manager.state.value.errorMessage.details() + f.manager.state.value.queue.map { it.error.details() }, ListenableWorker.Result.retry(), result)
+        val message = f.manager.state.value.queue.single().error.details()
+        for (detail in listOf("Remote", "cover image", "Sasayaki matches", "Cover permission denied", "Matches rate limited")) assertTrue(message, message.contains(detail))
+        val events = ErrorDiagnosticEvents.buffer.drain()
+        assertEquals(setOf(denied, limited), events.map { it.error }.toSet())
+        assertEquals(2, events.size)
+    }
+
+    @Test fun manualLibrarySyncPropagatesOriginalFailure() = runTest {
+        val f = fixture()
+        val error = GoogleDriveUnavailableException(IOException("Library connection failed", IOException("Host unreachable")))
+        f.remote.failRequest = { error }
+        assertSame(error, runCatching { f.manager.syncOrThrow() }.exceptionOrNull())
+        assertTrue(f.manager.state.value.errorMessage.details().contains("Host unreachable"))
+        assertSame(error, ErrorDiagnosticEvents.buffer.drain().single().error)
+    }
+
+    @Test fun openingCloudBookPropagatesOriginalStateFailure() = runTest {
+        val f = fixture()
+        f.remote.addState("a", "book-a.json", SyncFormat.encode(remoteBook))
+        f.manager.sync()
+        runCurrent()
+        val book = f.books.loadMetadata(f.store.bookDirectory("book-a"))!!
+        val error = GoogleDriveApiException("Book metadata unavailable", 403).apply {
+            initCause(IOException("Permission revoked"))
+        }
+        f.remote.failRead = { error }
+        assertSame(error, runCatching { f.manager.downloadBook(book) {} }.exceptionOrNull())
+        assertTrue(f.manager.state.value.queue.single().error.details().contains("Permission revoked"))
+        assertSame(error, ErrorDiagnosticEvents.buffer.drain().single().error)
+    }
+
+    @Test fun mergeLibraryFailureReachesDialogAndHistory() = attachFailure(AttachChoice.Merge)
+    @Test fun replaceFromCloudFailureReachesDialogAndHistory() = attachFailure(AttachChoice.Cloud)
+    @Test fun replaceFromDeviceFailureReachesDialogAndHistory() = attachFailure(AttachChoice.Device)
+
+    private fun attachFailure(choice: AttachChoice) = runTest {
+        val f = fixture()
+        val error = GoogleDriveApiException("Library request rejected", 403).apply {
+            initCause(IOException("Account storage full"))
+        }
+        f.remote.failRequest = { error }
+        val visibleError = MutableStateFlow<UiText?>(null)
+        visibleError.value = syncOperationError { f.manager.attach(choice) }
+        val message = visibleError.value.details()
+        for (detail in listOf("Library request rejected", "403", "Account storage full")) assertTrue(message, message.contains(detail))
+        assertSame(error, ErrorDiagnosticEvents.buffer.drain().single().error)
+    }
 
     private suspend fun TestScope.fixture(): Fixture {
         val dispatcher = UnconfinedTestDispatcher(testScheduler)
@@ -558,6 +669,7 @@ class GoogleDriveSyncManagerTest {
         var listPageSize = Int.MAX_VALUE
         var reportChanges = true
         var failRead: (String) -> Exception? = { null }
+        var failRequest: (() -> Exception)? = null
         var beforeWrite: (suspend () -> Unit)? = null
 
         init {
@@ -566,7 +678,7 @@ class GoogleDriveSyncManagerTest {
             folder("b", "books", "r")
         }
 
-        private fun folder(id: String, name: String, parent: String) {
+        fun folder(id: String, name: String, parent: String) {
             entries[id] = Entry(GoogleDriveFile(id, name, "application/vnd.google-apps.folder", "1", parents = listOf(parent), createdTime = "2020-01-01T00:00:00Z"))
         }
 
@@ -602,6 +714,7 @@ class GoogleDriveSyncManagerTest {
                 it.substringBefore('=') to URLDecoder.decode(it.substringAfter('='), "UTF-8")
             }
             requests += path
+            failRequest?.let { throw it() }
             if (path == "changes/startPageToken") return "{\"startPageToken\":\"start\"}"
             if (path == "changes") return buildJsonObject {
                 put("newStartPageToken", "next")

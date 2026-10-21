@@ -1244,6 +1244,14 @@ Validate relevant sync/update/Sasayaki changes with:
   `GoogleDriveSyncManagerTest`, and `GoogleDriveSyncWorkerTest` cover draft
   invalidation, persisted shelf order, transient failure/recovery and worker
   outcomes; authorization/format failures must not loop on automatic retries.
+- Hoshi sync errors: fail a foreground sync, open/download a cloud book, and each
+  library-merge choice. Error details and Diagnostics must retain the original
+  message, nested cause and HTTP status when present. Batch failures retain every
+  failed book and file category; a later rate-limited file must still request a
+  background retry after an earlier permanent failure. Successful downloads and
+  the final bookshelf refresh must not erase failed items. Cancellation produces
+  no error or diagnostic record. `GoogleDriveSyncManagerTest`,
+  `BookshelfViewModelTest` and `SyncErrorDiagnosticsTest` cover these paths.
 - TTU Google Drive Device Code connect/sign-out, clear cached Drive folders/covers,
   remote-only bookshelf list, pull-to-refresh, import, long-press delete,
   transient network behavior, manual import/export result dialogs,

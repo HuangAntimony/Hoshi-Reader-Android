@@ -1,5 +1,10 @@
 package moe.antimony.hoshi.features.bookshelf
 
+import kotlinx.coroutines.CancellationException
+import moe.antimony.hoshi.ui.ErrorDiagnosticEvents
+import java.io.IOException
+import org.junit.Before
+import org.junit.After
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -24,6 +29,70 @@ import org.junit.Test
 import java.io.File
 
 class BookshelfViewModelTest {
+    @Before fun clearDiagnostics() { ErrorDiagnosticEvents.buffer.drain() }
+    @After fun drainDiagnostics() { ErrorDiagnosticEvents.buffer.drain() }
+
+    @Test fun manualSyncFailureReachesVisibleStateAndHistory() {
+        val error = IOException("Could not fetch library", IOException("Connection reset"))
+        val repository = FakeBookshelfRepository(syncLibraryError = error)
+        val viewModel = BookshelfViewModel(repository, testScope())
+        viewModel.reloadBookEntries()
+        viewModel.refreshRemoteBooks()
+        val message = viewModel.uiState.value.errorMessage.testString().orEmpty()
+        assertTrue(message, message.contains("Could not fetch library"))
+        assertTrue(message, message.contains("Connection reset"))
+        assertEquals(listOf(error), ErrorDiagnosticEvents.buffer.drain().map { it.error })
+    }
+
+    @Test fun openingCloudBookKeepsDownloadCauseAndBookName() {
+        val entry = bookEntry("Cloud Book").let { it.copy(metadata = it.metadata.copy(epub = null)) }
+        val error = IOException("Download interrupted", IOException("Socket closed"))
+        val repository = FakeBookshelfRepository(downloadBookOperation = { _, _ -> throw error })
+        val viewModel = BookshelfViewModel(repository, testScope())
+        viewModel.openBook(entry)
+        val message = viewModel.uiState.value.errorMessage.testString().orEmpty()
+        for (detail in listOf("Cloud Book", "Download interrupted", "Socket closed")) assertTrue(message, message.contains(detail))
+        assertNull(viewModel.uiState.value.openReaderBookId)
+        assertTrue(viewModel.uiState.value.remoteImportProgressById.isEmpty())
+        assertEquals(listOf(error), ErrorDiagnosticEvents.buffer.drain().map { it.error })
+    }
+
+    @Test fun batchDownloadKeepsEveryBookFailureAndContinues() {
+        val entries = listOf(bookEntry("First Book"), bookEntry("Second Book"), bookEntry("Good Book"))
+        val errors = listOf(IOException("First transfer failed", IOException("Connection lost")), IOException("Second transfer failed"))
+        val attempted = mutableListOf<String>()
+        val repository = FakeBookshelfRepository(downloadBookOperation = { entry, _ ->
+            attempted += entry.metadata.id
+            val index = entries.indexOf(entry)
+            if (index < 2) throw errors[index]
+        })
+        val viewModel = BookshelfViewModel(repository, testScope())
+        viewModel.downloadBooks(entries)
+        val message = viewModel.uiState.value.errorMessage.testString().orEmpty()
+        for (detail in listOf("First Book", "Second Book", "First transfer failed", "Connection lost", "Second transfer failed")) assertTrue(message, message.contains(detail))
+        assertEquals(entries.map { it.metadata.id }, attempted)
+        assertEquals(errors, ErrorDiagnosticEvents.buffer.drain().map { it.error })
+        // The production sync notification schedules this reload after a successful download.
+        viewModel.reloadBookEntries()
+        assertEquals(message, viewModel.uiState.value.errorMessage.testString())
+        viewModel.consumeErrorMessage()
+        viewModel.reloadBookEntries()
+        assertNull(viewModel.uiState.value.errorMessage)
+    }
+
+    @Test fun cancelledBatchDownloadDoesNotReportFailureOrDownloadNextBook() {
+        val attempted = mutableListOf<String>()
+        val repository = FakeBookshelfRepository(downloadBookOperation = { entry, _ ->
+            attempted += entry.metadata.id
+            throw CancellationException("Download cancelled")
+        })
+        val viewModel = BookshelfViewModel(repository, testScope())
+        viewModel.downloadBooks(listOf(bookEntry("First"), bookEntry("Second")))
+        assertEquals(listOf("First"), attempted)
+        assertNull(viewModel.uiState.value.errorMessage)
+        assertTrue(ErrorDiagnosticEvents.buffer.drain().isEmpty())
+    }
+
     @Test
     fun initialStateWaitsForFirstShelfLoadBeforeShowingEmptyBooks() {
         val viewModel = BookshelfViewModel(FakeBookshelfRepository(), testScope())
@@ -1409,6 +1478,7 @@ class BookshelfViewModelTest {
         var entries: List<BookEntry> = emptyList(),
         var progressById: Map<String, Double> = emptyMap(),
         var openBookId: String = "book-a",
+        var syncLibraryError: Throwable? = null,
         var downloadBookOperation: (suspend (BookEntry, (Double) -> Unit) -> Unit)? = null,
         var importBookId: String = "imported-book",
         var shelves: List<BookShelf> = emptyList(),
@@ -1485,7 +1555,7 @@ class BookshelfViewModelTest {
             return entries.associate { it.metadata.id to progressById.getValue(it.metadata.id) }
         }
 
-        override suspend fun syncLibrary() = Unit
+        override suspend fun syncLibrary() { syncLibraryError?.let { throw it } }
 
         override suspend fun loadRemoteBooks(localEntries: List<BookEntry>): RemoteBookshelfLoadResult {
             remoteLoadRequests += localEntries.map { it.metadata.id }

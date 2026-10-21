@@ -475,7 +475,7 @@ fun SyncSettingsView(
         )
     }
     if (showQueue) {
-        SyncQueueSheet(state = hoshiState, onDismiss = { showQueue = false })
+        SyncQueueSheet(state = hoshiState, onDismiss = { showQueue = false }, onError = { operationError = it })
     }
     val colorScheme = MaterialTheme.colorScheme
     val screenLoadState: SettingsLoadState<Triple<SyncSettings, ReaderSettings, SasayakiSettings>> = when {
@@ -815,8 +815,10 @@ fun SyncSettingsView(
                             Text(stringResource(R.string.sync_download_all_books))
                         }
                     }
-                    hoshiState.errorMessage?.let {
-                        Text(it.asString(), color = colorScheme.error, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+                    hoshiState.errorMessage?.let { error ->
+                        TextButton(onClick = { operationError = error }) {
+                            Text(stringResource(R.string.sync_error_details), color = colorScheme.error)
+                        }
                     }
                 }
             }
@@ -860,7 +862,7 @@ fun SyncSettingsView(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SyncQueueSheet(state: GoogleDriveSyncState, onDismiss: () -> Unit) {
+private fun SyncQueueSheet(state: GoogleDriveSyncState, onDismiss: () -> Unit, onError: (UiText) -> Unit) {
     val colorScheme = MaterialTheme.colorScheme
     ModalBottomSheet(
         modifier = Modifier.hoshiContainerOutline(BottomSheetDefaults.ExpandedShape),
@@ -891,7 +893,11 @@ private fun SyncQueueSheet(state: GoogleDriveSyncState, onDismiss: () -> Unit) {
                             }
                             Column(Modifier.weight(1f)) {
                                 Text(item.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                item.error?.let { Text(it.asString(), style = MaterialTheme.typography.bodySmall, color = colorScheme.error) }
+                                item.error?.let { error ->
+                                    TextButton(onClick = { onError(error) }) {
+                                        Text(stringResource(R.string.sync_error_details), color = colorScheme.error)
+                                    }
+                                }
                             }
                             if (item.key == state.progress?.current) {
                                 CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)

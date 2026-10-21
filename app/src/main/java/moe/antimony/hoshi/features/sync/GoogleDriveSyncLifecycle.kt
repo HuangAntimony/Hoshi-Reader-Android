@@ -119,11 +119,15 @@ internal suspend fun backgroundSyncResult(sync: suspend () -> Unit): Result = tr
 } catch (cancelled: CancellationException) {
     throw cancelled
 } catch (error: Exception) {
-    ErrorDiagnosticEvents.buffer.record(UiText.Resource(R.string.bookshelf_sync_failed), error)
+    // File aggregates have already recorded every original failure with book/file context.
+    if (error !is GoogleDriveSyncException) {
+        ErrorDiagnosticEvents.buffer.record(UiText.Resource(R.string.bookshelf_sync_failed), error)
+    }
     if (error.isRetryableBackgroundSyncFailure()) Result.retry() else Result.failure()
 }
 
 internal fun Throwable.isRetryableBackgroundSyncFailure(): Boolean = when (this) {
+    is GoogleDriveSyncException -> cause?.isRetryableBackgroundSyncFailure() == true
     is GoogleDriveUnavailableException -> cause is java.io.IOException || cause.isRetryableBackgroundSyncFailure()
     is GoogleDriveApiException -> isRateLimited || (statusCode ?: 0) >= 500 || isTransientDriveNetworkFailure()
     else -> false
