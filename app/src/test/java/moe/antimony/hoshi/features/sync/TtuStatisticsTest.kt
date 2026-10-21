@@ -36,11 +36,12 @@ class TtuStatisticsTest {
         assertEquals(end + 1, exported.lastStatisticModified)
     }
 
-    @Test fun importReusesSmallestLiveIdDeletesOtherContributionsAndIsIdempotent() {
+    @Test fun importUsesLegacyIdDeletesOtherContributionsAndIsIdempotent() {
         val session = ReadingSession(end - 60000, end, 50, 30.0)
         val original = mapOf("B" to Timestamped<ReadingSession?>(end - 1, session), "A" to Timestamped<ReadingSession?>(end - 1, session))
         val merged = TtuStatistics.importHistory(listOf(daily), original, "book-a", 0, zone = zone)
-        assertEquals(100, merged.getValue("A").value!!.charactersRead)
+        assertEquals(100, merged.getValue(TtuStatistics.legacyId("book-a", daily.dateKey)).value!!.charactersRead)
+        assertNull(merged.getValue("A").value)
         assertNull(merged.getValue("B").value)
         assertEquals(merged, TtuStatistics.importHistory(listOf(daily), merged, "book-a", 0, zone = zone))
     }
@@ -53,7 +54,32 @@ class TtuStatisticsTest {
         assertNull(replaced.getValue(id).value)
         assertNull(replaced.getValue("old").value)
         assertEquals(100, replaced.getValue("NEW").value!!.charactersRead)
-        assertEquals(replaced, TtuStatistics.importHistory(listOf(daily), replaced, "book-a", 0, StatisticsSyncMode.Replace, zone))
         assertEquals(replaced, TtuStatistics.importHistory(emptyList(), replaced, "book-a", 0, StatisticsSyncMode.Replace, zone))
+    }
+
+    @Test fun reconcileSubtractsSessionsCountedInLegacyDayTotal() {
+        val id = TtuStatistics.legacyId("book-a", daily.dateKey)
+        val legacy = ReadingSession(end - 120000, end, 300, 120.0)
+        val counted = ReadingSession(end - 60000, end - 30000, 100, 30.0)
+        val later = ReadingSession(end + 1000, end + 61000, 50, 60.0)
+        val sessions = mapOf(
+            id to Timestamped<ReadingSession?>(end, legacy),
+            "A" to Timestamped<ReadingSession?>(end, counted),
+            "B" to Timestamped<ReadingSession?>(end, later),
+        )
+        val reconciled = TtuStatistics.reconciled(sessions, "book-a", 0, zone) { end + 10 }
+        assertEquals(Timestamped<ReadingSession?>(end + 10, ReadingSession(end - 120000, end - 60000, 200, 90.0)), reconciled.getValue(id))
+        assertEquals(sessions.getValue("A"), reconciled.getValue("A"))
+        assertEquals(sessions.getValue("B"), reconciled.getValue("B"))
+        assertEquals(reconciled, TtuStatistics.reconciled(reconciled, "book-a", 0, zone) { end + 20 })
+    }
+
+    @Test fun reconcileDeletesLegacySessionFullyCoveredByNewSessions() {
+        val id = TtuStatistics.legacyId("book-a", daily.dateKey)
+        val legacy = ReadingSession(end - 60000, end, 100, 60.0)
+        val sessions = mapOf(id to Timestamped<ReadingSession?>(end, legacy), "A" to Timestamped<ReadingSession?>(end, legacy))
+        val reconciled = TtuStatistics.reconciled(sessions, "book-a", 0, zone) { end + 10 }
+        assertEquals(Timestamped<ReadingSession?>(end + 10, null), reconciled.getValue(id))
+        assertEquals(sessions.getValue("A"), reconciled.getValue("A"))
     }
 }

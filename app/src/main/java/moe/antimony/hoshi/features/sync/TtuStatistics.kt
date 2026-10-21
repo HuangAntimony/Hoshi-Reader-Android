@@ -26,6 +26,30 @@ object TtuStatistics {
             legacyId(key, it.dateKey) to Timestamped(it.lastStatisticModified, session(it, resetTime, zone))
         }
 
+    fun reconciled(
+        sessions: ReadingSessions,
+        key: String,
+        resetTime: Int,
+        zone: ZoneId = ZoneId.systemDefault(),
+        now: () -> Long = System::currentTimeMillis,
+    ): ReadingSessions {
+        val result = sessions.toMutableMap()
+        for (day in StatisticsDay.grouped(sessions, resetTime, zone)) {
+            val id = legacyId(key, day.date.toString())
+            val legacy = day.sessions[id]?.value ?: continue
+            val counted = day.sessions.filterKeys { it != id }.values.mapNotNull { it.value }.filter { it.startedAt < legacy.endedAt }
+            val earliest = counted.minOfOrNull { it.startedAt } ?: continue
+            val merged = legacy.copy(
+                startedAt = minOf(legacy.startedAt, earliest),
+                endedAt = earliest,
+                charactersRead = legacy.charactersRead - counted.sumOf { it.charactersRead },
+                readingTime = legacy.readingTime - counted.sumOf { it.readingTime },
+            )
+            result[id] = Timestamped(now(), merged.takeIf { it.charactersRead > 0 && it.readingTime > 0 })
+        }
+        return result
+    }
+
     fun export(sessions: ReadingSessions, title: String, resetTime: Int, zone: ZoneId = ZoneId.systemDefault()): List<ReadingStatistics> =
         StatisticsDay.grouped(sessions, resetTime, zone).map { day ->
             val total = day.total
@@ -53,7 +77,7 @@ object TtuStatistics {
             val previous = days.remove(imported.dateKey).orEmpty()
             val modified = imported.lastStatisticModified
             if (mode == StatisticsSyncMode.Merge && previous.values.maxOfOrNull { it.modified }?.let { it >= modified } == true) continue
-            var id = previous.keys.minOrNull() ?: legacyId(key, imported.dateKey)
+            var id = legacyId(key, imported.dateKey)
             if (previous[id] == null && sessions[id] != null) id = newId()
             val value = if (imported.hasActivity) session(imported, resetTime, zone) else null
             if (mode == StatisticsSyncMode.Replace && previous.size == 1 && previous[id]?.value == value) continue

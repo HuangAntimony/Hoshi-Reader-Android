@@ -752,6 +752,7 @@ class GoogleDriveSyncManager internal constructor(
             return
         }
         val replaced = remote.generation > record.generation && (record.attached || record.deleted)
+        val resetTime = books.statisticsStore.resetMinutes()
         suspend fun applyBook() = store.transaction {
             var local = store.loadBook(key, remote)!!
             if (replaced) {
@@ -760,7 +761,8 @@ class GoogleDriveSyncManager internal constructor(
             }
             if (!record.attached && record.generation == 0) local = local.copy(metadata = remote.metadata)
             if (!record.attached && !record.deleted && !remote.deleted) local = local.copy(generation = remote.generation)
-            store.applyBook(key, SyncBook.merge(local, remote))
+            val merged = SyncBook.merge(local, remote)
+            store.applyBook(key, merged.copy(sessions = TtuStatistics.reconciled(merged.sessions, key, resetTime)))
         }
         if (replaced || (remote.deleted && remote.generation >= record.generation)) {
             books.workRegistry.delete(store.bookDirectory(key)) {

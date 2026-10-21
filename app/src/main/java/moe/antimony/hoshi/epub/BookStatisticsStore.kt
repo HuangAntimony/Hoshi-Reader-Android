@@ -57,7 +57,7 @@ internal data class StatisticsArchiveSummary(
 class BookStatisticsStore private constructor(
     private val filesDir: File,
     private val ioDispatcher: CoroutineDispatcher,
-    private val resetMinutes: suspend () -> Int,
+    val resetMinutes: suspend () -> Int,
     internal val storageLock: BookStorageLock,
 ) {
     @Inject constructor(
