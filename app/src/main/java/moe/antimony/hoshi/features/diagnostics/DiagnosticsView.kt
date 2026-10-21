@@ -54,7 +54,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
@@ -334,7 +333,7 @@ private fun DiagnosticsInfoRow(label: String, value: String, onClick: (() -> Uni
         Text(label, Modifier.weight(0.35f), style = MaterialTheme.typography.bodyMedium)
         if (onClick != null) {
             Text(value, Modifier.weight(0.65f), style = MaterialTheme.typography.bodyMedium,
-                color = Color(0xFF2196F3), textAlign = TextAlign.End,
+                color = MaterialTheme.colorScheme.primary, textAlign = TextAlign.End,
                 maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
         } else {
             SelectionContainer(Modifier.weight(0.65f)) {

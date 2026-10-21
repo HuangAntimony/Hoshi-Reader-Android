@@ -61,6 +61,8 @@ import moe.antimony.hoshi.features.settings.AdvancedSettingsView
 import moe.antimony.hoshi.features.statistics.StatisticsView
 import moe.antimony.hoshi.features.statistics.StatisticsSettingsView
 import moe.antimony.hoshi.features.statistics.StatisticsBookView
+import moe.antimony.hoshi.features.update.AboutAcknowledgementsScreen
+import moe.antimony.hoshi.features.update.AboutDependenciesScreen
 import moe.antimony.hoshi.features.update.AboutScreen
 import kotlinx.coroutines.launch
 
@@ -343,6 +345,8 @@ fun AppShell(
                     onSelectedTabChange = ::selectMainTab,
                     onOpenAnkiFormat = ::openAnkiFormat,
                     onOpenAnkiAdvanced = ::openAnkiAdvanced,
+                    onOpenAcknowledgements = { settingsBackStack.add(AppRoute.SettingsDetailRoute(SettingsDetailSection.Acknowledgements)) },
+                    onOpenDependencies = { settingsBackStack.add(AppRoute.SettingsDetailRoute(SettingsDetailSection.Dependencies)) },
                     onOpenTts = { settingsBackStack.add(AppRoute.TtsSettingsRoute) },
                     onOpenDiagnosticsRecords = { kind -> settingsBackStack.add(AppRoute.DiagnosticsRecordsRoute(kind)) },
                 )
@@ -536,6 +540,8 @@ private fun SettingsDetailDestination(
     onOpenAnkiFormat: (String) -> Unit,
     onOpenAnkiAdvanced: () -> Unit,
     onOpenTts: () -> Unit,
+    onOpenDependencies: () -> Unit,
+    onOpenAcknowledgements: () -> Unit,
     onOpenDiagnosticsRecords: (DiagnosticsRecordKind) -> Unit,
 ) {
     when (route.section) {
@@ -587,7 +593,11 @@ private fun SettingsDetailDestination(
             onOpenRecords = onOpenDiagnosticsRecords,
             modifier = Modifier.fillMaxSize(),
         )
+        SettingsDetailSection.Acknowledgements -> AboutAcknowledgementsScreen(onClose = onClose)
+        SettingsDetailSection.Dependencies -> AboutDependenciesScreen(onClose = onClose)
         SettingsDetailSection.About -> AboutScreen(
+            onOpenDependencies = onOpenDependencies,
+            onOpenAcknowledgements = onOpenAcknowledgements,
             onClose = onClose,
             modifier = Modifier.fillMaxSize(),
         )

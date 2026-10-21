@@ -64,4 +64,6 @@ enum class SettingsDetailSection {
     Advanced,
     Diagnostics,
     About,
+    Dependencies,
+    Acknowledgements,
 }

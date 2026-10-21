@@ -1,35 +1,19 @@
 package moe.antimony.hoshi.features.update
 
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import moe.antimony.hoshi.ui.theme.hoshiSurfaces
-import moe.antimony.hoshi.ui.theme.hoshiContainerBorder
-import android.content.Intent
+import moe.antimony.hoshi.features.settings.GroupDivider
 import android.content.res.Resources
-import android.net.Uri
-import androidx.compose.material.icons.automirrored.rounded.OpenInNew
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.CleaningServices
 import moe.antimony.hoshi.ui.HoshiAlertDialog as AlertDialog
-import moe.antimony.hoshi.ui.HoshiButton as Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -39,7 +23,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
@@ -66,9 +49,15 @@ private const val GitHubRepositoryUrl = "https://github.com/HuangAntimony/Hoshi-
 
 @Composable
 fun AboutScreen(
+    onOpenDependencies: () -> Unit,
+    onOpenAcknowledgements: () -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val actionsModel: AboutActionsViewModel = hiltViewModel()
+    val openLink = rememberAboutLinkOpener(actionsModel)
+    AboutActionErrors(actionsModel)
+    AboutSupportEffects(actionsModel)
     val previewModel: PreviewUpdateViewModel = hiltViewModel()
     PreviewUpdateEffects(previewModel)
     val context = LocalContext.current
@@ -186,248 +175,149 @@ fun AboutScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             item {
-                AboutCard {
-                    ListItem(
-                        colors = ListItemDefaults.colors(containerColor = hoshiSurfaces.group),
-                        headlineContent = { Text("Hoshi Reader") },
-                        supportingContent = {
-                            Column {
-                                Text(
-                                    stringResource(
-                                        R.string.about_version_format,
-                                        BuildConfig.VERSION_NAME,
-                                        BuildConfig.VERSION_CODE,
-                                    ),
+                AboutSection {
+                    AboutRow(stringResource(R.string.diagnostics_version_name), value = stringResource(R.string.about_version_value, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE))
+                    GroupDivider()
+                    AboutRow(stringResource(R.string.build_commit), value = BuildCommit.current?.shortSha
+                        ?: stringResource(R.string.diagnostics_unavailable))
+                }
+            }
+            item {
+                AboutSection(stringResource(R.string.about_updates)) {
+                    AboutRow(
+                        title = stringResource(R.string.about_check_updates),
+                        detail = if (checkState == AboutUpdateCheckState.Idle && actionableRecord == null) null
+                            else if (checkState.hasError(actionableRecord)) null
+                            else updateStatusText(resources, checkState, actionableRecord),
+                        busy = checkState is AboutUpdateCheckState.Checking,
+                        onClick = {
+                            scope.launch {
+                                checkState = AboutUpdateCheckState.Checking
+                                checkState = runCatching {
+                                    withContext(Dispatchers.IO) {
+                                        appContainer.updateCheckService.check(ignoreSkipped = true)
+                                    }
+                                }.fold(
+                                    onSuccess = { outcome ->
+                                        if (outcome is UpdateCheckOutcome.Available) {
+                                            pendingAvailableUpdate = outcome.update
+                                        }
+                                        AboutUpdateCheckState.Result(outcome)
+                                    },
+                                    onFailure = { error ->
+                                        if (error is CancellationException) throw error
+                                        AboutUpdateCheckState.Error(
+                                            resources.getString(R.string.about_update_check_failed).withErrorDetails(error),
+                                        )
+                                    },
                                 )
-                                Text(stringResource(R.string.build_commit_format,
-                                    BuildCommit.current?.shortSha ?: stringResource(R.string.diagnostics_unavailable)))
                             }
                         },
                     )
-                }
-            }
-            item {
-                AboutCard {
-                    Column(Modifier.padding(16.dp)) {
-                        Text(
-                            text = "GitHub",
-                            style = MaterialTheme.typography.titleMedium,
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            text = stringResource(R.string.about_github_body),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Spacer(Modifier.height(16.dp))
-                        OutlinedButton(
-                            onClick = {
-                                context.startActivity(
-                                    Intent(Intent.ACTION_VIEW, Uri.parse(GitHubRepositoryUrl)),
-                                )
-                            },
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Rounded.OpenInNew,
-                                contentDescription = null,
-                                modifier = Modifier.padding(end = 8.dp),
-                            )
-                            Text("GitHub")
+                    if (checkState.hasError(actionableRecord)) {
+                        Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                            AboutStatusText(updateStatusText(resources, checkState, actionableRecord), true)
                         }
                     }
-                }
-            }
-            item {
-                AboutCard {
-                    Column(Modifier.padding(16.dp)) {
-                        Text(
-                            text = stringResource(R.string.about_storage_cleanup),
-                            style = MaterialTheme.typography.titleMedium,
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        AboutStatusText(
-                            text = storageCleanupStatusText(resources, cleanupState),
-                            isError = cleanupState is StorageCleanupUiState.Error,
-                        )
-                        val report = cleanupState.reportOrNull()
-                        if (report != null && report.categories.isNotEmpty()) {
-                            Spacer(Modifier.height(12.dp))
-                            report.categories.forEach { category ->
-                                Text(
-                                    text = resources.getString(
-                                        R.string.about_storage_category_format,
-                                        resources.getString(category.id.titleRes),
-                                        formatStorageSize(category.sizeBytes),
-                                        formatItemCount(resources, category.itemCount),
-                                    ),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-                        Spacer(Modifier.height(16.dp))
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Button(
-                                onClick = {
-                                    scope.launch {
-                                        cleanupState = StorageCleanupUiState.Scanning
-                                        cleanupState = runCatching {
-                                            withContext(Dispatchers.IO) {
-                                                appContainer.storageCleanupRepository.scan()
-                                            }
-                                        }.fold(
-                                            onSuccess = { StorageCleanupUiState.Ready(it) },
-                                            onFailure = { error ->
-                                                if (error is CancellationException) throw error
-                                                StorageCleanupUiState.Error(
-                                                    resources.getString(R.string.about_storage_scan_failed).withErrorDetails(error),
-                                                )
-                                            },
-                                        )
-                                    }
-                                },
-                                enabled = !cleanupState.isBusy,
-                            ) {
-                                if (cleanupState == StorageCleanupUiState.Scanning) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier
-                                            .padding(end = 8.dp)
-                                            .size(18.dp),
-                                        strokeWidth = 2.dp,
-                                    )
-                                } else {
-                                    Icon(
-                                        imageVector = Icons.Rounded.CleaningServices,
-                                        contentDescription = null,
-                                        modifier = Modifier.padding(end = 8.dp),
-                                    )
-                                }
-                                Text(stringResource(R.string.action_scan))
-                            }
-                            if (report?.hasCleanableItems == true) {
-                                OutlinedButton(
-                                    onClick = { pendingCleanupConfirmation = report },
-                                    enabled = !cleanupState.isBusy,
-                                ) {
-                                    Text(stringResource(R.string.about_clean_up))
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            item {
-                AboutCard {
-                    Column(Modifier.padding(16.dp)) {
-                        Text(
-                            text = stringResource(R.string.about_updates),
-                            style = MaterialTheme.typography.titleMedium,
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        AboutStatusText(
-                            text = updateStatusText(resources, checkState, actionableRecord),
-                            isError = checkState.hasError(actionableRecord),
-                        )
-                        Spacer(Modifier.height(16.dp))
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Button(
-                                onClick = {
-                                    scope.launch {
-                                        checkState = AboutUpdateCheckState.Checking
-                                        checkState = runCatching {
-                                            withContext(Dispatchers.IO) {
-                                                appContainer.updateCheckService.check(ignoreSkipped = true)
-                                            }
-                                        }.fold(
-                                            onSuccess = { outcome ->
-                                                if (outcome is UpdateCheckOutcome.Available) {
-                                                    pendingAvailableUpdate = outcome.update
-                                                }
-                                                AboutUpdateCheckState.Result(outcome)
-                                            },
-                                            onFailure = { error ->
-                                                if (error is CancellationException) throw error
-                                                AboutUpdateCheckState.Error(
-                                                    resources.getString(R.string.about_update_check_failed).withErrorDetails(error),
-                                                )
-                                            },
-                                        )
-                                    }
-                                },
-                                enabled = checkState !is AboutUpdateCheckState.Checking,
-                            ) {
-                                if (checkState is AboutUpdateCheckState.Checking) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier
-                                            .padding(end = 8.dp)
-                                            .size(18.dp),
-                                        strokeWidth = 2.dp,
-                                    )
-                                }
-                                Text(stringResource(R.string.about_check_updates))
-                            }
-                            val downloadedFile = actionableRecord
-                                ?.takeIf { it.status == UpdateDownloadRecordStatus.Downloaded }
-                                ?.let { appContainer.updateDownloadManager.updateFile(it.fileName) }
-                                ?.takeIf(File::isFile)
-                            val availableUpdate = actionableRecord
-                                ?.takeIf {
-                                    it.status == UpdateDownloadRecordStatus.Available ||
-                                        it.status == UpdateDownloadRecordStatus.Skipped ||
-                                        it.status == UpdateDownloadRecordStatus.Failed
-                                }
-                                ?.toAvailableUpdate()
-                            if (availableUpdate != null) {
-                                OutlinedButton(
-                                    onClick = {
-                                        scope.launch {
-                                            checkState = runCatching {
-                                                withContext(Dispatchers.IO) {
-                                                    appContainer.updateCheckService.download(availableUpdate)
-                                                }
-                                            }.fold(
-                                                onSuccess = { AboutUpdateCheckState.Result(it) },
-                                                onFailure = { error ->
-                                                    if (error is CancellationException) throw error
-                                                    AboutUpdateCheckState.Error(
-                                                        resources.getString(R.string.about_update_download_failed).withErrorDetails(error),
-                                                    )
-                                                },
+                    val downloadedFile = actionableRecord?.takeIf { it.status == UpdateDownloadRecordStatus.Downloaded }
+                        ?.let { appContainer.updateDownloadManager.updateFile(it.fileName) }?.takeIf(File::isFile)
+                    val availableUpdate = actionableRecord?.takeIf {
+                        it.status == UpdateDownloadRecordStatus.Available || it.status == UpdateDownloadRecordStatus.Skipped ||
+                            it.status == UpdateDownloadRecordStatus.Failed
+                    }?.toAvailableUpdate()
+                    if (availableUpdate != null) {
+                        AboutRow(stringResource(R.string.about_download_stable),
+                            enabled = checkState !is AboutUpdateCheckState.Checking, onClick = {
+                                scope.launch {
+                                    checkState = runCatching {
+                                        withContext(Dispatchers.IO) {
+                                            appContainer.updateCheckService.download(availableUpdate)
+                                        }
+                                    }.fold(
+                                        onSuccess = { AboutUpdateCheckState.Result(it) },
+                                        onFailure = { error ->
+                                            if (error is CancellationException) throw error
+                                            AboutUpdateCheckState.Error(
+                                                resources.getString(R.string.about_update_download_failed).withErrorDetails(error),
                                             )
-                                        }
-                                    },
-                                    enabled = checkState !is AboutUpdateCheckState.Checking,
-                                ) {
-                                    Text(stringResource(R.string.action_download))
-                                }
-                            }
-                            if (downloadedFile != null) {
-                                OutlinedButton(
-                                    onClick = {
-                                        openDownloadedUpdate(context, downloadedFile)?.let { message ->
-                                            checkState = AboutUpdateCheckState.Error(message)
-                                        }
-                                    },
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.AutoMirrored.Rounded.OpenInNew,
-                                        contentDescription = null,
-                                        modifier = Modifier.padding(end = 8.dp),
+                                        },
                                     )
-                                    Text(stringResource(R.string.action_install))
                                 }
-                            }
-                        }
-                        PreviewUpdateControls(previewModel)
+                            })
                     }
+                    if (downloadedFile != null) {
+                        AboutRow(stringResource(R.string.about_install_stable), onClick = {
+                            try {
+                                openDownloadedUpdate(context, downloadedFile)?.let { checkState = AboutUpdateCheckState.Error(it) }
+                            } catch (cancelled: CancellationException) { throw cancelled }
+                            catch (error: Exception) {
+                                checkState = AboutUpdateCheckState.Error(resources.getString(R.string.about_update_download_failed).withErrorDetails(error))
+                            }
+                        })
+                    }
+                    GroupDivider()
+                    PreviewUpdateControls(previewModel)
+                }
+            }
+            item {
+                AboutSection(stringResource(R.string.about_project)) {
+                    AboutRow(stringResource(R.string.about_android_project),
+                        detail = stringResource(R.string.about_star_project), onClick = { openLink(GitHubRepositoryUrl) })
+                }
+            }
+            item {
+                AboutSection(stringResource(R.string.about_related_projects)) {
+                    AboutRow(stringResource(R.string.about_ios_project), onClick = { openLink("https://github.com/Manhhao/Hoshi-Reader") })
+                    GroupDivider()
+                    AboutRow(stringResource(R.string.about_desktop_project), onClick = { openLink("https://github.com/Manhhao/Hoshi-Reader-Desktop") })
+                }
+            }
+            item { AboutSupportSection(actionsModel, openLink) }
+            item {
+                AboutSection(stringResource(R.string.about_storage_cleanup)) {
+                    AboutRow(stringResource(R.string.about_scan_storage),
+                        detail = if (cleanupState == StorageCleanupUiState.Idle || cleanupState is StorageCleanupUiState.Error) null
+                            else storageCleanupStatusText(resources, cleanupState),
+                        busy = cleanupState.isBusy, onClick = {
+                            scope.launch {
+                                cleanupState = StorageCleanupUiState.Scanning
+                                cleanupState = runCatching {
+                                    withContext(Dispatchers.IO) {
+                                        appContainer.storageCleanupRepository.scan()
+                                    }
+                                }.fold(
+                                    onSuccess = { StorageCleanupUiState.Ready(it) },
+                                    onFailure = { error ->
+                                        if (error is CancellationException) throw error
+                                        StorageCleanupUiState.Error(
+                                            resources.getString(R.string.about_storage_scan_failed).withErrorDetails(error),
+                                        )
+                                    },
+                                )
+                            }
+                        })
+                    if (cleanupState is StorageCleanupUiState.Error) {
+                        Column(Modifier.padding(16.dp)) { AboutStatusText(storageCleanupStatusText(resources, cleanupState), true) }
+                    }
+                    val report = cleanupState.reportOrNull()
+                    if (report != null && report.categories.isNotEmpty()) {
+                        report.categories.forEach { category ->
+                            AboutRow(resources.getString(category.id.titleRes), value = formatStorageSize(category.sizeBytes),
+                                detail = formatItemCount(resources, category.itemCount))
+                        }
+                    }
+                    if (report?.hasCleanableItems == true) {
+                        GroupDivider()
+                        AboutRow(stringResource(R.string.about_clean_up), enabled = !cleanupState.isBusy,
+                            onClick = { pendingCleanupConfirmation = report })
+                    }
+                }
+            }
+            item {
+                AboutSection {
+                    AboutRow(stringResource(R.string.about_dependencies), showChevron = true, onClick = onOpenDependencies)
+                    GroupDivider()
+                    AboutRow(stringResource(R.string.about_attribution), showChevron = true, onClick = onOpenAcknowledgements)
                 }
             }
         }
@@ -454,19 +344,6 @@ private fun AboutStatusText(text: String, isError: Boolean) {
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-    }
-}
-
-@Composable
-private fun AboutCard(content: @Composable () -> Unit) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        color = hoshiSurfaces.group,
-        border = hoshiContainerBorder(),
-        tonalElevation = 0.dp,
-    ) {
-        content()
     }
 }
 

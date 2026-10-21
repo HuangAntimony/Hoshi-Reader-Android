@@ -82,6 +82,8 @@ class AppRouteTest {
                 "Advanced",
                 "Diagnostics",
                 "About",
+                "Dependencies",
+                "Acknowledgements",
             ),
             sectionClass.enumConstants.orEmpty().map { (it as Enum<*>).name },
         )

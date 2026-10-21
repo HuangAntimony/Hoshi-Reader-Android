@@ -1,22 +1,13 @@
 package moe.antimony.hoshi.features.update
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -88,21 +79,20 @@ internal fun PreviewUpdateControls(model: PreviewUpdateViewModel) {
     val state by model.state.collectAsStateWithLifecycle()
     val downloading = state.download?.status == UpdateDownloadRecordStatus.Downloading
     val downloaded = state.download?.status == UpdateDownloadRecordStatus.Downloaded
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Spacer(Modifier.height(8.dp))
-        state.message?.let { Text(it.asString()) }
-        if (downloading) Text(stringResource(R.string.preview_downloading))
-        if (downloaded) Text(stringResource(R.string.preview_downloaded))
-        if (state.loading || state.busy) CircularProgressIndicator()
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedButton(onClick = model::check, enabled = !state.loading && !state.busy && !state.preparingInstall && !downloading) {
-                Text(stringResource(if (state.loaded) R.string.preview_get_latest else R.string.settings_retry))
-            }
-            if (downloaded) {
-                OutlinedButton(onClick = model::installDownloaded, enabled = !state.busy && !state.preparingInstall) {
-                    Text(stringResource(R.string.action_install))
-                }
-            }
-        }
-    }
+    AboutRow(
+        title = stringResource(if (state.loaded) R.string.preview_get_latest else R.string.settings_retry),
+        detail = listOfNotNull(
+            state.message?.asString(),
+            when {
+                downloading -> stringResource(R.string.preview_downloading)
+                downloaded -> stringResource(R.string.preview_downloaded)
+                else -> null
+            },
+        ).joinToString("\n").ifEmpty { null },
+        busy = state.loading || state.busy || state.preparingInstall,
+        enabled = !downloading,
+        onClick = model::check,
+    )
+    if (downloaded) AboutRow(stringResource(R.string.preview_install_title),
+        enabled = !state.busy && !state.preparingInstall, onClick = model::installDownloaded)
 }

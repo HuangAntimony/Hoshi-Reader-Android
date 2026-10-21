@@ -328,7 +328,7 @@
     </plurals>
     <string name="reader_image_clip_label">Hoshi reader image</string>
     <string name="reader_image_copied">Image copied.</string>
-    <string name="reader_image_saved">Image saved.</string>
+    <string name="reader_image_saved">Saved to gallery.</string>
     <string name="reader_image_save_failed">Could not save image.</string>
     <string name="reader_chapters" comment="Reader chapter-list label; Sasayaki intentionally reuses the same visible label for audiobook chapters.">Chapters</string>
     <string name="reader_gallery">Gallery</string>
@@ -663,7 +663,7 @@
         <item quantity="other">%1$d items</item>
     </plurals>
     <string name="about_updates" comment="About screen section label for app release update controls; intentionally matches the Dictionary update section label.">Updates</string>
-    <string name="about_check_updates">Check for Updates</string>
+    <string name="about_check_updates">Check for stable updates</string>
     <string name="about_update_check_failed">Failed to check for updates.</string>
     <string name="about_update_download_failed">Failed to download update.</string>
     <string name="about_update_available_format">Update %1$s is available.</string>
@@ -1157,4 +1157,75 @@
     <string name="preview_download_title">Hoshi Reader Preview %1$s</string>
     <string name="preview_downloading">Downloading preview…</string>
     <string name="preview_downloaded">Preview downloaded and ready to install.</string>
+
+    <string name="about_project">Project</string>
+    <string name="about_android_project">Hoshi Reader Android</string>
+    <string name="about_ios_project">Hoshi Reader iOS</string>
+    <string name="about_support">Donate</string>
+    <string name="about_support_footer">If Hoshi is useful to you, consider supporting its development.</string>
+    <string name="about_sponsors">GitHub Sponsors</string>
+    <string name="about_kofi">Ko-fi</string>
+    <string name="about_wechat">WeChat appreciation</string>
+    <string name="about_wechat_hint">Save this image and select it in WeChat Scan to support development.</string>
+    <string name="about_save_image">Save to gallery</string>
+    <string name="about_image_saving">Saving…</string>
+    <string name="about_save_image_failed">Unable to save the appreciation code.</string>
+    <string name="about_open_link_failed">Unable to open the link.</string>
+    <string name="about_dependencies">Dependencies</string>
+    <string name="about_attribution">Acknowledgements</string>
+    <string name="about_scan_storage">Scan storage</string>
+    <string name="about_download_stable">Download stable release</string>
+    <string name="about_install_stable">Install stable release</string>
+    <string name="credit_hoshidicts" translatable="false">hoshidicts</string>
+    <string name="credit_glaze" translatable="false">glaze</string>
+    <string name="credit_zstd" translatable="false">zstd</string>
+    <string name="credit_libdeflate" translatable="false">libdeflate</string>
+    <string name="credit_unordered_dense" translatable="false">unordered_dense</string>
+    <string name="credit_utf8proc" translatable="false">utf8proc</string>
+    <string name="credit_ffmpeg" translatable="false">FFmpeg</string>
+    <string name="credit_yomitan" translatable="false">Yomitan</string>
+    <string name="credit_ankidroid" translatable="false">AnkiDroid</string>
+    <string name="credit_ankiconnect" translatable="false">Ankiconnect Android</string>
+    <string name="credit_ttu" translatable="false">ッツ Reader</string>
+    <string name="license_mit" translatable="false">MIT</string>
+    <string name="license_gpl3" translatable="false">GPL-3.0</string>
+    <string name="license_bsd3" translatable="false">BSD-3-Clause</string>
+    <string name="license_lgpl21" translatable="false">LGPL-2.1-or-later</string>
+    <string name="about_version_value" translatable="false">%1$s (%2$d)</string>
+    <string name="credit_okhttp" translatable="false">OkHttp</string>
+    <string name="credit_jsoup" translatable="false">jsoup</string>
+    <string name="license_apache2" translatable="false">Apache-2.0</string>
+    <string name="about_gallery_permission_needed">Allow storage access to save this image to the gallery on this Android version.</string>
+    <string name="about_image_load_failed">Unable to display the appreciation code.</string>
+    <string name="about_desktop_project">Hoshi Reader Desktop</string>
+    <string name="about_star_project">If you like this project, consider giving it a star on GitHub.</string>
+    <string name="credit_rbook" translatable="false">rbook</string>
+    <string name="credit_uniffi" translatable="false">UniFFI</string>
+    <string name="credit_thiserror" translatable="false">thiserror</string>
+    <string name="credit_coil" translatable="false">Coil</string>
+    <string name="credit_re2j" translatable="false">RE2/J</string>
+    <string name="credit_jna" translatable="false">JNA</string>
+    <string name="credit_materialkolor" translatable="false">MaterialKolor</string>
+    <string name="credit_androidx" translatable="false">AndroidX / Jetpack Compose</string>
+    <string name="credit_media3" translatable="false">AndroidX Media3</string>
+    <string name="credit_hilt" translatable="false">Dagger / Hilt</string>
+    <string name="credit_kotlin" translatable="false">Kotlin</string>
+    <string name="credit_coroutines" translatable="false">kotlinx.coroutines</string>
+    <string name="credit_serialization" translatable="false">kotlinx.serialization</string>
+    <string name="credit_play_services" translatable="false">Google Play services</string>
+    <string name="credit_desugar" translatable="false">Desugar JDK libraries</string>
+    <string name="credit_utfcpp" translatable="false">UTF8-CPP</string>
+    <string name="credit_xxhash" translatable="false">xxHash</string>
+    <string name="credit_kanji_processor" translatable="false">kanji-processor</string>
+    <string name="license_mpl2" translatable="false">MPL-2.0</string>
+    <string name="license_mit_apache2" translatable="false">MIT / Apache-2.0</string>
+    <string name="license_bsl1" translatable="false">BSL-1.0</string>
+    <string name="license_bsd2" translatable="false">BSD-2-Clause</string>
+    <string name="license_gpl2_classpath" translatable="false">GPL-2.0 + Classpath Exception</string>
+    <string name="license_android_sdk">Android SDK License</string>
+    <string name="credit_jmdict" translatable="false">JMdict for Yomitan</string>
+    <string name="credit_jiten" translatable="false">Jiten</string>
+    <string name="credit_kanji_stroke_order" translatable="false">Kanji Stroke Order Font</string>
+    <string name="license_cc_by_sa4" translatable="false">CC-BY-SA-4.0</string>
+    <string name="about_related_projects">Related projects</string>
 </resources>

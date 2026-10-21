@@ -661,7 +661,7 @@
         <item quantity="other">%1$d 项</item>
     </plurals>
     <string name="about_updates" comment="About screen section label for app release update controls; intentionally matches the Dictionary update section label.">更新</string>
-    <string name="about_check_updates">检查更新</string>
+    <string name="about_check_updates">检查正式版更新</string>
     <string name="about_update_check_failed">无法检查更新。</string>
     <string name="about_update_download_failed">无法下载更新。</string>
     <string name="about_update_available_format">更新 %1$s 可用。</string>
@@ -1154,4 +1154,56 @@
     <string name="preview_download_title">Hoshi Reader 预览版 %1$s</string>
     <string name="preview_downloading">正在下载预览版…</string>
     <string name="preview_downloaded">预览版已下载，可以安装。</string>
+
+    <string name="about_project">项目</string>
+    <string name="about_android_project">Hoshi Reader Android</string>
+    <string name="about_ios_project">Hoshi Reader iOS</string>
+    <string name="about_support">捐赠</string>
+    <string name="about_support_footer">如果 Hoshi 对你有帮助，欢迎支持开发。</string>
+    <string name="about_sponsors">GitHub Sponsors</string>
+    <string name="about_kofi">Ko-fi</string>
+    <string name="about_wechat">微信赞赏</string>
+    <string name="about_wechat_hint">保存图片后，可在微信扫一扫中从相册选择赞赏码。</string>
+    <string name="about_save_image">保存到相册</string>
+    <string name="about_image_saving">正在保存…</string>
+    <string name="about_save_image_failed">无法保存赞赏码。</string>
+    <string name="about_open_link_failed">无法打开链接。</string>
+    <string name="about_dependencies">依赖</string>
+    <string name="about_attribution">致谢</string>
+    <string name="about_scan_storage">扫描存储</string>
+    <string name="about_download_stable">下载正式版</string>
+    <string name="about_install_stable">安装正式版</string>
+    <string name="about_gallery_permission_needed">此 Android 版本需要存储权限才能将图片保存到相册。</string>
+    <string name="about_image_load_failed">无法显示赞赏码。</string>
+    <string name="about_desktop_project">Hoshi Reader Desktop</string>
+    <string name="about_star_project">喜欢这个项目的话，欢迎在 GitHub 点个 Star。</string>
+    <string name="credit_rbook" translatable="false">rbook</string>
+    <string name="credit_uniffi" translatable="false">UniFFI</string>
+    <string name="credit_thiserror" translatable="false">thiserror</string>
+    <string name="credit_coil" translatable="false">Coil</string>
+    <string name="credit_re2j" translatable="false">RE2/J</string>
+    <string name="credit_jna" translatable="false">JNA</string>
+    <string name="credit_materialkolor" translatable="false">MaterialKolor</string>
+    <string name="credit_androidx" translatable="false">AndroidX / Jetpack Compose</string>
+    <string name="credit_media3" translatable="false">AndroidX Media3</string>
+    <string name="credit_hilt" translatable="false">Dagger / Hilt</string>
+    <string name="credit_kotlin" translatable="false">Kotlin</string>
+    <string name="credit_coroutines" translatable="false">kotlinx.coroutines</string>
+    <string name="credit_serialization" translatable="false">kotlinx.serialization</string>
+    <string name="credit_play_services" translatable="false">Google Play services</string>
+    <string name="credit_desugar" translatable="false">Desugar JDK libraries</string>
+    <string name="credit_utfcpp" translatable="false">UTF8-CPP</string>
+    <string name="credit_xxhash" translatable="false">xxHash</string>
+    <string name="credit_kanji_processor" translatable="false">kanji-processor</string>
+    <string name="license_mpl2" translatable="false">MPL-2.0</string>
+    <string name="license_mit_apache2" translatable="false">MIT / Apache-2.0</string>
+    <string name="license_bsl1" translatable="false">BSL-1.0</string>
+    <string name="license_bsd2" translatable="false">BSD-2-Clause</string>
+    <string name="license_gpl2_classpath" translatable="false">GPL-2.0 + Classpath Exception</string>
+    <string name="license_android_sdk">Android SDK 许可协议</string>
+    <string name="credit_jmdict" translatable="false">JMdict for Yomitan</string>
+    <string name="credit_jiten" translatable="false">Jiten</string>
+    <string name="credit_kanji_stroke_order" translatable="false">Kanji Stroke Order Font</string>
+    <string name="license_cc_by_sa4" translatable="false">CC-BY-SA-4.0</string>
+    <string name="about_related_projects">友情链接</string>
 </resources>

@@ -8,6 +8,11 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
 
 ### Added
 
+- Add GitHub Sponsors and Ko-fi support links in About, plus a WeChat appreciation
+  code with direct gallery saving when the app interface is Chinese. About now includes
+  dedicated dependencies and acknowledgements pages showing license names
+  and linking to project homepages.
+
 - Get the latest development preview from About after a confirmation, with APK
   download and installation based on the full build commit rather than the version number.
   Stable release update checks remain unchanged.
@@ -181,6 +186,12 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   and ExtraBold variants.
 
 ### Changed
+
+- Redesign About with compact grouped rows for version and build information,
+  updates, project links, support and storage cleanup, following the iOS layout.
+  Keep the Android project and its GitHub star invitation in its own section,
+  group iOS and Desktop links under Related projects, and place dependencies and
+  acknowledgements page entries together at the bottom with navigation chevrons.
 
 - Replace BIZ UDPGothic with BIZ UDGothic in the recommended reader fonts.
 - Edit individual reading sessions in Statistics. Session deletions persist across

@@ -144,6 +144,32 @@ transient per-book failures. Worker tests require original failure diagnostics.
 Also verify real Custom Tab sign-in, Back/close cancellation and return to Sync
 settings on a device without Play Services.
 
+## About and Support
+
+- Check About in English and Chinese: Android project and Star invitation in their
+  own section, Related projects listing iOS and Desktop, and a separate final group
+  containing Dependencies and Acknowledgements. Compact version/build rows,
+  update actions and storage scan must remain usable. Only Chinese shows the
+  WeChat appreciation row; switching back to English hides the row and its dialog.
+- Open the appreciation image and save directly to the gallery. Verify the PNG
+  in Pictures/Hoshi Reader matches the bundled original and no file picker opens.
+  Android 10+ must not ask for storage permission; Android 8–9 requests write
+  permission only on Save. Denial shows a clear prompt without a fake diagnostic.
+  A failed write must remove its incomplete MediaStore entry. Verify support URLs
+  open the intended GitHub Sponsors and Ko-fi accounts without making a payment.
+- When changing runtime dependencies, check the About list against Gradle, Cargo
+  and native CMake declarations; group AndroidX components by project and include
+  bundled native components.
+- Open Dependencies and Acknowledgements from About and return using the toolbar and system Back;
+  both entries show the same trailing chevron as the Settings About entry.
+  About retains its scroll position; both lists live on their own pages and
+  iOS/Desktop are not duplicated in acknowledgements.
+- Dependency and acknowledgement rows show license names and all open project
+  homepages without expanding inline details. External-link and image-save failures must retain original
+  messages and nested causes in a visible error dialog and diagnostic history.
+- Repeat update/preview checks below after layout changes. A storage scan must
+  not delete anything; cancel its cleanup confirmation when checking on real data.
+
 ## Manual Preview Installation
 
 - In About, Get latest preview queries only published APK previews. Check that
@@ -254,7 +280,8 @@ settings on a device without Play Services.
   app restart: the operation, time and original cause/stack must remain. The
   overview must show single-line app/WebView metadata values with separate
   crash, error and process-exit entries (including independent empty states).
-  The build commit opens the matching full-SHA GitHub source snapshot. About shows
+  The build commit opens the matching full-SHA GitHub source snapshot and uses
+  the same theme link color as About, including after changing the accent. About shows
   the same short commit without a link; exported diagnostics include the full SHA
   and snapshot URL. Missing build provenance must not create an invalid link.
   Each list has one scroll surface and opens selectable full details on tap.

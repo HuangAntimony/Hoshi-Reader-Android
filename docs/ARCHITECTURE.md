@@ -86,6 +86,18 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   tags and prereleases, publishing verified ARM APKs before retiring previous
   workflow-owned previews. Automatic App update checks use only the latest full
   GitHub release; optional transcription component releases are independent.
+- About uses the shared settings group surfaces and compact action/value rows.
+  Project and support links use a page-scoped Hilt `AboutActionsViewModel` for
+  visible diagnostic errors; `AboutImageRepository` saves the original bundled
+  appreciation PNG into MediaStore Pictures/Hoshi Reader on IO.
+  Android 10+ uses pending media publication without a storage permission; Android
+  8–9 requests write permission only when saving. Failed writes remove the partial
+  media entry and retain the original error. WeChat support is shown only for a Chinese app configuration; GitHub Sponsors and
+  Ko-fi remain available in every UI language. Related projects contains iOS and Desktop;
+  Dependencies and Acknowledgements share a separate group at the bottom of About.
+  Dependencies and acknowledgements open in separate typed settings routes with their own ViewModel scopes. Both lists show license identifiers and open the
+  project homepage. The list groups direct runtime dependencies by project and includes
+  bundled native dictionary components; it is not a transitive dependency inventory. Bundled component license notices remain packaged as resources.
 - About offers a manual preview action through a Hilt ViewModel. It selects only
   workflow-owned published APK previews, resolves the annotated tag to a full
   commit SHA, and compares that identity instead of semantic versions. Preview
