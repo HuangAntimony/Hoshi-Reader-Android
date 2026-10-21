@@ -52,6 +52,34 @@ class SyncStorageTest {
         assertEquals(record, SyncFormat.json.decodeFromString<SyncState>(temporary.root.resolve("Books/.sync.json").readText()).books["book-a"])
         storage.reload()
         assertEquals(record, storage.state.books["book-a"])
+        local("book-b")
+        storage.prepareLibrary()
+        assertEquals(record, storage.state.books["book-a"])
+        assertTrue(storage.state.books.getValue("book-b").pending)
+    }
+
+    @Test fun startupPreparationDefersLiveBookStatisticsUntilTheBookIsSynced() = runBlocking {
+        val root = local()
+        val statistics = root.resolve("statistics.json")
+        statistics.writeText("[]")
+
+        storage.prepareLibrary()
+
+        assertEquals("[]", statistics.readText())
+        assertTrue(storage.state.books.getValue("book-a").pending)
+        assertTrue(storage.loadBook("book-a")!!.sessions.isEmpty())
+        assertEquals("{}", statistics.readText())
+    }
+
+    @Test fun startupPreparationStillMigratesAndRemovesEmptyStatisticsArchives() = runBlocking {
+        val root = temporary.root.resolve("Books/statistics_archive/archived").apply { mkdirs() }
+        repository.saveMetadata(root, BookMetadata("archived", "Archived", folder = "archived", lastAccess = 0.0))
+        root.resolve("statistics.json").writeText("[]")
+
+        storage.prepareLibrary()
+
+        assertFalse(root.exists())
+        assertTrue(storage.state.books.getValue("archived").deleted)
     }
 
     @Test fun appliesCloudPlaceholderWithoutClaimingLocalFiles() = runBlocking {

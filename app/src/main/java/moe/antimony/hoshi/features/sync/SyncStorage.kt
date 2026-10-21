@@ -149,10 +149,14 @@ class SyncStorage @Inject constructor(
 
     suspend fun prepareLibrary() = transaction {
         val empty = mutableListOf<File>()
-        for (root in bookDirectories()) {
-            val sessions = statistics.loadSessions(root)
+        for (root in bookDirectoryCandidates()) {
+            val archived = root.parentFile!!.name == "statistics_archive"
+            // Existing live records need no preparation; avoid decoding their metadata again.
+            if (!archived && root.name.syncKey() in state.books) continue
+            if (books.loadMetadata(root) == null) continue
             prepareBook(root)
-            if (root.parentFile!!.name == "statistics_archive" && sessions.isEmpty()) empty += root
+            // Live sessions are read/migrated when syncing the book, not during startup.
+            if (archived && statistics.loadSessions(root).isEmpty()) empty += root
         }
         books.loadShelfList()
         save()
@@ -395,9 +399,11 @@ class SyncStorage @Inject constructor(
         updateRecord(key) { it.copy(sources = emptyMap()) }
     }
 
-    suspend fun bookDirectories(): List<File> = transaction {
+    private fun bookDirectoryCandidates(): List<File> =
         listOf(booksDirectory, booksDirectory.resolve("statistics_archive")).flatMap { it.listFiles().orEmpty().toList() }
-            .filter { books.loadMetadata(it) != null }
+
+    suspend fun bookDirectories(): List<File> = transaction {
+        bookDirectoryCandidates().filter { books.loadMetadata(it) != null }
     }
 
     suspend fun bookDirectory(folder: String, archived: Boolean = false): File = withContext(ioDispatcher) {

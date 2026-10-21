@@ -118,7 +118,7 @@ internal class AndroidBookshelfRepository @Inject constructor(
         onLegacyBookMigrationProgress: (LegacyBookMigrationProgress) -> Unit,
     ): BookshelfLoadResult = withContext(ioDispatcher) {
         val entries = bookRepository.loadBookEntries(sortOption, onLegacyBookMigrationProgress)
-        val shelves = bookRepository.loadShelves()
+        val shelves = bookRepository.loadShelves(entries)
         BookshelfLoadResult(
             entries = entries,
             progressById = loadBookProgressById(entries, bookRepository),

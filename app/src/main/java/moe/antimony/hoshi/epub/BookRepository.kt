@@ -194,13 +194,20 @@ class BookRepository private constructor(
     suspend fun saveShelfList(shelves: Map<String, Timestamped<Int?>>) =
         sidecarDataSource.saveShelfList(fileDataSource.booksDirectory, shelves)
 
+    /** Reuse the snapshot from [loadBookEntries], which has already migrated legacy shelves. */
+    suspend fun loadShelves(entries: List<BookEntry>): List<BookShelf> =
+        resolveShelves(loadShelfList(), entries.map { it.metadata })
+
     suspend fun loadShelves(): List<BookShelf> {
         val list = loadShelfList()
         val books = loadAllBooks().mapNotNull { loadMetadata(it) }
-        return list.entries.filter { it.value.value != null }
+        return resolveShelves(list, books)
+    }
+
+    private fun resolveShelves(list: Map<String, Timestamped<Int?>>, books: List<BookMetadata>): List<BookShelf> =
+        list.entries.filter { it.value.value != null }
             .sortedWith(compareBy({ it.value.value }, { it.key }))
             .map { (name, _) -> BookShelf(name, books.filter { it.shelves?.get(name)?.value == true }.map { it.id }) }
-    }
 
     suspend fun saveShelves(shelves: List<BookShelf>) = storageLock.withLock {
         val old = loadShelfList()

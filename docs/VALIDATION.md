@@ -174,6 +174,7 @@ profile; identify app-owned callers and self/inclusive time.
 | Worse after repeated entry | Live WebView targets, process CPU, heap retention and pending callbacks before/after each cycle |
 | Reader JS scales badly | Look for nested block×text/cue×screen scans and layout reads after DOM writes; protect improvements with operation-count tests |
 | Bookshelf cover jank | Separate original `HoshiCoverPipeline: source_decode` from cached thumbnail decode; a second unchanged warm round trip should not decode originals |
+| Blank bookshelf at startup | Compare the same signed release and library over repeated force-stop launches; use recording frame timestamps for shelf chrome → first books → covers. `am start -W` measures Activity display, not bookshelf data readiness. Measure repository stages and concurrent sync preparation separately on an isolated sidecar copy; do not compare debug/JIT timings directly with release latency. |
 | Statistics scrolling | Keep period/book expansion/heatmap/font state fixed; distinguish viewport drawing from repeated offscreen card recomposition |
 | Transcription slowness | Same compressed input and resume position; measure decoding, model load, inference and saving/alignment, plus thermal state, RSS/PSS and CPU/wall time |
 

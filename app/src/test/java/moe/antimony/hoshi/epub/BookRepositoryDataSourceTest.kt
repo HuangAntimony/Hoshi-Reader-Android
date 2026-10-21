@@ -12,6 +12,48 @@ import java.util.zip.ZipFile
 
 class BookRepositoryDataSourceTest {
     @Test
+    fun shelvesUseTheLoadedBookSnapshotAndRefreshOnNextLoad() = runBlocking {
+        val filesDir = Files.createTempDirectory("hoshi-shelf-snapshot").toFile()
+        try {
+            val repository = BookRepository(filesDir)
+            val root = repository.createBookDirectory("book")
+            repository.saveMetadata(root, BookMetadata("id", "Book", folder = "book", lastAccess = 0.0))
+            repository.saveShelves(listOf(BookShelf("Second", listOf("id")), BookShelf("First", emptyList())))
+            val entries = repository.loadBookEntries()
+            val id = entries.single().metadata.id
+            repository.saveShelves(listOf(BookShelf("Second", emptyList()), BookShelf("First", listOf(id))))
+
+            assertEquals(
+                listOf(BookShelf("Second", listOf(id)), BookShelf("First", emptyList())),
+                repository.loadShelves(entries),
+            )
+            assertEquals(
+                listOf(BookShelf("Second", emptyList()), BookShelf("First", listOf(id))),
+                repository.loadShelves(repository.loadBookEntries()),
+            )
+        } finally {
+            filesDir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun shelfSnapshotIncludesLegacyMembershipMigration() = runBlocking {
+        val filesDir = Files.createTempDirectory("hoshi-legacy-shelf-snapshot").toFile()
+        try {
+            val repository = BookRepository(filesDir)
+            val root = repository.createBookDirectory("book")
+            repository.saveMetadata(root, BookMetadata("id", "Book", folder = "book", lastAccess = 0.0))
+            filesDir.resolve("Books/shelves.json").writeText("""[{"name":"Shelf","bookIds":["id"]}]""")
+
+            val entries = repository.loadBookEntries()
+
+            assertEquals(listOf(BookShelf("Shelf", listOf(entries.single().metadata.id))), repository.loadShelves(entries))
+        } finally {
+            filesDir.deleteRecursively()
+        }
+    }
+
+    @Test
     fun importDataSourceImportsLongTitleWithoutLeavingTemporaryFiles() = runBlocking {
         val filesDir = Files.createTempDirectory("hoshi-long-import").toFile()
         val source = filesDir.resolve("source-fixture.epub")
