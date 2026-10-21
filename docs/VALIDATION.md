@@ -179,6 +179,37 @@ not. Auth changes must check generated BuildConfig and merged redirect schemes,
 including empty environment values. Protocol and activity tests live under
 `features/sync` in the JVM/device test trees.
 
+### Drive payload transfer fixtures
+
+`DriveFileTransferTest` covers resumable protocol recovery and persistence with
+MockWebServer. `BookTransferSchedulerTest` and `SyncTransferTrackerTest` cover
+concurrency and monotonic-clock speed sampling without real network timing.
+`SyncQueueViewTest` renders isolated upload/download rows without accessing the
+book repository or account; its screenshot is in target cache
+`sync-queue-fixture.png`.
+
+For device restart recovery, build/install the debug and androidTest APKs under
+the signature/data-protection rules above. Start
+`python3 tools/drive-transfer-fixture.py`, then use
+`adb -s "$hoshi_serial" reverse tcp:18765 tcp:18765`. Run these methods separately
+with `am instrument -w -r -e class <class>#<method> -e driveFixtureUrl
+http://127.0.0.1:18765 moe.antimony.hoshi.debug.test/androidx.test.runner.AndroidJUnitRunner`:
+
+1. `moe.antimony.hoshi.features.sync.DriveTransferDeviceTest#prepareInterruptedUpload`
+   waits for a confirmed chunk and a deliberately dropped subsequent connection.
+2. Call `curl -X POST http://127.0.0.1:18765/allow-resume`, then run
+   `DriveTransferDeviceTest#resumeAfterProcessRestartAndDownload` with the same
+   full class package. It checks a different PID, resumes the saved session,
+   compares downloaded SHA-256, and removes only its generated cache fixture.
+
+The loopback server throttles payload reads/writes and exposes `/stats` to verify
+that the new process queried the saved session and resumed at the acknowledged
+byte instead of creating another upload. Require `OK (1 test)` for each method;
+Android instrumentation's final code alone does not distinguish assertion
+failures. Remove the task-owned reverse with
+`adb -s "$hoshi_serial" reverse --remove tcp:18765` and stop the server afterward.
+These tests do not establish real Google account throughput or proxy behavior.
+
 ### Transcription components and benchmarks
 
 - `tools/build-transcription-audio.py --help` owns build options. After decoder or

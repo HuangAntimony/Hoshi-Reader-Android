@@ -30,6 +30,17 @@ class SyncSettingsRepositoryTest {
     }
 
     @Test
+    fun persistsAndBoundsBookTransferConcurrency() = runBlocking {
+        repository().use { repository ->
+            assertEquals(2, repository.settings.first().transferConcurrency)
+            for ((value, expected) in listOf(1 to 1, 8 to 8, 0 to 1, 9 to 8)) {
+                repository.update { it.copy(transferConcurrency = value) }
+                assertEquals(expected, repository.settings.first().transferConcurrency)
+            }
+        }
+    }
+
+    @Test
     fun movesAnExistingLoginToTtuOnlyOnce() = runBlocking {
         repository(hasTtuLogin = { true }).use { repository ->
             assertEquals(SyncProvider.Ttu, repository.settings.first().provider)

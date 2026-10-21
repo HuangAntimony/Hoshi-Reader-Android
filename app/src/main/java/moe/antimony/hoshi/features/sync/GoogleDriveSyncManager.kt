@@ -60,6 +60,7 @@ data class GoogleDriveSyncState(
     val attachPending: Boolean = false,
     val attachDismissed: Boolean = false,
     val missingBooks: Int = 0,
+    val activeTransfers: Map<String, SyncFileTransfer> = emptyMap(),
 )
 
 enum class AttachChoice { Merge, Device, Cloud }
@@ -68,7 +69,7 @@ data class SyncQueueItem(val key: String, val title: String, val direction: Sync
 
 enum class SyncTransferDirection { Upload, Download, Both }
 
-data class SyncProgress(val done: Int, val total: Int, val current: String?)
+data class SyncProgress(val done: Int, val total: Int)
 
 private enum class SyncPhase { State, File }
 
@@ -122,12 +123,14 @@ class GoogleDriveSyncManager internal constructor(
     private val isAuthenticated: suspend () -> Boolean,
     private val revokeAccess: suspend () -> Unit,
     private val clearTtuCache: () -> Unit,
+    private val fileTransfer: DriveFileTransfer,
 ) {
     @Inject constructor(
         store: SyncStorage,
         drive: GoogleDriveSyncHandler,
         client: GoogleDriveClient,
         auth: GoogleDriveAuth,
+        fileTransfer: GoogleDriveFileTransfer,
         settings: SyncSettingsRepository,
         ttu: TtuDriveHandler,
         books: BookRepository,
@@ -137,7 +140,7 @@ class GoogleDriveSyncManager internal constructor(
         @MainDispatcher mainDispatcher: CoroutineDispatcher,
         @IoDispatcher ioDispatcher: CoroutineDispatcher,
     ) : this(store, drive, client, settings, books, filesDir, cacheDir, scope, mainDispatcher, ioDispatcher,
-        { auth.status(SyncProvider.Gdrive) == DriveAuthStatus.Connected }, auth::revokeAccess, ttu::clearCache)
+        { auth.status(SyncProvider.Gdrive) == DriveAuthStatus.Connected }, auth::revokeAccess, ttu::clearCache, fileTransfer)
 
     private val mutableState = MutableStateFlow(GoogleDriveSyncState())
     val state = mutableState.asStateFlow()
@@ -156,8 +159,11 @@ class GoogleDriveSyncManager internal constructor(
     private var runError: Exception? = null
     private val jobs = mutableListOf<TransferJob>()
     private var active = 0
-    private var epubs = 0
-    private var priority = 0
+    private val scheduler = BookTransferScheduler()
+    private val transferTracker = SyncTransferTracker()
+    private val activeTitles = mutableMapOf<String, String>()
+    private var transferTicker: Job? = null
+    private val readerDownloads = mutableSetOf<Job>()
     private var downloads = setOf<String>()
     private val busy = mutableSetOf<String>()
     private val wakeSignal = MutableStateFlow(0)
@@ -175,6 +181,9 @@ class GoogleDriveSyncManager internal constructor(
     }
 
     init {
+        scope.launch(mainDispatcher) {
+            settings.settings.collect { scheduler.setLimit(it.transferConcurrency) }
+        }
         store.onChange = { scope.launch { schedule() } }
         store.syncEnabled = { withContext(mainDispatcher) { enabled() } }
     }
@@ -231,9 +240,12 @@ class GoogleDriveSyncManager internal constructor(
         debounceTask = null
         stateTask?.cancel()
         fileTransferTask?.cancel()
+        val readers = readerDownloads.toList()
+        readers.forEach { it.cancel() }
         withContext(ioDispatcher) { client.stop() }
         stateTask?.join()
         fileTransferTask?.join()
+        readers.forEach { it.join() }
         stateTask = null
         fileTransferTask = null
         downloads = emptySet()
@@ -245,6 +257,7 @@ class GoogleDriveSyncManager internal constructor(
 
     suspend fun signOut(): Unit = withContext(mainDispatcher) {
         stop()
+        fileTransfer.reset()
         if (settings.settings.first().provider == SyncProvider.Gdrive) resetConnection()
         revokeAccess()
         withContext(ioDispatcher) { clearTtuCache() }
@@ -252,6 +265,7 @@ class GoogleDriveSyncManager internal constructor(
 
     suspend fun changeProvider(provider: SyncProvider): Unit = withContext(mainDispatcher) {
         stop()
+        fileTransfer.reset()
         withContext(ioDispatcher) { clearTtuCache() }
         settings.update { it.copy(provider = provider) }
         start()
@@ -260,6 +274,7 @@ class GoogleDriveSyncManager internal constructor(
     suspend fun clearCache(): Unit = withContext(mainDispatcher) {
         initialization.await()
         stop()
+        fileTransfer.reset()
         cache = GoogleDriveSyncCache(root = cache.root, attachPending = cache.attachPending, replacedRoot = cache.replacedRoot)
         saveCache()
         withContext(ioDispatcher) { clearTtuCache() }
@@ -270,6 +285,7 @@ class GoogleDriveSyncManager internal constructor(
         initialization.await()
         stop()
         client.resume()
+        fileTransfer.reset()
         try {
             if (choice == AttachChoice.Device) {
                 cache = cache.copy(attachPending = false, replacedRoot = true)
@@ -304,6 +320,7 @@ class GoogleDriveSyncManager internal constructor(
 
     suspend fun resetConnection(restoringBackup: Boolean = false): Unit = withContext(mainDispatcher) {
         initialization.await()
+        fileTransfer.reset()
         store.transaction {
             if (restoringBackup) store.reload()
             store.prepareLibrary()
@@ -450,6 +467,15 @@ class GoogleDriveSyncManager internal constructor(
     }
 
     private suspend fun runFileSync(): Boolean {
+        val records = store.transaction { store.state.books.toMap() }
+        val root = cache.root
+        fileTransfer.discardObsolete { upload ->
+            records[upload.book]?.let { record ->
+                upload.root == root && record.attached && record.generation == upload.generation &&
+                    (!record.deleted || upload.type == SyncFileType.cover) && record.sources[upload.type] == upload.source &&
+                    (record.files[upload.type]?.modified ?: Long.MIN_VALUE) < upload.source
+            } == true
+        }
         enqueue(reset = true)
         val listing = if (progress == null) Listing() else listFiles()
         try {
@@ -474,8 +500,7 @@ class GoogleDriveSyncManager internal constructor(
         while (true) {
             currentCoroutineContext().ensureActive()
             val version = wakeSignal.value
-            val open = epubs < 3 && priority == 0
-            val index = jobs.indexOfFirst { !it.epub || open }
+            val index = if (jobs.isEmpty()) -1 else 0
             if (index < 0) {
                 if (jobs.isEmpty() && active == 0) return
                 wakeSignal.first { it != version }
@@ -483,15 +508,15 @@ class GoogleDriveSyncManager internal constructor(
             }
             val job = jobs.removeAt(index)
             active++
-            if (job.epub) epubs++
-            progress = progress?.copy(current = job.key)
             publish()
             val result = runCatching {
-                lock(job.key)
-                try {
-                    if (job.epub) downloadFile(job.key, SyncFileType.epub, listing) else syncFiles(job.key, listing)
-                } finally {
-                    unlock(job.key)
+                scheduler.withBook(job.key) {
+                    lock(job.key)
+                    try {
+                        if (job.epub) downloadFile(job.key, SyncFileType.epub, listing) else syncFiles(job.key, listing)
+                    } finally {
+                        unlock(job.key)
+                    }
                 }
             }
             val failure = runCatching { recordBook(job.key, SyncPhase.File, result) }.exceptionOrNull()
@@ -499,7 +524,6 @@ class GoogleDriveSyncManager internal constructor(
             val deferred = !job.epub && succeeded && wantsEpub(job.key)
             active--
             if (job.epub) {
-                epubs--
                 if (succeeded) downloads = downloads - job.key
             }
             if (deferred) jobs += TransferJob(job.key, true)
@@ -534,7 +558,6 @@ class GoogleDriveSyncManager internal constructor(
         if (reset) {
             jobs.clear()
             active = 0
-            epubs = 0
             transfers = emptyList()
             progress = null
         }
@@ -545,7 +568,7 @@ class GoogleDriveSyncManager internal constructor(
             if (transfers.any { it.key == key }) continue
             val direction = record.transferDirection(key in downloads) ?: continue
             transfers = transfers + SyncQueueItem(key, bookTitle(key, record.deleted), direction, null)
-            progress = (progress ?: SyncProgress(0, 0, null)).let { it.copy(total = it.total + 1) }
+            progress = (progress ?: SyncProgress(0, 0)).let { it.copy(total = it.total + 1) }
         }
         wake()
         publish()
@@ -617,7 +640,34 @@ class GoogleDriveSyncManager internal constructor(
                 UiText.Joined(listOf(it, error.message), "\n\n")
             } ?: error.message)
         }
-        return queue
+        val active = transferTracker.snapshot()
+        for ((key, transfer) in active) {
+            if (queue.none { it.key == key }) queue += SyncQueueItem(key, activeTitles[key] ?: key, transfer.direction, null)
+        }
+        return queue.sortedBy { if (it.key in active) 0 else 1 }
+    }
+
+    private suspend fun <T> trackTransfer(
+        key: String, type: SyncFileType, direction: SyncTransferDirection,
+        action: suspend ((DriveTransferUpdate) -> Unit) -> T,
+    ): T {
+        activeTitles[key] = bookTitle(key, store.state.books[key]?.deleted == true)
+        val id = transferTracker.begin(key, direction, type)
+        if (transferTicker == null) transferTicker = scope.launch(mainDispatcher) {
+            while (true) { delay(500); publish() }
+        }
+        publish()
+        try {
+            return action { transferTracker.update(key, id, it) }
+        } finally {
+            transferTracker.finish(key, id)
+            activeTitles.remove(key)
+            if (transferTracker.snapshot().isEmpty()) {
+                transferTicker?.cancel()
+                transferTicker = null
+            }
+            publish()
+        }
     }
 
     fun setAttachDismissed(dismissed: Boolean) {
@@ -626,9 +676,10 @@ class GoogleDriveSyncManager internal constructor(
 
     private fun publish() {
         mutableState.value = state.value.copy(
-            isSyncing = stateTask != null || fileTransferTask != null,
+            isSyncing = stateTask != null || fileTransferTask != null || readerDownloads.any { it.isActive },
             queue = queue(),
             progress = progress,
+            activeTransfers = transferTracker.snapshot(),
             attachPending = cache.attachPending,
             missingBooks = store.state.books.values.count { it.missingEpub },
         )
@@ -640,7 +691,7 @@ class GoogleDriveSyncManager internal constructor(
     }
 
     suspend fun downloadBook(book: BookMetadata, onProgress: (Double) -> Unit): BookMetadata = withContext(mainDispatcher) {
-        scope.async {
+        val task = scope.async(start = CoroutineStart.LAZY) {
             val key = book.folder!!.syncKey()
             try {
                 sync(book)
@@ -650,17 +701,13 @@ class GoogleDriveSyncManager internal constructor(
                 currentCoroutineContext().ensureActive()
                 if (store.state.books[key]?.deleted == true) throw GoogleDriveSyncException(UiText.Resource(R.string.sync_book_deleted))
                 if (enabled() && store.state.books[key]?.files?.get(SyncFileType.epub)?.value != null) {
-                    priority++
-                    try {
+                    scheduler.withBook(key, priority = true) {
                         lock(key)
                         try {
                             downloadFile(key, SyncFileType.epub, Listing(), onProgress)
                         } finally {
                             unlock(key)
                         }
-                    } finally {
-                        priority--
-                        wake()
                     }
                 }
                 currentCoroutineContext().ensureActive()
@@ -670,7 +717,12 @@ class GoogleDriveSyncManager internal constructor(
             } finally {
                 withContext(NonCancellable) { startFileSync() }
             }
-        }.await()
+        }
+        readerDownloads += task
+        task.invokeOnCompletion { scope.launch(mainDispatcher) { readerDownloads -= task; publish() } }
+        task.start()
+        // A caller leaving the reader does not stop application-owned work.
+        task.await()
     }
 
     private suspend fun changes(): RemoteChanges {
@@ -851,7 +903,9 @@ class GoogleDriveSyncManager internal constructor(
             Triple(record, source, url)
         } ?: return
         val name = if (fileType == SyncFileType.sasayaki) "$source-${url.name.syncKey()}" else url.name.syncKey()
-        upload(listing, key, record.generation, name, url)
+        val request = trackTransfer(key, fileType, SyncTransferDirection.Upload) { onProgress ->
+            upload(listing, key, record.generation, fileType, source, name, url, onProgress)
+        }
         currentCoroutineContext().ensureActive()
         store.transaction {
             if (!canPublish(key, fileType, source, record.generation)) return@transaction
@@ -863,6 +917,7 @@ class GoogleDriveSyncManager internal constructor(
             listing.published = true
             store.saveChanges(false)
         }
+        fileTransfer.acknowledge(request)
     }
 
     private suspend fun listFiles(): Listing {
@@ -896,7 +951,10 @@ class GoogleDriveSyncManager internal constructor(
         cache = cache.copy(bookFolders = cache.bookFolders - "$key/$generation")
     }
 
-    private suspend fun upload(listing: Listing, key: String, generation: Int, name: String, file: File) {
+    private suspend fun upload(
+        listing: Listing, key: String, generation: Int, type: SyncFileType, source: Long,
+        name: String, file: File, onProgress: (DriveTransferUpdate) -> Unit,
+    ): DriveUploadRequest {
         var (book, folder) = resolveFolder(listing, key, generation)
         if (folder == null) {
             if (book == null) {
@@ -908,8 +966,13 @@ class GoogleDriveSyncManager internal constructor(
             rememberFolder(listing, key, generation, created)
             folder = created
         }
-        if ((folder to name) in listing.files) return
-        if (listing.listed || folder in listing.created) client.write(file, name, folder) else drive.upload(file, name, folder)
+        val request = DriveUploadRequest(cache.root, key, generation, type, source, folder, name)
+        if ((folder to name) !in listing.files &&
+            (listing.listed || folder in listing.created || drive.children(folder, name).isEmpty())) {
+            val uploaded = fileTransfer.upload(file, request, onProgress)
+            listing.files[folder to name] = uploaded
+        }
+        return request
     }
 
     private suspend fun findFile(listing: Listing, key: String, generation: Int, name: String): GoogleDriveFile? {
@@ -969,7 +1032,12 @@ class GoogleDriveSyncManager internal constructor(
         val file = findFile(listing, key, record.generation, name) ?: throw GoogleDriveApiException("$name is missing from Google Drive.", 404)
         val temporary = cacheDir.resolve(UUID.randomUUID().toString())
         try {
-            drive.download(file, temporary, onProgress)
+            trackTransfer(key, fileType, SyncTransferDirection.Download) { update ->
+                fileTransfer.download(driveUrl("files/${file.id.urlPathSegment()}", mapOf("alt" to "media")), temporary, file.size?.toLongOrNull()) { value ->
+                    update(value)
+                    value.totalBytes?.takeIf { it > 0 }?.let { onProgress(value.bytes.toDouble() / it) }
+                }
+            }
             currentCoroutineContext().ensureActive()
             store.transaction {
                 val current = store.state.books.getValue(key)

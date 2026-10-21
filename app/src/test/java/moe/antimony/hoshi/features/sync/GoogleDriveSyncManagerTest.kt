@@ -163,6 +163,7 @@ class GoogleDriveSyncManagerTest {
 
     private suspend fun TestScope.fixture(
         dispatcher: TestDispatcher = UnconfinedTestDispatcher(testScheduler),
+        transferFactory: (GoogleDriveClient) -> DriveFileTransfer = { TestDriveFileTransfer(it) },
         beforeRequest: suspend () -> Unit = {},
     ): Fixture {
         val remote = DriveService()
@@ -179,7 +180,7 @@ class GoogleDriveSyncManagerTest {
         val client = GoogleDriveClient(token, { settings.settings.first().provider }, {}, dispatcher, remote::connection)
         val handler = GoogleDriveSyncHandler(client)
         val manager = GoogleDriveSyncManager(store, handler, client, settings, books, temporary.root,
-            temporary.root.resolve("cache").apply { mkdirs() }, CoroutineScope(backgroundScope.coroutineContext + SupervisorJob(backgroundScope.coroutineContext[Job])), dispatcher, dispatcher, { true }, {}, {})
+            temporary.root.resolve("cache").apply { mkdirs() }, CoroutineScope(backgroundScope.coroutineContext + SupervisorJob(backgroundScope.coroutineContext[Job])), dispatcher, dispatcher, { true }, {}, {}, transferFactory(client))
         return Fixture(remote, books, store, manager, settings, client)
     }
 
@@ -316,7 +317,7 @@ class GoogleDriveSyncManagerTest {
         val settings = SyncSettingsRepository(MemoryPreferences(), NoTtu, dispatcher)
         settings.update { it.copy(enabled = true) }
         val client = GoogleDriveClient(object : DriveAccessTokenProvider { override suspend fun accessToken() = "token" }, { SyncProvider.Gdrive }, {}, dispatcher, f.remote::connection)
-        val restarted = GoogleDriveSyncManager(f.store, GoogleDriveSyncHandler(client), client, settings, f.books, temporary.root, temporary.root.resolve("cache"), CoroutineScope(backgroundScope.coroutineContext + SupervisorJob(backgroundScope.coroutineContext[Job])), dispatcher, dispatcher, { true }, {}, {})
+        val restarted = GoogleDriveSyncManager(f.store, GoogleDriveSyncHandler(client), client, settings, f.books, temporary.root, temporary.root.resolve("cache"), CoroutineScope(backgroundScope.coroutineContext + SupervisorJob(backgroundScope.coroutineContext[Job])), dispatcher, dispatcher, { true }, {}, {}, TestDriveFileTransfer(client))
         restarted.sync(metadata)
         assertEquals(3, f.remote.reads["a"])
         assertEquals(1, f.remote.queries.count { "book-a.json" in it })
@@ -393,6 +394,36 @@ class GoogleDriveSyncManagerTest {
         f.manager.sync()
         assertEquals(2, f.remote.reads["a"])
         assertEquals("Other device", f.store.loadBook("book-a")!!.metadata.value.title)
+    }
+
+    @Test fun exposesEveryActiveBookAndHonorsLiveConcurrencyChanges() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val f = fixture(transferFactory = { client -> object : TestDriveFileTransfer(client) {
+            override suspend fun upload(file: java.io.File, request: DriveUploadRequest, progress: (DriveTransferUpdate) -> Unit): GoogleDriveFile {
+                progress(DriveTransferUpdate(2, file.length(), deltaBytes = 2))
+                gate.await()
+                return super.upload(file, request, progress)
+            }
+        } })
+        repeat(3) { index ->
+            val name = "book-$index"
+            val root = f.books.createBookDirectory(name)
+            f.books.saveMetadata(root, BookMetadata(name, name, folder = name, epub = "$name.epub", lastAccess = 0.0))
+            root.resolve("$name.epub").writeText("sample-epub")
+            f.store.handleBookImport(f.books.loadMetadata(root)!!, root)
+        }
+        f.manager.sync()
+        advanceTimeBy(501)
+        runCurrent()
+        assertEquals(2, f.manager.state.value.activeTransfers.size)
+        assertTrue(f.manager.state.value.activeTransfers.values.all { it.bytes == 2L })
+        f.settings.update { it.copy(transferConcurrency = 3) }
+        runCurrent()
+        assertEquals(3, f.manager.state.value.activeTransfers.size)
+        gate.complete(Unit)
+        runCurrent()
+        assertTrue(f.manager.state.value.activeTransfers.isEmpty())
+        assertTrue(f.manager.state.value.queue.isEmpty())
     }
 
     @Test fun publishesFilesOnlyAfterUploadAndDownloadsEpubOnlyOnDemand() = runTest {

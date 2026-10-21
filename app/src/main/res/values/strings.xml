@@ -73,7 +73,7 @@
     <string name="statistics_partial_unavailable">Some statistics are temporarily unavailable.</string>
     <string name="statistics_target_met">Goal met</string>
     <string name="statistics_target_not_met">Goal not met</string>
-    <string name="statistics_trend_legend_format">%1$s / %2$s</string>
+    <string name="statistics_trend_legend_format" comment="Statistics legend values; distinct translation context from transferred / total file bytes.">%1$s / %2$s</string>
     <string name="statistics_character_target_format" comment="Daily character target value, intentionally matching generic statistics character value format.">%1$s chars</string>
     <string name="statistics_duration_target_format">%1$s</string>
     <string name="statistics_characters_value_format" comment="Generic character metric value, intentionally matching daily character target value.">%1$s chars</string>
@@ -1229,4 +1229,15 @@
     <string name="credit_kanji_stroke_order" translatable="false">Kanji Stroke Order Font</string>
     <string name="license_cc_by_sa4" translatable="false">CC-BY-SA-4.0</string>
     <string name="about_related_projects">Related projects</string>
+    <string name="sync_transfer_concurrency" comment="Drive file transfer queue">Simultaneous book transfers</string>
+    <string name="sync_upload_speed" comment="Drive file transfer queue">Upload: %1$s</string>
+    <string name="sync_download_speed" comment="Drive file transfer queue">Download: %1$s</string>
+    <string name="sync_transfer_preparing" comment="Drive file transfer queue">Preparing</string>
+    <string name="sync_transfer_uploading" comment="Drive file transfer queue">Uploading</string>
+    <string name="sync_transfer_downloading" comment="Drive file transfer queue">Downloading</string>
+    <string name="sync_transfer_confirming" comment="Drive file transfer queue">Waiting for confirmation</string>
+    <string name="sync_transfer_retrying" comment="Drive file transfer queue">Retrying</string>
+    <string name="sync_transfer_stage" comment="Drive file transfer queue">%1$s · %2$s</string>
+    <string name="sync_transfer_amount" comment="Drive file transfer queue">%1$s / %2$s</string>
+    <string name="sync_transfer_percent" comment="Drive file transfer queue">%1$d%% · %2$s</string>
 </resources>

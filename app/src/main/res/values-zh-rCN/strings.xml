@@ -1207,4 +1207,15 @@
     <string name="credit_kanji_stroke_order" translatable="false">Kanji Stroke Order Font</string>
     <string name="license_cc_by_sa4" translatable="false">CC-BY-SA-4.0</string>
     <string name="about_related_projects">友情链接</string>
+    <string name="sync_transfer_concurrency" comment="Drive file transfer queue">同时传输的书籍数</string>
+    <string name="sync_upload_speed" comment="Drive file transfer queue">上传：%1$s</string>
+    <string name="sync_download_speed" comment="Drive file transfer queue">下载：%1$s</string>
+    <string name="sync_transfer_preparing" comment="Drive file transfer queue">准备中</string>
+    <string name="sync_transfer_uploading" comment="Drive file transfer queue">上传中</string>
+    <string name="sync_transfer_downloading" comment="Drive file transfer queue">下载中</string>
+    <string name="sync_transfer_confirming" comment="Drive file transfer queue">等待确认</string>
+    <string name="sync_transfer_retrying" comment="Drive file transfer queue">正在重试</string>
+    <string name="sync_transfer_stage" comment="Drive file transfer queue">%1$s · %2$s</string>
+    <string name="sync_transfer_amount" comment="Drive file transfer queue">%1$s / %2$s</string>
+    <string name="sync_transfer_percent" comment="Drive file transfer queue">%1$d%% · %2$s</string>
 </resources>

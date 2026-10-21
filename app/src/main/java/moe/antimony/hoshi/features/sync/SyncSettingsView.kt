@@ -136,6 +136,7 @@ fun SyncSettingsView(
     var authAttempt by remember { mutableStateOf(0) }
     var authStatus by remember { mutableStateOf<DriveAuthStatus?>(null) }
     var providerMenuExpanded by remember { mutableStateOf(false) }
+    var concurrencyMenuExpanded by remember { mutableStateOf(false) }
     var directionMenuExpanded by remember { mutableStateOf(false) }
     var statisticsModeMenuExpanded by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
@@ -763,6 +764,26 @@ fun SyncSettingsView(
             item {
                 if (currentSettings?.enabled == true && currentSettings.provider == SyncProvider.Gdrive && currentAuthStatus == DriveAuthStatus.Connected) {
                     SettingsCard {
+                        ListItem(
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                            headlineContent = { Text(stringResource(R.string.sync_transfer_concurrency)) },
+                            trailingContent = {
+                                Box {
+                                    TextButton(onClick = { concurrencyMenuExpanded = true }) { Text(currentSettings.transferConcurrency.toString()) }
+                                    DropdownMenu(expanded = concurrencyMenuExpanded, onDismissRequest = { concurrencyMenuExpanded = false }) {
+                                        (1..8).forEach { count ->
+                                            DropdownMenuItem(text = { Text(count.toString()) }, onClick = {
+                                                concurrencyMenuExpanded = false
+                                                launchOperation(UiText.Resource(R.string.display_settings_save_failed)) {
+                                                    repository.update { it.copy(transferConcurrency = count) }
+                                                }
+                                            })
+                                        }
+                                    }
+                                }
+                            },
+                        )
+                        SettingsDivider()
                         hoshiState.lastSync?.let { lastSync ->
                             ListItem(
                                 colors = ListItemDefaults.colors(containerColor = Color.Transparent),
@@ -854,56 +875,6 @@ fun SyncSettingsView(
                         }
                     }
                     if (currentSettings.provider == SyncProvider.Ttu) GoogleCloudOAuthSetupCard()
-                }
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun SyncQueueSheet(state: GoogleDriveSyncState, onDismiss: () -> Unit, onError: (UiText) -> Unit) {
-    val colorScheme = MaterialTheme.colorScheme
-    ModalBottomSheet(
-        modifier = Modifier.hoshiContainerOutline(BottomSheetDefaults.ExpandedShape),
-        containerColor = hoshiSurfaces.overlay,
-        tonalElevation = 0.dp,
-        onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-    ) {
-        Column(Modifier.padding(horizontal = 24.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text(stringResource(R.string.sync_queue), style = MaterialTheme.typography.titleLarge)
-            if (state.queue.isEmpty()) {
-                Text(stringResource(R.string.sync_queue_all_synced), color = colorScheme.onSurfaceVariant)
-            } else {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    items(state.queue, key = { it.key }) { item ->
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            item.direction?.let { direction ->
-                                Icon(
-                                    when (direction) {
-                                        SyncTransferDirection.Upload -> Icons.Rounded.ArrowUpward
-                                        SyncTransferDirection.Download -> Icons.Rounded.ArrowDownward
-                                        SyncTransferDirection.Both -> Icons.Rounded.SwapVert
-                                    },
-                                    contentDescription = null,
-                                    tint = colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(16.dp),
-                                )
-                            }
-                            Column(Modifier.weight(1f)) {
-                                Text(item.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                item.error?.let { error ->
-                                    TextButton(onClick = { onError(error) }) {
-                                        Text(stringResource(R.string.sync_error_details), color = colorScheme.error)
-                                    }
-                                }
-                            }
-                            if (item.key == state.progress?.current) {
-                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                            }
-                        }
-                    }
                 }
             }
         }

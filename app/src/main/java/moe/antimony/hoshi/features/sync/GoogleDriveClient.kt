@@ -282,7 +282,7 @@ internal fun String.urlQueryComponent(): String =
 internal fun String.urlPathSegment(): String =
     split("/").joinToString("/") { it.urlQueryComponent() }
 
-private fun checkValidatedInternet(context: Context) {
+internal fun checkValidatedInternet(context: Context) {
     val connectivityManager = context.applicationContext.getSystemService(ConnectivityManager::class.java)
     val network = connectivityManager?.activeNetwork
         ?: throw GoogleDriveApiException(GoogleDriveApiException.NoInternetConnectionMessage)

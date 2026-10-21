@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.CoroutineDispatcher
@@ -53,6 +54,7 @@ class SyncSettingsRepository(
             autoSyncEnabled = this[KEY_AUTO_SYNC_ENABLED] ?: false,
             authProvider = SyncAuthProvider.DeviceCode,
             uploadBooks = this[KEY_UPLOAD_BOOKS] ?: true,
+            transferConcurrency = (this[KEY_TRANSFER_CONCURRENCY] ?: 2).coerceIn(1, 8),
         )
 
     private fun MutablePreferences.writeSyncSettings(settings: SyncSettings) {
@@ -62,6 +64,7 @@ class SyncSettingsRepository(
         this[KEY_AUTO_SYNC_ENABLED] = settings.autoSyncEnabled
         this[KEY_AUTH_PROVIDER] = settings.authProvider.name
         this[KEY_UPLOAD_BOOKS] = settings.uploadBooks
+        this[KEY_TRANSFER_CONCURRENCY] = settings.transferConcurrency.coerceIn(1, 8)
     }
 
     companion object {
@@ -72,6 +75,7 @@ class SyncSettingsRepository(
         private val KEY_MODE = stringPreferencesKey("syncMode")
         private val KEY_AUTO_SYNC_ENABLED = booleanPreferencesKey("autoSyncEnabled")
         private val KEY_AUTH_PROVIDER = stringPreferencesKey("syncAuthProvider")
+        private val KEY_TRANSFER_CONCURRENCY = intPreferencesKey("transferConcurrency")
         private val KEY_UPLOAD_BOOKS = booleanPreferencesKey("uploadBooks")
     }
 }

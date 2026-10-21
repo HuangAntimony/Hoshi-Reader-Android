@@ -39,6 +39,7 @@ data class SyncSettings(
     val autoSyncEnabled: Boolean = false,
     val authProvider: SyncAuthProvider = SyncAuthProvider.DeviceCode,
     val uploadBooks: Boolean = true,
+    val transferConcurrency: Int = 2,
 )
 
 sealed interface DriveAuthStatus {
