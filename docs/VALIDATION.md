@@ -1261,6 +1261,13 @@ Validate relevant sync/update/Sasayaki changes with:
   the final bookshelf refresh must not erase failed items. Cancellation produces
   no error or diagnostic record. `GoogleDriveSyncManagerTest`,
   `BookshelfViewModelTest` and `SyncErrorDiagnosticsTest` cover these paths.
+- Native Hoshi Drive reauthorization: after a successful connection, remove Hoshi's
+  access in Google account settings and trigger sync. When Google requires consent
+  again, Connect must reappear without signing out first and remain available after
+  app restart. Reconnect and confirm sync resumes. A successful silent token refresh,
+  temporary network failure or cancellation must retain the connection.
+  `GoogleDriveNativeLoginTest` covers persisted state, connection actions and original
+  error details/history using DataStore; real Play Services consent needs device QA.
 - TTU Google Drive Device Code connect/sign-out, clear cached Drive folders/covers,
   remote-only bookshelf list, pull-to-refresh, import, long-press delete,
   transient network behavior, manual import/export result dialogs,

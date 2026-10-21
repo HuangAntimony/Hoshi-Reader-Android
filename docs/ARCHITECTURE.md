@@ -673,6 +673,10 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   Native and browser authorization failures use the shared error-details dialog
   and diagnostic history; user cancellation remains silent. Browser token errors
   retain HTTP status and OAuth diagnostics without recording token response bodies.
+  When native token acquisition requires user consent, the persisted connection
+  flag clears before the original authorization-required failure reaches the UI,
+  exposing Connect again. Silent refresh success, temporary failures and cancellation
+  keep the connection; discovering revoked consent does not reset library bookkeeping.
 - `GoogleDriveClient` shares cancellable HTTP transport, token refresh and network
   preflight. Hoshi connections use 60-second connect/read timeouts; TTU uses
   10 seconds. `GoogleDriveSyncHandler` owns the native Drive layout and changes

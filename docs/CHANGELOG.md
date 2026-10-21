@@ -19,6 +19,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   keep each failed book and file category, and canceling stays quiet.
   Connecting through the Google account picker resets pending sync operations so
   books deleted before sign-in do not delete existing cloud copies.
+  When native Google authorization requires consent again, the Connect button
+  reappears without signing out first; temporary errors keep the connection.
   Devices without Google Play Services can connect through their browser.
   Android-generated Sasayaki matches include the image-list field required by iOS.
   Debug builds sync edits after 2 seconds and poll for cloud changes every 5 seconds.

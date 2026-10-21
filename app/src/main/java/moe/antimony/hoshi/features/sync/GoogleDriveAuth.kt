@@ -2,6 +2,8 @@ package moe.antimony.hoshi.features.sync
 
 import android.content.Context
 import android.content.Intent
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.preferencesDataStore
@@ -20,6 +22,18 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.tasks.await
 
 private val Context.hoshiDriveAuthDataStore by preferencesDataStore(name = "hoshi-drive-auth")
+private val connectedKey = booleanPreferencesKey("connected")
+
+internal suspend fun DataStore<Preferences>.nativeDriveStatus(): DriveAuthStatus =
+    if (data.first()[connectedKey] == true) DriveAuthStatus.Connected else DriveAuthStatus.NotConnected
+
+internal suspend fun DataStore<Preferences>.nativeDriveAccessToken(authorize: suspend () -> String): String = try {
+    authorize()
+} catch (error: DriveAuthorizationRequiredException) {
+    // User consent is required: expose Connect before reporting the sync failure.
+    edit { it[connectedKey] = false }
+    throw error
+}
 
 @Singleton
 class GoogleDriveAuth @Inject constructor(
@@ -29,7 +43,6 @@ class GoogleDriveAuth @Inject constructor(
     val browser: GoogleDriveBrowserAuth,
 ) : DriveAuthorizer {
     private val client by lazy { Identity.getAuthorizationClient(context) }
-    private val connectedKey = booleanPreferencesKey("connected")
 
     suspend fun provider(): SyncProvider = settings.get().settings.first().provider
 
@@ -67,11 +80,8 @@ class GoogleDriveAuth @Inject constructor(
         SyncProvider.Ttu -> ttu.status()
         SyncProvider.Gdrive -> {
             val browserStatus = browser.status()
-            when {
-                browserStatus == DriveAuthStatus.Connected || usesBrowserAuthorization() -> browserStatus
-                context.hoshiDriveAuthDataStore.data.first()[connectedKey] == true -> DriveAuthStatus.Connected
-                else -> DriveAuthStatus.NotConnected
-            }
+            if (browserStatus == DriveAuthStatus.Connected || usesBrowserAuthorization()) browserStatus
+            else context.hoshiDriveAuthDataStore.nativeDriveStatus()
         }
     }
 
@@ -79,9 +89,11 @@ class GoogleDriveAuth @Inject constructor(
         if (provider() == SyncProvider.Ttu) return ttu.accessToken()
         if (browser.status() == DriveAuthStatus.Connected) return browser.accessToken()
         if (status(SyncProvider.Gdrive) != DriveAuthStatus.Connected) throw DriveAuthorizationRequiredException()
-        val result = authorize()
-        if (result.hasResolution()) throw DriveAuthorizationRequiredException()
-        return result.accessToken!!
+        return context.hoshiDriveAuthDataStore.nativeDriveAccessToken {
+            val result = authorize()
+            if (result.hasResolution()) throw DriveAuthorizationRequiredException()
+            result.accessToken!!
+        }
     }
 
     override suspend fun clearAccessToken(token: String) {
