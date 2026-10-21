@@ -97,7 +97,7 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   Dependencies and Acknowledgements share a separate group at the bottom of About.
   Dependencies and acknowledgements open in separate typed settings routes with their own ViewModel scopes. Both lists show license identifiers and open the
   project homepage. The list groups direct runtime dependencies by project and includes
-  bundled native dictionary components; it is not a transitive dependency inventory. Bundled component license notices remain packaged as resources.
+  bundled native dictionary components; it is not a transitive dependency inventory.
 - About offers a manual preview action through a Hilt ViewModel. It selects only
   workflow-owned published APK previews, resolves the annotated tag to a full
   commit SHA, and compares that identity instead of semantic versions. Preview
