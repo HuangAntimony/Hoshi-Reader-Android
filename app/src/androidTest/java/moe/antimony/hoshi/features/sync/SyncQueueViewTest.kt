@@ -1,5 +1,9 @@
 package moe.antimony.hoshi.features.sync
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.graphics.Color
+import org.junit.Assert.assertTrue
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.mutableStateOf
@@ -67,6 +71,39 @@ class SyncQueueViewTest {
         compose.onNodeWithText("Book 1").assertIsDisplayed()
         compose.runOnIdle { state.value = queue(listOf(0) + (1..39), (0..7).toSet()) }
         compose.onNodeWithText("Book 0").assertIsDisplayed()
+    }
+
+    @Test fun shrinkingEInkSheetDoesNotDrawAnOutlineAcrossTheBackdrop() {
+        val state = mutableStateOf(queue(listOf(0, 1, 2), setOf(0, 1, 2)))
+        compose.setContent {
+            HoshiReaderTheme(darkTheme = false, eInkMode = true) {
+                Box(Modifier.fillMaxSize().background(Color.White)) {
+                    SyncQueueSheet(state.value, {}, {})
+                }
+            }
+        }
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        for (count in listOf(3, 1, 0)) {
+            compose.runOnIdle { state.value = queue((0 until count).toList(), (0 until count).toSet()) }
+            compose.waitForIdle()
+            val sheetTop = compose.onNode(SemanticsMatcher.keyIsDefined(SemanticsProperties.PaneTitle))
+                .fetchSemanticsNode().boundsInWindow.top.toInt()
+            val bitmap = requireNotNull(instrumentation.uiAutomation.takeScreenshot())
+            try {
+                File(instrumentation.targetContext.cacheDir, "sync-queue-sheet-$count.png").outputStream().use {
+                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
+                }
+                if (count == 0) assertTrue("Empty sheet should leave a visible backdrop", sheetTop > bitmap.height / 2)
+                // The fixture backdrop is blank. Ignore status icons and the sheet's own edge;
+                // a black line across its middle 80% can only be an out-of-place outline.
+                for (y in bitmap.height / 10 until sheetTop - 4) {
+                    val dark = (bitmap.width / 10 until bitmap.width * 9 / 10).count { x ->
+                        android.graphics.Color.red(bitmap.getPixel(x, y)) < 80
+                    }
+                    assertTrue("$count books: stray horizontal border at y=$y above sheetTop=$sheetTop", dark < bitmap.width / 2)
+                }
+            } finally { bitmap.recycle() }
+        }
     }
 
     @Test fun showsEveryActiveTransferAndSeparateTotals() {

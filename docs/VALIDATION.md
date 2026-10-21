@@ -111,6 +111,12 @@ Stop the fixture and remove only this reverse mapping after testing.
 
 ## WebView and UI automation pitfalls
 
+- Material 3 `ModalBottomSheet` applies its caller modifier before the internal
+  sheet offset; an outer `border` can remain on the scrim at the unshifted height.
+  Check short and shrinking E-ink sheets, not only full-height lists.
+  `SyncQueueViewTest` captures the real dialog window and checks for stray lines
+  above the sheet while its queue shrinks.
+
 - Cold launch normally lands on Bookshelf; open a book before testing Reader.
   Single-tap text opens lookup; long press tests native selection/highlights.
 - Standalone reader fixtures must inject measured

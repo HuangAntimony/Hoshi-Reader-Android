@@ -24,14 +24,12 @@ import androidx.compose.ui.unit.dp
 import java.util.Locale
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.ui.UiText
-import moe.antimony.hoshi.ui.theme.hoshiContainerOutline
 import moe.antimony.hoshi.ui.theme.hoshiSurfaces
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun SyncQueueSheet(state: GoogleDriveSyncState, onDismiss: () -> Unit, onError: (UiText) -> Unit) {
     ModalBottomSheet(
-        modifier = Modifier.hoshiContainerOutline(BottomSheetDefaults.ExpandedShape),
         containerColor = hoshiSurfaces.overlay,
         tonalElevation = 0.dp,
         onDismissRequest = onDismiss,
