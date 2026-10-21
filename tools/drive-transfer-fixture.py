@@ -11,12 +11,14 @@ import time
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--port', type=int, default=18765)
+    parser.add_argument('--benchmark', action='store_true', help='Disable deliberate interruption and accept the declared file size')
+    parser.add_argument('--response-delay', type=float, default=0, help='Seconds to delay each payload acknowledgement')
     args = parser.parse_args()
     payload = bytearray()
     events = []
     resumed = False
     lock = threading.Lock()
-    size = 2 * 1024 * 1024 + 17
+    size = 12 * 1024 * 1024 + 17
     completed = dict(id='fixture-upload', name='generated.epub',
                      mimeType='application/epub+zip', size=str(size), createdTime='')
 
@@ -39,13 +41,18 @@ def main():
                 pass
 
         def do_POST(self):
-            nonlocal resumed
+            nonlocal resumed, size
             self.rfile.read(int(self.headers.get('Content-Length', 0)))
             if self.path == '/allow-resume':
                 resumed = True
                 return self.reply(data={'ready': True})
             if not self.path.startswith('/upload?'):
                 return self.reply(404)
+            if args.benchmark:
+                size = int(self.headers['X-Upload-Content-Length'])
+                payload.clear()
+                events.clear()
+                completed['size'] = str(size)
             events.append({'method': 'POST'})
             self.reply(headers={'Location': f'http://127.0.0.1:{args.port}/session'})
 
@@ -70,11 +77,12 @@ def main():
                 match = re.fullmatch(r'bytes (\d+)-(\d+)/(\d+)', content_range)
                 if not match or int(match[1]) != len(payload):
                     return self.reply(400)
-                if not resumed and len(payload) >= 1024 * 1024:
+                if not args.benchmark and not resumed and len(payload) >= 4 * 1024 * 1024:
                     # Drop a fully received request before acknowledging it.
                     self.close_connection = True
                     return
                 payload.extend(body)
+                time.sleep(max(0, args.response_delay))
                 if len(payload) == size:
                     return self.reply(data=completed)
                 self.reply(308, headers={'Range': f'bytes=0-{len(payload)-1}'})

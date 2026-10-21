@@ -56,6 +56,7 @@ class GoogleDriveFileTransfer internal constructor(
         var query = session != null
         var offset = 0L
         var failures = 0
+        val chunkSizer = DriveUploadChunkSizer()
         while (true) {
             currentCoroutineContext().ensureActive()
             if (!file.isFile || file.length() != size || file.lastModified() != modified) {
@@ -78,12 +79,15 @@ class GoogleDriveFileTransfer internal constructor(
                     offset = 0
                 }
                 val held = session
+                val requestStarted = System.nanoTime()
+                val wasQuery = query
                 val response = if (query) {
                     progress(DriveTransferUpdate(offset, size, offset, SyncTransferPhase.Retrying))
                     bytes(Request.Builder().url(held.url).header("Content-Range", "bytes */$size").put(byteArrayOf().toRequestBody()))
                 } else {
                     val start = offset
-                    val length = minOf(1024L * 1024, size - start)
+                    val length = minOf(chunkSizer.bytes, size - start)
+                    progress(DriveTransferUpdate(start, size, start))
                     val body = object : RequestBody() {
                         override fun contentType() = "application/octet-stream".toMediaType()
                         override fun contentLength() = length
@@ -116,7 +120,10 @@ class GoogleDriveFileTransfer internal constructor(
                     }
                     308 -> {
                         val next = confirmedOffset(response.headers["Range"], size)
-                        if (next > offset) failures = 0
+                        if (next > offset) {
+                            failures = 0
+                            if (!wasQuery) chunkSizer.confirmed(next - offset, (System.nanoTime() - requestStarted) / 1_000_000)
+                        }
                         else if (!query) throw IOException("Drive upload made no confirmed progress")
                         offset = next
                         query = next == size
@@ -141,6 +148,7 @@ class GoogleDriveFileTransfer internal constructor(
                     if (error is IOException) throw GoogleDriveUnavailableException(error)
                     throw error
                 }
+                if (error is IOException) chunkSizer.failed()
                 progress(DriveTransferUpdate(offset, size, offset, SyncTransferPhase.Retrying))
                 retryDelay(failures++)
                 query = session != null
@@ -157,6 +165,7 @@ class GoogleDriveFileTransfer internal constructor(
                     if (!response.isSuccessful) throw apiError(response.code, response.body?.string().orEmpty())
                     val body = response.body ?: throw IOException("Drive download has no response body")
                     val total = body.contentLength().takeIf { it >= 0 } ?: size
+                    progress(DriveTransferUpdate(0, total))
                     var received = 0L
                     body.byteStream().use { input ->
                         destination.outputStream().use { output ->

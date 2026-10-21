@@ -1,6 +1,6 @@
 package moe.antimony.hoshi.features.sync
 
-/** Immutable UI snapshot. Bytes are current-file progress; speed includes retransmission. */
+/** Immutable UI snapshot. Bytes are current-file progress; speed is useful progress per elapsed transfer time. */
 data class SyncFileTransfer(
     val id: Long,
     val direction: SyncTransferDirection,
@@ -19,22 +19,33 @@ data class SyncFileTransfer(
 
 /** Thread-safe callbacks from OkHttp; publishing is separately throttled by the manager. */
 internal class SyncTransferTracker(private val clock: () -> Long = { System.nanoTime() / 1_000_000 }) {
-    private data class Sample(val at: Long, val bytes: Long)
-    private data class Active(var state: SyncFileTransfer, val started: Long, val samples: ArrayDeque<Sample> = ArrayDeque())
+    private data class Active(
+        var state: SyncFileTransfer,
+        var started: Long? = null,
+        var baseline: Long = 0,
+        var lastActivity: Long = 0,
+    )
     private val active = linkedMapOf<String, Active>()
     private var nextId = 0L
 
     @Synchronized fun begin(key: String, direction: SyncTransferDirection, type: SyncFileType): Long {
         val id = ++nextId
-        active[key] = Active(SyncFileTransfer(id, direction, type), clock())
+        active[key] = Active(SyncFileTransfer(id, direction, type))
         return id
     }
 
     @Synchronized fun update(key: String, id: Long, update: DriveTransferUpdate) {
         val entry = active[key]?.takeIf { it.state.id == id } ?: return
         val now = clock()
-        if (update.deltaBytes > 0) entry.samples += Sample(now, update.deltaBytes)
-        trim(entry, now)
+        // A rejected/expired session loses its old remote offset, but not elapsed time.
+        if (update.phase == SyncTransferPhase.Preparing && update.bytes == 0L) entry.baseline = 0
+        if (entry.started == null && (update.phase == SyncTransferPhase.Transferring || update.deltaBytes > 0)) {
+            entry.started = now
+            // The initial server offset belongs to a previous process, not this transfer.
+            entry.baseline = (update.bytes - update.deltaBytes).coerceAtLeast(0)
+            entry.lastActivity = now
+        }
+        if (update.deltaBytes > 0 || update.confirmedBytes > entry.state.confirmedBytes) entry.lastActivity = now
         entry.state = entry.state.copy(phase = update.phase, bytes = update.bytes, totalBytes = update.totalBytes, confirmedBytes = update.confirmedBytes)
     }
 
@@ -45,13 +56,13 @@ internal class SyncTransferTracker(private val clock: () -> Long = { System.nano
     @Synchronized fun snapshot(): Map<String, SyncFileTransfer> {
         val now = clock()
         return active.mapValues { (_, entry) ->
-            trim(entry, now)
-            val elapsed = (now - entry.started).coerceIn(1, 3000)
-            entry.state.copy(bytesPerSecond = entry.samples.sumOf { it.bytes }.toDouble() * 1000 / elapsed)
+            val started = entry.started
+            // Include response/retry waits; current in-flight bytes are provisional and
+            // roll back on recovery. Repeated writes never inflate useful throughput.
+            val speed = if (started == null || now - entry.lastActivity >= 60_000) 0.0 else {
+                (entry.state.bytes - entry.baseline).coerceAtLeast(0).toDouble() * 1000 / (now - started).coerceAtLeast(1000)
+            }
+            entry.state.copy(bytesPerSecond = speed)
         }
-    }
-
-    private fun trim(entry: Active, now: Long) {
-        while (entry.samples.firstOrNull()?.let { it.at <= now - 3000 } == true) entry.samples.removeFirst()
     }
 }

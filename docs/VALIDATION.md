@@ -183,7 +183,7 @@ including empty environment values. Protocol and activity tests live under
 
 `DriveFileTransferTest` covers resumable protocol recovery and persistence with
 MockWebServer. `BookTransferSchedulerTest` and `SyncTransferTrackerTest` cover
-concurrency and monotonic-clock speed sampling without real network timing.
+concurrency and monotonic-clock effective speed measurement without real network timing.
 `SyncQueueViewTest` renders isolated upload/download rows without accessing the
 book repository or account; its screenshot is in target cache
 `sync-queue-fixture.png`.
@@ -208,6 +208,15 @@ byte instead of creating another upload. Require `OK (1 test)` for each method;
 Android instrumentation's final code alone does not distinguish assertion
 failures. Remove the task-owned reverse with
 `adb -s "$hoshi_serial" reverse --remove tcp:18765` and stop the server afterward.
+For a controlled before/after comparison, start the fixture with
+`--benchmark --response-delay 4` and run
+`DriveTransferDeviceTest#measureUploadThroughputAndConfirmationSpeed` on the old
+and new debug APKs with the same test APK and loopback argument. The method
+reports elapsed seconds and zero-speed samples while awaiting acknowledgement;
+`-e expectEffectiveSpeed true` asserts no such zero samples for the new build.
+It uploads the same generated 12 MiB file each time; `/stats` reports payload
+request counts and ranges. Compare total duration, not the UI's estimated speed.
+
 These tests do not establish real Google account throughput or proxy behavior.
 
 ### Transcription components and benchmarks

@@ -34,19 +34,19 @@ class DriveFileTransferTest {
             server.enqueue(MockResponse().setHeader("Location", server.url("/session")))
             server.enqueue(MockResponse().setResponseCode(308).setHeader("Range", "bytes=0-524287"))
             server.enqueue(MockResponse().setBody(completed))
-            val file = temporary.newFile().apply { writeBytes(ByteArray(1048576 + 123) { (it % 251).toByte() }) }
+            val file = temporary.newFile().apply { writeBytes(ByteArray(4194304 + 123) { (it % 251).toByte() }) }
             val updates = mutableListOf<DriveTransferUpdate>()
             val result = transport(server, temporary.newFolder()).upload(file, request) { updates += it }
             assertEquals("uploaded", result.id)
             val init = server.takeRequest()
             assertTrue(init.path!!.contains("uploadType=resumable"))
             val first = server.takeRequest()
-            assertEquals("bytes 0-1048575/1048699", first.getHeader("Content-Range"))
-            assertEquals(1048576, first.bodySize)
+            assertEquals("bytes 0-4194303/4194427", first.getHeader("Content-Range"))
+            assertEquals(4194304, first.bodySize)
             val last = server.takeRequest()
-            assertEquals("bytes 524288-1048698/1048699", last.getHeader("Content-Range"))
-            assertEquals(524411, last.bodySize)
-            assertEquals(1048699L, updates.last().confirmedBytes)
+            assertEquals("bytes 524288-4194426/4194427", last.getHeader("Content-Range"))
+            assertEquals(3670139, last.bodySize)
+            assertEquals(4194427L, updates.last().confirmedBytes)
             assertTrue(updates.any { it.deltaBytes > 0 })
         }
     }
