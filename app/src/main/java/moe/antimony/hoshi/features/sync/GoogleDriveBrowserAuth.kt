@@ -3,6 +3,7 @@ package moe.antimony.hoshi.features.sync
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.core.content.IntentCompat
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
@@ -16,6 +17,7 @@ import java.util.Base64
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -57,16 +59,26 @@ class GoogleDriveBrowserAuth internal constructor(
     suspend fun authorizationIntent(): Intent = Intent(context, GoogleDriveBrowserAuthActivity::class.java)
         .putExtra(GoogleDriveBrowserAuthActivity.AuthorizationUri, authorizationRequest().toUri().toString())
 
+    suspend fun cancelAuthorization() = mutex.withLock {
+        dataStore.edit { it.remove(pendingKey) }
+        Unit
+    }
+
     suspend fun accept(intent: Intent?) = mutex.withLock {
         val pending = dataStore.data.first()[pendingKey]
         dataStore.edit { it.remove(pendingKey) }
+        intent?.let { IntentCompat.getSerializableExtra(it, GoogleDriveBrowserAuthActivity.AuthorizationError, Exception::class.java) }
+            ?.let { throw it }
         val request = pending?.let { BrowserAuthJson.decodeFromString<BrowserAuthorizationRequest>(it) }
         val response = intent?.data
         if (request == null || response == null || request.clientId != clientId ||
             response.buildUpon().clearQuery().fragment(null).build().toString() != request.redirectUri ||
-            response.fragment != null || response.getQueryParameters("state") != listOf(request.state) ||
-            response.getQueryParameter("error") != null
+            response.fragment != null || response.getQueryParameters("state") != listOf(request.state)
         ) throw DriveAuthorizationRequiredException()
+        response.getQueryParameter("error")?.let { error ->
+            if (error == "access_denied") throw CancellationException("access_denied")
+            throw BrowserTokenException(error, description = response.getQueryParameter("error_description"))
+        }
         val code = response.getQueryParameters("code").singleOrNull()?.takeIf { it.isNotEmpty() }
             ?: throw DriveAuthorizationRequiredException()
         val token = requestToken(
@@ -107,7 +119,7 @@ class GoogleDriveBrowserAuth internal constructor(
                     it.remove(tokensKey)
                     it.remove(refreshKey)
                 }
-                throw DriveAuthorizationRequiredException()
+                throw DriveAuthorizationRequiredException(error)
             }
             throw error
         }

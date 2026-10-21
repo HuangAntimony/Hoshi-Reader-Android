@@ -26,10 +26,15 @@ import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import moe.antimony.hoshi.di.ApplicationScope
+import moe.antimony.hoshi.R
+import moe.antimony.hoshi.ui.ErrorDiagnosticEvents
+import moe.antimony.hoshi.ui.UiText
 
 @Singleton
 class GoogleDriveSyncLifecycle @Inject constructor(
@@ -43,7 +48,6 @@ class GoogleDriveSyncLifecycle @Inject constructor(
         lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStart(owner: LifecycleOwner) {
                 workManager.get().cancelUniqueWork(BackgroundWork)
-                scope.launch { manager.start() }
             }
 
             override fun onStop(owner: LifecycleOwner) {
@@ -60,9 +64,7 @@ class GoogleDriveSyncLifecycle @Inject constructor(
             }
         })
         scope.launch {
-            settings.settings.map { it.enabled }.distinctUntilChanged().collect { enabled ->
-                if (enabled) manager.start() else manager.stop()
-            }
+            observeSyncPolling(lifecycle, settings.settings, manager)
         }
         context.getSystemService(ConnectivityManager::class.java).registerDefaultNetworkCallback(object : ConnectivityManager.NetworkCallback() {
             private var connected: Network? = null
@@ -85,6 +87,23 @@ class GoogleDriveSyncLifecycle @Inject constructor(
     }
 }
 
+internal suspend fun observeSyncPolling(
+    lifecycle: Lifecycle,
+    settings: Flow<SyncSettings>,
+    manager: GoogleDriveSyncManager,
+) {
+    combine(lifecycle.currentStateFlow, settings) { state, config ->
+        state.isAtLeast(Lifecycle.State.STARTED) to config.enabled
+    }.distinctUntilChanged().collectLatest { (foreground, enabled) ->
+        when {
+            !enabled -> manager.stop()
+            // start() resumes the transport shared with TTU and only polls for Hoshi.
+            foreground -> manager.start()
+            else -> manager.pausePolling()
+        }
+    }
+}
+
 @HiltWorker
 class GoogleDriveSyncWorker @AssistedInject constructor(
     @Assisted context: Context,
@@ -100,11 +119,12 @@ internal suspend fun backgroundSyncResult(sync: suspend () -> Unit): Result = tr
 } catch (cancelled: CancellationException) {
     throw cancelled
 } catch (error: Exception) {
+    ErrorDiagnosticEvents.buffer.record(UiText.Resource(R.string.bookshelf_sync_failed), error)
     if (error.isRetryableBackgroundSyncFailure()) Result.retry() else Result.failure()
 }
 
-private fun Throwable.isRetryableBackgroundSyncFailure(): Boolean = when (this) {
+internal fun Throwable.isRetryableBackgroundSyncFailure(): Boolean = when (this) {
     is GoogleDriveUnavailableException -> cause is java.io.IOException || cause.isRetryableBackgroundSyncFailure()
-    is GoogleDriveApiException -> statusCode == 429 || (statusCode ?: 0) >= 500 || isTransientDriveNetworkFailure()
+    is GoogleDriveApiException -> isRateLimited || (statusCode ?: 0) >= 500 || isTransientDriveNetworkFailure()
     else -> false
 }

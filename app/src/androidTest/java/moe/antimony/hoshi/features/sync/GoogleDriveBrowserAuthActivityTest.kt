@@ -3,7 +3,9 @@ package moe.antimony.hoshi.features.sync
 import android.app.Activity
 import android.app.Instrumentation
 import android.content.Intent
+import android.content.ActivityNotFoundException
 import android.net.Uri
+import androidx.core.content.IntentCompat
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.runner.lifecycle.ActivityLifecycleCallback
@@ -27,6 +29,7 @@ class GoogleDriveBrowserAuthActivityTest {
     private val browserLaunched = CountDownLatch(1)
     private val stopped = CountDownLatch(1)
     private var authActivity: GoogleDriveBrowserAuthActivity? = null
+    private var browserFailure: ActivityNotFoundException? = null
     private val lifecycle = ActivityLifecycleCallback { activity, stage ->
         if (activity is GoogleDriveBrowserAuthActivity) {
             authActivity = activity
@@ -37,6 +40,7 @@ class GoogleDriveBrowserAuthActivityTest {
         override fun onStartActivity(intent: Intent): Instrumentation.ActivityResult? {
             if (intent.action == Intent.ACTION_VIEW && intent.data?.host == "accounts.google.com") {
                 launches += Intent(intent)
+                browserFailure?.let { throw it }
                 intent.setClassName(instrumentation.context.packageName, OAuthBrowserFixtureActivity::class.java.name)
                 browserLaunched.countDown()
             }
@@ -78,6 +82,18 @@ class GoogleDriveBrowserAuthActivityTest {
         browserCommand("cancel")
         assertEquals(Activity.RESULT_CANCELED, result().resultCode)
         assertEquals(1, launches.size)
+    }
+
+    @Test
+    fun missingBrowserReturnsItsFailureInsteadOfCancellation() {
+        browserFailure = ActivityNotFoundException("No activity handles the authorization URL")
+        launch()
+        val result = result()
+        assertEquals(Activity.RESULT_OK, result.resultCode)
+        val failure = IntentCompat.getSerializableExtra(result.resultData,
+            GoogleDriveBrowserAuthActivity.AuthorizationError, Exception::class.java)
+        assertTrue(failure is ActivityNotFoundException)
+        assertEquals(browserFailure?.message, failure?.message)
     }
 
     @Test

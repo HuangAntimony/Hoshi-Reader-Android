@@ -4,6 +4,9 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.work.ListenableWorker
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleRegistry
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.net.HttpURLConnection
@@ -17,6 +20,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
@@ -52,11 +56,85 @@ class GoogleDriveSyncManagerTest {
         val settings = SyncSettingsRepository(MemoryPreferences(), NoTtu, dispatcher)
         settings.update { it.copy(enabled = true) }
         val token = object : DriveAccessTokenProvider { override suspend fun accessToken() = "token" }
-        val client = GoogleDriveClient(token, { SyncProvider.Gdrive }, {}, dispatcher, remote::connection)
+        val client = GoogleDriveClient(token, { settings.settings.first().provider }, {}, dispatcher, remote::connection)
         val handler = GoogleDriveSyncHandler(client)
         val manager = GoogleDriveSyncManager(store, handler, client, settings, books, temporary.root,
             temporary.root.resolve("cache").apply { mkdirs() }, CoroutineScope(backgroundScope.coroutineContext + SupervisorJob(backgroundScope.coroutineContext[Job])), dispatcher, dispatcher, { true }, {}, {})
-        return Fixture(remote, books, store, manager)
+        return Fixture(remote, books, store, manager, settings, client)
+    }
+
+    @Test fun enabledTtuKeepsSharedTransportAvailableAcrossLifecycleTransitions() = runTest {
+        val f = fixture()
+        f.settings.update { it.copy(provider = SyncProvider.Ttu) }
+        val owner = object : LifecycleOwner {
+            override val lifecycle = LifecycleRegistry.createUnsafe(this)
+        }
+        owner.lifecycle.currentState = Lifecycle.State.CREATED
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            observeSyncPolling(owner.lifecycle, f.settings.settings, f.manager)
+        }
+        for (state in listOf(Lifecycle.State.CREATED, Lifecycle.State.STARTED, Lifecycle.State.CREATED)) {
+            owner.lifecycle.currentState = state
+            runCurrent()
+            val requests = f.remote.requests.size
+            f.client.request("files", query = mapOf("q" to "'root' in parents"))
+            assertTrue(f.remote.requests.size > requests)
+            val afterRequest = f.remote.requests.size
+            advanceTimeBy(if (BuildConfig.DEBUG) 10_000 else 240_000)
+            runCurrent()
+            assertEquals("TTU must not start Hoshi polling", afterRequest, f.remote.requests.size)
+        }
+    }
+
+    @Test fun backgroundColdStartDoesNotPollAndForegroundTransitionsControlPolling() = runTest {
+        val f = fixture()
+        val owner = object : LifecycleOwner {
+            override val lifecycle = LifecycleRegistry.createUnsafe(this)
+        }
+        owner.lifecycle.currentState = Lifecycle.State.CREATED
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            observeSyncPolling(owner.lifecycle, f.settings.settings, f.manager)
+        }
+        val interval = if (BuildConfig.DEBUG) 5_000L else 120_000L
+        advanceTimeBy(interval * 2)
+        runCurrent()
+        assertTrue("A background launch must not start foreground polling", f.remote.requests.isEmpty())
+
+        f.manager.syncInBackground()
+        val backgroundRequests = f.remote.requests.size
+        assertTrue(backgroundRequests > 0)
+        advanceTimeBy(interval * 2)
+        runCurrent()
+        assertEquals(backgroundRequests, f.remote.requests.size)
+
+        owner.lifecycle.currentState = Lifecycle.State.STARTED
+        runCurrent()
+        val foregroundRequests = f.remote.requests.size
+        assertTrue(foregroundRequests > backgroundRequests)
+        advanceTimeBy(interval)
+        runCurrent()
+        assertTrue(f.remote.requests.size > foregroundRequests)
+
+        owner.lifecycle.currentState = Lifecycle.State.CREATED
+        runCurrent()
+        val stoppedRequests = f.remote.requests.size
+        advanceTimeBy(interval * 2)
+        runCurrent()
+        assertEquals(stoppedRequests, f.remote.requests.size)
+        f.settings.update { it.copy(enabled = false) }
+        f.settings.update { it.copy(enabled = true) }
+        runCurrent()
+        assertEquals(stoppedRequests, f.remote.requests.size)
+
+        owner.lifecycle.currentState = Lifecycle.State.STARTED
+        runCurrent()
+        assertTrue(f.remote.requests.size > stoppedRequests)
+        f.settings.update { it.copy(enabled = false) }
+        runCurrent()
+        val disabledRequests = f.remote.requests.size
+        advanceTimeBy(interval * 2)
+        runCurrent()
+        assertEquals(disabledRequests, f.remote.requests.size)
     }
 
     @Test fun cancelingForegroundWaiterLetsBackgroundPassFinishAndReleaseSyncState() = runTest {
@@ -77,6 +155,27 @@ class GoogleDriveSyncManagerTest {
         assertEquals("next", f.manager.cache.cursor)
         f.manager.sync()
         assertNull(f.manager.state.value.errorMessage)
+    }
+
+    @Test fun backgroundRetryIncludesTransientFailuresAfterAPermanentBookFailure() = runTest {
+        val f = fixture()
+        f.remote.addState("a", "book-a.json", SyncFormat.encode(remoteBook))
+        f.remote.addState("b", "book-b.json", SyncFormat.encode(remoteBook))
+        f.remote.failRead = { id ->
+            if (id == "a") GoogleDriveApiException("Permission denied", 403)
+            else GoogleDriveApiException("Rate limited", 429)
+        }
+        assertEquals(ListenableWorker.Result.retry(), backgroundSyncResult(f.manager::syncInBackground))
+        assertEquals(2, f.manager.state.value.queue.count { it.error != null })
+    }
+
+    @Test fun runLevelFormatFailureStillStopsRetriesDespiteEarlierRateLimitedBooks() = runTest {
+        val f = fixture()
+        f.remote.addState("a", "book-a.json", SyncFormat.encode(remoteBook))
+        f.remote.failRead = { id -> if (id == "a") GoogleDriveApiException("Rate limited", 429) else null }
+        assertEquals(ListenableWorker.Result.retry(), backgroundSyncResult(f.manager::syncInBackground))
+        f.remote.addState("b", "book-b.json", SyncFormat.encode(remoteBook).replace("\"formatVersion\":1", "\"formatVersion\":2"))
+        assertEquals(ListenableWorker.Result.failure(), backgroundSyncResult(f.manager::syncInBackground))
     }
 
     @Test fun capturesCursorBeforeListingAndSkipsUnchangedStateAfterRestart() = runTest {
@@ -441,7 +540,7 @@ class GoogleDriveSyncManagerTest {
         assertTrue(f.remote.queries.none { "name='book-a.json'" in it })
     }
 
-    private data class Fixture(val remote: DriveService, val books: BookRepository, val store: SyncStorage, val manager: GoogleDriveSyncManager)
+    private data class Fixture(val remote: DriveService, val books: BookRepository, val store: SyncStorage, val manager: GoogleDriveSyncManager, val settings: SyncSettingsRepository, val client: GoogleDriveClient)
 
     private class MemoryPreferences : DataStore<Preferences> {
         override val data = MutableStateFlow(emptyPreferences())

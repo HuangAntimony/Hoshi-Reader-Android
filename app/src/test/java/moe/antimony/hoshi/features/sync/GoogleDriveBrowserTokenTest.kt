@@ -41,10 +41,12 @@ class GoogleDriveBrowserTokenTest {
     fun distinguishesRejectedRefreshFromServerFailureAndRejectsMalformedSuccess() = runBlocking {
         val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
         val responses = mapOf(
-            "/invalid" to (400 to """{"error":"invalid_grant"}"""),
+            "/invalid" to (400 to """{"error":"invalid_grant","error_description":"Token has expired or been revoked."}"""),
             "/unavailable" to (503 to "Service unavailable"),
             "/missing" to (200 to """{"expires_in":3600}"""),
             "/empty" to (200 to """{"access_token":"","expires_in":3600}"""),
+            "/malformed" to (200 to """{"access_token":"private-access-token","expires_in":oops}"""),
+            "/echo" to (400 to """{"error":"invalid_grant","error_description":"Token private-refresh-token has expired"}"""),
         )
         for ((path, response) in responses) {
             server.createContext(path) { exchange ->
@@ -57,13 +59,22 @@ class GoogleDriveBrowserTokenTest {
         try {
             for (path in responses.keys) {
                 val failure = runCatching {
-                    requestBrowserToken(mapOf("refresh_token" to "refresh"), Dispatchers.IO) {
+                    requestBrowserToken(mapOf("refresh_token" to "private-refresh-token"), Dispatchers.IO) {
                         URL("http://127.0.0.1:${server.address.port}$path").openConnection() as HttpURLConnection
                     }
                 }.exceptionOrNull()
                 assertTrue(failure != null)
-                if (path == "/invalid") assertEquals("invalid_grant", (failure as BrowserTokenException).error)
-                if (path == "/unavailable") assertEquals(null, (failure as BrowserTokenException).error)
+                assertFalse(failure!!.stackTraceToString().contains("private-access-token"))
+                assertFalse(failure.stackTraceToString().contains("private-refresh-token"))
+                if (path == "/invalid") {
+                    assertEquals("invalid_grant", (failure as BrowserTokenException).error)
+                    assertTrue(failure.message.orEmpty().contains("HTTP 400"))
+                    assertTrue(failure.message.orEmpty().contains("Token has expired or been revoked."))
+                }
+                if (path == "/unavailable") {
+                    assertEquals(null, (failure as BrowserTokenException).error)
+                    assertTrue(failure.message.orEmpty().contains("HTTP 503"))
+                }
             }
         } finally {
             server.stop(0)

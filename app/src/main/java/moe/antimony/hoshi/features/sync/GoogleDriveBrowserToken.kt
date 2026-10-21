@@ -7,6 +7,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -22,7 +23,12 @@ internal data class BrowserTokenResponse(
     fun expiresAt(): Long = System.currentTimeMillis() + expiresIn * 1000
 }
 
-internal class BrowserTokenException(val error: String?) : IOException()
+internal class BrowserTokenException(
+    val error: String?,
+    val statusCode: Int? = null,
+    description: String? = null,
+) : IOException(listOfNotNull(statusCode?.let { "HTTP $it" }, error, description)
+    .filter { it.isNotBlank() }.distinct().joinToString("\n").ifEmpty { null })
 
 internal suspend fun requestBrowserToken(
     parameters: Map<String, String>,
@@ -40,14 +46,29 @@ internal suspend fun requestBrowserToken(
     try {
         val body = parameters.entries.joinToString("&") { (key, value) -> "${key.urlQueryComponent()}=${value.urlQueryComponent()}" }
         connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
-        if (connection.responseCode !in 200..299) {
-            val error = connection.errorStream?.bufferedReader()?.use { it.readText() }
-            throw BrowserTokenException(error?.let {
-                runCatching { BrowserAuthJson.parseToJsonElement(it).jsonObject["error"]?.jsonPrimitive?.content }.getOrNull()
-            })
+        val status = connection.responseCode
+        if (status !in 200..299) {
+            val response = connection.errorStream?.bufferedReader()?.use { it.readText() }
+            val error = response?.let {
+                runCatching { BrowserAuthJson.parseToJsonElement(it).jsonObject }.getOrNull()
+            }
+            // Only OAuth's diagnostic fields are retained; never retain the token response body.
+            fun diagnostic(field: String): String? = error?.get(field)?.let {
+                runCatching { it.jsonPrimitive.content }.getOrNull()
+            }?.let { text ->
+                parameters.filterKeys { it in setOf("code", "code_verifier", "refresh_token", "client_secret") }
+                    .values.filter { it.isNotEmpty() }.fold(text) { safe, secret -> safe.replace(secret, "[redacted]") }
+            }
+            throw BrowserTokenException(diagnostic("error"), status, diagnostic("error_description"))
         }
-        val token = BrowserAuthJson.decodeFromString<BrowserTokenResponse>(connection.inputStream.bufferedReader().use { it.readText() })
-        if (token.accessToken.isEmpty()) throw BrowserTokenException(null)
+        val response = connection.inputStream.bufferedReader().use { it.readText() }
+        val token = try {
+            BrowserAuthJson.decodeFromString<BrowserTokenResponse>(response)
+        } catch (error: SerializationException) {
+            // This decoder includes its input in exceptions, which may contain credentials.
+            throw BrowserTokenException(null, status, error.javaClass.name)
+        }
+        if (token.accessToken.isEmpty()) throw BrowserTokenException(null, status)
         token
     } finally {
         connection.disconnect()

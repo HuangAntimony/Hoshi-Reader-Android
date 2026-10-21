@@ -213,7 +213,8 @@ class GoogleDriveSyncManager internal constructor(
         sync()
         fileTransferTask?.join()
         runError?.let { throw it }
-        bookErrors.values.firstOrNull()?.let { throw it.cause }
+        val errors = bookErrors.values.map { it.cause }
+        (errors.firstOrNull { it.isRetryableBackgroundSyncFailure() } ?: errors.firstOrNull())?.let { throw it }
     }
 
     suspend fun stop(): Unit = withContext(mainDispatcher) {

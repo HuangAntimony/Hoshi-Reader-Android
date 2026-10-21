@@ -1,6 +1,7 @@
 package moe.antimony.hoshi.features.sync
 
 import android.content.Context
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
 import androidx.datastore.core.DataStore
@@ -14,6 +15,7 @@ import java.security.MessageDigest
 import java.util.Base64
 import java.util.UUID
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
@@ -26,6 +28,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -129,8 +132,11 @@ class GoogleDriveBrowserAuthTest {
         val auth = authorizer()
         connect(auth)
         auth.clearAccessToken("access")
-        tokenResponse = { throw BrowserTokenException("invalid_grant") }
-        assertTrue(runCatching { auth.accessToken() }.exceptionOrNull() is DriveAuthorizationRequiredException)
+        val rejected = BrowserTokenException("invalid_grant", 400, "Token has been revoked.")
+        tokenResponse = { throw rejected }
+        val failure = runCatching { auth.accessToken() }.exceptionOrNull()
+        assertTrue(failure is DriveAuthorizationRequiredException)
+        assertSame(rejected, failure?.cause)
         assertEquals(DriveAuthStatus.NotConnected, authorizer().status())
     }
 
@@ -156,11 +162,45 @@ class GoogleDriveBrowserAuthTest {
             val request = auth.authorizationRequest()
             auth.accept(Intent().setData(Uri.parse(request.redirectUri).buildUpon()
                 .appendQueryParameter("state", request.state).appendQueryParameter("error", "access_denied").build()))
-        }.exceptionOrNull() is DriveAuthorizationRequiredException)
+        }.exceptionOrNull() is CancellationException)
         tokenResponse = { throw IOException() }
         assertTrue(runCatching { connect(auth) }.exceptionOrNull() is IOException)
         assertEquals(DriveAuthStatus.Connected, auth.status())
         assertEquals("access", auth.accessToken())
+    }
+
+    @Test
+    fun cancelConsumesPendingRequestWithoutChangingTheExistingLogin() = runBlocking {
+        val auth = authorizer()
+        connect(auth)
+        val canceled = callback(auth.authorizationRequest())
+        auth.cancelAuthorization()
+        assertTrue(runCatching { auth.accept(canceled) }.exceptionOrNull() is DriveAuthorizationRequiredException)
+        assertEquals(DriveAuthStatus.Connected, auth.status())
+        assertEquals("access", auth.accessToken())
+        assertEquals(1, requests.size)
+    }
+
+    @Test
+    fun browserLaunchAndOAuthCallbackFailuresKeepOriginalDetails() = runBlocking {
+        val auth = authorizer()
+        auth.authorizationRequest()
+        val launchError = ActivityNotFoundException("No browser can open Google authorization")
+        assertSame(launchError, runCatching {
+            auth.accept(Intent().putExtra(GoogleDriveBrowserAuthActivity.AuthorizationError, launchError))
+        }.exceptionOrNull())
+        val request = auth.authorizationRequest()
+        val failure = runCatching {
+            auth.accept(Intent().setData(Uri.parse(request.redirectUri).buildUpon()
+                .appendQueryParameter("state", request.state)
+                .appendQueryParameter("error", "invalid_request")
+                .appendQueryParameter("error_description", "Redirect URI is not registered")
+                .build()))
+        }.exceptionOrNull()
+        assertTrue(failure is BrowserTokenException)
+        assertTrue(failure?.message.orEmpty().contains("invalid_request"))
+        assertTrue(failure?.message.orEmpty().contains("Redirect URI is not registered"))
+        assertTrue(requests.isEmpty())
     }
 
     @Test

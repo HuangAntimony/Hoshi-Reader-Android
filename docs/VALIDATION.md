@@ -102,15 +102,24 @@ redirect schemes, including a build with empty environment values. Run
 `GoogleDriveBrowserAuthTest` and `GoogleDriveBrowserAuthActivityTest` on a device
 using a separately built test APK and the explicit instrumentation runner. Their
 token fixtures, DataStore files and intercepted browser launches are test-owned;
-they do not change the user's connection or contact Google. Require `OK (18 tests)`.
+they do not change the user's connection or contact Google. Require `OK (21 tests)`.
 Run the activity tests through the debug caller fixture so callback routing uses
-an app-owned task. Keep the external browser fixture framework-only Java: an
+an app-owned task. Unlock the device and keep its screen on: these tests exercise
+real window-focus callbacks, which cannot complete behind the keyguard.
+Keep the external browser fixture framework-only Java: an
 activity launched in the test APK's own process cannot rely on Kotlin or other
 target-app dependencies being packaged in that APK.
 The tests cover PKCE/state/redirect validation, one-time exchange, cancellation,
 activity recreation, pending-request persistence, token persistence and
-refresh failure handling. `GoogleDriveBrowserTokenTest` uses a local HTTP server
-to verify form encoding, token responses, failures and rejected HTTP redirects.
+refresh failure handling, original browser-launch errors and OAuth error details.
+`GoogleDriveBrowserTokenTest` uses a local HTTP server to verify form encoding,
+token responses, failures, rejected HTTP redirects and credential-free diagnostics.
+`DriveAuthorizationErrorsTest` verifies visible error details and diagnostic history,
+including nested causes, platform status codes and silent cancellation.
+`GoogleDriveSyncManagerTest` exercises a cold background process, foreground/background
+polling transitions and continued TTU transport availability. `GoogleDriveRetryTest` covers exhausted 403 rate limits and
+recovery on a later worker run; the manager tests also cover mixed permanent and
+transient per-book failures. Worker tests require original failure diagnostics.
 Also verify real Custom Tab sign-in, Back/close cancellation and return to Sync
 settings on a device without Play Services.
 

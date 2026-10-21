@@ -14,7 +14,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   Delete Everywhere to remove it across devices while retaining reading history.
   Book deletion actions stack vertically, and cloud icons sit inline on the first
   title line.
-  Failed Google Drive sign-ins show an error dialog.
+  Failed Google Drive sign-ins show their original error details in a dialog and
+  Diagnostics; canceling sign-in stays quiet.
   Connecting through the Google account picker resets pending sync operations so
   books deleted before sign-in do not delete existing cloud copies.
   Devices without Google Play Services can connect through their browser.
@@ -26,7 +27,8 @@ Historical release notes before v1.3.0 live in [CHANGELOG_ARCHIVE.md](CHANGELOG_
   per-book errors.
   Books sync eight at a time using far fewer Google Drive requests, and
   rate-limited or failed requests are retried.
-  Background sync waits for a network connection and retries temporary failures.
+  Background sync waits for a network connection and retries temporary failures,
+  including sustained Drive rate limits; background launches do not start foreground polling.
   Renaming a shelf preserves its order and book memberships.
 - Keep the latest 100 runtime errors in Diagnostics, including the operation,
   time, original error details and cause stack; retain them across restarts,

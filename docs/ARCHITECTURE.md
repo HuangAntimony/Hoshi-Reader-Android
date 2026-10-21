@@ -670,6 +670,9 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
   locally on sign-out. Debug/release browser client IDs and redirect schemes come
   from ignored `secrets.properties` or build environment variables; no client secret
   is used. TTU retains its device-code authorization. Preferences remain DataStore-backed.
+  Native and browser authorization failures use the shared error-details dialog
+  and diagnostic history; user cancellation remains silent. Browser token errors
+  retain HTTP status and OAuth diagnostics without recording token response bodies.
 - `GoogleDriveClient` shares cancellable HTTP transport, token refresh and network
   preflight. Hoshi connections use 60-second connect/read timeouts; TTU uses
   10 seconds. `GoogleDriveSyncHandler` owns the native Drive layout and changes
@@ -686,10 +689,12 @@ refactor goals belong in `docs/ARCHITECTURE_REFACTORING.md`.
 - `GoogleDriveSyncManager` performs targeted synchronization on open, 120-second
   foreground polling and 30-second local-edit debounce in release builds; debug
   builds use 5-second polling and 2-second debounce for testing. It also performs
-  network-restored passes, immutable upload/download and stale-file cleanup. Process lifecycle callbacks
-  start/pause polling; a Hilt WorkManager job performs the final background pass
+  network-restored passes, immutable upload/download and stale-file cleanup. Process lifecycle state
+  and sync settings jointly gate polling, including cold background launches;
+  a Hilt WorkManager job performs the final background pass
   with a connected-network constraint. State and file failures propagate to the
-  worker: temporary network/server failures retry, while authorization and format
+  worker: temporary network/server failures and HTTP 403/429 rate limits retry,
+  even when another book has a permanent failure, while authorization and format
   failures wait for user action.
   Hoshi cloud books are local metadata placeholders: tapping downloads the EPUB,
   Delete Local retains their cloud state, and Delete Everywhere archives sessions

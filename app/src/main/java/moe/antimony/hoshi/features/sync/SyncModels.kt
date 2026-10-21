@@ -56,9 +56,9 @@ sealed interface DriveAuthorizationResult {
     data class Failed(val message: String) : DriveAuthorizationResult
 }
 
-open class DriveAuthException(message: String) : Exception(message)
+open class DriveAuthException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
-class DriveAuthorizationRequiredException : DriveAuthException("Connect Google Drive before syncing.")
+class DriveAuthorizationRequiredException(cause: Throwable? = null) : DriveAuthException("Connect Google Drive before syncing.", cause)
 
 sealed interface SyncResult {
     data class Synced(val title: String) : SyncResult
@@ -111,12 +111,15 @@ data class ResolvedBookPosition(
 class GoogleDriveApiException(
     message: String,
     val statusCode: Int? = null,
+    val reasons: Set<String> = emptySet(),
 ) : Exception(message) {
     val isStaleCacheError: Boolean get() = statusCode == 404
+    val isRateLimited: Boolean get() = statusCode == 429 ||
+        (statusCode == 403 && reasons.any { it == "userRateLimitExceeded" || it == "rateLimitExceeded" })
 
-    override fun getLocalizedMessage(): String =
-        if (statusCode == null) super.getLocalizedMessage().orEmpty()
-        else "${super.getLocalizedMessage().orEmpty()}\nHTTP $statusCode"
+    override fun getLocalizedMessage(): String = listOfNotNull(
+        super.getLocalizedMessage(), statusCode?.let { "HTTP $it" },
+    ).plus(reasons).distinct().joinToString("\n")
 
     companion object {
         const val NoInternetConnectionMessage = "No internet connection."

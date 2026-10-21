@@ -27,7 +27,6 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
@@ -245,21 +244,19 @@ class GoogleDriveClient internal constructor(
         }
         if (status >= 400) {
             val error = runCatching { SyncFormat.json.parseToJsonElement(data.decodeToString()).jsonObject["error"]?.jsonObject }.getOrNull()
-            if (attempt < 4 && isTransient(method, status, error)) {
+            val reasons = runCatching {
+                error?.get("errors")?.jsonArray?.mapNotNull { it.jsonObject["reason"]?.jsonPrimitive?.content }?.toSet()
+            }.getOrNull().orEmpty()
+            val message = runCatching { error?.get("message")?.jsonPrimitive?.content }.getOrNull()
+            val failure = GoogleDriveApiException(message ?: "Request failed with status $status", status, reasons)
+            if (attempt < 4 && (failure.isRateLimited || (status >= 500 && method != "POST"))) {
                 delay(1_000L * (1L shl attempt) + Random.nextLong(1_000))
                 checkConnection(connection)
                 return perform(url, method, contentType, retry, attempt + 1, limited, configure, read)
             }
-            val message = runCatching { error?.get("message")?.jsonPrimitive?.content }.getOrNull()
-            throw GoogleDriveApiException(message ?: "Request failed with status $status", status)
+            throw failure
         }
         return data
-    }
-
-    private fun isTransient(method: String, status: Int, error: JsonObject?): Boolean {
-        val reason = runCatching { error?.get("errors")?.jsonArray?.firstOrNull()?.jsonObject?.get("reason")?.jsonPrimitive?.content }.getOrNull()
-        val limited = status == 429 || (status == 403 && reason?.endsWith("ateLimitExceeded") == true)
-        return limited || (status >= 500 && method != "POST")
     }
 
     private inline fun <T> unavailable(action: () -> T): T = try {

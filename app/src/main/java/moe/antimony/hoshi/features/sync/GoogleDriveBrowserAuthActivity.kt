@@ -30,7 +30,8 @@ class GoogleDriveBrowserAuthActivity : Activity() {
             browserStarted = true
             try {
                 CustomTabsIntent.Builder().build().launchUrl(this, Uri.parse(uri))
-            } catch (_: ActivityNotFoundException) {
+            } catch (error: ActivityNotFoundException) {
+                setResult(RESULT_OK, Intent().putExtra(AuthorizationError, error))
                 finish()
             }
         }
@@ -65,6 +66,7 @@ class GoogleDriveBrowserAuthActivity : Activity() {
 
     companion object {
         internal const val AuthorizationUri = "authorizationUri"
+        internal const val AuthorizationError = "authorizationError"
         private const val BrowserStarted = "browserStarted"
         private const val LeftForBrowser = "leftForBrowser"
     }
