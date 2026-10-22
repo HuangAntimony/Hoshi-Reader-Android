@@ -21,24 +21,47 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.util.Locale
+import moe.antimony.hoshi.LocalHoshiUiDependencies
 import moe.antimony.hoshi.R
+import moe.antimony.hoshi.features.settings.StaticSettingsDetailScaffold
+import moe.antimony.hoshi.ui.ErrorDetailsText
+import moe.antimony.hoshi.ui.HoshiAlertDialog
 import moe.antimony.hoshi.ui.UiText
-import moe.antimony.hoshi.ui.theme.hoshiSurfaces
+import moe.antimony.hoshi.ui.asString
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun SyncQueueSheet(state: GoogleDriveSyncState, onDismiss: () -> Unit, onError: (UiText) -> Unit) {
-    ModalBottomSheet(
-        containerColor = hoshiSurfaces.overlay,
-        tonalElevation = 0.dp,
-        onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-    ) { SyncQueueContent(state, onError) }
+internal fun SyncQueueView(onClose: () -> Unit, modifier: Modifier = Modifier) {
+    val manager = LocalHoshiUiDependencies.current.googleDriveSyncManager
+    val state by manager.state.collectAsStateWithLifecycle()
+    SyncQueueScreen(state, onClose, modifier)
 }
 
 @Composable
-internal fun SyncQueueContent(state: GoogleDriveSyncState, onError: (UiText) -> Unit) {
+internal fun SyncQueueScreen(state: GoogleDriveSyncState, onClose: () -> Unit, modifier: Modifier = Modifier) {
+    var errorDetails by remember { mutableStateOf<UiText?>(null) }
+    StaticSettingsDetailScaffold(
+        title = stringResource(R.string.sync_queue),
+        onClose = onClose,
+        modifier = modifier,
+    ) { padding ->
+        SyncQueueContent(state, { errorDetails = it }, Modifier.fillMaxSize().padding(padding))
+    }
+    errorDetails?.let { error ->
+        HoshiAlertDialog(
+            onDismissRequest = { errorDetails = null },
+            title = { Text(stringResource(R.string.dialog_error_title)) },
+            text = { ErrorDetailsText(error.asString()) },
+            confirmButton = {
+                TextButton(onClick = { errorDetails = null }) { Text(stringResource(R.string.action_ok)) }
+            },
+        )
+    }
+}
+
+@Composable
+internal fun SyncQueueContent(state: GoogleDriveSyncState, onError: (UiText) -> Unit, modifier: Modifier = Modifier) {
     val colors = MaterialTheme.colorScheme
     val listState = rememberLazyListState()
     val queueKeys = remember(state.queue) { state.queue.map { it.key } }
@@ -53,8 +76,7 @@ internal fun SyncQueueContent(state: GoogleDriveSyncState, onError: (UiText) -> 
             previousKeys = queueKeys
         }
     }
-    Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text(stringResource(R.string.sync_queue), style = MaterialTheme.typography.titleLarge)
+    Column(modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             Text(stringResource(R.string.sync_upload_speed, transferRate(state.activeTransfers.values.filter { it.direction == SyncTransferDirection.Upload }.sumOf { it.bytesPerSecond })), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
             Text(stringResource(R.string.sync_download_speed, transferRate(state.activeTransfers.values.filter { it.direction == SyncTransferDirection.Download }.sumOf { it.bytesPerSecond })), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
@@ -62,7 +84,7 @@ internal fun SyncQueueContent(state: GoogleDriveSyncState, onError: (UiText) -> 
         if (state.queue.isEmpty()) {
             Text(stringResource(R.string.sync_queue_all_synced), color = colors.onSurfaceVariant)
         } else {
-            LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            LazyColumn(modifier = Modifier.weight(1f), state = listState, verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 items(state.queue, key = { it.key }) { item ->
                     val transfer = state.activeTransfers[item.key]
                     Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {

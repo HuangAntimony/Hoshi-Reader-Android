@@ -61,6 +61,9 @@ Names without an extension are searchable types, not necessarily filenames.
   but inactive at CREATED lifecycle.
   Each stack uses `rememberSaveableStateHolderNavEntryDecorator()` and
   `rememberViewModelStoreNavEntryDecorator()` with typed route keys.
+- Sync settings and its transfer queue are separate Settings-stack routes.
+  The queue observes application-owned transfer state and uses the regular page
+  scaffold; leaving it does not stop synchronization.
 - Persisted controls require a confirmed `SettingsLoadState.Loaded`; pages use
   `SettingsDetailScaffold`, embedded controls use `SettingsContent`. Profile
   switches reset readiness and reject late results from the previous profile.

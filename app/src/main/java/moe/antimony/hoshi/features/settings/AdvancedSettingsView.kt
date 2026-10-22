@@ -38,12 +38,12 @@ import moe.antimony.hoshi.features.anki.AnkiConnectView
 import moe.antimony.hoshi.features.audio.AudioSettingsView
 import moe.antimony.hoshi.features.backup.BackupSettingsView
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettingsView
-import moe.antimony.hoshi.features.sync.SyncSettingsView
 import moe.antimony.hoshi.features.wallpaper.BookCoverWallpaperSettingsView
 
 @Composable
 fun AdvancedSettingsView(
     onClose: () -> Unit,
+    onOpenSync: () -> Unit,
     onBooksRestored: () -> Unit = {},
     onOpenTts: () -> Unit = {},
     modifier: Modifier = Modifier,
@@ -67,13 +67,6 @@ fun AdvancedSettingsView(
         BackupSettingsView(
             onClose = { destination = null },
             onBooksRestored = onBooksRestored,
-            modifier = modifier,
-        )
-        return
-    }
-    if (destination == AdvancedDestination.Syncing) {
-        SyncSettingsView(
-            onClose = { destination = null },
             modifier = modifier,
         )
         return
@@ -115,7 +108,13 @@ fun AdvancedSettingsView(
                                 colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                                 leadingContent = { Icon(row.icon.imageVector(), contentDescription = null) },
                                 headlineContent = { Text(stringResource(row.titleRes)) },
-                                modifier = Modifier.clickable { if (row.destination == AdvancedDestination.Tts) onOpenTts() else destination = row.destination },
+                                modifier = Modifier.clickable {
+                                    when (row.destination) {
+                                        AdvancedDestination.Tts -> onOpenTts()
+                                        AdvancedDestination.Syncing -> onOpenSync()
+                                        else -> destination = row.destination
+                                    }
+                                },
                             )
                             if (index != section.rows.lastIndex) {
                                 GroupDivider()

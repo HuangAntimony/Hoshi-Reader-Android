@@ -109,6 +109,7 @@ import moe.antimony.hoshi.ui.rememberSyncedTextFieldState
 @Composable
 fun SyncSettingsView(
     onClose: () -> Unit,
+    onOpenQueue: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -150,7 +151,6 @@ fun SyncSettingsView(
     var showSignOutConfirmation by remember { mutableStateOf(false) }
     var showClearCacheConfirmation by remember { mutableStateOf(false) }
     var showDownloadAllConfirmation by remember { mutableStateOf(false) }
-    var showQueue by remember { mutableStateOf(false) }
     val screenState = SyncSettingsScreenState(settings = settings, authStatus = authStatus)
     val currentSettings = settings
     val currentReaderSettings = readerSettings
@@ -475,9 +475,6 @@ fun SyncSettingsView(
             },
         )
     }
-    if (showQueue) {
-        SyncQueueSheet(state = hoshiState, onDismiss = { showQueue = false }, onError = { operationError = it })
-    }
     val colorScheme = MaterialTheme.colorScheme
     val screenLoadState: SettingsLoadState<Triple<SyncSettings, ReaderSettings, SasayakiSettings>> = when {
         settingsLoader.state is SettingsLoadState.Failed -> settingsLoader.state
@@ -796,7 +793,7 @@ fun SyncSettingsView(
                         val failed = hoshiState.queue.count { it.error != null }
                         ListItem(
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                            modifier = Modifier.clickable { showQueue = true },
+                            modifier = Modifier.clickable(onClick = onOpenQueue),
                             headlineContent = { Text(stringResource(R.string.sync_queue)) },
                             supportingContent = progress?.let {
                                 {

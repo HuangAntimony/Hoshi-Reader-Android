@@ -348,8 +348,14 @@ fun AppShell(
                     onOpenAcknowledgements = { settingsBackStack.add(AppRoute.SettingsDetailRoute(SettingsDetailSection.Acknowledgements)) },
                     onOpenDependencies = { settingsBackStack.add(AppRoute.SettingsDetailRoute(SettingsDetailSection.Dependencies)) },
                     onOpenTts = { settingsBackStack.add(AppRoute.TtsSettingsRoute) },
+                    onOpenSync = { settingsBackStack.add(AppRoute.SyncSettingsRoute) },
                     onOpenDiagnosticsRecords = { kind -> settingsBackStack.add(AppRoute.DiagnosticsRecordsRoute(kind)) },
                 )
+                AppRoute.SyncSettingsRoute -> moe.antimony.hoshi.features.sync.SyncSettingsView(
+                    onClose = ::popRoute,
+                    onOpenQueue = { settingsBackStack.add(AppRoute.SyncQueueRoute) },
+                )
+                AppRoute.SyncQueueRoute -> moe.antimony.hoshi.features.sync.SyncQueueView(onClose = ::popRoute)
                 is AppRoute.DiagnosticsRecordsRoute -> DiagnosticsView(
                     onClose = ::popRoute,
                     records = route.kind,
@@ -548,6 +554,7 @@ private fun SettingsDetailDestination(
     onOpenAnkiFormat: (String) -> Unit,
     onOpenAnkiAdvanced: () -> Unit,
     onOpenTts: () -> Unit,
+    onOpenSync: () -> Unit,
     onOpenDependencies: () -> Unit,
     onOpenAcknowledgements: () -> Unit,
     onOpenDiagnosticsRecords: (DiagnosticsRecordKind) -> Unit,
@@ -592,6 +599,7 @@ private fun SettingsDetailDestination(
         )
         SettingsDetailSection.Advanced -> AdvancedSettingsView(
             onOpenTts = onOpenTts,
+            onOpenSync = onOpenSync,
             onClose = onClose,
             onBooksRestored = onBooksRestored,
             modifier = Modifier.fillMaxSize(),
@@ -636,7 +644,8 @@ private fun AppRoute.toMainTab(): MainTab = when (this) {
     AppRoute.StatisticsRoute, AppRoute.StatisticsSettingsRoute, is AppRoute.StatisticsBookRoute -> MainTab.Statistics
     AppRoute.SettingsRoute -> MainTab.Settings
     is AppRoute.ReaderRoute -> MainTab.Books
-    is AppRoute.SettingsDetailRoute, is AppRoute.DiagnosticsRecordsRoute -> MainTab.Settings
+    is AppRoute.SettingsDetailRoute, is AppRoute.DiagnosticsRecordsRoute,
+    AppRoute.SyncSettingsRoute, AppRoute.SyncQueueRoute -> MainTab.Settings
     is AppRoute.AnkiCardFormatRoute, AppRoute.AnkiAdvancedRoute, AppRoute.TtsSettingsRoute, AppRoute.TtsVoiceSettingsRoute, AppRoute.TtsReplacementsSettingsRoute, AppRoute.TtsReadingSettingsRoute -> MainTab.Settings
 }
 

@@ -5,6 +5,26 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class AppRouteBackStackTest {
+    @Test fun queueRestoresAndReturnsThroughSyncSettings() {
+        val routes = listOf(
+            AppRoute.SettingsRoute,
+            AppRoute.SettingsDetailRoute(SettingsDetailSection.Advanced),
+            AppRoute.SyncSettingsRoute,
+            AppRoute.SyncQueueRoute,
+        )
+        val restored = routes.mapTo(mutableListOf<NavKey>()) {
+            kotlinx.serialization.json.Json.decodeFromString(AppRoute.serializer(),
+                kotlinx.serialization.json.Json.encodeToString(AppRoute.serializer(), it))
+        }
+        assertEquals(routes, restored)
+        org.junit.Assert.assertFalse(appRouteUsesMainShell(AppRoute.SyncQueueRoute))
+        org.junit.Assert.assertFalse(appRouteUsesMainShell(AppRoute.SyncSettingsRoute))
+        restored.popAppRoute()
+        assertEquals(AppRoute.SyncSettingsRoute, restored.last())
+        restored.popAppRoute()
+        assertEquals(AppRoute.SettingsDetailRoute(SettingsDetailSection.Advanced), restored.last())
+    }
+
     @Test fun ttsSectionsRestoreAndPopBackToTtsHome() {
         listOf(AppRoute.TtsVoiceSettingsRoute, AppRoute.TtsReplacementsSettingsRoute, AppRoute.TtsReadingSettingsRoute).forEach { route ->
             val serialized = kotlinx.serialization.json.Json.encodeToString(AppRoute.serializer(), route)

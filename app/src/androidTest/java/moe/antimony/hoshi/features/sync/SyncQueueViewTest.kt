@@ -19,6 +19,8 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import moe.antimony.hoshi.ui.theme.HoshiReaderTheme
@@ -60,6 +62,7 @@ class SyncQueueViewTest {
         val restoration = StateRestorationTester(compose)
         restoration.setContent { HoshiReaderTheme { Box(Modifier.height(420.dp)) { SyncQueueContent(state.value, {}) } } }
         compose.onNode(hasScrollToIndexAction()).performScrollToIndex(20)
+        compose.onNodeWithText("8.0 KiB/s", substring = true).assertIsDisplayed()
         val before = compose.onNodeWithText("Book 20").fetchSemanticsNode().boundsInRoot.top
         restoration.emulateSavedInstanceStateRestore()
         compose.onNodeWithText("Book 20").assertIsDisplayed()
@@ -73,37 +76,61 @@ class SyncQueueViewTest {
         compose.onNodeWithText("Book 0").assertIsDisplayed()
     }
 
-    @Test fun shrinkingEInkSheetDoesNotDrawAnOutlineAcrossTheBackdrop() {
+    @Test fun queuePageShowsErrorDetailsWithoutLosingTheQueue() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val state = GoogleDriveSyncState(queue = listOf(SyncQueueItem(
+            "failed", "Failed fixture", SyncTransferDirection.Upload,
+            moe.antimony.hoshi.ui.UiText.Literal("Network fixture detail"),
+        )))
+        compose.setContent { HoshiReaderTheme { SyncQueueScreen(state, {}) } }
+
+        compose.onNodeWithText(context.getString(moe.antimony.hoshi.R.string.sync_error_details)).performClick()
+        compose.onNodeWithText("Network fixture detail").assertIsDisplayed()
+        compose.onNodeWithText(context.getString(moe.antimony.hoshi.R.string.action_ok)).performClick()
+        compose.onNodeWithText("Failed fixture").assertIsDisplayed()
+    }
+
+    @Test fun shrinkingEInkQueueStaysFullScreenWithoutBackdrop() {
         val state = mutableStateOf(queue(listOf(0, 1, 2), setOf(0, 1, 2)))
+        var closed = 0
         compose.setContent {
             HoshiReaderTheme(darkTheme = false, eInkMode = true) {
-                Box(Modifier.fillMaxSize().background(Color.White)) {
-                    SyncQueueSheet(state.value, {}, {})
+                Box(Modifier.fillMaxSize().background(Color.Magenta)) {
+                    SyncQueueScreen(state.value, { closed++ })
                 }
             }
         }
         val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        val title = context.getString(moe.antimony.hoshi.R.string.sync_queue)
+        val back = context.getString(moe.antimony.hoshi.R.string.action_back)
+        compose.onNodeWithContentDescription(back).assertIsDisplayed()
+        val titleTop = compose.onNodeWithText(title).fetchSemanticsNode().boundsInRoot.top
         for (count in listOf(3, 1, 0)) {
             compose.runOnIdle { state.value = queue((0 until count).toList(), (0 until count).toSet()) }
             compose.waitForIdle()
-            val sheetTop = compose.onNode(SemanticsMatcher.keyIsDefined(SemanticsProperties.PaneTitle))
-                .fetchSemanticsNode().boundsInWindow.top.toInt()
+            compose.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsProperties.PaneTitle)).assertCountEquals(0)
+            assertEquals(titleTop, compose.onNodeWithText(title).fetchSemanticsNode().boundsInRoot.top, 1f)
             val bitmap = requireNotNull(instrumentation.uiAutomation.takeScreenshot())
             try {
-                File(instrumentation.targetContext.cacheDir, "sync-queue-sheet-$count.png").outputStream().use {
+                File(context.cacheDir, "sync-queue-page-$count.png").outputStream().use {
                     bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
                 }
-                if (count == 0) assertTrue("Empty sheet should leave a visible backdrop", sheetTop > bitmap.height / 2)
-                // The fixture backdrop is blank. Ignore status icons and the sheet's own edge;
-                // a black line across its middle 80% can only be an out-of-place outline.
-                for (y in bitmap.height / 10 until sheetTop - 4) {
-                    val dark = (bitmap.width / 10 until bitmap.width * 9 / 10).count { x ->
-                        android.graphics.Color.red(bitmap.getPixel(x, y)) < 80
-                    }
-                    assertTrue("$count books: stray horizontal border at y=$y above sheetTop=$sheetTop", dark < bitmap.width / 2)
+                // The page must paint its own white background through the full content height,
+                // even after the last transfer leaves; neither backdrop nor scrim may show.
+                for (y in bitmap.height / 4 until bitmap.height * 9 / 10) {
+                    val pixel = bitmap.getPixel(bitmap.width / 40, y)
+                    assertTrue("$count books: non-white page margin at y=$y",
+                        android.graphics.Color.red(pixel) > 245 &&
+                            android.graphics.Color.green(pixel) > 245 &&
+                            android.graphics.Color.blue(pixel) > 245)
                 }
             } finally { bitmap.recycle() }
         }
+        compose.onNodeWithContentDescription(back).performClick()
+        compose.runOnIdle { assertEquals(1, closed) }
+        androidx.test.espresso.Espresso.pressBack()
+        compose.runOnIdle { assertEquals(2, closed) }
     }
 
     @Test fun showsEveryActiveTransferAndSeparateTotals() {
@@ -113,7 +140,7 @@ class SyncQueueViewTest {
         )
         compose.setContent {
             HoshiReaderTheme {
-                SyncQueueContent(GoogleDriveSyncState(
+                SyncQueueScreen(GoogleDriveSyncState(
                     queue = listOf(SyncQueueItem("a", "Upload fixture", SyncTransferDirection.Upload, null),
                         SyncQueueItem("b", "Download fixture", SyncTransferDirection.Download, null),
                         SyncQueueItem("c", "Waiting fixture", SyncTransferDirection.Upload, null)),

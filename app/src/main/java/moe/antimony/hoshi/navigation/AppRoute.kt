@@ -36,6 +36,12 @@ sealed interface AppRoute : NavKey {
     data class DiagnosticsRecordsRoute(val kind: DiagnosticsRecordKind) : AppRoute
 
     @Serializable
+    data object SyncSettingsRoute : AppRoute
+
+    @Serializable
+    data object SyncQueueRoute : AppRoute
+
+    @Serializable
     data class AnkiCardFormatRoute(
         val formatId: String,
     ) : AppRoute
