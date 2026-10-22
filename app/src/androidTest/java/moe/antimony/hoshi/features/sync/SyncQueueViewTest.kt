@@ -90,6 +90,24 @@ class SyncQueueViewTest {
         compose.onNodeWithText("Failed fixture").assertIsDisplayed()
     }
 
+    @Test fun emptyQueueOnlyClaimsBooksSyncedAfterACompletedCheck() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val allSynced = context.getString(moe.antimony.hoshi.R.string.sync_queue_all_synced)
+        val state = mutableStateOf(GoogleDriveSyncState(isSyncing = true))
+        compose.setContent { HoshiReaderTheme { SyncQueueContent(state.value, {}) } }
+
+        compose.onNodeWithText(allSynced).assertDoesNotExist()
+        compose.onNodeWithText(context.getString(moe.antimony.hoshi.R.string.sync_queue_checking)).assertIsDisplayed()
+        compose.runOnIdle { state.value = GoogleDriveSyncState(errorMessage = moe.antimony.hoshi.ui.UiText.Literal("State fixture failed")) }
+        compose.onNodeWithText(allSynced).assertDoesNotExist()
+        compose.onNodeWithText(context.getString(moe.antimony.hoshi.R.string.sync_queue_interrupted)).assertIsDisplayed()
+        compose.runOnIdle { state.value = GoogleDriveSyncState() }
+        compose.onNodeWithText(allSynced).assertDoesNotExist()
+        compose.onNodeWithText(context.getString(moe.antimony.hoshi.R.string.sync_queue_not_checked)).assertIsDisplayed()
+        compose.runOnIdle { state.value = GoogleDriveSyncState(lastSync = 1L) }
+        compose.onNodeWithText(allSynced).assertIsDisplayed()
+    }
+
     @Test fun shrinkingEInkQueueStaysFullScreenWithoutBackdrop() {
         val state = mutableStateOf(queue(listOf(0, 1, 2), setOf(0, 1, 2)))
         var closed = 0

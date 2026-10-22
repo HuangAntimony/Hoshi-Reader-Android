@@ -921,6 +921,9 @@
     <string name="sync_queue">Queue</string>
     <string name="sync_queue_empty">Empty</string>
     <string name="sync_queue_all_synced">All Books Synced</string>
+    <string name="sync_queue_checking">Checking book states. The transfer queue will appear when ready.</string>
+    <string name="sync_queue_interrupted">Sync stopped before the transfer queue was ready.</string>
+    <string name="sync_queue_not_checked">Book states have not been checked yet.</string>
     <string name="sync_queue_progress" translatable="false">%1$d / %2$d</string>
     <plurals name="sync_queue_failed">
         <item quantity="one">%1$d failed</item>

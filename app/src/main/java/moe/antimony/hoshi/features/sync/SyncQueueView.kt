@@ -82,7 +82,13 @@ internal fun SyncQueueContent(state: GoogleDriveSyncState, onError: (UiText) -> 
             Text(stringResource(R.string.sync_download_speed, transferRate(state.activeTransfers.values.filter { it.direction == SyncTransferDirection.Download }.sumOf { it.bytesPerSecond })), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
         }
         if (state.queue.isEmpty()) {
-            Text(stringResource(R.string.sync_queue_all_synced), color = colors.onSurfaceVariant)
+            val message = when {
+                state.errorMessage != null -> R.string.sync_queue_interrupted
+                state.isSyncing -> R.string.sync_queue_checking
+                state.lastSync == null -> R.string.sync_queue_not_checked
+                else -> R.string.sync_queue_all_synced
+            }
+            Text(stringResource(message), color = colors.onSurfaceVariant)
         } else {
             LazyColumn(modifier = Modifier.weight(1f), state = listState, verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 items(state.queue, key = { it.key }) { item ->

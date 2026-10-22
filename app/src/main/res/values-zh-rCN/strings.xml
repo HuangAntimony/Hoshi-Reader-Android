@@ -919,6 +919,9 @@
     <string name="sync_queue">队列</string>
     <string name="sync_queue_empty">空</string>
     <string name="sync_queue_all_synced">所有书籍已同步</string>
+    <string name="sync_queue_checking">正在检查书籍状态，传输队列准备好后会显示。</string>
+    <string name="sync_queue_interrupted">同步已中断，传输队列尚未准备好。</string>
+    <string name="sync_queue_not_checked">尚未检查书籍状态。</string>
     <plurals name="sync_queue_failed">
         <item quantity="one">%1$d 本失败</item>
         <item quantity="other">%1$d 本失败</item>
