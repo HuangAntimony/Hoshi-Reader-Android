@@ -54,7 +54,7 @@ class SyncSettingsRepository(
             autoSyncEnabled = this[KEY_AUTO_SYNC_ENABLED] ?: false,
             authProvider = SyncAuthProvider.DeviceCode,
             uploadBooks = this[KEY_UPLOAD_BOOKS] ?: true,
-            transferConcurrency = (this[KEY_TRANSFER_CONCURRENCY] ?: 2).coerceIn(1, 8),
+            transferConcurrency = (this[KEY_TRANSFER_CONCURRENCY] ?: SyncSettings.DefaultTransferConcurrency).coerceIn(1, 8),
         )
 
     private fun MutablePreferences.writeSyncSettings(settings: SyncSettings) {

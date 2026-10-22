@@ -405,6 +405,7 @@ class GoogleDriveSyncManagerTest {
                 return super.upload(file, request, progress)
             }
         } })
+        f.settings.update { it.copy(transferConcurrency = 2) }
         repeat(3) { index ->
             val name = "book-$index"
             val root = f.books.createBookDirectory(name)
