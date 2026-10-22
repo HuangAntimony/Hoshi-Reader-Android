@@ -1131,7 +1131,7 @@ class GoogleDriveSyncManager internal constructor(
 }
 
 private val Throwable.stopsRun: Boolean
-    get() = this !is Exception || this is CancellationException || this is SyncFormatError || (this is GoogleDriveUnavailableException && this !is GoogleDriveMetadataNetworkException)
+    get() = this !is Exception || this is CancellationException || this is SyncFormatError || this is DriveAuthException || (this is GoogleDriveUnavailableException && this !is GoogleDriveMetadataNetworkException)
 
 private val SyncRecord.missingEpub: Boolean
     get() = !deleted && files[SyncFileType.epub]?.let { published -> published.value != null && (sources[SyncFileType.epub]?.let { it < published.modified } ?: true) } == true

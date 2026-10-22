@@ -708,6 +708,33 @@ class GoogleDriveSyncManagerTest {
         assertNull(f.manager.cache.cursor)
     }
 
+    @Test fun rejectedTransferAuthorizationStopsTheWholeRun() = runTest {
+        val rejection = DriveAuthorizationRequiredException()
+        var uploads = 0
+        val f = fixture(transferFactory = { client -> object : TestDriveFileTransfer(client) {
+            override suspend fun upload(file: java.io.File, request: DriveUploadRequest, progress: (DriveTransferUpdate) -> Unit): GoogleDriveFile {
+                uploads++
+                throw rejection
+            }
+        } })
+        f.settings.update { it.copy(transferConcurrency = 1) }
+        repeat(2) { index ->
+            val name = "book-$index"
+            val root = f.books.createBookDirectory(name)
+            f.books.saveMetadata(root, BookMetadata(name, name, folder = name, epub = "$name.epub", lastAccess = 0.0))
+            root.resolve("$name.epub").writeText("sample-epub")
+            f.store.handleBookImport(f.books.loadMetadata(root)!!, root)
+        }
+
+        f.manager.sync()
+        runCurrent()
+
+        assertEquals(1, uploads)
+        assertTrue(f.manager.state.value.errorMessage.details().contains("Connect Google Drive"))
+        assertTrue(f.manager.state.value.queue.none { it.error != null })
+        assertTrue(f.store.state.books.values.all { it.files[SyncFileType.epub] == null })
+    }
+
     @Test fun backgroundSyncReportsOfflineFailureAndRecoversOnNextAttempt() = runTest {
         val f = fixture()
         f.remote.addState("a", "book-a.json", SyncFormat.encode(remoteBook))

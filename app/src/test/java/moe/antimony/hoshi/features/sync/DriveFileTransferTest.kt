@@ -181,6 +181,31 @@ class DriveFileTransferTest {
         }
     }
 
+    @Test fun secondUnauthorizedUploadResponseRequiresReconnect() = runBlocking {
+        MockWebServer().use { server ->
+            server.start()
+            var refreshes = 0
+            val tokens = object : DriveAccessTokenProvider {
+                override suspend fun accessToken() = if (refreshes == 0) "expired" else "fresh"
+                override suspend fun clearAccessToken(token: String) { assertEquals("expired", token); refreshes++ }
+            }
+            val engine = GoogleDriveFileTransfer(tokens, DriveUploadSessions(temporary.newFolder()), Dispatchers.IO, OkHttpClient(),
+                endpoint = server.url("/upload").toString(), checkInternet = {}, retryDelay = {})
+            server.enqueue(MockResponse().setHeader("Location", server.url("/session")))
+            server.enqueue(MockResponse().setResponseCode(401))
+            server.enqueue(MockResponse().setResponseCode(401))
+
+            val error = runCatching { engine.upload(temporary.newFile().apply { writeText("x") }, request) {} }.exceptionOrNull()
+
+            assertTrue(error.toString(), error is DriveAuthorizationRequiredException)
+            assertEquals(1, refreshes)
+            assertEquals(3, server.requestCount)
+            server.takeRequest()
+            assertEquals("Bearer expired", server.takeRequest().getHeader("Authorization"))
+            assertEquals("Bearer fresh", server.takeRequest().getHeader("Authorization"))
+        }
+    }
+
     @Test fun retryBudgetIsBoundedAndConfirmedProgressResetsIt() = runBlocking {
         MockWebServer().use { server ->
             server.start()
