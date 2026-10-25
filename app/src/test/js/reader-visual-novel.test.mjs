@@ -726,7 +726,7 @@ function buildDocument(body, options = {}) {
         },
         fonts: { ready: options.fontsReady ?? Promise.resolve() },
         readyState: 'loading',
-        baseURI: 'https://example.invalid/chapter.xhtml',
+        baseURI: options.baseURI ?? 'https://example.invalid/chapter.xhtml',
         createDocumentFragment() {
             return new TestFragment();
         },
@@ -804,6 +804,7 @@ function loadReader(body, options = {}) {
         },
     };
     const window = {
+        hoshiReaderImageReferenceCounts: options.imageReferenceCounts,
         addEventListener() {},
         innerHeight: 800,
         innerWidth: 480,
@@ -2993,3 +2994,19 @@ test('VN cue jumps and page navigation clear search marks while passive cues pre
     reader.paginate('backward');
     assert.equal(highlights.searchRange, null);
 });
+
+for (const mode of ['sentences', 'blocks']) {
+    test(`VN ${mode} retains repeated image screens while excluding their playback holds`, async () => {
+        const cue = { id: 'cue', start: 1, length: 2 };
+        const { reader } = await initializeReader(bodyWith(
+            p('一。'), imageBlock('images/divider.jpg'), imageBlock('images/art.jpg'), p('二三。')
+        ), { mode, sentencesPerScreen: 1, revealSpeed: 0,
+            baseURI: 'https://appassets.androidplatform.net/epub/chapter.xhtml',
+            imageReferenceCounts: { 'images/divider.jpg': 3, 'images/art.jpg': 2 } });
+        reader.applySasayakiCues([cue]);
+        assert.deepEqual(Array.from(reader.sasayakiMediaStopsBeforeCue(cue), s => s.screenIndex), [2]);
+        assert.equal(reader.screens.length, 4);
+        reader.showSasayakiMediaStop({ screenIndex: 2 });
+        assert.equal(currentScreen(reader).querySelector('img').getAttribute('src'), 'images/art.jpg');
+    });
+}

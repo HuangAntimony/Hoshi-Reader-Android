@@ -20,6 +20,8 @@ data class EpubBook(
     val bookInfo: BookInfo = buildBookInfo(chapters),
     val author: String? = null,
 ) {
+    internal val imageReferenceCounts: Map<String, Int> by lazy { countImageReferences() }
+
     fun readResource(path: String): ByteArray? {
         val normalized = path.normalizeResourceHref()
         return resources[normalized]?.readBytes()

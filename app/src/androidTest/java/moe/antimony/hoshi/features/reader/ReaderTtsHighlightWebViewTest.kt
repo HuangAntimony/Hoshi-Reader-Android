@@ -2,6 +2,10 @@ package moe.antimony.hoshi.features.reader
 
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.webkit.WebResourceRequest
+import moe.antimony.hoshi.epub.EpubBook
+import moe.antimony.hoshi.epub.EpubChapter
+import moe.antimony.hoshi.epub.EpubResource
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toPixelMap
@@ -51,17 +55,30 @@ class ReaderTtsHighlightWebViewTest {
                 val styles = ReaderContentStyles.styleTag(settings = settings, sasayakiBackgroundColor = 0xFF0000FF, readerCssTemplate = assets.readerCss)
                 val script = ReaderPaginationScripts.shellScript(settings = settings, assets = assets)
                 val beforeImage = "前です".repeat(300) + "。"
+                val imageStyle = "display:block;break-before:column;break-after:column"
+                val body = "<body><p>$beforeImage</p><img width='600' height='900' style='$imageStyle' src='divider.svg'/>" +
+                    "<img width='600' height='900' style='$imageStyle' src='art.svg'/><p>後です。</p></body>"
+                fun svg(color: String) = "<svg xmlns='http://www.w3.org/2000/svg' width='600' height='900'><rect width='600' height='900' fill='$color'/></svg>".toByteArray()
+                val book = EpubBook("Image hold fixture", chapters = listOf(
+                    EpubChapter("one", "one.xhtml", "application/xhtml+xml", body),
+                    EpubChapter("two", "two.xhtml", "application/xhtml+xml", "<img src='divider.svg'/><img src='divider.svg'/><img src='art.svg'/>"),
+                ), resources = mapOf("divider.svg" to EpubResource("image/svg+xml", svg("green")),
+                    "art.svg" to EpubResource("image/svg+xml", svg("red"))))
+                val bridge = ReaderWebResourceBridge(book, fontFileForRequest = { null })
+                val references = bridge.resourceForUrl("https://appassets.androidplatform.net/reader-media/image-references.json")!!.data.decodeToString()
+                assertEquals(3, book.imageReferenceCounts["divider.svg"])
+                assertEquals(2, book.imageReferenceCounts["art.svg"])
                 instrumentation.runOnMainSync {
                     val density = webView.resources.displayMetrics.density
                     val viewport = readerViewportCssLayout(settings,
                         (webView.width / density).toInt(), (webView.height / density).toInt()).cssVariables()
                     webView.webViewClient = object : WebViewClient() {
                         override fun onPageFinished(view: WebView, url: String) { loaded.countDown() }
+                        override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest) =
+                            bridge.resourceForUrl(request.url.toString())?.toWebResourceResponse()
                     }
-                    webView.loadDataWithBaseURL(null,
-                        "<!doctype html><html><head><script>window.HoshiReaderRestore={postMessage:()=>window.testRestored=true};</script>$styles<style>$viewport</style>$script</head>" +
-                            "<body><p>$beforeImage</p><img width='600' height='900' style='display:block;break-before:column;break-after:column' " +
-                            "src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22600%22 height=%22900%22%3E%3Crect width=%22600%22 height=%22900%22 fill=%22red%22/%3E%3C/svg%3E'/><p>後です。</p></body></html>",
+                    webView.loadDataWithBaseURL("https://appassets.androidplatform.net/epub/one.xhtml",
+                        "<!doctype html><html><head><script>window.hoshiReaderImageReferenceCounts=$references;window.HoshiReaderRestore={postMessage:()=>window.testRestored=true};</script>$styles<style>$viewport</style>$script</head>$body</html>",
                         "text/html", "utf-8", null)
                 }
                 assertTrue(description, loaded.await(15, TimeUnit.SECONDS))
@@ -104,7 +121,7 @@ class ReaderTtsHighlightWebViewTest {
                     override suspend fun holdVisibleStop(progress: Double?) = error("Same chapter")
                 }
                 revealReaderPlaybackWithMediaStops(0, true, SasayakiCueRevealSource.NaturalPlayback, 300, { 0 }, actions)
-                assertTrue(description, shown > 0)
+                assertEquals("$description only the ordinary illustration holds", 1, shown)
                 assertEquals("\"tts-image-next\"", evaluate(webView, "window.hoshiReader.activeCueId"))
                 composeRule.waitUntil("$description sentence after image", 5_000) { bluePixelCount() > 100 }
 

@@ -13,6 +13,22 @@ import org.junit.rules.TemporaryFolder
 @OptIn(ExperimentalCoroutinesApi::class)
 class TtsBookRepositoryTest {
     @get:Rule val folder = TemporaryFolder()
+    @Test fun repeatedImagesDoNotCreatePlaybackBarriersButOrdinaryIllustrationsDo() = runTest {
+        val chapters = listOf(
+            EpubChapter("a", "Text/a.xhtml", "application/xhtml+xml", "<p>一。</p><img src='../images/divider.jpg'/><p>二。</p><img src='../images/art.jpg'/><p>三。</p>"),
+            EpubChapter("b", "Text/b.xhtml", "application/xhtml+xml", "<img src='../images/divider.jpg'/><p>四。</p><img src='../images/divider.jpg'/>"),
+        )
+        val book = EpubBook("Book", chapters = chapters)
+        val repository = TtsBookRepository(UnconfinedTestDispatcher(testScheduler))
+        val sentences = repository.chapter(book, 0)
+        assertEquals(listOf(false, false, true), sentences.map { it.imageBefore })
+        assertEquals(false, repository.chapter(book, 1).single().imageBefore)
+        val from = repository.at(book, 0, 0)!!
+        val to = repository.adjacent(book, from, 1)!!
+        assertEquals(false, repository.hasImagesBetween(book, from, to))
+        assertEquals(true, repository.hasImagesBetween(book, to, repository.adjacent(book, to, 1)!!))
+    }
+
     @Test fun playbackAndLookupShareParsedChapterButReopenedBooksReadFreshContent() = runTest {
         val root = folder.newFolder()
         val file = File(root, "one.xhtml")

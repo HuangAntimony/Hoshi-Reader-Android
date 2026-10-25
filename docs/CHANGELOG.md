@@ -21,6 +21,8 @@ Release notes before v1.3.0 are in [CHANGELOG_ARCHIVE.md](CHANGELOG_ARCHIVE.md).
 
 ### Changed
 
+- Skip Sasayaki and TTS image holds for images referenced three or more times in a book’s main text, while retaining holds for images used once or twice.
+
 - Make Statistics charts easier to read with a one-hour minimum scale and compact previous/next period buttons alongside swipe navigation, with stable single-line period titles and duration/comparison rows when paging.
 - Label the selected-text menu entry “Hoshi Lookup” (“Hoshi 查词” in Simplified Chinese) to make dictionary lookup easier to identify.
 - Simplify About into compact groups for updates, project links, support and storage cleanup.

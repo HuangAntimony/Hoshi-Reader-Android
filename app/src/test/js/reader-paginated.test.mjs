@@ -446,6 +446,7 @@ function loadReader(body, sourceUrl = readerPaginatedUrl, options = {}) {
     const documentHead = Object.hasOwn(options, 'documentHead') ? options.documentHead : head;
     const document = {
         body,
+        baseURI: 'https://appassets.androidplatform.net/epub/Text/chapter.xhtml',
         head: documentHead,
         documentElement,
         fonts: { ready: options.fontsReady ?? Promise.resolve() },
@@ -529,6 +530,7 @@ function loadReader(body, sourceUrl = readerPaginatedUrl, options = {}) {
     vm.runInNewContext(readerSource(sourceUrl, options), {
         CSS: css,
         Highlight: Set,
+        URL,
         document,
         Node: { ELEMENT_NODE: 1, TEXT_NODE: 3 },
         NodeFilter: { SHOW_TEXT: 4, FILTER_ACCEPT: 1, FILTER_REJECT: 2 },
@@ -1821,3 +1823,23 @@ test('continuous body scroll reports the current document token', () => {
     body.listeners?.get('scroll')?.();
     assert.deepEqual(messages, ['restore-token']);
 });
+
+for (const sourceUrl of [readerPaginatedUrl, readerContinuousUrl]) {
+    test(`${sourceUrl.pathname} skips repeated images but retains ordinary image stops`, () => {
+        const body = new TestElement('body');
+        body.scrollHeight = 4000;
+        body.appendChild(new TestText('一'));
+        const repeated = imgAt(900, 1300);
+        repeated.src = '../images/divider.jpg';
+        const ordinary = imgAt(1720, 2100);
+        ordinary.src = '../images/art.jpg';
+        body.appendChild(repeated);
+        body.appendChild(ordinary);
+        const { reader, window } = loadReader(body, sourceUrl);
+        window.hoshiReaderMediaSemantics.setImageReferenceCounts({ 'images/divider.jpg': 3, 'images/art.jpg': 2 });
+        reader.pageHeight = 800;
+        assert.deepEqual(Array.from(reader.sasayakiMediaElements()), [ordinary]);
+        assert.equal(reader.sasayakiMediaStopsToChapterEnd().length, 1);
+        assert.equal(body.querySelectorAll('img').length, 2);
+    });
+}

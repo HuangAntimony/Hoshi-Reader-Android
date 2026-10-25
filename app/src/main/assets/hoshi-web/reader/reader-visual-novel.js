@@ -912,7 +912,7 @@ window.hoshiReader = {
         endRawCount: rawEnd,
         ids: this.collectIdsForNode(child, sources[i].extraIds),
         splittable: stats.hasText && !hasStandaloneMedia,
-        mediaStop: hasStandaloneMedia,
+        mediaStop: hasStandaloneMedia && this.containsHoldableMedia(child),
         render: () => {
           var fragment = document.createDocumentFragment();
           fragment.appendChild(this.cloneSourceNodeWithOffsets(child));
@@ -1123,7 +1123,7 @@ window.hoshiReader = {
         endRawCount: position.endRaw,
         ids: this.collectIdsForNode(child, sources[i].extraIds),
         splittable: false,
-        mediaStop: hasStandaloneMedia,
+        mediaStop: hasStandaloneMedia && this.containsHoldableMedia(child),
         render: () => {
           var fragment = document.createDocumentFragment();
           fragment.appendChild(this.cloneSourceNodeWithOffsets(child));
@@ -1140,6 +1140,15 @@ window.hoshiReader = {
       return this.contentStream.sourcePositionForNode(node);
     }
     return { hasText: false, startChar: 0, endChar: 0, startRaw: 0, endRaw: 0 };
+  },
+  containsHoldableMedia: function(root) {
+    if (!root || root.nodeType !== Node.ELEMENT_NODE) return false;
+    var elements = this.isStandaloneMediaTag(String(root.tagName || '').toLowerCase())
+      ? [root]
+      : Array.from(root.querySelectorAll('img, svg, image, video, canvas, audio, picture, table, iframe, object, embed'));
+    return elements.some(function(element) {
+      return window.hoshiReaderMediaSemantics.shouldHoldMedia(element);
+    });
   },
   containsStandaloneMedia: function(root) {
     if (this.contentStream && typeof this.contentStream.containsStandaloneMedia === 'function') {
@@ -1192,7 +1201,7 @@ window.hoshiReader = {
       endRawCount: unit.endRaw,
       ids: ids,
       splittable: false,
-      mediaStop: true,
+      mediaStop: window.hoshiReaderMediaSemantics.shouldHoldMedia(unit.mediaNode || unit.node),
       render: () => {
         var fragment = document.createDocumentFragment();
         fragment.appendChild(this.cloneMediaUnit(unit));

@@ -19,6 +19,40 @@
       .some(function(token) { return token.toLowerCase().indexOf('gaiji') >= 0; });
   }
 
+  var imageReferenceCounts = global.hoshiReaderImageReferenceCounts || {};
+
+  function setImageReferenceCounts(counts) {
+    imageReferenceCounts = counts || {};
+  }
+
+  function shouldHoldMedia(element) {
+    if (!element) return true;
+    var tag = String(element.tagName || '').toLowerCase();
+    if (tag === 'img' && isGaijiImage(element)) return false;
+    if (tag === 'picture' || tag === 'svg') {
+      var descendants = Array.from(element.querySelectorAll ? element.querySelectorAll('*') : []);
+      if (tag === 'svg' && descendants.some(function(child) {
+        return ['path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'text', 'use', 'foreignobject'].indexOf(String(child.tagName || '').toLowerCase()) >= 0;
+      })) return true;
+      var images = descendants.filter(function(child) {
+        return ['img', 'image'].indexOf(String(child.tagName || '').toLowerCase()) >= 0;
+      });
+      return !images.length || images.some(shouldHoldMedia);
+    }
+    if (tag !== 'img' && tag !== 'image') return true;
+    var source = tag === 'img' ? imageSource(element) : svgImageSource(element);
+    if (!source) return true;
+    try {
+      var doc = documentForNode(element);
+      var url = new URL(source, doc && doc.baseURI);
+      if (url.origin !== 'https://appassets.androidplatform.net' || url.pathname.indexOf('/epub/') !== 0) return true;
+      var path = decodeURIComponent(url.pathname.slice('/epub/'.length));
+      return !(Number(imageReferenceCounts[path]) >= 3);
+    } catch (_error) {
+      return true;
+    }
+  }
+
   function isLargeImage(img) {
     return Number(img && img.naturalWidth || 0) > 256 || Number(img && img.naturalHeight || 0) > 256;
   }
@@ -265,6 +299,8 @@
 
   global.hoshiReaderMediaSemantics = {
     isGaijiImage: isGaijiImage,
+    setImageReferenceCounts: setImageReferenceCounts,
+    shouldHoldMedia: shouldHoldMedia,
     setupReaderImage: setupReaderImage,
     setupReaderImages: setupReaderImages
   };

@@ -2,6 +2,7 @@ package moe.antimony.hoshi.features.reader
 
 import java.io.File
 import moe.antimony.hoshi.epub.EpubBook
+import moe.antimony.hoshi.epub.EpubChapter
 import moe.antimony.hoshi.epub.EpubResource
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -14,6 +15,20 @@ import org.junit.rules.TemporaryFolder
 class ReaderWebResourceBridgeTest {
     @get:Rule
     val temporaryFolder = TemporaryFolder()
+
+    @Test fun servesBookWideImageReferencesWithoutChangingChapterMarkup() {
+        val html = "<html><body><img src='images/divider.jpg'/><img src='images/art.jpg'/></body></html>"
+        val book = EpubBook("fixture", chapters = listOf(
+            EpubChapter("a", "chapter.xhtml", "application/xhtml+xml", html),
+            EpubChapter("b", "other.xhtml", "application/xhtml+xml", "<img src='images/divider.jpg'/><img src='images/divider.jpg'/>"),
+        ), resources = mapOf("chapter.xhtml" to EpubResource("application/xhtml+xml", html.toByteArray())))
+        val bridge = ReaderWebResourceBridge(book, fontFileForRequest = { null })
+        val references = bridge.resourceForUrl("https://appassets.androidplatform.net/reader-media/image-references.json")!!
+        assertEquals("application/json", references.mediaType)
+        assertEquals("{\"images/divider.jpg\":3,\"images/art.jpg\":1}", references.data.decodeToString())
+        assertEquals(html, bridge.resourceForUrl("https://appassets.androidplatform.net/epub/chapter.xhtml")!!.data.decodeToString())
+        assertNull(bridge.resourceForUrl("https://other.example/reader-media/image-references.json"))
+    }
 
     @Test
     fun servesSanitizedEpubCssWithUtf8EncodingOnlyForAppAssetsHost() {

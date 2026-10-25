@@ -456,7 +456,7 @@ class TtsPlaybackControllerTest {
     }
 
     private val chapterBook = EpubBook("Chapters", chapters = (0..5).map { chapter ->
-        EpubChapter("$chapter", "$chapter.xhtml", "application/xhtml+xml", "<img src='image.jpg'/><p>第${chapter}章。</p>")
+        EpubChapter("$chapter", "$chapter.xhtml", "application/xhtml+xml", "<img src='image${chapter}.jpg'/><p>第${chapter}章。</p>")
     })
 
     @Test fun prefetchCrossesChaptersWithoutChangingItsSentenceBound() = runTest {
@@ -488,6 +488,19 @@ class TtsPlaybackControllerTest {
             assertEquals(requests, audio.requests.size)
             controller.startAt(4, 0); runCurrent()
             assertEquals(4, controller.state.value.sentence?.chapter)
+            assertEquals(2, output.playCount)
+        }
+    }
+
+    @Test fun repeatedChapterImagesDoNotPauseNaturalPlayback() = runTest {
+        val repeated = chapterBook.copy(chapters = chapterBook.chapters.map { it.copy(html = "<img src='divider.jpg'/><p>本文。</p>") })
+        fixture(fixtureBook = repeated) { controller, output, _, _ ->
+            val holds = mutableListOf<Int>()
+            controller.presentSentence = { sentence, hold -> if (hold) holds += sentence.chapter }
+            controller.play(); runCurrent()
+            output.onEnded(); runCurrent()
+            assertTrue(holds.isEmpty())
+            assertEquals(1, controller.state.value.sentence?.chapter)
             assertEquals(2, output.playCount)
         }
     }

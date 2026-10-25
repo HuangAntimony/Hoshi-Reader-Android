@@ -10,6 +10,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.di.IoDispatcher
 import moe.antimony.hoshi.epub.EpubBook
+import moe.antimony.hoshi.epub.shouldHoldImage
 
 internal data class TtsBookPosition(
     val sentences: List<TtsSentence>, val index: Int,
@@ -36,7 +37,7 @@ class TtsBookRepository @Inject constructor(@param:IoDispatcher private val disp
             chapters[key]?.let { return@withLock it }
             val source = book.chapters[index]
             val html = source.html.ifBlank { book.readResource(source.href)?.toString(Charsets.UTF_8).orEmpty() }
-            val sentences = TtsText.extractChapter(index, html, source.mediaType)
+            val sentences = TtsText.extractChapter(index, html, source.mediaType) { book.shouldHoldImage(source.href, it) }
             currentCoroutineContext().ensureActive()
             chapters[key] = sentences
             if (chapters.size > 4) chapters.remove(chapters.keys.first())

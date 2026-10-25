@@ -203,7 +203,7 @@ dynamic configuration and bridge calls.
 | --- | --- | --- |
 | `reader-text-semantics.js` | Normalization, raw/matchable counts and character predicate, Sasayaki punctuation ownership and search range semantics | All three modes |
 | `reader-dom-text.js` | Live DOM ruby normalization, selected body-text slices and Sasayaki structural boundaries | Paginated/continuous normalization; selection and Sasayaki adapters across modes |
-| `reader-media-semantics.js` | Image/gaiji setup, SVG ratio, blur/tint, tap bridge and scoped loading | All three modes |
+| `reader-media-semantics.js` | Image/gaiji setup, SVG ratio, blur/tint, tap bridge, scoped loading and image-hold eligibility | All three modes |
 | `reader-layout-semantics.js` | Oversized publisher inline-block and empty-strut sanitation | All three modes before offsets/restore/screen construction |
 | `reader-paginated.js` | Columns, snapping, page metrics and page restore | Paginated |
 | `reader-continuous.js` | Inset body scrolling, viewport bounds and scroll restore | Continuous |
@@ -224,6 +224,7 @@ dynamic configuration and bridge calls.
   stay with the owners above.
   Connecting other mode runtimes to VN stream/range-map instances requires an
   explicit design and validation plan first.
+- `EpubBook.imageReferenceCounts` lazily caches original image references across distinct linear, non-navigation spine documents for that book snapshot; first access runs on a resource/loading worker. `ReaderWebResourceBridge` serves the counts at `/reader-media/image-references.json` before Reader runtime initialization. Shared media semantics suppress holds at three references without changing layout; VN keeps media screens and filters their hold eligibility. TTS source extraction consumes the same counts, including background and cross-chapter barriers. Unknown counts preserve holds.
 - `ReaderWebViewStateHolder` owns document/restore generations. Stale bridge
   callbacks cannot alter a replacement document. Renderer recovery preserves
   the latest accepted position and rebuilds WebView-local state.

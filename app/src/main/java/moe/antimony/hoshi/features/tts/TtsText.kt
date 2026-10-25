@@ -48,7 +48,7 @@ object TtsText {
         return extractChapter(chapter, html, mediaType).sentences
     }
 
-    internal fun extractChapter(chapter: Int, html: String, mediaType: String): TtsChapterText {
+    internal fun extractChapter(chapter: Int, html: String, mediaType: String, shouldHoldImage: (Element) -> Boolean = { true }): TtsChapterText {
         val result = mutableListOf<TtsSentence>()
         val source = StringBuilder()
         val sourceStarts = mutableListOf<Int>()
@@ -95,7 +95,7 @@ object TtsText {
                 is TextNode -> append(node.wholeText)
                 is Element -> when (node.normalName()) {
                     "head", "rt", "rp", "script", "style" -> Unit
-                    "img", "svg" -> { flush(); imageBefore = true }
+                    "img", "svg" -> { flush(); imageBefore = imageBefore || shouldHoldImage(node) }
                     "br" -> flush()
                     "ruby" -> {
                         val reading = node.select("rt").joinToString("") { it.wholeText() }
