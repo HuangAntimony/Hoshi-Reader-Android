@@ -151,10 +151,15 @@ Validation guidance and failure injection methods are in
 - `BookStorageLock` serializes atomic sidecar/statistics transactions.
   `BookWorkRegistry` joins active book work before deletion or generation
   replacement, before acquiring that lock.
+  Book discovery rechecks each directory and completes its legacy metadata/EPUB
+  migration under the same storage lock; an earlier directory snapshot must not
+  recreate or return a book that has since been deleted.
 - Bookshelf loading reuses the migrated `BookEntry` snapshot for shelf membership
   instead of rereading every book's metadata. `SyncStorage.prepareLibrary` prepares
   only missing live bookkeeping and checks empty archives; live-book sessions are loaded/migrated
   when needed by sync/statistics, not eagerly under the startup storage lock.
+  A live directory with a deleted sync record is marked pending during preparation
+  so the next sync reapplies its state even when the remote version is cached.
 - `BookStatisticsStore` is the shared owner for reader sessions, edits, sync and
   archive/restore. UUID-keyed nullable records retain deletions; daily totals
   derive from sessions and reset time. `Books/statistics_archive/` participates

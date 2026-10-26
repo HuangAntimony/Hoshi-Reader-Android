@@ -152,7 +152,14 @@ class SyncStorage @Inject constructor(
         for (root in bookDirectoryCandidates()) {
             val archived = root.parentFile!!.name == "statistics_archive"
             // Existing live records need no preparation; avoid decoding their metadata again.
-            if (!archived && root.name.syncKey() in state.books) continue
+            val key = root.name.syncKey()
+            val record = state.books[key]
+            if (!archived && record != null) {
+                // Older shelf loaders could recreate a deleted book's directory. Reapply
+                // its state on the next sync even when the remote version is unchanged.
+                if (record.deleted && root.isDirectory) updateRecord(key) { it.copy(pending = true) }
+                continue
+            }
             if (books.loadMetadata(root) == null) continue
             prepareBook(root)
             // Live sessions are read/migrated when syncing the book, not during startup.

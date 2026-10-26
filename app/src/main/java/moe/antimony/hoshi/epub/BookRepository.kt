@@ -19,8 +19,6 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
@@ -82,8 +80,6 @@ class BookRepository private constructor(
     var onBookChange: (suspend (String, moe.antimony.hoshi.features.sync.SyncFileType?) -> Unit)? = null
     var onShelvesChange: (suspend () -> Unit)? = null
 
-    private val legacyPackedMigrationMutex = Mutex()
-
     val currentBookFile: File get() = fileDataSource.currentBookFile
 
     suspend fun loadAllBooks(): List<File> = fileDataSource.loadAllBooks()
@@ -100,7 +96,7 @@ class BookRepository private constructor(
         }
         var legacyMigrationCurrent = 0
         val entries = roots
-            .map { (root, metadata) ->
+            .mapNotNull { (root, metadata) ->
                 if (shouldMigrateLegacyExtractedBookToPackedEpub(root, metadata)) {
                     legacyMigrationCurrent += 1
                     onLegacyBookMigrationProgress(
@@ -110,7 +106,7 @@ class BookRepository private constructor(
                         ),
                     )
                 }
-                val migration = migrateLegacyBookForIosBackupCompatibility(root, metadata)
+                val migration = migrateLegacyBookForIosBackupCompatibility(root, metadata) ?: return@mapNotNull null
                 if (migration.oldId != migration.metadata.id) {
                     idReplacements[migration.oldId] = migration.metadata.id
                 }
@@ -128,7 +124,7 @@ class BookRepository private constructor(
     override suspend fun loadBookEntry(bookId: String): BookEntry? {
         loadShelfList()
         for (root in loadAllBooks()) {
-            val migration = migrateLegacyBookForIosBackupCompatibility(root, loadMetadata(root))
+            val migration = migrateLegacyBookForIosBackupCompatibility(root, loadMetadata(root)) ?: continue
             if (migration.oldId != migration.metadata.id) {
                 replaceShelfBookIds(mapOf(migration.oldId to migration.metadata.id))
             }
@@ -391,16 +387,21 @@ class BookRepository private constructor(
     private suspend fun migrateLegacyBookForIosBackupCompatibility(
         root: File,
         storedMetadata: BookMetadata?,
-    ): LegacyBookMigration = legacyPackedMigrationMutex.withLock {
-        val currentMetadata = loadMetadata(root) ?: storedMetadata
-        val oldId = storedMetadata?.id ?: currentMetadata?.id ?: root.name
-        val baseMetadata = currentMetadata ?: root.fallbackMetadata()
-        val iosMetadata = baseMetadata.withIosBackupCompatibleFields(root)
-        if (iosMetadata != currentMetadata) {
-            saveMetadata(root, iosMetadata)
+    ): LegacyBookMigration? = withContext(ioDispatcher) {
+        storageLock.withLock {
+            // Enumeration can outlive a sync deletion. Keep this check and all migration
+            // writes in the deletion transaction's lock so a stale load cannot revive it.
+            if (!root.isDirectory) return@withLock null
+            val currentMetadata = loadMetadata(root)
+            val oldId = storedMetadata?.id ?: currentMetadata?.id ?: root.name
+            val baseMetadata = currentMetadata ?: root.fallbackMetadata()
+            val iosMetadata = baseMetadata.withIosBackupCompatibleFields(root)
+            if (iosMetadata != currentMetadata) {
+                saveMetadata(root, iosMetadata)
+            }
+            val packedMetadata = migrateLegacyExtractedBookToPackedEpub(root, iosMetadata)
+            LegacyBookMigration(oldId = oldId, metadata = packedMetadata)
         }
-        val packedMetadata = migrateLegacyExtractedBookToPackedEpub(root, iosMetadata)
-        LegacyBookMigration(oldId = oldId, metadata = packedMetadata)
     }
 
     private fun shouldMigrateLegacyExtractedBookToPackedEpub(root: File, metadata: BookMetadata?): Boolean =

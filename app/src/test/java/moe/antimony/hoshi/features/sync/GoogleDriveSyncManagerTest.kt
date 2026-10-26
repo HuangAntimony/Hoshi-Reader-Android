@@ -13,6 +13,8 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLDecoder
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CoroutineScope
@@ -51,6 +53,7 @@ import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import kotlin.coroutines.CoroutineContext
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class GoogleDriveSyncManagerTest {
@@ -165,10 +168,11 @@ class GoogleDriveSyncManagerTest {
     private suspend fun TestScope.fixture(
         dispatcher: TestDispatcher = UnconfinedTestDispatcher(testScheduler),
         transferFactory: (GoogleDriveClient) -> DriveFileTransfer = { TestDriveFileTransfer(it) },
+        booksDispatcher: CoroutineDispatcher = dispatcher,
         beforeRequest: suspend () -> Unit = {},
     ): Fixture {
         val remote = DriveService()
-        val books = BookRepository(temporary.root, dispatcher)
+        val books = BookRepository(temporary.root, booksDispatcher)
         val store = SyncStorage(temporary.root, books, dispatcher)
         val settings = SyncSettingsRepository(MemoryPreferences(), NoTtu, dispatcher)
         settings.update { it.copy(enabled = true) }
@@ -693,6 +697,138 @@ class GoogleDriveSyncManagerTest {
         assertTrue(stopped)
         assertFalse(root.exists())
         assertTrue(f.store.state.books.getValue("book-a").deleted)
+    }
+
+    @Test fun shelfReloadDoesNotRecreateBookDeletedAfterDirectoryEnumeration() = runTest {
+        assertDeletionDuringBookLoad(bookCount = 1, pauseAt = 3)
+    }
+
+    @Test fun batchDeletionDoesNotRecreateBooksFromPartiallyReadShelfSnapshot() = runTest {
+        assertDeletionDuringBookLoad(bookCount = 3, pauseAt = 4)
+    }
+
+    @Test fun bookLookupDoesNotRecreateBookDeletedAfterDirectoryEnumeration() = runTest {
+        assertDeletionDuringBookLoad(bookCount = 1, pauseAt = 3, lookup = true)
+    }
+
+    @Test fun migrationWaitingForDeletionLockRechecksDirectoryBeforeWriting() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val gate = BookLoadGate(dispatcher, pauseAt = 4)
+        val f = fixture(dispatcher = dispatcher, booksDispatcher = gate)
+        f.remote.addState("a", "book-a.json", SyncFormat.encode(remoteBook))
+        f.manager.sync()
+        runCurrent()
+        val root = f.store.bookDirectory("book-a")
+        val loading = async(CoroutineName("paused-book-load")) { f.books.loadBookEntries() }
+        runCurrent()
+        assertTrue(gate.isPaused)
+        try {
+            f.store.transaction {
+                // Resume migration while deletion owns the lock. An unlocked existence
+                // check would see this directory, then block only on its metadata read.
+                gate.release()
+                runCurrent()
+                assertFalse(loading.isCompleted)
+                f.store.applyBook("book-a", remoteBook.delete())
+            }
+        } finally {
+            if (gate.isPaused) gate.release()
+        }
+
+        assertTrue("Migration must discard the snapshot after waiting for deletion", loading.await().isEmpty())
+        assertFalse("Migration must not write a replacement metadata file", root.exists())
+    }
+
+    private suspend fun TestScope.assertDeletionDuringBookLoad(bookCount: Int, pauseAt: Int, lookup: Boolean = false) {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val gate = BookLoadGate(dispatcher, pauseAt)
+        val f = fixture(dispatcher = dispatcher, booksDispatcher = gate)
+        val roots = (0 until bookCount).map { index ->
+            val key = "book-$index"
+            val root = f.books.createBookDirectory(key)
+            f.books.saveMetadata(root, BookMetadata(
+                java.util.UUID.randomUUID().toString(), "Book $index", folder = key,
+                epub = "$key.epub", cover = "cover.jpg", lastAccess = 0.0,
+                shelves = mapOf("Shelf" to Timestamped(100, true)),
+            ))
+            root.resolve("$key.epub").writeText("epub-content")
+            root.resolve("cover.jpg").writeText("cover-content")
+            f.store.handleBookImport(f.books.loadMetadata(root)!!, root)
+            root
+        }
+        f.manager.sync()
+        runCurrent()
+        f.manager.sync()
+        runCurrent()
+        assertNull(f.manager.state.value.errorMessage)
+        val bookId = f.books.loadMetadata(roots.first())!!.id
+        roots.forEachIndexed { index, root -> assertTrue(root.setLastModified(1_000_000L - index * 1000)) }
+
+        // Dispatches 1/2 read shelves and enumerate directories. Pause before either
+        // the first metadata read (3), or a later read after a snapshot was retained (4).
+        val loading = async(CoroutineName("paused-book-load")) {
+            if (lookup) listOfNotNull(f.books.loadBookEntry(bookId)) else f.books.loadBookEntries()
+        }
+        runCurrent()
+        assertTrue("The loader must pause after directory enumeration", gate.isPaused)
+        try {
+            for (entry in f.remote.entries.values.filter { it.file.name.startsWith("book-") && it.file.name.endsWith(".json") }) {
+                entry.file = entry.file.copy(md5Checksum = "900")
+                entry.data = SyncFormat.encode(SyncFormat.decode<SyncBook>(entry.data).delete())
+            }
+            f.manager.sync()
+            runCurrent()
+            assertTrue(roots.none { it.exists() })
+            assertTrue(f.store.state.books.values.all { it.deleted })
+        } finally {
+            gate.release()
+        }
+        assertTrue("The in-flight load must omit deleted books", loading.await().isEmpty())
+        assertTrue("Loading must not recreate deleted directories", roots.none { it.exists() })
+        f.manager.sync()
+        runCurrent()
+        assertTrue(f.books.loadBookEntries().isEmpty())
+    }
+
+    @Test fun startupReconcilesLeftoverDirectoryEvenWhenRemoteDeletionVersionIsCached() = runTest {
+        val f = fixture()
+        f.remote.addState("a", "book-a.json", SyncFormat.encode(remoteBook.delete()))
+        f.manager.sync()
+        runCurrent()
+        val root = f.store.bookDirectory("book-a")
+        assertFalse(root.exists())
+        assertFalse(f.store.state.books.getValue("book-a").pending)
+        val cachedVersion = f.manager.cache.bookVersions["book-a"]
+        // Reproduce the empty sidecar that older shelf loaders could write after deletion.
+        f.books.saveMetadata(root, BookMetadata(java.util.UUID.randomUUID().toString(), folder = "book-a", lastAccess = 0.0))
+        f.store.prepareLibrary()
+        assertEquals(cachedVersion, f.manager.cache.bookVersions["book-a"])
+
+        f.manager.sync()
+        runCurrent()
+
+        assertFalse("A normal sync must remove the leftover without opening the book", root.exists())
+        assertTrue(f.store.state.books.getValue("book-a").deleted)
+        assertFalse(f.store.state.books.getValue("book-a").pending)
+        assertTrue(f.books.loadBookEntries().isEmpty())
+    }
+
+    private class BookLoadGate(private val delegate: CoroutineDispatcher, private val pauseAt: Int) : CoroutineDispatcher() {
+        private var held: Pair<CoroutineContext, Runnable>? = null
+        private var bookLoadDispatches = 0
+        val isPaused get() = held != null
+
+        override fun dispatch(context: CoroutineContext, block: Runnable) {
+            if (context[CoroutineName]?.name == "paused-book-load" && ++bookLoadDispatches == pauseAt) {
+                held = context to block
+            } else delegate.dispatch(context, block)
+        }
+
+        fun release() {
+            val (context, block) = checkNotNull(held)
+            held = null
+            delegate.dispatch(context, block)
+        }
     }
 
     @Test fun bookFailureContinuesRunAndKeepsCursor() = runTest {
