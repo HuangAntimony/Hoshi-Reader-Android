@@ -20,6 +20,14 @@ import kotlinx.coroutines.withTimeout
 import okhttp3.*
 import okio.ByteString
 
+internal data class OnlineTtsResponse(val statusCode: Int, val body: ByteArray) {
+    /** Only synthesis opts in: a complete HTTP 200 with no audio contributes no file. */
+    fun synthesisAudio(decode: (ByteArray) -> ByteArray = { it }): ByteArray? {
+        val audio = decode(body)
+        return audio.takeUnless { statusCode == 200 && it.isEmpty() }
+    }
+}
+
 @Singleton
 class OnlineTtsTransport internal constructor(private val client: OkHttpClient,
     private val customClient: OkHttpClient = client.newBuilder().connectTimeout(15, TimeUnit.SECONDS)
@@ -30,7 +38,10 @@ class OnlineTtsTransport internal constructor(private val client: OkHttpClient,
         .connectTimeout(15, TimeUnit.SECONDS).readTimeout(45, TimeUnit.SECONDS)
         .callTimeout(60, TimeUnit.SECONDS).followRedirects(false).followSslRedirects(false).build())
 
-    internal suspend fun request(request: Request, selfHosted: Boolean = false): ByteArray = suspendCancellableCoroutine { continuation ->
+    internal suspend fun request(request: Request, selfHosted: Boolean = false): ByteArray =
+        requestResponse(request, selfHosted).body
+
+    internal suspend fun requestResponse(request: Request, selfHosted: Boolean = false): OnlineTtsResponse = suspendCancellableCoroutine { continuation ->
         val call = (if (selfHosted) customClient else client).newCall(request)
         continuation.invokeOnCancellation { call.cancel() }
         call.enqueue(object : Callback {
@@ -60,7 +71,7 @@ class OnlineTtsTransport internal constructor(private val client: OkHttpClient,
                             output.toByteArray()
                         }
                     }
-                    continuation.resume(bytes)
+                    continuation.resume(OnlineTtsResponse(response.code, bytes))
                 } catch (error: Exception) {
                     continuation.resumeWithException(if (error is TtsException) error else TtsException(
                         if (error is InterruptedIOException) TtsFailure.Timeout else TtsFailure.Network, cause = redactedTransportError(error, request)))

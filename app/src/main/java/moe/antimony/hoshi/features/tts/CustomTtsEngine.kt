@@ -83,8 +83,9 @@ class CustomTtsEngine internal constructor(
                         }
                     }
                     val path = if (speaker == null) "audio/speech" else "voice/${vitsModels.getValue(speaker.first)}"
-                    val bytes = request(source, path, body)
+                    val bytes = requestResponse(source, path, body).synthesisAudio()
                     currentCoroutineContext().ensureActive()
+                    if (bytes == null) continue
                     validateTtsAudio(bytes, source.format)
                     File(directory, "${UUID.randomUUID()}.${source.format.name.lowercase()}").also {
                         files += it; it.writeBytes(bytes)
@@ -97,7 +98,10 @@ class CustomTtsEngine internal constructor(
             throw error
         }
     }
-    private suspend fun request(source: TtsCustomSource, path: String, body: JsonObject? = null): ByteArray {
+    private suspend fun request(source: TtsCustomSource, path: String, body: JsonObject? = null): ByteArray =
+        requestResponse(source, path, body).body
+
+    private suspend fun requestResponse(source: TtsCustomSource, path: String, body: JsonObject? = null): OnlineTtsResponse {
         val url = customTtsBaseUrl(source.baseUrl).newBuilder().apply { path.split('/').forEach { addPathSegment(it) } }.build()
         val request = Request.Builder().url(url)
         if (source.encryptedKey.isNotBlank()) {
@@ -106,7 +110,7 @@ class CustomTtsEngine internal constructor(
             if (source.protocol == TtsCustomProtocol.OpenAi) request.header("Authorization", "Bearer $key") else request.header("X-API-KEY", key)
         }
         if (body != null) request.post(body.toString().toByteArray(Charsets.UTF_8).toRequestBody("application/json".toMediaType()))
-        return transport.request(request.build(), selfHosted = true)
+        return transport.requestResponse(request.build(), selfHosted = true)
     }
 
     private fun parse(bytes: ByteArray): JsonElement = try { Json.parseToJsonElement(bytes.toString(Charsets.UTF_8)) }

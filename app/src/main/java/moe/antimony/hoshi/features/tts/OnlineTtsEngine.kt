@@ -44,7 +44,7 @@ class OnlineTtsEngine internal constructor(
             TtsOnlineSource.GoogleTranslate -> listOf(TtsVoiceInfo("ja", true))
             TtsOnlineSource.Edge -> OnlineTtsProtocol.microsoftVoices(transport.request(edgeRequest(false)).toString(Charsets.UTF_8))
             TtsOnlineSource.Azure, TtsOnlineSource.MicrosoftTranslator -> OnlineTtsProtocol.microsoftVoices(
-                azureSpeechRequest(source, config, "/cognitiveservices/voices/list").toString(Charsets.UTF_8))
+                azureSpeechRequest(source, config, "/cognitiveservices/voices/list").body.toString(Charsets.UTF_8))
             TtsOnlineSource.GoogleCloud -> OnlineTtsProtocol.googleVoices(transport.request(Request.Builder()
                 .url("https://texttospeech.googleapis.com/v1/voices?languageCode=ja-JP")
                 .header("X-Goog-Api-Key", key(source, config)).build()).toString(Charsets.UTF_8))
@@ -77,17 +77,20 @@ class OnlineTtsEngine internal constructor(
                         TtsOnlineSource.Edge -> transport.edgeAudio(edgeRequest(true), OnlineTtsProtocol.ssml(
                             part, voice, rate, pitchText, options.volume))
                         TtsOnlineSource.Azure, TtsOnlineSource.MicrosoftTranslator -> azureSpeechRequest(source, config,
-                            "/cognitiveservices/v1", OnlineTtsProtocol.azureSsml(part, voices.first { it.id == voice }, rate, pitch, options), options)
-                        TtsOnlineSource.GoogleCloud -> OnlineTtsProtocol.googleAudio(transport.request(Request.Builder()
+                            "/cognitiveservices/v1", OnlineTtsProtocol.azureSsml(part, voices.first { it.id == voice }, rate, pitch, options), options).synthesisAudio()
+                        TtsOnlineSource.GoogleCloud -> transport.requestResponse(Request.Builder()
                             .url("https://texttospeech.googleapis.com/v1/text:synthesize")
                             .header("X-Goog-Api-Key", credential)
-                            .post(OnlineTtsProtocol.googleBody(part, voice, rate, pitch, options).toRequestBody("application/json".toMediaType())).build()).toString(Charsets.UTF_8))
-                        TtsOnlineSource.GoogleTranslate -> OnlineTtsProtocol.translateAudio(transport.request(Request.Builder()
+                            .post(OnlineTtsProtocol.googleBody(part, voice, rate, pitch, options).toRequestBody("application/json".toMediaType())).build())
+                            .synthesisAudio { OnlineTtsProtocol.googleAudio(it.toString(Charsets.UTF_8)) }
+                        TtsOnlineSource.GoogleTranslate -> transport.requestResponse(Request.Builder()
                             .url("https://translate.google.com/_/TranslateWebserverUi/data/batchexecute?rpcids=jQ1olc")
                             .header("Referer", "https://translate.google.com/").header("User-Agent", "Mozilla/5.0")
-                            .post(FormBody.Builder().add("f.req", OnlineTtsProtocol.translateBody(part, rate < 1f)).build()).build()).toString(Charsets.UTF_8))
+                            .post(FormBody.Builder().add("f.req", OnlineTtsProtocol.translateBody(part, rate < 1f)).build()).build())
+                            .synthesisAudio { OnlineTtsProtocol.translateAudio(it.toString(Charsets.UTF_8)) }
                     }
                     currentCoroutineContext().ensureActive()
+                    if (bytes == null) continue
                     validateTtsAudio(bytes, if (mp3) TtsAudioFormat.Mp3 else TtsAudioFormat.Wav)
                     val file = File(directory, "${UUID.randomUUID()}.${if (mp3) "mp3" else "wav"}")
                     files += file
@@ -104,8 +107,8 @@ class OnlineTtsEngine internal constructor(
     private fun source(settings: TtsSettings) = TtsOnlineSource.from(settings.engine) ?: throw TtsException(TtsFailure.Configuration)
     private suspend fun azureSpeechRequest(source: TtsOnlineSource, config: TtsOnlineConfig, path: String,
         ssml: String? = null, options: TtsSynthesisOptions = TtsSynthesisOptions(),
-    ): ByteArray {
-        suspend fun request(region: String, header: String, credential: String): ByteArray = transport.request(Request.Builder()
+    ): OnlineTtsResponse {
+        suspend fun request(region: String, header: String, credential: String): OnlineTtsResponse = transport.requestResponse(Request.Builder()
             .url(OnlineTtsProtocol.azureBase(region) + path).header(header, credential).header("User-Agent", "Hoshi")
             .apply { if (ssml != null) {
                 header("X-Microsoft-OutputFormat", azureFormat(options))

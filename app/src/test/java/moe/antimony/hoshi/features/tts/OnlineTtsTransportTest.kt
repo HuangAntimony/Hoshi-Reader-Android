@@ -76,6 +76,17 @@ class OnlineTtsTransportTest {
 
     private fun client() = OkHttpClient.Builder().callTimeout(3, TimeUnit.SECONDS).build()
 
+    @Test fun successfulHeadersDoNotTurnAnIncompleteBodyIntoEmptyAudio() = runBlocking {
+        MockWebServer().use { server ->
+            server.enqueue(MockResponse().setBody("").setHeader("Content-Length", "100")
+                .setSocketPolicy(SocketPolicy.DISCONNECT_AT_END))
+            val error = runCatching {
+                OnlineTtsTransport(client()).request(Request.Builder().url(server.url("/speech")).build())
+            }.exceptionOrNull() as TtsException
+            assertEquals(TtsFailure.Network, error.failure)
+        }
+    }
+
     @Test fun requestTimeoutIsReportedSeparatelyFromNetworkFailure() = runBlocking {
         MockWebServer().use { server ->
             server.enqueue(MockResponse().setBody("late").setBodyDelay(500, TimeUnit.MILLISECONDS))
@@ -146,6 +157,21 @@ class OnlineTtsTransportTest {
                 OnlineTtsTransport(client()).edgeAudio(Request.Builder().url(server.url("/edge")).build(), "<speak/>")
                 fail("Expected incomplete synthesis failure")
             } catch (error: TtsException) { assertEquals(TtsFailure.InvalidResponse, error.failure) }
+        }
+    }
+
+    @Test fun edgeStillRejectsACompletedTurnWithoutAudio() = runBlocking {
+        MockWebServer().use { server ->
+            server.enqueue(MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
+                override fun onMessage(webSocket: WebSocket, text: String) {
+                    if (text.contains("Path:ssml")) webSocket.send("Path:turn.end\r\n\r\n{}")
+                }
+                override fun onClosing(webSocket: WebSocket, code: Int, reason: String) { webSocket.close(code, reason) }
+            }))
+            val error = runCatching {
+                OnlineTtsTransport(client()).edgeAudio(Request.Builder().url(server.url("/edge")).build(), "<speak/>")
+            }.exceptionOrNull() as TtsException
+            assertEquals(TtsFailure.InvalidResponse, error.failure)
         }
     }
 }

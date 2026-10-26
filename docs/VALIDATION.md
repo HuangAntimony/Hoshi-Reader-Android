@@ -320,6 +320,13 @@ for real playback, and deterministic controller/repository tests for concurrency
 limits, ordered publication, cancellation and injected failures. Do not infer a
 universal optimum or service rate limit from one device/network session.
 
+`TtsEmptyAudioDeviceTest#translatorEmptyNarrationPreservesDialoguePlaybackReplayAndExport`
+is an opt-in live Translator regression: pass `-e ttsEmptyAudioLive true` with the
+data-preserving instrumentation procedure. It uses in-memory voice settings,
+a unique scratch directory and an isolated player, verifies empty narration
+plus audible dialogue, replay, following speech and the shared preview/Anki
+export file, and never adds a card. Logs use `HoshiTtsEmptyAudio`.
+
 ### External TTS and release automation
 
 - `CustomTtsDeviceTest` opts into supplied `vitsUrl` or `openAiUrl`/`openAiModel`
