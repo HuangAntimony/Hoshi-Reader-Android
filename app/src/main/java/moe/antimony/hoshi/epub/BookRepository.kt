@@ -16,6 +16,8 @@ import java.util.zip.ZipOutputStream
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -36,6 +38,10 @@ import moe.antimony.hoshi.di.FilesDir
 import moe.antimony.hoshi.di.IoDispatcher
 import moe.antimony.hoshi.importing.ImportFileType
 import moe.antimony.hoshi.importing.validateImportFile
+import moe.antimony.hoshi.features.sync.SyncFileType
+import moe.antimony.hoshi.R
+import moe.antimony.hoshi.ui.ErrorDiagnosticEvents
+import moe.antimony.hoshi.ui.UiText
 
 @Singleton
 class BookRepository private constructor(
@@ -164,12 +170,48 @@ class BookRepository private constructor(
         epub.inputStream().use { input -> input.copyTo(output) }
     }
 
-    override suspend fun metadataCoverPath(bookRoot: File, coverHref: String?): String? =
+    suspend fun metadataCoverPath(bookRoot: File, coverHref: String?): String? =
         fileDataSource.metadataCoverPath(bookRoot, coverHref)
 
     suspend fun metadataCoverPath(bookRoot: File, parsedBook: EpubBook): String? =
         metadataCoverPath(bookRoot, parsedBook.coverHref)
             ?: fileDataSource.writeCoverResource(bookRoot, parsedBook)
+
+    override suspend fun restoreCoverIfNeeded(bookRoot: File, parsedBook: EpubBook) = withContext(ioDispatcher) {
+        try {
+            storageLock.withLock {
+                val metadata = loadMetadata(bookRoot) ?: return@withLock
+                val current = fileDataSource.coverFile(BookEntry(bookRoot, metadata))
+                if (current != null && !current.isSvgCover()) return@withLock
+                val href = parsedBook.coverHref ?: return@withLock
+                val mediaType = parsedBook.mediaType(href)
+                if (mediaType !in setOf("image/jpeg", "image/png", "image/gif", "image/webp")) return@withLock
+                // Publish the file, metadata and sync source together even if opening is cancelled.
+                // A separate name keeps the previous cover intact until this succeeds.
+                withContext(NonCancellable) publish@{
+                    val cover = fileDataSource.writeCoverResource(bookRoot, parsedBook, "cover-restored-${UUID.randomUUID()}.${mediaType.coverExtension()}")
+                        ?: return@publish
+                    try {
+                        sidecarDataSource.saveMetadata(bookRoot, metadata.copy(cover = cover))
+                        onBookChange?.invoke(bookRoot.name.syncKey(), SyncFileType.cover)
+                    } catch (error: Exception) {
+                        try {
+                            sidecarDataSource.saveMetadata(bookRoot, metadata)
+                        } catch (rollbackError: Exception) {
+                            error.addSuppressed(rollbackError)
+                        }
+                        // A missing file also makes the next opening retry if metadata rollback failed.
+                        bookRoot.resolve(File(cover).name).delete()
+                        throw error
+                    }
+                }
+            }
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            ErrorDiagnosticEvents.buffer.record(UiText.Resource(R.string.reader_cover_restore_failed), error)
+        }
+    }
 
     suspend fun deleteBook(
         bookRoot: File,
@@ -472,7 +514,7 @@ data class LegacyBookMigrationProgress(
 
 interface ReaderRouteBookRepository {
     suspend fun loadBookEntry(bookId: String): BookEntry?
-    suspend fun metadataCoverPath(bookRoot: File, coverHref: String?): String?
+    suspend fun restoreCoverIfNeeded(bookRoot: File, parsedBook: EpubBook)
     suspend fun saveMetadata(bookRoot: File, metadata: BookMetadata)
     suspend fun loadBookmark(bookRoot: File): Bookmark?
     suspend fun saveBookmark(bookRoot: File, bookmark: Bookmark)
@@ -561,18 +603,27 @@ class BookFileDataSource(
         "Books/${root.name}/${destination.name}"
     }
 
-    suspend fun writeCoverResource(bookRoot: File, parsedBook: EpubBook): String? = withContext(ioDispatcher) {
+    suspend fun writeCoverResource(bookRoot: File, parsedBook: EpubBook, destinationName: String? = null): String? = withContext(ioDispatcher) {
         val coverHref = parsedBook.coverHref?.takeIf { it.isNotBlank() } ?: return@withContext null
         val bytes = parsedBook.readResource(coverHref) ?: return@withContext null
         val root = bookRoot.canonicalFile
-        val rawName = File(coverHref).name.takeIf { it.isNotBlank() } ?: "cover.${parsedBook.mediaType(coverHref).coverExtension()}"
+        val rawName = destinationName ?: File(coverHref).name.takeIf { it.isNotBlank() } ?: "cover.${parsedBook.mediaType(coverHref).coverExtension()}"
         val fileName = rawName.sanitizeRootFileName().ifBlank { "cover.${parsedBook.mediaType(coverHref).coverExtension()}" }
         val destination = root.resolve(fileName).canonicalFile
         if (destination.path != root.path && !destination.path.startsWith(root.path + File.separator)) {
             return@withContext null
         }
         destination.parentFile?.mkdirs()
-        destination.writeBytes(bytes)
+        val temporary = File.createTempFile(".cover-", ".tmp", root)
+        try {
+            temporary.outputStream().use { stream ->
+                stream.write(bytes)
+                stream.fd.sync()
+            }
+            Files.move(temporary.toPath(), destination.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+        } finally {
+            temporary.delete()
+        }
         "Books/${root.name}/${destination.name}"
     }
 
@@ -899,6 +950,16 @@ private fun String.coverExtension(): String = when (lowercase()) {
     "image/svg+xml" -> "svg"
     "image/webp" -> "webp"
     else -> "jpg"
+}
+
+private fun File.isSvgCover(): Boolean {
+    if (extension.equals("svg", ignoreCase = true)) return true
+    // Some remote covers contain SVG bytes despite a .jpeg filename.
+    val prefix = inputStream().use { input ->
+        val buffer = ByteArray(4096)
+        String(buffer, 0, input.read(buffer).coerceAtLeast(0), Charsets.UTF_8)
+    }.trimStart('\uFEFF', ' ', '\t', '\r', '\n')
+    return prefix.startsWith("<") && Regex("<(?:[\\w.-]+:)?svg(?:\\s|>)", RegexOption.IGNORE_CASE).containsMatchIn(prefix)
 }
 
 internal fun String.isUuidString(): Boolean =

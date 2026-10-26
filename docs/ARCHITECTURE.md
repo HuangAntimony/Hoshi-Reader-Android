@@ -139,6 +139,15 @@ Validation guidance and failure injection methods are in
   SAF supplies imports. `BookRepository` owns import/extraction/I/O; parsing
   extracts only into controlled cache/temp locations. Metadata keeps the full
   title independently of its byte-bounded physical filename.
+- `EpubBookParser` resolves unsupported spine items through cycle-checked manifest
+  fallbacks to HTML. Chapter resources, reader facts and media use the resolved
+  href; the original href remains a navigation alias. Rebuilt reader facts restore
+  bookmarks from character counts. Parsing unwraps only lossless single-raster SVG
+  covers. On opening, `BookRepository.restoreCoverIfNeeded` reuses the parsed EPUB
+  to replace missing/SVG covers with a local bitmap and marks only the cover for
+  sync. Publication finishes across cancellation; repair failures stay nonfatal
+  and retry on the next opening. Normal covers, books without a usable bitmap
+  cover and Sasayaki matches remain unchanged; there is no library-wide migration or remote orphan cleanup.
 - `BookStorageLock` serializes atomic sidecar/statistics transactions.
   `BookWorkRegistry` joins active book work before deletion or generation
   replacement, before acquiring that lock.
@@ -204,7 +213,7 @@ dynamic configuration and bridge calls.
 | `reader-text-semantics.js` | Normalization, raw/matchable counts and character predicate, Sasayaki punctuation ownership and search range semantics | All three modes |
 | `reader-dom-text.js` | Live DOM ruby normalization, selected body-text slices and Sasayaki structural boundaries | Paginated/continuous normalization; selection and Sasayaki adapters across modes |
 | `reader-media-semantics.js` | Image/gaiji setup, SVG ratio, blur/tint, tap bridge, scoped loading and image-hold eligibility | All three modes |
-| `reader-layout-semantics.js` | Oversized publisher inline-block and empty-strut sanitation | All three modes before offsets/restore/screen construction |
+| `reader-layout-semantics.js` | Publisher inline-block/empty-strut sanitation, pure-image wrapper centering and overflowing image paragraph margins | All three modes before offsets/restore; VN also sanitizes displayed clones after media setup |
 | `reader-paginated.js` | Columns, snapping, page metrics and page restore | Paginated |
 | `reader-continuous.js` | Inset body scrolling, viewport bounds and scroll restore | Continuous |
 | `reader-visual-novel.js` | Block/sentence screens, fitting, reveal, cross-screen cue merge and navigation | VN |

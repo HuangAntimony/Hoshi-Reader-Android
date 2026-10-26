@@ -1768,6 +1768,7 @@ window.hoshiReader = {
       this.hideCurrentScreenForReveal();
     }
     this.setupReaderImages(this.screen);
+    window.hoshiReaderLayoutSemantics.sanitizeInlineBlocks(this.screen, this.isVertical());
     this.buildNodeOffsets();
     if (this.revealComplete) this.applyCurrentScreenHighlights();
     if (this.revealComplete) this.refreshSasayakiCuePresentation();

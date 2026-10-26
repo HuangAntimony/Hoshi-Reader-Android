@@ -21,6 +21,7 @@ pub struct ManifestItem {
     pub href: String,
     pub media_type: String,
     pub properties: Option<String>,
+    pub fallback_id: Option<String>,
 }
 
 #[derive(Debug, Clone, uniffi::Record)]
@@ -104,6 +105,7 @@ impl EpubBook {
                     href: entry.href_raw().to_string(),
                     media_type: entry.media_type().to_string(),
                     properties: if props.is_empty() { None } else { Some(props) },
+                    fallback_id: entry.fallback().map(|fallback| fallback.id().to_string()),
                 }
             })
             .collect()

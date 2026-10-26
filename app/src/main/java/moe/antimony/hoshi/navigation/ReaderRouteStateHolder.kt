@@ -28,10 +28,10 @@ internal class ReaderRouteStateHolder(
                 ?: error("Book not found.")
             val cachedBookInfo = repository.loadReaderBookInfo(entry.root)
             val parsedBook = parser.parse(entry.root, cachedBookInfo)
+            repository.restoreCoverIfNeeded(entry.root, parsedBook)
             val currentMetadata = repository.loadBookEntry(bookId)!!.metadata
             val metadata = currentMetadata.copy(
                 title = currentMetadata.title ?: parsedBook.title,
-                cover = currentMetadata.cover ?: repository.metadataCoverPath(entry.root, parsedBook.coverHref),
                 folder = entry.root.name,
                 lastAccess = repository.currentAppleReferenceDateSeconds(),
                 bookLanguage = currentMetadata.bookLanguage ?: parsedBook.language,
@@ -43,13 +43,11 @@ internal class ReaderRouteStateHolder(
             val displayEntry = entry.copy(metadata = metadata)
             val displayBook = parsedBook.copy(title = displayEntry.displayTitle)
             if (cachedBookInfo != displayBook.bookInfo) {
-                repository.saveBookInfo(entry.root, displayBook.bookInfo)
-            }
-            if (cachedBookInfo == null) {
                 repository.loadBookmark(entry.root)?.let { bookmark ->
                     val position = displayBook.bookInfo.resolveTtuCharacterPosition(bookmark.characterCount)
                     repository.saveBookmark(entry.root, bookmark.copy(chapterIndex = position?.spineIndex ?: 0, progress = position?.progress ?: 0.0))
                 }
+                repository.saveBookInfo(entry.root, displayBook.bookInfo)
             }
             beforeBookmarkLoad(displayEntry)
             val refreshed = repository.loadBookEntry(bookId)!!

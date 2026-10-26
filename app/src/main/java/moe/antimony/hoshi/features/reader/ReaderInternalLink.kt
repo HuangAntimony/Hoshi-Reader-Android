@@ -19,10 +19,10 @@ internal fun EpubBook.resolveInternalReaderLink(url: String): ReaderInternalLink
     val href = path.removePrefix("/epub/").readerHrefBase()
     if (href.isBlank()) return null
     val spineIndex = chapters.indexOfFirst { chapter ->
-        val chapterPath = chapter.href.readerHrefBase()
-        href == chapterPath ||
-            href.endsWith("/$chapterPath") ||
-            chapterPath.endsWith("/$href")
+        listOfNotNull(chapter.href, chapter.originalHref).any { candidate ->
+            val chapterPath = candidate.readerHrefBase()
+            href == chapterPath || href.endsWith("/$chapterPath") || chapterPath.endsWith("/$href")
+        }
     }.takeIf { it >= 0 } ?: return null
 
     return ReaderInternalLinkTarget(

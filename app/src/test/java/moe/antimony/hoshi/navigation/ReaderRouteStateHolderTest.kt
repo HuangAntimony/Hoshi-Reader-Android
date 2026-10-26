@@ -133,6 +133,31 @@ class ReaderRouteStateHolderTest {
     }
 
     @Test
+    fun rebuiltBookInfoRestoresFromCharacterCountAndPreservesTimestamp() = runBlocking {
+        val root = File("book-a")
+        val original = readerBook()
+        val updated = original.copy(
+            chapters = listOf(EpubChapter("image", "front.xhtml", "application/xhtml+xml", "<html><body/></html>")) + original.chapters,
+            bookInfo = original.bookInfo.copy(chapterInfo = mapOf(
+                "front.xhtml" to BookInfo.ChapterInfo(0, 0, 0),
+                "chapter-1.xhtml" to BookInfo.ChapterInfo(1, 0, 10),
+            )),
+        )
+        val bookmark = Bookmark(0, 0.8, 4, 123.0)
+        val repository = FakeReaderRouteBookRepository(
+            entry = BookEntry(root, BookMetadata("book-a", "Book", null, "book-a", 0.0)),
+            bookInfo = original.bookInfo,
+            bookmark = bookmark,
+        )
+        val parser = object : ReaderRouteEpubParser {
+            override fun parse(root: File, cachedBookInfo: BookInfo?): EpubBook = updated
+        }
+        val state = ReaderRouteStateHolder(repository, parser).load("book-a") as ReaderRouteLoadState.Ready
+        assertEquals(bookmark.copy(chapterIndex = 1, progress = 0.4), state.bookmark)
+        assertEquals(updated.bookInfo, repository.savedBookInfo)
+    }
+
+    @Test
     fun saveBookmarkCalculatesCharacterCountAndNotifiesRefresh() = runBlocking {
         val root = File("book-a")
         val book = readerBook(html = "1234567890")
@@ -207,8 +232,10 @@ class ReaderRouteStateHolderTest {
 
         override suspend fun loadBookEntry(bookId: String): BookEntry? = entry?.let { it.copy(metadata = savedMetadata ?: it.metadata) }
 
-        override suspend fun metadataCoverPath(bookRoot: File, coverHref: String?): String? =
-            coverHref?.let { "Books/${bookRoot.name}/${File(it).name}" }
+        override suspend fun restoreCoverIfNeeded(bookRoot: File, parsedBook: EpubBook) {
+            val metadata = savedMetadata ?: entry?.metadata ?: return
+            savedMetadata = metadata.copy(cover = metadata.cover ?: parsedBook.coverHref?.let { "Books/${bookRoot.name}/${File(it).name}" })
+        }
 
         override suspend fun saveMetadata(bookRoot: File, metadata: BookMetadata) {
             savedMetadata = metadata

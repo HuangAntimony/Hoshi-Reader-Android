@@ -122,6 +122,11 @@ Stop the fixture and remove only this reverse mapping after testing.
 - Standalone reader fixtures must inject measured
   `readerViewportCssLayout(...).cssVariables()` and wait for `HoshiReaderRestore`.
   Shell injection alone can leave VN with a zero-height viewport.
+- Picture fixtures must also wait for visible pixels after the WebView visual-state
+  callback. Correct image bounds and a ready bridge can precede compositor paint;
+  an immediate `WebView.draw` or screenshot may still be blank. Use a bounded
+  screenshot check against the current image before accepting painting or centering
+  evidence; a nonblank screenshot can still contain the previous chapter.
 - Use screenshots/recordings for painting, menu visibility and handle movement.
   CSS Custom Highlights can clip vertical glyph edges despite a correct DOM Range.
 - Native-handle fixtures need real long-press/drag events with both

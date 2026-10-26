@@ -963,6 +963,20 @@ function sasayakiWrappers(reader) {
     return currentScreen(reader).querySelectorAll('.hoshi-sasayaki-cue');
 }
 
+test('visual novel sanitizes the displayed screen after media setup and before offsets', async () => {
+    const { reader, window } = await initializeReader(bodyWith(p('本文。')));
+    const events = [];
+    reader.setupReaderImages = () => events.push('media');
+    window.hoshiReaderLayoutSemantics.sanitizeInlineBlocks = (scope, vertical) => {
+        assert.equal(scope, reader.screen);
+        assert.equal(vertical, true);
+        events.push('layout');
+    };
+    reader.buildNodeOffsets = () => events.push('offsets');
+    reader.renderScreen(0, true);
+    assert.deepEqual(events, ['media', 'layout', 'offsets']);
+});
+
 test('visual novel initialization sanitizes attached source after fonts and images before building screens', async () => {
     let resolveFonts;
     let resolveImages;

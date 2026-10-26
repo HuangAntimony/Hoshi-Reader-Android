@@ -32,6 +32,7 @@ class TestElement {
     constructor(tagName, rect = {}) {
         this.tagName = tagName.toUpperCase();
         this.childNodes = [];
+        this.textContent = '';
         this.parentNode = null;
         this.style = new TestStyle();
         this.attributes = new Map();
@@ -52,6 +53,10 @@ class TestElement {
         child.parentNode = this;
         this.childNodes.push(child);
         return child;
+    }
+
+    get children() {
+        return this.childNodes.filter((child) => child.tagName);
     }
 
     getAttribute(name) {
@@ -75,6 +80,8 @@ class TestElement {
         const visit = (node) => {
             node.childNodes.forEach((child) => {
                 if (selector === 'p' && child.tagName === 'P') result.push(child);
+                if (selector === '*') result.push(child);
+                if (selector === 'img, svg' && ['IMG', 'SVG'].includes(child.tagName)) result.push(child);
                 if (selector === 'span:empty' && child.tagName === 'SPAN' && child.childNodes.length === 0) {
                     result.push(child);
                 }
@@ -94,6 +101,7 @@ function loadLayoutSemantics(elements, body) {
     const document = {
         body,
         querySelectorAll(selector) {
+            if (selector === 'p') return elements.filter((element) => element.tagName === 'P');
             if (selector === 'div, span') {
                 return elements.filter((element) => element.tagName === 'DIV' || element.tagName === 'SPAN');
             }
@@ -222,4 +230,102 @@ test('layout sanitizer preserves semantic anchors, publisher art, and nested emp
     assert.equal(art.style.getPropertyValue('display'), '');
     assert.equal(generatedArt.style.getPropertyValue('display'), '');
     assert.equal(nestedEmpty.style.getPropertyValue('display'), '');
+});
+
+function imageParagraph({ vertical = true, size = 371, margin = 27, text = '', gaiji = false, generated = false, classified = true } = {}) {
+    const body = new TestElement('body');
+    body.clientWidth = 384;
+    body.clientHeight = 789;
+    body.computed.paddingLeft = '6px';
+    body.computed.paddingRight = '6px';
+    const paragraph = new TestElement('p');
+    paragraph.textContent = text;
+    paragraph.setAttribute('id', 'picture-anchor');
+    paragraph.computed.marginLeft = paragraph.computed.marginRight = vertical ? `${margin}px` : '0px';
+    paragraph.computed.marginTop = paragraph.computed.marginBottom = vertical ? '0px' : `${margin}px`;
+    const link = paragraph.appendChild(new TestElement('a'));
+    link.setAttribute('href', 'image.jpg');
+    if (generated) link.beforeComputed = { content: '"Caption"' };
+    const image = link.appendChild(new TestElement('img', vertical ? { width: size, height: 186 } : { width: 300, height: size }));
+    image.setAttribute('class', gaiji ? 'gaiji' : classified ? 'block-img' : '');
+    image.naturalWidth = 2048;
+    image.naturalHeight = 1028;
+    const { document, layout } = loadLayoutSemantics([paragraph, link, image], body);
+    layout.sanitizeInlineBlocks(document, vertical);
+    return { paragraph, image, link };
+}
+
+test('overflowing image-only paragraphs lose only their block-axis margins without replacing nodes', () => {
+    for (const vertical of [true, false]) {
+        const { paragraph, image, link } = imageParagraph({ vertical, size: vertical ? 371 : 780 });
+        for (const edge of vertical ? ['left', 'right'] : ['top', 'bottom']) {
+            assert.equal(paragraph.style.getPropertyValue(`margin-${edge}`), '0px');
+            assert.equal(paragraph.style.getPropertyPriority(`margin-${edge}`), 'important');
+        }
+        assert.equal(paragraph.getAttribute('id'), 'picture-anchor');
+        assert.equal(link.childNodes[0], image);
+        assert.equal(link.getAttribute('href'), 'image.jpg');
+    }
+});
+
+test('image paragraphs preserve fitting margins, mixed text, gaiji, and generated captions', () => {
+    for (const options of [{ size: 250 }, { text: 'Caption' }, { gaiji: true }, { generated: true }]) {
+        const { paragraph } = imageParagraph(options);
+        assert.equal(paragraph.style.getPropertyValue('margin-left'), '');
+        assert.equal(paragraph.style.getPropertyValue('margin-right'), '');
+    }
+});
+
+test('VN source images are sanitized before the displayed clone receives its media class', () => {
+    const { paragraph } = imageParagraph({ classified: false });
+    assert.equal(paragraph.style.getPropertyValue('margin-left'), '0px');
+});
+
+test('image overflow without positive block margins preserves the publisher margins', () => {
+    for (const margin of [0, -10]) {
+        const { paragraph } = imageParagraph({ size: 450, margin });
+        assert.equal(paragraph.style.getPropertyValue('margin-left'), '');
+        assert.equal(paragraph.style.getPropertyValue('margin-right'), '');
+    }
+});
+
+test('layout sanitizer uses the displayed VN screen content bounds when given an element scope', () => {
+    const body = new TestElement('body');
+    body.clientWidth = body.clientHeight = 1000;
+    const screen = new TestElement('div');
+    screen.clientWidth = 384;
+    screen.clientHeight = 789;
+    screen.computed.paddingLeft = screen.computed.paddingRight = '6px';
+    const paragraph = screen.appendChild(new TestElement('p'));
+    paragraph.computed.marginLeft = paragraph.computed.marginRight = '27px';
+    const image = paragraph.appendChild(new TestElement('img', { width: 371, height: 186 }));
+    image.setAttribute('class', 'block-img');
+    const { layout } = loadLayoutSemantics([screen, paragraph, image], body);
+    layout.sanitizeInlineBlocks(screen, true);
+    assert.equal(paragraph.style.getPropertyValue('margin-left'), '0px');
+    assert.equal(paragraph.style.getPropertyValue('margin-right'), '0px');
+});
+
+test('a compact image-only inline wrapper uses the full line for centering and drops its empty strut', () => {
+    const body = new TestElement('body');
+    body.clientWidth = 384;
+    body.clientHeight = 812;
+    const parent = new TestElement('section');
+    const strut = parent.appendChild(new TestElement('span'));
+    strut.computed.display = 'inline-block';
+    const wrapper = parent.appendChild(new TestElement('div', { width: 371, height: 523 }));
+    wrapper.computed.display = 'inline-block';
+    const paragraph = wrapper.appendChild(new TestElement('p'));
+    paragraph.setAttribute('id', 'cover');
+    const imageBox = paragraph.appendChild(new TestElement('span', { width: 371, height: 481 }));
+    imageBox.computed.display = 'inline-block';
+    const image = imageBox.appendChild(new TestElement('img', { width: 371, height: 523 }));
+    image.setAttribute('class', 'block-img');
+    const { document, layout } = loadLayoutSemantics([strut, wrapper, paragraph, imageBox, image], body);
+    layout.sanitizeInlineBlocks(document, true);
+    assert.equal(wrapper.style.getPropertyValue('display'), 'block');
+    assert.equal(strut.style.getPropertyValue('display'), 'none');
+    assert.equal(paragraph.getAttribute('id'), 'cover');
+    assert.equal(imageBox.style.getPropertyValue('height'), 'auto');
+    assert.equal(imageBox.childNodes[0], image);
 });
