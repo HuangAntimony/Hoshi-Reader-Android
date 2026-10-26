@@ -89,11 +89,13 @@ window.hoshiReader = {
   buildNodeOffsets: function() {
     var offsets = new WeakMap();
     var rawOffsets = new WeakMap();
-    var walker = this.createWalker();
+    // Whole-chapter scans filter in JS to avoid a native-to-JS callback per node.
+    var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
     var count = 0;
     var rawCount = 0;
     var node;
     while (node = walker.nextNode()) {
+      if (this.isFurigana(node)) continue;
       offsets.set(node, count);
       rawOffsets.set(node, rawCount);
       count += this.countChars(node.textContent);
@@ -463,16 +465,17 @@ __HOSHI_READER_SASAYAKI_SCRIPT__
     var progressStops = [];
     var exploredChars = 0;
     var totalChars = 0;
-    var walker = this.createWalker();
+    var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
     var node;
     while (node = walker.nextNode()) {
+      if (this.isFurigana(node)) continue;
       var nodeLen = this.countChars(node.textContent);
       totalChars += nodeLen;
       if (nodeLen <= 0) continue;
       var range = document.createRange();
       range.selectNodeContents(node);
       var rects = range.getClientRects();
-      var progressRect = this.getRect(range);
+      var progressRect = rects[0] || range.getBoundingClientRect();
       var nodeStartEdge = progressRect && progressRect.width > 0 && progressRect.height > 0
         ? (context.vertical ? progressRect.top : progressRect.left) + currentScroll
         : null;
@@ -676,6 +679,7 @@ window.hoshiReader.initialize = function() {
   document.body.appendChild(spacer);
   window.hoshiReader.normalizeRubyTextNodes();
   window.hoshiReader.stabilizeRubyAdjacentTextNodes();
+  window.hoshiReaderDocumentPreparation?.resume();
   Promise.all([
     Promise.resolve(document.fonts && document.fonts.ready),
     imageSetupPromise

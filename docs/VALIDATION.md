@@ -170,6 +170,15 @@ Select the intended `appassets.androidplatform.net` target. VN readiness is
 Check `calculateProgress()` after restore and pair it with screenshots for blank
 or incorrect content. Collect `Performance.getMetrics` and a focused CDP CPU
 profile; identify app-owned callers and self/inclusive time.
+Measure latency again without tracing: detailed DevTools timeline events can
+inflate native-to-JavaScript callback costs, especially filtered TreeWalker
+scans. Use separate CPU samples for attribution and compare complete pagination
+metrics and raw/matchable node offsets when optimizing chapter traversal.
+For sparse or variable-frame-rate device recordings, inspect decoded source
+frames with their presentation timestamps. Resampling to a fixed frame rate can
+omit the short final frame that first shows the page; confirm visible-paint timing
+against the original frames, not only an `fps`-filtered contact sheet. Software
+recordings do not measure an E-ink panel's physical refresh completion.
 
 | Signal | Next measurement |
 | --- | --- |
@@ -198,6 +207,12 @@ instrumentation procedure above. It checks generated stylesheet output and a
 generous latency budget without opening an Activity or accessing user data.
 Run this on Android: host JVM timings do not expose the repeated whole-input ICU
 initialization caused by Kotlin's transforming `Regex.replace` match iteration.
+
+`ReaderDocumentPreparationWebViewTest` exercises document-start layout deferral
+and its no-hook fallback with generated HTML/XHTML, all three modes and both
+writing directions. It checks hidden initial geometry, restored text/progress and
+painted image pixels without using books or preferences. The deferred case needs
+`DOCUMENT_START_SCRIPT` support; the fallback runs independently.
 
 ## Specialized build and service setup
 

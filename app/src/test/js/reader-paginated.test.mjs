@@ -600,6 +600,90 @@ function rubyParagraphWithWhitespaceTextNodes() {
     return { paragraph, ruby };
 }
 
+for (const method of ['buildNodeOffsets', 'buildPaginationMetrics']) {
+    test(`paginated ${method} scans ruby text without native walker filter callbacks`, () => {
+        const body = new TestElement('body');
+        body.appendChild(new TestText('𠮟가、'));
+        const ruby = new TestElement('ruby');
+        const base = new TestText('한글');
+        ruby.appendChild(base);
+        const annotations = [];
+        for (const tag of ['rt', 'rp']) {
+            const annotation = new TestElement(tag);
+            const nested = new TestElement('span');
+            const text = new TestText('reading');
+            nested.appendChild(text);
+            annotation.appendChild(nested);
+            ruby.appendChild(annotation);
+            annotations.push(text);
+        }
+        body.appendChild(ruby);
+        const tail = new TestText(' ㄱㆎA');
+        body.appendChild(tail);
+        const { reader, document } = loadReader(body);
+        reader.pageHeight = 800;
+        reader.pageWidth = 480;
+        let filterCalls = 0;
+        const createTreeWalker = document.createTreeWalker;
+        document.createTreeWalker = (root, whatToShow, filter) => createTreeWalker(root, whatToShow,
+            filter && { acceptNode(node) { filterCalls += 1; return filter.acceptNode(node); } });
+
+        const metrics = reader[method]();
+
+        if (method === 'buildNodeOffsets') {
+            assert.equal(reader.nodeStartOffsets.get(base), 2);
+            assert.equal(reader.nodeStartRawOffsets.get(base), 3);
+            assert.equal(reader.nodeStartOffsets.get(tail), 4);
+            assert.equal(reader.nodeStartRawOffsets.get(tail), 5);
+            for (const annotation of annotations) {
+                assert.equal(reader.nodeStartOffsets.has(annotation), false);
+                assert.equal(reader.nodeStartRawOffsets.has(annotation), false);
+            }
+        } else {
+            assert.equal(metrics.totalChars, 7);
+        }
+        assert.equal(filterCalls, 0, 'whole-chapter scans must avoid per-node native-to-JS filter calls');
+    });
+}
+
+for (const vertical of [true, false]) {
+    test(`paginated metrics reuse text rectangles with vertical=${vertical}`, () => {
+        const body = new TestElement('body');
+        for (const text of ['前', '隠', '後']) body.appendChild(new TestText(text));
+        const { reader, document } = loadReader(body);
+        reader.getScrollContext = () => ({ vertical, pageSize: 800, maxScroll: 3200 });
+        reader.getPagePosition = () => 100;
+        const rects = [
+            [testRect(10, 30, 10, 30), testRect(810, 830, 810, 830)],
+            [],
+            [testRect(1610, 1630, 1610, 1630)],
+        ];
+        const reads = [0, 0, 0];
+        let fallbackReads = 0;
+        document.createRange = () => {
+            let index;
+            return {
+                selectNodeContents(node) { index = body.childNodes.indexOf(node); },
+                getClientRects() { reads[index] += 1; return rects[index]; },
+                getBoundingClientRect() {
+                    assert.equal(index, 1, 'bounding fallback is only needed for an empty rect list');
+                    fallbackReads += 1;
+                    return testRect(0, 0, 0, 0);
+                },
+            };
+        };
+
+        const metrics = reader.buildPaginationMetrics();
+
+        assert.deepEqual(JSON.parse(JSON.stringify(metrics)), {
+            minScroll: 0, maxScroll: 1600, totalChars: 3,
+            progressStops: [{ scroll: 110, exploredChars: 1 }, { scroll: 1710, exploredChars: 3 }],
+        });
+        assert.deepEqual(reads, [1, 1, 1]);
+        assert.equal(fallbackReads, 1);
+    });
+}
+
 function imgAt(top, bottom, left = 0, right = 20) {
     const img = new TestElement('img');
     img.rect = testRect(top, bottom, left, right);

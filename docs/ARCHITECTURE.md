@@ -214,6 +214,7 @@ dynamic configuration and bridge calls.
 | `reader-dom-text.js` | Live DOM ruby normalization, selected body-text slices and Sasayaki structural boundaries | Paginated/continuous normalization; selection and Sasayaki adapters across modes |
 | `reader-media-semantics.js` | Image/gaiji setup, SVG ratio, blur/tint, tap bridge, scoped loading and image-hold eligibility | All three modes |
 | `reader-layout-semantics.js` | Publisher inline-block/empty-strut sanitation, pure-image wrapper centering and overflowing image paragraph margins | All three modes before offsets/restore; VN also sanitizes displayed clones after media setup |
+| `reader-document-preparation.js` | Defer initial publisher layout until reader viewport/styles are installed | Chapter WebView document-start hook; all modes resume before content geometry/font readiness |
 | `reader-paginated.js` | Columns, snapping, page metrics and page restore | Paginated |
 | `reader-continuous.js` | Inset body scrolling, viewport bounds and scroll restore | Continuous |
 | `reader-visual-novel.js` | Block/sentence screens, fitting, reveal, cross-screen cue merge and navigation | VN |
@@ -224,6 +225,9 @@ dynamic configuration and bridge calls.
 
 - Raw code-point offsets, normalized matchable offsets and DOM UTF-16 positions
   are different coordinate systems. Convert through the owning index/projection.
+- VN's detached content stream caches media units for the source snapshot;
+  consumers treat the list and descriptors as read-only. Source changes require
+  `rebuild()`, which invalidates media discovery alongside text indexes.
 - VN lookup/mining uses complete source sentences; the current clone supplies
   hit testing, visible ranges and anchors only. Paginated/continuous do not
   consume VN stream/range-map instances. New sharing requires equivalent
@@ -237,6 +241,12 @@ dynamic configuration and bridge calls.
 - `ReaderWebViewStateHolder` owns document/restore generations. Stale bridge
   callbacks cannot alter a replacement document. Renderer recovery preserves
   the latest accepted position and rebuilds WebView-local state.
+- `HoshiReaderWebView` installs one document-start preparation script when supported
+  and removes it on release. It only defers top-level `/epub/` documents at the
+  appassets origin, preserving the publisher's inline display property. Mode
+  initialization resumes layout before measuring content geometry or awaiting fonts;
+  the existing restore/visual-state gate still controls visibility. Unsupported
+  WebViews retain the ordinary initialization path.
 - DOM selection state owns the navigation lock. `blocked` is distinct from a
   chapter-boundary `limit` result.
 - Reader, Dictionary and Process Text use the same iframe popup host and native

@@ -238,6 +238,65 @@ test('content stream records standalone media units in source order', () => {
     );
 });
 
+for (const withMedia of [false, true]) {
+    test(`content stream reuses media discovery until rebuilding (withMedia=${withMedia})`, () => {
+        const image = el('img', { id: 'plate', src: 'plate.jpg' });
+        const root = el('section', {}, [el('p', {}, ['前']), ...(withMedia ? [image] : [])]);
+        const stream = loadContentStreamModule().create(root);
+        const children = root.childNodes;
+        let sourceReads = 0;
+        Object.defineProperty(root, 'childNodes', {
+            get() { sourceReads += 1; return children; },
+        });
+        const first = stream.mediaUnits();
+        assert.equal(first.length, withMedia ? 1 : 0);
+        assert.ok(sourceReads > 0);
+        sourceReads = 0;
+
+        for (let i = 0; i < 5; i += 1) {
+            assert.deepEqual(stream.mediaUnits(), first);
+        }
+        assert.equal(sourceReads, 0, 'repeated media queries must not walk the source again');
+
+        const added = el('svg', { id: 'added' }, [el('image', { href: 'new.jpg' })]);
+        root.appendChild(added);
+        stream.rebuild();
+        const rebuilt = stream.mediaUnits();
+        assert.equal(rebuilt.length, withMedia ? 2 : 1);
+        assert.equal(rebuilt.at(-1).mediaNode, added);
+        assert.equal(rebuilt.at(-1).startChar, 1);
+        assert.ok(rebuilt.at(-1).ids.has('added'));
+    });
+}
+
+test('content stream text traversal prunes ignored subtrees without rechecking every ancestor', () => {
+    const hidden = text('無視');
+    const annotation = el('rt', {}, [el('span', {}, [hidden])]);
+    let branch = el('p', {}, [text('𠮟'), annotation, text('後')]);
+    const nodes = [branch, ...branch.childNodes, annotation.childNodes[0], hidden];
+    for (let i = 0; i < 48; i += 1) {
+        branch = el('div', {}, [branch]);
+        nodes.push(branch);
+    }
+    const stream = loadContentStreamModule().create(branch);
+    let parentReads = 0;
+    for (const node of nodes) {
+        const parent = node.parentNode;
+        Object.defineProperty(node, 'parentNode', {
+            get() { parentReads += 1; return parent; },
+        });
+    }
+    const visited = [];
+    stream.walkTextNodes(branch, node => visited.push(node.textContent));
+    assert.deepEqual(visited, ['𠮟', '後']);
+    assert.ok(parentReads <= nodes.length * 2, `ancestor checks should be linear, got ${parentReads}`);
+
+    const ignored = [];
+    stream.walkTextNodes(hidden, node => ignored.push(node));
+    stream.walkTextNodes(annotation.childNodes[0], node => ignored.push(node));
+    assert.deepEqual(ignored, []);
+});
+
 test('content stream keeps figure media as the render root', () => {
     const image = el('img', { id: 'inner', src: 'plate.jpg' });
     const figure = el('figure', { id: 'fig' }, [image]);

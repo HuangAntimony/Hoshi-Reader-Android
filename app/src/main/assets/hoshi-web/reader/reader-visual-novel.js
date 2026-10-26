@@ -205,6 +205,7 @@ window.hoshiReader = {
   initialize: function() {
     if (this.readyPromise) return this.readyPromise;
     window.hoshiReaderViewport.ensureDeviceViewport();
+    window.hoshiReaderDocumentPreparation?.resume();
     this.readyPromise = Promise.resolve(document.fonts && document.fonts.ready)
       .then(() => {
         return this.waitForImages(document.body);

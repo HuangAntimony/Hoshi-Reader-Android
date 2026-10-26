@@ -521,6 +521,7 @@ window.hoshiReader.initialize = function() {
   style.setProperty('--hoshi-continuous-top', (window.innerHeight * __HOSHI_CONTINUOUS_VERTICAL_PADDING_RATIO__) + 'px');
   style.setProperty('--hoshi-continuous-width', (window.innerWidth * (1 - 2 * __HOSHI_CONTINUOUS_HORIZONTAL_PADDING_RATIO__)) + 'px');
   style.setProperty('--hoshi-continuous-height', (window.innerHeight * (1 - 2 * __HOSHI_CONTINUOUS_VERTICAL_PADDING_RATIO__)) + 'px');
+  window.hoshiReaderDocumentPreparation?.resume();
   var viewport = window.hoshiReader.contentViewport();
   document.documentElement.style.setProperty('--hoshi-vertical-padding-block', (viewport.height * __HOSHI_VERTICAL_PADDING_BLOCK_RATIO__) + 'px');
   document.documentElement.style.setProperty('--hoshi-vertical-padding-gap', (viewport.height * __HOSHI_VERTICAL_PADDING_GAP_RATIO__) + 'px');

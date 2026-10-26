@@ -273,6 +273,7 @@
 
     rebuild: function() {
       this.cachedSasayakiTextIndex = null;
+      this.cachedMediaUnits = null;
       this.textEntries = [];
       this.sourceTextOffsets = new WeakMap();
       this.sourceTextRawOffsets = new WeakMap();
@@ -327,15 +328,18 @@
 
     walkTextNodes: function(root, visit) {
       if (!root || isIgnoredNode(root, this.root)) return;
-      if (root.nodeType === TEXT_NODE) {
-        visit(root);
-        return;
-      }
-      if (!isContainerNode(root)) return;
-      var children = childrenOf(root);
-      for (var i = 0; i < children.length; i++) {
-        this.walkTextNodes(children[i], visit);
-      }
+      // Once the starting ancestry is accepted, prune ignored subtrees locally.
+      // Rechecking the full ancestry for every descendant scales with tree depth.
+      var walk = function(node) {
+        if (node.nodeType === TEXT_NODE) {
+          visit(node);
+          return;
+        }
+        if (!isContainerNode(node) || ignoredTags.has(tagName(node))) return;
+        var children = childrenOf(node);
+        for (var i = 0; i < children.length; i++) walk(children[i]);
+      };
+      walk(root);
     },
 
     updateSourceNodeStats: function(node, entry) {
@@ -494,6 +498,9 @@
     },
 
     mediaUnits: function() {
+      // The detached source is stable until rebuild; every image screen shares
+      // this discovery pass instead of walking the whole chapter again.
+      if (this.cachedMediaUnits) return this.cachedMediaUnits;
       var result = [];
       var visit = (function(node) {
         if (!node || isIgnoredNode(node, this.root)) return;
@@ -523,6 +530,7 @@
       result.sort(function(a, b) {
         return a.preorder - b.preorder;
       });
+      this.cachedMediaUnits = result;
       return result;
     },
 
