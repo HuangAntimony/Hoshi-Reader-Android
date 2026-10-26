@@ -15,6 +15,27 @@ import org.junit.rules.TemporaryFolder
 
 class OnlineTtsEngineTest {
     @get:Rule val folder = TemporaryFolder()
+
+    @Test fun edgeCatalogAndSynthesisSendV2TokensAndMatchingVersion() = runBlocking {
+        val requests = mutableListOf<Request>()
+        val engine = engine { request ->
+            requests += request
+            if (request.url.encodedPath.endsWith("/voices/list"))
+                200 to """[{"Locale":"ja-JP","ShortName":"ja-JP-NanamiNeural"}]""".toByteArray()
+            else 403 to ByteArray(0)
+        }
+        val error = runCatching {
+            engine.synthesize("接続テスト。", TtsSettings(engine = TtsOnlineSource.Edge.id), folder.root)
+        }.exceptionOrNull() as TtsException
+        assertEquals(TtsFailure.Authentication, error.failure)
+        assertEquals(listOf("/consumer/speech/synthesize/readaloud/voices/list",
+            "/consumer/speech/synthesize/readaloud/edge/v1"), requests.map { it.url.encodedPath })
+        for (request in requests) {
+            assertEquals("2-143.0.3650.75", request.url.queryParameter("Sec-MS-GEC-Version"))
+            assertTrue(request.url.queryParameter("Sec-MS-GEC")!!.matches(Regex("[0-9A-F]{16}-[0-9A-F]{64}")))
+        }
+    }
+
     private val wav: ByteArray get() = ByteBuffer.allocate(48).order(ByteOrder.LITTLE_ENDIAN).apply {
         put("RIFF".toByteArray()); putInt(40); put("WAVEfmt ".toByteArray()); putInt(16)
         putShort(1); putShort(1); putInt(24000); putInt(48000); putShort(2); putShort(16)

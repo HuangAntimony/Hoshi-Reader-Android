@@ -132,7 +132,7 @@ class OnlineTtsEngine internal constructor(
         val url = (OnlineTtsProtocol.edgeBase + path).toHttpUrl().newBuilder()
             .addQueryParameter("TrustedClientToken", OnlineTtsProtocol.edgeToken)
             .addQueryParameter("Sec-MS-GEC", OnlineTtsProtocol.edgeGec(System.currentTimeMillis() / 1000))
-            .addQueryParameter("Sec-MS-GEC-Version", "1-${OnlineTtsProtocol.edgeVersion}")
+            .addQueryParameter("Sec-MS-GEC-Version", "2-${OnlineTtsProtocol.edgeVersion}")
         if (socket) url.addQueryParameter("ConnectionId", UUID.randomUUID().toString().replace("-", ""))
         return Request.Builder().url(url.build())
             .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0")

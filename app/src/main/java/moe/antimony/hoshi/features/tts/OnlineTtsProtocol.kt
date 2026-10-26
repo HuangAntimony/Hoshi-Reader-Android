@@ -1,6 +1,5 @@
 package moe.antimony.hoshi.features.tts
 
-import java.security.MessageDigest
 import java.util.Base64
 import kotlinx.serialization.json.*
 import kotlin.math.roundToInt
@@ -127,12 +126,7 @@ internal object OnlineTtsProtocol {
         throw TtsException(TtsFailure.InvalidResponse)
     }
 
-    fun edgeGec(unixSeconds: Long): String {
-        val seconds = unixSeconds + 11_644_473_600L
-        val ticks = (seconds - seconds % 300) * 10_000_000L
-        return MessageDigest.getInstance("SHA-256").digest("$ticks$edgeToken".toByteArray())
-            .joinToString("") { "%02X".format(it) }
-    }
+    fun edgeGec(unixSeconds: Long): String = EdgeTtsToken.generate(unixSeconds, edgeToken)
 
     fun edgeAudio(frame: ByteArray): ByteArray {
         if (frame.size < 2) throw TtsException(TtsFailure.InvalidResponse)

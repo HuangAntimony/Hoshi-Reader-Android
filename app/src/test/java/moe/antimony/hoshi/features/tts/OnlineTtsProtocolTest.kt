@@ -5,6 +5,26 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class OnlineTtsProtocolTest {
+    @Test fun edgeV2TokenMatchesBrowserCaptureAndUpstreamVectors() {
+        // Browser capture: https://github.com/rany2/edge-tts/pull/492
+        // Remaining vectors: edge-tts 7.3.1, including the next window and post-2038 time.
+        val vectors = listOf(
+            1_791_888_000L to "492D7694A183A45E-56E821F95D4579C5B7C7E33DC7303FF379EC36D510213555BBBB9EB17EF15876",
+            1_791_888_300L to "6D26B5F5B70269AD-280E82E1BBE24E4E8866E3502EB6277B9436F61ABDC1C224518A038BBD7BBDAD",
+            1_793_037_600L to "854DFD8C38425A55-2A1C787288C73B0E8403376D6BC9D96603287CB3292EEEF10D458FCAB18871DF",
+            4_102_444_800L to "DD230DB44FEE2FD7-DA0D4FA797866E36C992FABB81DD2F9DB37EB74D675D63228277003DCD3F9F8C",
+        )
+        for ((seconds, token) in vectors) assertEquals("Unix seconds: $seconds", token, OnlineTtsProtocol.edgeGec(seconds))
+    }
+
+    @Test fun edgeV2TokenUsesThePrecedingFiveMinuteWindow() {
+        val token = "492D7694A183A45E-56E821F95D4579C5B7C7E33DC7303FF379EC36D510213555BBBB9EB17EF15876"
+        assertEquals(token, OnlineTtsProtocol.edgeGec(1_791_888_000L))
+        assertEquals(token, OnlineTtsProtocol.edgeGec(1_791_888_299L))
+        assertEquals("DAAEAD2FD5438630-897933E9C951AADAA0A792FFD23FBB12339BBBBA71EA7BF84FFA0C777C3C9550",
+            OnlineTtsProtocol.edgeGec(1_791_887_999L))
+    }
+
     @Test fun literalReplacementsAreEscapedForMicrosoftSpeech() {
         val sentence = TtsText.chapter(0, "<p>待って――まだ……続く。</p>").single()
         val rules = listOf(TtsWord("dash", "――", "、"), TtsWord("ellipsis", "……", "、<break/>"))
