@@ -886,7 +886,7 @@ private fun LazyGridScope.googleDriveSection(
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
-private fun BooksTab(
+internal fun BooksTab(
     layoutSpec: MainShellLayoutSpec,
     bookEntries: List<BookEntry>,
     remoteBookEntries: List<RemoteBookEntry>,

@@ -111,6 +111,11 @@ Stop the fixture and remove only this reverse mapping after testing.
 
 ## WebView and UI automation pitfalls
 
+- `BookshelfImportProgressTest` renders the real shelf with a scratch `SyncStorage`
+  and generated books, without accessing the installed library or Drive account.
+  It checks standard/E-ink import progress across the real reload timer and saves
+  screenshots under the debug app's `cache/import-progress-evidence/` directory.
+
 - Material 3 `ModalBottomSheet` applies its caller modifier before the internal
   sheet offset; an outer `border` can remain on the scrim at the unshifted height.
   Check short and shrinking E-ink sheets, not only full-height lists.

@@ -160,6 +160,10 @@ Validation guidance and failure injection methods are in
   when needed by sync/statistics, not eagerly under the startup storage lock.
   A live directory with a deleted sync record is marked pending during preparation
   so the next sync reapplies its state even when the remote version is cached.
+- `BookshelfViewModel` owns import progress from folder scanning through the final
+  shelf load. Background reloads cannot clear or replace that progress; local/sync
+  notifications during import are coalesced into the final refresh, with changes
+  arriving during that load refreshed afterward. Cloud transfers continue normally.
 - `BookStatisticsStore` is the shared owner for reader sessions, edits, sync and
   archive/restore. UUID-keyed nullable records retain deletions; daily totals
   derive from sessions and reset time. `Books/statistics_archive/` participates

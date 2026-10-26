@@ -12,6 +12,11 @@ internal class SyncReloadScheduler(
 ) {
     private var task: Job? = null
 
+    fun cancel() {
+        task?.cancel()
+        task = null
+    }
+
     fun schedule() {
         if (task != null) return
         task = scope.launch {

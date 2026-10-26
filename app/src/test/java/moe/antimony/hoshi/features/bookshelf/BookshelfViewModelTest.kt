@@ -27,10 +27,215 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.test.resetMain
+import moe.antimony.hoshi.epub.BookRepository
+import moe.antimony.hoshi.features.sync.SyncStorage
 
 class BookshelfViewModelTest {
     @Before fun clearDiagnostics() { ErrorDiagnosticEvents.buffer.drain() }
     @After fun drainDiagnostics() { ErrorDiagnosticEvents.buffer.drain() }
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    @Test fun localImportNotificationsKeepBatchProgressAndRefreshOnlyAtCompletion() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(dispatcher)
+        val root = java.nio.file.Files.createTempDirectory("hoshi-import-notifications").toFile()
+        val books = BookRepository(root, dispatcher)
+        val storage = SyncStorage(root, books, dispatcher)
+        storage.syncEnabled = { false }
+        val repository = FakeBookshelfRepository()
+        val viewModel = BookshelfViewModel(repository, storage)
+        val gates = List(3) { CompletableDeferred<Unit>() }
+        var imported = 0
+        try {
+            runCurrent()
+            viewModel.reloadBookEntries()
+            runCurrent()
+            viewModel.importBooks((0..2).map { index ->
+                PendingBookImport("content://fixture/book-$index.epub", "book-$index.epub") {
+                    gates[index].await()
+                    val bookRoot = books.createBookDirectory("book-$index")
+                    val metadata = BookMetadata(java.util.UUID.randomUUID().toString(), "Book $index", folder = bookRoot.name, epub = "book.epub", lastAccess = 0.0)
+                    books.saveMetadata(bookRoot, metadata)
+                    bookRoot.resolve("book.epub").writeText("fixture payload")
+                    repository.entries = repository.entries + BookEntry(bookRoot, metadata)
+                    storage.handleBookImport(metadata, bookRoot)
+                    imported++
+                    metadata.id
+                }
+            })
+            runCurrent()
+            assertTrue(viewModel.uiState.value.isLoading)
+            assertEquals("Importing 1 / 3...", viewModel.uiState.value.blockingProgressMessage.testString())
+
+            gates[0].complete(Unit)
+            runCurrent()
+            assertEquals("Importing 2 / 3...", viewModel.uiState.value.blockingProgressMessage.testString())
+            advanceTimeBy(1_999)
+            runCurrent()
+            assertTrue(viewModel.uiState.value.isLoading)
+            advanceTimeBy(1)
+            runCurrent()
+            assertEquals(1, imported)
+            assertTrue(viewModel.uiState.value.isLoading)
+            assertEquals("Importing 2 / 3...", viewModel.uiState.value.blockingProgressMessage.testString())
+            assertEquals(1, repository.loadRequests.size)
+            assertTrue(viewModel.uiState.value.bookEntries.isEmpty())
+
+            gates[1].complete(Unit)
+            runCurrent()
+            assertEquals(2, imported)
+            assertEquals("Importing 3 / 3...", viewModel.uiState.value.blockingProgressMessage.testString())
+            assertTrue(viewModel.uiState.value.isLoading)
+            advanceTimeBy(2_000)
+            runCurrent()
+            assertEquals(2, imported)
+            assertEquals("Importing 3 / 3...", viewModel.uiState.value.blockingProgressMessage.testString())
+            assertEquals(1, repository.loadRequests.size)
+            assertTrue(viewModel.uiState.value.bookEntries.isEmpty())
+
+            gates[2].complete(Unit)
+            runCurrent()
+            assertEquals(3, imported)
+            assertEquals(3, viewModel.uiState.value.bookEntries.size)
+            assertNull(viewModel.uiState.value.blockingProgressMessage)
+            advanceTimeBy(2_000)
+            runCurrent()
+            assertEquals(2, repository.loadRequests.size)
+            // A fast import consumes an already scheduled refresh instead of reloading twice.
+            storage.notifyBooksChanged()
+            runCurrent()
+            viewModel.importBook("content://fixture/fast.epub") { "fast" }
+            runCurrent()
+            assertEquals(3, repository.loadRequests.size)
+            advanceTimeBy(2_000)
+            runCurrent()
+            assertEquals(3, repository.loadRequests.size)
+            // Notifications after the import still refresh normally.
+            storage.notifyBooksChanged()
+            runCurrent()
+            advanceTimeBy(2_000)
+            runCurrent()
+            assertEquals(4, repository.loadRequests.size)
+        } finally {
+            viewModel.viewModelScope.coroutineContext[Job]!!.cancelAndJoin()
+            Dispatchers.resetMain()
+            root.deleteRecursively()
+        }
+    }
+
+    @Test fun inFlightShelfReloadCannotDismissImportProgress() {
+        val loadGate = CompletableDeferred<Unit>()
+        val importGate = CompletableDeferred<Unit>()
+        val repository = FakeBookshelfRepository(loadPlans = ArrayDeque(listOf(
+            FakeBookshelfRepository.LoadPlan(loadGate, emptyList()),
+        )))
+        val viewModel = BookshelfViewModel(repository, testScope())
+        viewModel.reloadBookEntries()
+        viewModel.importBook("content://fixture/book.epub", "book.epub") {
+            importGate.await()
+            "imported"
+        }
+        loadGate.complete(Unit)
+        assertTrue(viewModel.uiState.value.isLoading)
+        assertEquals("Importing book.epub...", viewModel.uiState.value.blockingProgressMessage.testString())
+        importGate.complete(Unit)
+        assertFalse(viewModel.uiState.value.isLoading)
+        assertNull(viewModel.uiState.value.blockingProgressMessage)
+    }
+
+    @Test fun folderScanAndSingleImportKeepProgressUntilFinalRefreshFinishes() {
+        val scanGate = CompletableDeferred<Unit>()
+        val importGate = CompletableDeferred<Unit>()
+        val loadGate = CompletableDeferred<Unit>()
+        val repository = FakeBookshelfRepository(
+            migrationProgressEvents = listOf(LegacyBookMigrationProgress(1, 2)),
+            loadPlans = ArrayDeque(listOf(FakeBookshelfRepository.LoadPlan(loadGate, emptyList()))),
+        )
+        val viewModel = BookshelfViewModel(repository, testScope())
+        viewModel.importBookFolder {
+            scanGate.await()
+            listOf(PendingBookImport("content://fixture/book.epub", "book.epub") {
+                importGate.await()
+                "imported"
+            })
+        }
+        viewModel.reloadBookEntries()
+        assertTrue(repository.loadRequests.isEmpty())
+        assertTrue(viewModel.uiState.value.isLoading)
+        assertEquals("Scanning folder...", viewModel.uiState.value.blockingProgressMessage.testString())
+        scanGate.complete(Unit)
+        assertEquals("Importing book.epub...", viewModel.uiState.value.blockingProgressMessage.testString())
+        importGate.complete(Unit)
+        assertTrue(viewModel.uiState.value.isLoading)
+        assertEquals("Importing book.epub...", viewModel.uiState.value.blockingProgressMessage.testString())
+        loadGate.complete(Unit)
+        assertEquals(1, repository.loadRequests.size)
+        assertFalse(viewModel.uiState.value.isLoading)
+        assertNull(viewModel.uiState.value.blockingProgressMessage)
+    }
+
+    @Test fun failedFolderScanReleasesDeferredReloadAndAllowsAnotherImport() {
+        val scanGate = CompletableDeferred<Unit>()
+        val repository = FakeBookshelfRepository()
+        val viewModel = BookshelfViewModel(repository, testScope())
+        viewModel.importBookFolder {
+            scanGate.await()
+            throw IOException("Folder unavailable")
+        }
+        viewModel.reloadBookEntries()
+        assertTrue(repository.loadRequests.isEmpty())
+        scanGate.complete(Unit)
+        assertEquals(1, repository.loadRequests.size)
+        assertFalse(viewModel.uiState.value.isLoading)
+        assertNull(viewModel.uiState.value.blockingProgressMessage)
+        assertTrue(viewModel.uiState.value.errorMessage.testString()!!.contains("Folder unavailable"))
+        viewModel.importBook("content://fixture/book.epub", "book.epub") { "imported" }
+        assertEquals(2, repository.loadRequests.size)
+        assertNull(viewModel.uiState.value.errorMessage)
+    }
+
+    @Test fun reloadRequestedDuringFinalImportRefreshIsNotLost() {
+        val loadGate = CompletableDeferred<Unit>()
+        val repository = FakeBookshelfRepository(loadPlans = ArrayDeque(listOf(
+            FakeBookshelfRepository.LoadPlan(loadGate, emptyList()),
+        )))
+        val viewModel = BookshelfViewModel(repository, testScope())
+        viewModel.importBook("content://fixture/book.epub") { "imported" }
+        repository.entries = listOf(bookEntry("arrived-during-final-load"))
+        viewModel.reloadBookEntries()
+        assertEquals(1, repository.loadRequests.size)
+        loadGate.complete(Unit)
+        assertEquals(2, repository.loadRequests.size)
+        assertEquals(repository.entries, viewModel.uiState.value.bookEntries)
+        assertFalse(viewModel.uiState.value.isLoading)
+        assertNull(viewModel.uiState.value.blockingProgressMessage)
+    }
+
+    @Test fun cancellingBatchStopsFurtherImportsAndDoesNotReportAnImportFailure() {
+        val repository = FakeBookshelfRepository()
+        val viewModel = BookshelfViewModel(repository, testScope())
+        var secondImported = false
+        viewModel.importBooks(listOf(
+            PendingBookImport("cancelled") { throw CancellationException("Left bookshelf") },
+            PendingBookImport("second") { secondImported = true; "second" },
+        ))
+        assertFalse(secondImported)
+        assertNull(viewModel.uiState.value.errorMessage)
+        assertNull(viewModel.uiState.value.blockingProgressMessage)
+        assertFalse(viewModel.uiState.value.isLoading)
+        assertTrue(ErrorDiagnosticEvents.buffer.drain().isEmpty())
+        viewModel.importBook("retry") { "imported" }
+        assertEquals(1, repository.loadRequests.size)
+    }
 
     @Test fun manualSyncFailureReachesVisibleStateAndHistory() {
         val error = IOException("Could not fetch library", IOException("Connection reset"))
