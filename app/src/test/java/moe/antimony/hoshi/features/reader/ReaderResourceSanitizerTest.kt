@@ -7,6 +7,38 @@ import org.junit.Test
 
 class ReaderResourceSanitizerTest {
     @Test
+    fun replacementKeepsLiteralCssAndUnmatchedSectionsAcrossMultipleRules() {
+        val css = """
+            /* prefix */
+            .c1 {text-indent: 1em; content: '$1\path';}
+            .untouched {color: red;}
+            .calibre_2 {text-indent: -1em; content: '$2\tail';}
+            .annotation {
+              -epub-text-emphasis-style: '$3\mark';
+            }
+            .vertical {writing-mode: vertical-rl;color: blue;}
+            /* suffix */
+        """.trimIndent()
+        val expected = """
+            /* prefix */
+            .c1 { text-indent: 0; content: '$1\path';}
+            .untouched {color: red;}
+            .calibre_2 {text-indent: -1em; content: '$2\tail';}
+            .annotation {
+              -webkit-text-emphasis-style: '$3\mark';
+              text-emphasis-style: '$3\mark';
+            }
+            .vertical {color: blue;}
+            /* suffix */
+        """.trimIndent()
+
+        assertEquals(expected, sanitizeReaderCss(css))
+        assertEquals("", sanitizeReaderCss(""))
+        assertEquals("p { color: red; }", sanitizeReaderCss("p { color: red; }"))
+        assertEquals(".c1 {color: red}", sanitizeReaderCss(".c1 {color: red}"))
+    }
+
+    @Test
     fun cssSanitizerNormalizesKnownEpubPrivateDeclarationsBeforeWebViewRendering() {
         val css = """
             .h-valign-width {

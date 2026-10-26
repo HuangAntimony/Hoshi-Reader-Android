@@ -1,5 +1,7 @@
 package moe.antimony.hoshi.features.reader
 
+import java.util.regex.Matcher
+
 internal fun sanitizeReaderResource(mediaType: String, bytes: ByteArray): ByteArray {
     if (!mediaType.substringBefore(';').trim().equals("text/css", ignoreCase = true)) {
         return bytes
@@ -12,9 +14,9 @@ internal fun sanitizeReaderCss(css: String): String =
 
 private fun sanitizeCalibreCss(css: String): String {
     var didStripLineHeight = false
-    val result = calibreRuleRegex.replace(css) { match ->
-        val selector = match.groupValues[1]
-        val declarations = match.groupValues[2].split(';')
+    val result = calibreRuleRegex.replaceCssMatches(css) { match ->
+        val selector = match.group(1).orEmpty()
+        val declarations = match.group(2).orEmpty().split(';')
         if (declarations.any { it.propertyName() == "line-height" }) {
             didStripLineHeight = true
         }
@@ -32,10 +34,10 @@ private fun sanitizeCalibreCss(css: String): String {
 }
 
 private fun sanitizeEpubPrivateCss(css: String): String =
-    epubPrivateDeclarationRegex.replace(css) { match ->
-        val indent = match.groups["indent"]?.value.orEmpty()
-        val property = match.groups["property"]?.value.orEmpty().lowercase()
-        val value = match.groups["value"]?.value?.trim().orEmpty()
+    epubPrivateDeclarationRegex.replaceCssMatches(css) { match ->
+        val indent = match.group("indent").orEmpty()
+        val property = match.group("property").orEmpty().lowercase()
+        val value = match.group("value").orEmpty().trim()
         replacementDeclarations(indent, property, value)
     }
 
@@ -58,7 +60,24 @@ private val publisherWritingModeDeclarationRegex =
     Regex("""(?i)(^|[;{])\s*(?:-webkit-)?writing-mode\s*:\s*[^;{}]+;?""")
 
 private fun stripPublisherWritingModeCss(css: String): String =
-    publisherWritingModeDeclarationRegex.replace(css) { match -> match.groupValues[1] }
+    publisherWritingModeDeclarationRegex.replaceCssMatches(css) { match -> match.group(1).orEmpty() }
+
+private inline fun Regex.replaceCssMatches(css: String, transform: (Matcher) -> String): String {
+    // Kotlin's transforming Regex.replace creates a new Matcher for every match.
+    // Android initializes ICU with the entire input each time, making large publisher
+    // stylesheets quadratic. Keep one matcher per pass and append replacements literally.
+    val matcher = toPattern().matcher(css)
+    if (!matcher.find()) return css
+    return buildString(css.length) {
+        var previousEnd = 0
+        do {
+            append(css, previousEnd, matcher.start())
+            append(transform(matcher))
+            previousEnd = matcher.end()
+        } while (matcher.find())
+        append(css, previousEnd, css.length)
+    }
+}
 
 private fun String.sanitizeCalibreDeclaration(stripHeight: Boolean): String? =
     when (propertyName()) {

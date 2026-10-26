@@ -193,6 +193,12 @@ Report before/after measurements and scope of the claim. Remove temporary adb
 forwards (`adb -s "$hoshi_serial" forward --remove tcp:9222`) and restore only
 task-owned device changes; keep logs/recordings outside the repository.
 
+For large publisher CSS, run `ReaderCssPerformanceDeviceTest` with the explicit
+instrumentation procedure above. It checks generated stylesheet output and a
+generous latency budget without opening an Activity or accessing user data.
+Run this on Android: host JVM timings do not expose the repeated whole-input ICU
+initialization caused by Kotlin's transforming `Regex.replace` match iteration.
+
 ## Specialized build and service setup
 
 ### Google Drive browser authentication
