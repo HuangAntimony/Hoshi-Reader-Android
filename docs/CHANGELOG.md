@@ -28,7 +28,7 @@ Release notes before v1.3.0 are in [CHANGELOG_ARCHIVE.md](CHANGELOG_ARCHIVE.md).
 - Make Statistics charts easier to read with a one-hour minimum scale and compact previous/next period buttons alongside swipe navigation, with stable single-line period titles and duration/comparison rows when paging.
 - Label the selected-text menu entry “Hoshi Lookup” (“Hoshi 查词” in Simplified Chinese) to make dictionary lookup easier to identify.
 - Simplify About into compact groups for updates, project links, support and storage cleanup.
-- Edit individual reading sessions in Statistics, with deletions preserved across sync.
+- Edit individual reading sessions in Statistics, with deletions preserved across sync and reading sessions split at the configured daily reset time so each day's reading counts toward its own totals and goals.
 - Replace BIZ UDPGothic with BIZ UDGothic in the recommended fonts.
 
 ### Fixed

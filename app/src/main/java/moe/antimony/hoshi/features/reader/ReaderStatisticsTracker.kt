@@ -27,8 +27,10 @@ internal class ReaderStatisticsTracker(
     initialStatistics: ReadingSessions,
     resetMinutes: Int = 0,
     private val clock: ReaderStatisticsClock = SystemReaderStatisticsClock,
+    private val onSaveSessions: (ReadingSessions) -> Unit = {},
 ) {
     private var history = initialStatistics
+    private var pendingCompletedSessions: ReadingSessions = emptyMap()
     private var historyDays = emptyMap<java.time.LocalDate, ReadingTotal>()
     private var historyTotal = ReadingTotal()
     private var lastTimestampMillis = clock.currentTimeMillis()
@@ -77,9 +79,21 @@ internal class ReaderStatisticsTracker(
         val now = clock.currentTimeMillis()
         val time = (now - lastTimestampMillis).toDouble() / 1000
         if (time <= 0) return
-        currentSession = currentSession.track(maxOf(currentCharacter - lastCharacterCount, -currentSession.charactersRead), time, now)
+        val characters = maxOf(currentCharacter - lastCharacterCount, -currentSession.charactersRead)
+        val dayChanged = StatisticsDay.date(currentSession.startedAt, resetMinutes) != StatisticsDay.date(now, resetMinutes)
+        if (dayChanged) {
+            if (currentSession.hasActivity && history[sessionId]?.value != currentSession) {
+                pendingCompletedSessions = pendingCompletedSessions +
+                    (sessionId to Timestamped<ReadingSession?>(now, currentSession))
+            }
+            sessionId = UUID.randomUUID().toString().uppercase()
+            currentSession = ReadingSession(now, now)
+            regroupSessions()
+        }
+        currentSession = currentSession.track(characters, time, now)
         lastTimestampMillis = now
         lastCharacterCount = currentCharacter
+        if (dayChanged && pendingCompletedSessions.isNotEmpty()) onSaveSessions(pendingCompletedSessions)
     }
 
     fun resetBaseline(currentCharacter: Int) {
@@ -94,24 +108,32 @@ internal class ReaderStatisticsTracker(
         if (!paused && isTracking) resetBaseline(currentCharacter)
     }
 
-    fun statisticsForPersistenceOrNull(): ReadingSessions? =
+    fun statisticsForPersistenceOrNull(): ReadingSessions? {
+        var pending = pendingCompletedSessions
         if (currentSession.hasActivity && history[sessionId]?.value != currentSession) {
-            mapOf(sessionId to Timestamped(clock.currentTimeMillis(), currentSession))
-        } else null
+            pending = pending + (sessionId to Timestamped(clock.currentTimeMillis(), currentSession))
+        }
+        return pending.takeIf { it.isNotEmpty() }
+    }
 
     fun applySessions(sessions: ReadingSessions) {
+        // Keep finished segments until storage confirms their latest values or a deletion.
+        // An older in-flight save can be read back after a day rollover.
+        pendingCompletedSessions = pendingCompletedSessions.filter { (id, pending) ->
+            val stored = sessions[id]
+            stored == null || (stored.value != null && stored.value != pending.value)
+        }
         if (sessions[sessionId]?.let { it.value == null } == true) {
             sessionId = UUID.randomUUID().toString().uppercase()
             currentSession = ReadingSession(clock.currentTimeMillis(), clock.currentTimeMillis())
         }
-        if (history != sessions) {
-            history = sessions
-            regroupSessions()
-        }
+        history = sessions
+        regroupSessions()
     }
 
     private fun regroupSessions() {
-        historyDays = StatisticsDay.grouped(history - sessionId, resetMinutes).associate { it.date to it.total }
+        historyDays = StatisticsDay.grouped((history + pendingCompletedSessions) - sessionId, resetMinutes)
+            .associate { it.date to it.total }
         historyTotal = historyDays.values.fold(ReadingTotal()) { total, day ->
             ReadingTotal(total.charactersRead + day.charactersRead, total.readingTime + day.readingTime)
         }

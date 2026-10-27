@@ -420,6 +420,7 @@ fun ReaderWebView(
             statisticsLoadFailure = error
         }
     }
+    val currentOnSaveStatistics = rememberUpdatedState(onSaveStatistics)
     val statisticsTracker = remember(
         bookRoot,
         book.title,
@@ -429,6 +430,7 @@ fun ReaderWebView(
             ReaderStatisticsTracker(
                 initialStatistics = statistics,
                 resetMinutes = effectiveSettings.statisticsResetMinutes,
+                onSaveSessions = { currentOnSaveStatistics.value(it) },
             )
         }
     }

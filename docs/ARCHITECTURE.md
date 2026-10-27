@@ -174,6 +174,10 @@ Validation guidance and failure injection methods are in
   archive/restore. UUID-keyed nullable records retain deletions; daily totals
   derive from sessions and reset time. `Books/statistics_archive/` participates
   in Books backups but not ordinary book discovery or TTU exports.
+  `ReaderStatisticsTracker` rolls sessions at the configured statistics-day
+  boundary and queues completed segments through the reader's serialized saves.
+  Pending segments remain in totals and save snapshots until store readback
+  confirms their values or deletions; late readback must not drop unsaved segments.
 - Sidecars preserve iOS contracts. Bookmark dates use the Apple reference epoch;
   sync/session timestamps use Unix milliseconds. Provider conversion belongs
   at the sync boundary. JSON uses Kotlin Serialization or Moshi. Compatibility
