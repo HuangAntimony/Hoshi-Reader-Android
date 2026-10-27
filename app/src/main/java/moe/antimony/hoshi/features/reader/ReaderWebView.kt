@@ -1683,7 +1683,8 @@ fun ReaderWebView(
     }
     val currentSyncMatch = rememberUpdatedState<suspend (String) -> Unit> { key ->
         if (bookRoot?.name?.syncKey() == key) withContext(Dispatchers.Main.immediate) {
-            val match = bookRepository.loadSasayakiMatch(bookRoot)
+            val savedMatch = bookRepository.loadSasayakiMatch(bookRoot)
+            val match = sasayakiTranscriptionViewModel.matchForReader(bookRoot, savedMatch)
             sasayakiSheetMatchData = match
             pendingSasayakiMatchUpdate = PendingSasayakiMatchUpdate(match, preserveLayout = true)
         }

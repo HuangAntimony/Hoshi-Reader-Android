@@ -25,6 +25,25 @@ import org.junit.rules.TemporaryFolder
 class SasayakiTranscriptionViewModelTest {
     @get:Rule val temporary = TemporaryFolder()
 
+    @Test fun syncedMatchRefreshPreservesTheActiveTranscriptionMatchUntilTheTaskStops() = runTest {
+        val root = temporary.newFolder()
+        val otherRoot = temporary.newFolder()
+        val repository = MemoryRepository()
+        val coordinator = SasayakiTranscriptionCoordinator(Backend(), repository, BookWorkRegistry(), backgroundScope, StandardTestDispatcher(testScheduler))
+        val model = SasayakiTranscriptionViewModel(coordinator, repository, backgroundScope)
+        val remote = SasayakiMatchData(emptyList(), 2)
+        assertEquals(remote, model.matchForReader(root, remote))
+        coordinator.start(root, "audio")
+        assertEquals(remote, model.matchForReader(root, remote))
+        runCurrent()
+        assertEquals(repository.match, model.matchForReader(root, remote))
+        assertEquals(repository.match, model.matchForReader(root, null))
+        assertEquals(remote, model.matchForReader(otherRoot, remote))
+        coordinator.pause(root); runCurrent()
+        assertEquals(remote, model.matchForReader(root, remote))
+        assertNull(model.matchForReader(root, null))
+    }
+
     @Test fun matchSourceSelectsDefaultEvenWithoutSavedTranscriptAndAfterReaderReopen() = runTest {
         val root = temporary.newFolder()
         val repository = MemoryRepository()
@@ -354,6 +373,7 @@ class SasayakiTranscriptionViewModelTest {
         assertEquals(10.0, repository.saved!!.through, 0.0)
         assertNotNull(coordinator.state.value.match)
         assertEquals("A closed Reader must not receive UI callbacks", deliveredBeforeClosing, matches)
+        assertEquals(listOf(repository.match), repository.savedMatches)
         val reopened = SasayakiTranscriptionViewModel(coordinator, repository, backgroundScope)
         reopened.bind(root, "audio") {}
         runCurrent()
@@ -403,6 +423,8 @@ class SasayakiTranscriptionViewModelTest {
             return saved
         }
         override suspend fun save(root: File, transcript: SasayakiTranscript) { saved = transcript }
+        val savedMatches = mutableListOf<SasayakiMatchData>()
+        override suspend fun saveMatch(root: File, match: SasayakiMatchData) { savedMatches += match }
         override suspend fun clear(root: File) { saved = null }
         override suspend fun openAlignment(root: File) = SasayakiTranscriptionAlignment { tokens ->
             finishAlignment?.await()

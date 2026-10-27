@@ -278,13 +278,22 @@ internal class SasayakiTranscriptionCoordinator @Inject constructor(
             withContext(NonCancellable + ioDispatcher) {
                 matching.cancelAndJoin()
                 if (checkpointNeeded && !deleted.get()) {
+                    mutableState.update { it.copy(stage = SasayakiTranscriptionStage.Aligning) }
                     try {
                         repository.save(root, checkpoint())
                         if (tokens.isNotEmpty() && !deleted.get() && (completed || alignedCount != tokens.size)) {
-                            mutableState.update { it.copy(stage = SasayakiTranscriptionStage.Aligning) }
                             align(tokens)
                         }
                     } catch (failure: Exception) { error = reportSasayakiFailure("transcription_finalize", failure, SasayakiFailureKind.Storage) }
+                }
+                // Only a stopped run publishes a file version. Keep the last successful
+                // live result even if saving the checkpoint or final alignment failed.
+                result?.takeUnless { deleted.get() }?.let { match ->
+                    try {
+                        repository.saveMatch(root, match)
+                    } catch (failure: Exception) {
+                        error = reportSasayakiFailure("transcription_match_save", failure, SasayakiFailureKind.Storage)
+                    }
                 }
                 mutableState.update { it.copy(
                     stage = SasayakiTranscriptionStage.Idle,

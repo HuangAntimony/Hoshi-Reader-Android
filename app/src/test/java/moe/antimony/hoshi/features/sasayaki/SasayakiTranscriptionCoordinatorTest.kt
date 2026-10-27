@@ -73,8 +73,10 @@ class SasayakiTranscriptionCoordinatorTest {
         assertEquals(SasayakiTranscriptionStage.Transcribing, coordinator.state.value.stage)
         assertNotNull(coordinator.state.value.match)
         assertEquals(1, repository.alignments)
+        assertTrue(repository.savedMatches.isEmpty())
         coordinator.pause(root)
         runCurrent()
+        assertEquals(listOf(coordinator.state.value.match), repository.savedMatches)
     }
 
     @Test fun preparingModelsDoesNotShowTranscriptionOrCompletedDownload() = runTest {
@@ -164,6 +166,7 @@ class SasayakiTranscriptionCoordinatorTest {
         assertEquals(1, repository.alignments)
         assertFalse(coordinator.state.value.running)
         assertTrue(repository.saved!!.isComplete)
+        assertEquals(listOf(coordinator.state.value.match), repository.savedMatches)
     }
 
     @Test fun safeCheckpointNearAudioEndStillResumesRemainingSpeech() = runTest {
@@ -197,6 +200,7 @@ class SasayakiTranscriptionCoordinatorTest {
         registry.delete(root) { root.deleteRecursively() }
         assertFalse(coordinator.state.value.running)
         assertNull(repository.saved)
+        assertTrue(repository.savedMatches.isEmpty())
         assertEquals(alignmentsBeforeDeletion, repository.alignments)
         assertFalse(root.exists())
     }
@@ -204,11 +208,13 @@ class SasayakiTranscriptionCoordinatorTest {
     @Test fun immediatePauseReleasesSlotWithoutStartingBackend() = runTest {
         val root = temporary.newFolder()
         val backend = Backend()
-        val coordinator = SasayakiTranscriptionCoordinator(backend, MemoryRepository(), BookWorkRegistry(), backgroundScope, StandardTestDispatcher(testScheduler))
+        val repository = MemoryRepository()
+        val coordinator = SasayakiTranscriptionCoordinator(backend, repository, BookWorkRegistry(), backgroundScope, StandardTestDispatcher(testScheduler))
         assertTrue(coordinator.start(root, "audio"))
         coordinator.pause(root); runCurrent()
         assertFalse(coordinator.state.value.running)
         assertEquals(0, backend.transcriptions)
+        assertTrue(repository.savedMatches.isEmpty())
     }
 
     @Test fun decodingFailureRetainsCompletedProgressAndShowsResourceError() = runTest {
@@ -220,6 +226,7 @@ class SasayakiTranscriptionCoordinatorTest {
         assertNotNull(coordinator.state.value.error)
         assertEquals(1, repository.alignments)
         assertFalse(coordinator.state.value.running)
+        assertEquals(listOf(coordinator.state.value.match), repository.savedMatches)
     }
 
     @Test fun audioDurationFailureUsesAudioSpecificMessage() = runTest {
@@ -256,6 +263,7 @@ class SasayakiTranscriptionCoordinatorTest {
         coordinator.pause(root); runCurrent()
 
         assertEquals(UiText.Joined(listOf(UiText.Resource(R.string.sasayaki_transcription_error_storage), UiText.Literal("save detail"))), coordinator.state.value.error)
+        assertEquals(listOf(coordinator.state.value.match), repository.savedMatches)
     }
 
     @Test fun clearRetainsMatchAndCannotRaceWithActiveTranscription() = runTest {
@@ -368,6 +376,77 @@ class SasayakiTranscriptionCoordinatorTest {
         assertEquals(10.0, repository.saved!!.through, 0.0)
     }
 
+    @Test fun finalAlignmentFailureStillSavesTheLastSuccessfulLiveMatch() = runTest {
+        val root = temporary.newFolder()
+        val backend = BatchBackend()
+        val failure = IOException("final alignment failed")
+        val repository = MemoryRepository(beforeAlign = { count -> if (count == 2) throw failure })
+        val coordinator = SasayakiTranscriptionCoordinator(backend, repository, BookWorkRegistry(), backgroundScope,
+            StandardTestDispatcher(testScheduler), SasayakiTranscriptionClock { testScheduler.currentTime * 1_000_000 })
+        coordinator.start(root, "audio")
+        backend.batches.send(SasayakiTranscriptionBatch(listOf(SasayakiToken("一", 1.0, 2.0)), 10.0)); runCurrent()
+        val live = coordinator.state.value.match!!
+        backend.batches.send(SasayakiTranscriptionBatch(listOf(SasayakiToken("二", 11.0, 12.0)), 20.0)); runCurrent()
+        coordinator.pause(root); runCurrent()
+        assertEquals(listOf(1, 2), repository.alignmentSizes)
+        assertEquals(listOf(live), repository.savedMatches)
+        assertEquals(20.0, repository.saved!!.through, 0.0)
+        assertFalse(coordinator.state.value.running)
+        assertEquals(UiText.Joined(listOf(UiText.Resource(R.string.sasayaki_transcription_error_match),
+            UiText.Literal("final alignment failed"))), coordinator.state.value.error)
+    }
+
+    @Test fun failedMatchingNeverSavesAnEmptyReplacement() = runTest {
+        val repository = MemoryRepository(beforeAlign = { throw IOException("no successful match") })
+        val root = temporary.newFolder()
+        val coordinator = SasayakiTranscriptionCoordinator(Backend(), repository, BookWorkRegistry(), backgroundScope, StandardTestDispatcher(testScheduler))
+        coordinator.start(root, "audio"); runCurrent()
+        coordinator.pause(root); runCurrent()
+        assertNotNull(repository.saved)
+        assertNull(coordinator.state.value.match)
+        assertTrue(repository.savedMatches.isEmpty())
+    }
+
+    @Test fun finalMatchSaveFailureReportsOriginalErrorAndRetainsCheckpoint() = runTest {
+        ErrorDiagnosticEvents.buffer.drain()
+        val failure = IOException("match write failed", IOException("disk full"))
+        val repository = MemoryRepository(beforeMatchSave = { throw failure })
+        val root = temporary.newFolder()
+        val coordinator = SasayakiTranscriptionCoordinator(Backend(), repository, BookWorkRegistry(), backgroundScope, StandardTestDispatcher(testScheduler))
+        coordinator.start(root, "audio"); runCurrent()
+        coordinator.pause(root); runCurrent()
+        assertFalse(coordinator.state.value.running)
+        assertEquals(10.0, repository.saved!!.through, 0.0)
+        assertTrue(repository.savedMatches.isEmpty())
+        assertEquals(UiText.Joined(listOf(UiText.Resource(R.string.sasayaki_transcription_error_storage),
+            UiText.Literal("match write failed\ndisk full"))), coordinator.state.value.error)
+        assertSame(failure, ErrorDiagnosticEvents.buffer.drain().single().error)
+    }
+
+    @Test fun pausingAgainDuringFinalMatchSaveKeepsTheTaskSlotUntilPersistenceFinishes() = runTest {
+        val finishSave = CompletableDeferred<Unit>()
+        val repository = MemoryRepository(beforeMatchSave = { finishSave.await() })
+        val root = temporary.newFolder()
+        val coordinator = SasayakiTranscriptionCoordinator(Backend(), repository, BookWorkRegistry(), backgroundScope, StandardTestDispatcher(testScheduler))
+        coordinator.start(root, "audio"); runCurrent()
+        coordinator.pause(root); runCurrent()
+        assertEquals(SasayakiTranscriptionStage.Aligning, coordinator.state.value.stage)
+        coordinator.pause(root); runCurrent()
+        assertFalse(coordinator.start(root, "audio"))
+        assertTrue(repository.savedMatches.isEmpty())
+        finishSave.complete(Unit); runCurrent()
+        assertFalse(coordinator.state.value.running)
+        assertEquals(listOf(coordinator.state.value.match), repository.savedMatches)
+    }
+
+    private class BatchBackend : SasayakiTranscriptionBackend {
+        val batches = Channel<SasayakiTranscriptionBatch>(Channel.UNLIMITED)
+        override suspend fun duration(source: String) = 100.0
+        override suspend fun transcribe(source: String, from: Double, onDownloadRequired: suspend (Long) -> Unit,
+            onDownload: suspend (Double) -> Unit, onBatch: suspend (SasayakiTranscriptionBatch) -> Unit, parallelism: Int,
+        ) { for (batch in batches) onBatch(batch) }
+    }
+
     private class Backend(private val fail: Boolean = false) : SasayakiTranscriptionBackend {
         var from = -1.0
         var transcriptions = 0
@@ -381,7 +460,9 @@ class SasayakiTranscriptionCoordinatorTest {
         }
     }
 
-    private class MemoryRepository(var saved: SasayakiTranscript? = null, val beforeAlign: suspend (Int) -> Unit = {}, private val failSave: Boolean = false) : SasayakiTranscriptionRepository {
+    private class MemoryRepository(var saved: SasayakiTranscript? = null, val beforeAlign: suspend (Int) -> Unit = {},
+        private val failSave: Boolean = false, private val beforeMatchSave: suspend () -> Unit = {},
+    ) : SasayakiTranscriptionRepository {
         var alignments = 0
         val alignmentSizes = mutableListOf<Int>()
         override suspend fun load(root: File) = saved
@@ -389,6 +470,8 @@ class SasayakiTranscriptionCoordinatorTest {
             if (failSave) throw IOException("save detail")
             saved = transcript
         }
+        val savedMatches = mutableListOf<SasayakiMatchData>()
+        override suspend fun saveMatch(root: File, match: SasayakiMatchData) { beforeMatchSave(); savedMatches += match }
         override suspend fun clear(root: File) { saved = null }
         override suspend fun openAlignment(root: File) = SasayakiTranscriptionAlignment { tokens ->
             alignments++

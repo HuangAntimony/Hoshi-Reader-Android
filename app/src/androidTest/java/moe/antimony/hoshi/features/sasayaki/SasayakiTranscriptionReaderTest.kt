@@ -51,10 +51,16 @@ class SasayakiTranscriptionReaderTest {
         reader.batch(10.0)
         compose.waitUntil { reader.model.uiState.value.through == 10.0 && reader.matches.size == 1 }
         assertTrue("Matches arrive before pausing, with the controls sheet closed", reader.model.uiState.value.canPause)
+        assertTrue(reader.repository.savedMatches.isEmpty())
+        compose.runOnIdle {
+            val remote = SasayakiMatchData(emptyList(), 3)
+            assertEquals(reader.matches.last(), reader.model.matchForReader(reader.root, remote))
+        }
         compose.runOnIdle { reader.visible.value = true }
         compose.onAllNodes(hasText("0:00:10 / 0:01:40", substring = true)).assertCountEquals(1)
         compose.onNodeWithText(reader.text(R.string.sasayaki_transcription_pause)).assertIsEnabled().performClick()
         compose.waitUntil { reader.model.uiState.value.canStart }
+        assertEquals(listOf(reader.matches.last()), reader.repository.savedMatches)
         compose.onNodeWithText(reader.text(R.string.sasayaki_transcription_resume)).assertIsEnabled().performClick()
         compose.waitUntil { reader.backend.runs == 2 }
         assertEquals(10.0, reader.backend.resumedFrom, 0.0)
@@ -237,6 +243,8 @@ class SasayakiTranscriptionReaderTest {
         var saved: SasayakiTranscript? = null
         override suspend fun load(root: File) = saved
         override suspend fun save(root: File, transcript: SasayakiTranscript) { saved = transcript }
+        val savedMatches = mutableListOf<SasayakiMatchData>()
+        override suspend fun saveMatch(root: File, match: SasayakiMatchData) { savedMatches += match }
         override suspend fun clear(root: File) { saved = null }
         override suspend fun openAlignment(root: File) = SasayakiTranscriptionAlignment { _ -> SasayakiMatchData(emptyList(), 0) }
     }

@@ -133,6 +133,9 @@ internal class SasayakiTranscriptionViewModel internal constructor(
         }
     }
 
+    fun matchForReader(root: File, savedMatch: SasayakiMatchData?): SasayakiMatchData? =
+        coordinator.state.value.takeIf { it.root == root && it.running }?.match ?: savedMatch
+
     fun start(preset: SasayakiTranscriptionPreset = SasayakiTranscriptionPreset.Balanced) {
         if (!_uiState.value.canStart) return
         val activeRoot = root ?: return

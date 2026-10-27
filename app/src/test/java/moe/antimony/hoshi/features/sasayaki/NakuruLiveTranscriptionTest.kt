@@ -9,6 +9,8 @@ import kotlinx.coroutines.test.runTest
 import moe.antimony.hoshi.epub.BookRepository
 import moe.antimony.hoshi.epub.BookWorkRegistry
 import moe.antimony.hoshi.epub.EpubBookParser
+import moe.antimony.hoshi.epub.SasayakiMatch
+import moe.antimony.hoshi.epub.SasayakiMatchData
 import moe.antimony.hoshi.epub.writeMinimalExtractedEpub
 import moe.antimony.hoshi.features.sasayaki.transcription.SasayakiTranscriptionBackend
 import moe.antimony.hoshi.features.sasayaki.transcription.SasayakiTranscriptionBatch
@@ -21,7 +23,7 @@ import org.junit.rules.TemporaryFolder
 class NakuruLiveTranscriptionTest {
     @get:Rule val temporary = TemporaryFolder()
 
-    @Test fun actualNakuruMatchesAreSavedAndPublishedWhileBatchesContinue() = runTest {
+    @Test fun actualNakuruMatchesStayLiveAndAreSavedOnlyWhenTranscriptionStops() = runTest {
         val root = temporary.newFolder()
         writeMinimalExtractedEpub(root,
             firstChapterHtml = "<body><p>今日は、いい天気です。明日も晴れるでしょう。</p></body>",
@@ -29,6 +31,10 @@ class NakuruLiveTranscriptionTest {
         )
         val dispatcher = StandardTestDispatcher(testScheduler)
         val books = BookRepository(temporary.newFolder(), dispatcher)
+        val previousMatch = SasayakiMatchData(listOf(SasayakiMatch("old", 0.0, 1.0, "以前", 0, 0, 2)), 0)
+        books.saveSasayakiMatch(root, previousMatch)
+        var matchChanges = 0
+        books.onBookChange = { _, _ -> matchChanges++ }
         val store = SasayakiTranscriptStore(dispatcher)
         val parser = EpubBookParser(temporary.newFolder())
         val repository = AndroidSasayakiTranscriptionRepository(store, books, parser, dispatcher, dispatcher)
@@ -48,7 +54,8 @@ class NakuruLiveTranscriptionTest {
         runCurrent()
         assertEquals(SasayakiTranscriptionStage.Transcribing, coordinator.state.value.stage)
         assertEquals(listOf("今日は", "いい天気です"), coordinator.state.value.match!!.matches.map { it.text })
-        assertEquals(coordinator.state.value.match, books.loadSasayakiMatch(root))
+        assertEquals(previousMatch, books.loadSasayakiMatch(root))
+        assertEquals(0, matchChanges)
         val revision = coordinator.state.value.revision
         val next = listOf(SasayakiToken("明日も晴れるでしょう", 5.0, 8.0))
         batches.send(SasayakiTranscriptionBatch(next, 8.0))
@@ -59,7 +66,8 @@ class NakuruLiveTranscriptionTest {
         assertEquals(revision, coordinator.state.value.revision)
         advanceTimeBy(1); runCurrent()
         assertEquals(listOf("今日は", "いい天気です", "明日も晴れるでしょう"), coordinator.state.value.match!!.matches.map { it.text })
-        assertEquals(coordinator.state.value.match, books.loadSasayakiMatch(root))
+        assertEquals(previousMatch, books.loadSasayakiMatch(root))
+        assertEquals(0, matchChanges)
         val last = listOf(SasayakiToken("新しい章が始まりました", 10.0, 14.0))
         batches.send(SasayakiTranscriptionBatch(last, 14.0)); runCurrent()
         coordinator.pause(root); runCurrent()
@@ -67,6 +75,7 @@ class NakuruLiveTranscriptionTest {
         assertEquals(14.0, store.load(root)!!.through, 0.0)
         assertEquals(first + next + last, store.load(root)!!.tokens)
         assertEquals(coordinator.state.value.match, books.loadSasayakiMatch(root))
+        assertEquals(1, matchChanges)
         assertFalse(coordinator.state.value.running)
         batches.close()
         coordinator.start(root, "audio"); runCurrent()
@@ -74,5 +83,6 @@ class NakuruLiveTranscriptionTest {
         assertEquals(expected, coordinator.state.value.match)
         assertTrue(store.load(root)!!.isComplete)
         assertFalse(coordinator.state.value.running)
+        assertEquals("Realigning unchanged tokens must not publish another file version", 1, matchChanges)
     }
 }

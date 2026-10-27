@@ -15,6 +15,7 @@ import moe.antimony.hoshi.epub.SasayakiMatchData
 internal interface SasayakiTranscriptionRepository {
     suspend fun load(root: File): SasayakiTranscript?
     suspend fun save(root: File, transcript: SasayakiTranscript)
+    suspend fun saveMatch(root: File, match: SasayakiMatchData)
     suspend fun clear(root: File)
     suspend fun openAlignment(root: File): SasayakiTranscriptionAlignment
 }
@@ -34,29 +35,27 @@ internal class AndroidSasayakiTranscriptionRepository @Inject constructor(
     override suspend fun load(root: File) = store.load(root)
     override suspend fun save(root: File, transcript: SasayakiTranscript) = store.save(root, transcript)
     override suspend fun clear(root: File) = store.clear(root)
+    override suspend fun saveMatch(root: File, match: SasayakiMatchData) = withContext(ioDispatcher) {
+        books.storageLock.withLock {
+            try {
+                check(root.isDirectory)
+                if (books.loadSasayakiMatch(root) != match) books.saveSasayakiMatch(root, match)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                throw error.asSasayakiFailure(SasayakiFailureKind.Storage)
+            }
+        }
+    }
+
     override suspend fun openAlignment(root: File): SasayakiTranscriptionAlignment {
         val book = withContext(ioDispatcher) {
             check(root.isDirectory)
             parser.parse(root)
         }
         val aligner = withContext(defaultDispatcher) { NakuruTranscriptAligner(book) }
-        var previous: SasayakiMatchData? = null
         return SasayakiTranscriptionAlignment { tokens ->
-            val result = withContext(defaultDispatcher) { aligner.align(tokens) }
-            if (result != previous) {
-                withContext(ioDispatcher) {
-                    check(root.isDirectory)
-                    try {
-                        books.saveSasayakiMatch(root, result)
-                    } catch (cancelled: CancellationException) {
-                        throw cancelled
-                    } catch (error: Exception) {
-                        throw error.asSasayakiFailure(SasayakiFailureKind.Storage)
-                    }
-                }
-                previous = result
-            }
-            result
+            withContext(defaultDispatcher) { aligner.align(tokens) }
         }
     }
 }

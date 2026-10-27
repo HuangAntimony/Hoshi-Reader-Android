@@ -13,6 +13,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLDecoder
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.async
@@ -49,6 +50,15 @@ import moe.antimony.hoshi.epub.BookMetadata
 import moe.antimony.hoshi.epub.BookRepository
 import moe.antimony.hoshi.epub.ReadingStatistics
 import moe.antimony.hoshi.epub.SasayakiPlaybackData
+import moe.antimony.hoshi.epub.EpubBookParser
+import moe.antimony.hoshi.epub.writeMinimalExtractedEpub
+import moe.antimony.hoshi.features.sasayaki.AndroidSasayakiTranscriptionRepository
+import moe.antimony.hoshi.features.sasayaki.SasayakiToken
+import moe.antimony.hoshi.features.sasayaki.SasayakiTranscriptStore
+import moe.antimony.hoshi.features.sasayaki.SasayakiTranscriptionClock
+import moe.antimony.hoshi.features.sasayaki.SasayakiTranscriptionCoordinator
+import moe.antimony.hoshi.features.sasayaki.transcription.SasayakiTranscriptionBackend
+import moe.antimony.hoshi.features.sasayaki.transcription.SasayakiTranscriptionBatch
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -533,6 +543,73 @@ class GoogleDriveSyncManagerTest {
         f.manager.downloadBook(f.books.loadMetadata(root)!!) {}
         assertEquals("epub-content", root.resolve("book-a.epub").readText())
         assertEquals(reference.modified, f.store.state.books.getValue("book-a").sources[SyncFileType.epub])
+    }
+
+    @Test fun liveTranscriptionUploadsOnlyTheMatchSavedOnPause() = transcriptionUploadsFinalMatch(false)
+
+    @Test fun completedTranscriptionWhileSyncIsDisabledUploadsOnceAfterEnabling() = transcriptionUploadsFinalMatch(true)
+
+    private fun transcriptionUploadsFinalMatch(disabled: Boolean) = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val uploadedMatches = mutableListOf<String>()
+        val f = fixture(dispatcher, transferFactory = { client -> object : TestDriveFileTransfer(client) {
+            override suspend fun upload(file: java.io.File, request: DriveUploadRequest, progress: (DriveTransferUpdate) -> Unit): GoogleDriveFile {
+                if (request.type == SyncFileType.sasayaki) uploadedMatches += file.readText()
+                return super.upload(file, request, progress)
+            }
+        } })
+        val root = f.books.createBookDirectory("book-a")
+        writeMinimalExtractedEpub(root, firstChapterHtml = "<body><p>今日は、いい天気です。明日も晴れるでしょう。</p></body>")
+        val metadata = BookMetadata("ID", "Local", folder = "book-a", lastAccess = 0.0)
+        f.books.saveMetadata(root, metadata)
+        f.store.handleBookImport(metadata, root)
+        f.manager.sync(); runCurrent()
+        if (disabled) { f.settings.update { it.copy(enabled = false) }; runCurrent() }
+        val repository = AndroidSasayakiTranscriptionRepository(SasayakiTranscriptStore(dispatcher), f.books,
+            EpubBookParser(temporary.newFolder()), dispatcher, dispatcher)
+        val batches = Channel<SasayakiTranscriptionBatch>(Channel.UNLIMITED)
+        val backend = object : SasayakiTranscriptionBackend {
+            override suspend fun duration(source: String) = 30.0
+            override suspend fun transcribe(source: String, from: Double, onDownloadRequired: suspend (Long) -> Unit,
+                onDownload: suspend (Double) -> Unit, onBatch: suspend (SasayakiTranscriptionBatch) -> Unit, parallelism: Int,
+            ) { for (batch in batches) onBatch(batch) }
+        }
+        val coordinator = SasayakiTranscriptionCoordinator(backend, repository, f.books.workRegistry, backgroundScope,
+            dispatcher, SasayakiTranscriptionClock { testScheduler.currentTime * 1_000_000 })
+        coordinator.start(root, "audio")
+        val words = listOf(
+            listOf(SasayakiToken("今日は", 1.0, 2.0), SasayakiToken("いい天気です", 2.0, 4.0)),
+            listOf(SasayakiToken("明日も晴れるでしょう", 5.0, 8.0)),
+        )
+        for ((index, tokens) in words.withIndex()) {
+            batches.send(SasayakiTranscriptionBatch(tokens, tokens.last().end + 1.0))
+            runCurrent(); advanceTimeBy(15_000); runCurrent()
+            f.manager.sync(); runCurrent()
+            assertEquals(index + 2, coordinator.state.value.match!!.matches.size)
+            assertNull(f.books.loadSasayakiMatch(root))
+            assertNull(f.store.state.books.getValue("book-a").sources[SyncFileType.sasayaki])
+            assertTrue(uploadedMatches.isEmpty())
+        }
+        if (disabled) batches.close() else coordinator.pause(root)
+        runCurrent()
+        assertFalse(coordinator.state.value.running)
+        assertEquals(3, f.books.loadSasayakiMatch(root)!!.matches.size)
+        assertNotNull(f.store.state.books.getValue("book-a").sources[SyncFileType.sasayaki])
+        if (disabled) {
+            f.manager.sync(); runCurrent()
+            assertTrue(uploadedMatches.isEmpty())
+            f.store.reload()
+            f.settings.update { it.copy(enabled = true) }
+        }
+        f.manager.sync(); runCurrent()
+        assertNull(f.manager.state.value.errorMessage)
+        assertEquals(listOf(root.resolve("sasayaki_match.json").readText()), uploadedMatches)
+        val reference = f.store.state.books.getValue("book-a").files[SyncFileType.sasayaki]
+        batches.close()
+        coordinator.start(root, "audio"); runCurrent()
+        repeat(2) { f.manager.sync(); runCurrent() }
+        assertEquals(1, uploadedMatches.size)
+        assertEquals(reference, f.store.state.books.getValue("book-a").files[SyncFileType.sasayaki])
     }
 
     @Test fun downloadAllAndTappedDownloadFetchEveryMissingEpub() = runTest {
