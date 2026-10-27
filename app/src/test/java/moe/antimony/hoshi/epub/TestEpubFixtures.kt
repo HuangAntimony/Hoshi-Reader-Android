@@ -32,7 +32,7 @@ internal fun writeMinimalExtractedEpub(
     root.resolve("OPS/text/chapter-1.xhtml").writeText(firstChapterHtml)
     root.resolve("OPS/text/chapter-2.xhtml").writeText(secondChapterHtml)
     root.resolve("OPS/styles/book.css").writeText("body {}")
-    root.resolve("OPS/images/cover.jpg").writeBytes(byteArrayOf(1, 2, 3))
+    writeTestEpubCover(root.resolve("OPS/images/cover.jpg"))
     val languageElement = language?.let { "<dc:language>$it</dc:language>" }.orEmpty()
     val authorElement = author?.let { "<dc:creator>$it</dc:creator>" }.orEmpty()
     val coverPropertiesAttribute = coverProperties?.let { " properties=\"$it\"" }.orEmpty()
@@ -80,3 +80,11 @@ internal fun writeMinimalEpubArchive(archive: File, title: String = "Sample Book
     }
     tempRoot.deleteRecursively()
 }
+
+internal fun writeTestEpubCover(file: File) {
+    file.writeBytes(testEpubCoverBytes())
+}
+
+internal fun testEpubCoverBytes(): ByteArray = java.io.ByteArrayOutputStream().also { output ->
+    javax.imageio.ImageIO.write(java.awt.image.BufferedImage(10, 20, java.awt.image.BufferedImage.TYPE_INT_RGB), "jpg", output)
+}.toByteArray()

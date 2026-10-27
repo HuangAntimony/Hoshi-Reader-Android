@@ -136,6 +136,65 @@ class EpubImageFallbackDeviceTest {
         }
     }
 
+    @Test fun conflictingCoverSamplesRecoverThroughExistingOpenFlowOnce() = runBlocking {
+        val directory = InstrumentationRegistry.getArguments().getString("coverSamplesDir")
+        assumeTrue("Requires task-owned EPUB copies supplied through coverSamplesDir", directory != null)
+        val scratch = File(instrumentation.targetContext.cacheDir, "epub-cover-candidates-${System.nanoTime()}").apply { mkdirs() }
+        try {
+            val parser = EpubBookParser(scratch.resolve("parser"))
+            val repository = BookRepository(scratch.resolve("library"))
+            val holder = ReaderRouteStateHolder(repository, DefaultReaderRouteEpubParser(parser))
+            val thumbnails = BookCoverThumbnailStore(scratch, AndroidBookCoverThumbnailEncoder(), Dispatchers.IO)
+            for ((name, image, chapters) in listOf(Triple("front", "o_c01.jpg", 17), Triple("back", "o_c02.jpg", 20))) {
+                val root = repository.createBookDirectory(name)
+                File(directory, "$name.epub").copyTo(root.resolve("book.epub"))
+                val original = root.resolve("book.epub").readBytes()
+                val parsed = parser.parsePacked(root.resolve("book.epub"))
+                assertEquals("OEBPS/image/$image", parsed.coverHref)
+                assertEquals(chapters, parsed.chapters.size)
+                val expected = requireNotNull(parsed.readResource("OEBPS/image/$image"))
+                // Fresh imports use the same selected resource as existing-book recovery.
+                val importedRoot = repository.createBookDirectory("imported-$name")
+                val importedCover = requireNotNull(repository.metadataCoverPath(importedRoot, parsed))
+                assertArrayEquals(expected, importedRoot.resolve(File(importedCover).name).readBytes())
+                val metadata = BookMetadata(UUID.randomUUID().toString(), "Cover fixture", folder = root.name,
+                    cover = "Books/${root.name}/cover.svg", lastAccess = 0.0, epub = "book.epub")
+                root.resolve("cover.svg").writeBytes(byteArrayOf())
+                repository.saveMetadata(root, metadata)
+                repository.saveBookInfo(root, parsed.bookInfo)
+                val bookmark = Bookmark(0, 0.0, 0, 123.0)
+                repository.saveBookmark(root, bookmark)
+                val changes = mutableListOf<SyncFileType?>()
+                repository.onBookChange = { _, type -> changes += type }
+
+                val ready = holder.load(metadata.id) as ReaderRouteLoadState.Ready
+                val cover = requireNotNull(ready.bookCoverFile)
+                assertArrayEquals(expected, cover.readBytes())
+                assertEquals(bookmark, ready.bookmark)
+                assertEquals(listOf(SyncFileType.cover), changes)
+                val decoded = BitmapFactory.decodeFile(cover.path)
+                assertNotNull("$name restored bitmap", decoded)
+                decoded?.recycle()
+                val thumbnail = requireNotNull(thumbnails.thumbnail(BookCoverSource(cover.path, name), 320))
+                val decodedThumbnail = BitmapFactory.decodeFile(thumbnail.path)
+                assertNotNull("$name thumbnail", decodedThumbnail)
+                decodedThumbnail?.recycle()
+
+                val modified = cover.lastModified()
+                changes.clear()
+                val reopened = holder.load(metadata.id) as ReaderRouteLoadState.Ready
+                assertEquals(cover, reopened.bookCoverFile)
+                assertEquals(modified, cover.lastModified())
+                assertTrue(changes.isEmpty())
+                assertEquals(bookmark, reopened.bookmark)
+                assertArrayEquals(original, root.resolve("book.epub").readBytes())
+                assertEquals(parsed.bookInfo, reopened.book.bookInfo)
+                Log.i("HoshiEpubFallback", "$name recovered=${cover.name} bytes=${cover.length()} chapters=$chapters repeatedOpenUnchanged=true")
+                repository.onBookChange = null
+            }
+        } finally { scratch.deleteRecursively() }
+    }
+
     @Test fun sampleCopiesRestoreChaptersGalleryAndImportableCovers() = runBlocking {
         val directory = InstrumentationRegistry.getArguments().getString("epubSamplesDir")
         assumeTrue("Requires task-owned copies supplied through epubSamplesDir", directory != null)

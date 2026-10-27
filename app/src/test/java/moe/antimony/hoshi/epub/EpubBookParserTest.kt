@@ -15,12 +15,16 @@ class EpubBookParserTest {
     @get:Rule
     val tempFolder = TemporaryFolder()
 
+    private fun parser() = EpubBookParser(tempFolder.root.resolve("parser-cache")) { file ->
+        javax.imageio.ImageIO.read(file)?.let { it.width to it.height }
+    }
+
     @Test
     fun parsesExtractedEpubUsingContainerManifestAndSpineLikePoc() {
         val root = tempFolder.newFolder("book")
         writeExtractedEpub(root)
 
-        val book = EpubBookParser().parse(root)
+        val book = parser().parse(root)
 
         assertEquals("Sample Book", book.title)
         assertEquals(
@@ -51,7 +55,7 @@ class EpubBookParserTest {
             """.trimIndent(),
         )
 
-        val chapter = EpubBookParser().parse(root).chapters.last()
+        val chapter = parser().parse(root).chapters.last()
 
         assertEquals(
             """
@@ -87,7 +91,7 @@ class EpubBookParserTest {
             secondChapterHtml = "<html><body><p>Second</p></body></html>",
         )
 
-        val book = EpubBookParser().parse(root)
+        val book = parser().parse(root)
 
         assertEquals("Script Fixture", book.title)
         assertEquals("OPS/images/cover.jpg", book.coverHref)
@@ -104,7 +108,7 @@ class EpubBookParserTest {
         val cacheRoot = tempFolder.newFolder("packed-cache")
         writeMinimalEpubArchive(archive, title = "Packed Book")
 
-        val book = EpubBookParser().parsePacked(archive, cacheRoot)
+        val book = parser().parsePacked(archive, cacheRoot)
 
         assertEquals("Packed Book", book.title)
         assertEquals(listOf("OPS/text/chapter-1.xhtml", "OPS/text/chapter-2.xhtml"), book.chapters.map { it.href })
@@ -117,7 +121,7 @@ class EpubBookParserTest {
         val root = tempFolder.newFolder("english-book")
         writeMinimalExtractedEpub(root, title = "English Book", language = "en-US")
 
-        val book = EpubBookParser().parse(root)
+        val book = parser().parse(root)
 
         assertEquals("en-US", book.language)
     }
@@ -127,7 +131,7 @@ class EpubBookParserTest {
         val root = tempFolder.newFolder("authored-book")
         writeMinimalExtractedEpub(root, author = "  Jane Doe  ")
 
-        val book = EpubBookParser().parse(root)
+        val book = parser().parse(root)
 
         assertEquals("Jane Doe", book.author)
     }
@@ -141,7 +145,7 @@ class EpubBookParserTest {
             coverProperties = null,
         )
 
-        val book = EpubBookParser().parse(root)
+        val book = parser().parse(root)
 
         assertEquals("OPS/images/cover.jpg", book.coverHref)
     }
@@ -155,7 +159,7 @@ class EpubBookParserTest {
             coverProperties = null,
         )
 
-        val book = EpubBookParser().parse(root)
+        val book = parser().parse(root)
 
         assertEquals(null, book.coverHref)
     }
@@ -181,7 +185,7 @@ class EpubBookParserTest {
             images = emptyList(),
         )
 
-        val book = EpubBookParser().parse(
+        val book = parser().parse(
             root,
             cachedBookInfo = cachedBookInfoWithoutFragmentOffsets,
         )
@@ -208,7 +212,7 @@ class EpubBookParserTest {
         val root = tempFolder.newFolder("nested-epub2-ncx")
         writeNestedEpub2NcxFixture(root)
 
-        val book = EpubBookParser().parse(root)
+        val book = parser().parse(root)
 
         assertEquals(
             listOf("OEBPS/Text/chapter.xhtml#part-1"),
@@ -229,9 +233,9 @@ class EpubBookParserTest {
         val cacheRoot = tempFolder.newFolder("stable-cache")
         writeMinimalEpubArchive(archive, title = "Stable Packed Book")
 
-        val first = EpubBookParser().parsePacked(archive, cacheRoot)
+        val first = parser().parsePacked(archive, cacheRoot)
         val firstRoot = first.rootDirectory
-        val second = EpubBookParser().parsePacked(archive, cacheRoot)
+        val second = parser().parsePacked(archive, cacheRoot)
 
         assertEquals(firstRoot?.canonicalFile, second.rootDirectory?.canonicalFile)
         assertEquals(1, cacheRoot.listFiles().orEmpty().count { it.isDirectory })
@@ -251,7 +255,7 @@ class EpubBookParserTest {
                 "OPS/text/chapter-2.xhtml" to BookInfo.ChapterInfo(1, 5, 6),
             ),
         )
-        val parser = EpubBookParser()
+        val parser = parser()
 
         val regenerated = parser.parse(root, cachedBookInfo = stale)
         val reused = parser.parse(root, cachedBookInfo = regenerated.bookInfo)
@@ -282,7 +286,7 @@ class EpubBookParserTest {
             images = emptyList(),
             readerFactsVersion = 2,
         )
-        val parser = EpubBookParser()
+        val parser = parser()
 
         val regenerated = parser.parse(root, cachedBookInfo = stale)
         val reused = parser.parse(root, cachedBookInfo = regenerated.bookInfo)
@@ -306,7 +310,7 @@ class EpubBookParserTest {
         val archive = tempFolder.newFile("incomplete-cache.epub")
         val cacheRoot = tempFolder.newFolder("incomplete-cache")
         writeMinimalEpubArchive(archive, title = "Incomplete Cache Book")
-        val parser = EpubBookParser()
+        val parser = parser()
         val first = parser.parsePacked(archive, cacheRoot)
         val extractedRoot = requireNotNull(first.rootDirectory)
         val missingChapter = extractedRoot.resolve("OPS/text/chapter-2.xhtml")
@@ -329,9 +333,9 @@ class EpubBookParserTest {
         writeMinimalEpubArchive(firstArchive, title = "First Packed Book")
         writeMinimalEpubArchive(secondArchive, title = "Second Packed Book")
 
-        val first = EpubBookParser().parsePacked(firstArchive, cacheRoot)
+        val first = parser().parsePacked(firstArchive, cacheRoot)
         val firstRoot = first.rootDirectory?.canonicalFile
-        val second = EpubBookParser().parsePacked(secondArchive, cacheRoot)
+        val second = parser().parsePacked(secondArchive, cacheRoot)
         val secondRoot = second.rootDirectory?.canonicalFile
 
         assertTrue(secondRoot?.isDirectory == true)
@@ -348,7 +352,7 @@ class EpubBookParserTest {
         val root = tempFolder.newFolder("renamed-book")
         writeMinimalEpubArchive(root.resolve("original.epub"), title = "Packed Book")
         root.resolve("metadata.json").writeText("""{"id":"book","title":"Packed Book","folder":"renamed-book","lastAccess":0,"epub":"original.epub"}""")
-        assertEquals("Packed Book", EpubBookParser().parse(root).title)
+        assertEquals("Packed Book", parser().parse(root).title)
     }
 
     @Test
@@ -370,7 +374,7 @@ class EpubBookParserTest {
             """.trimIndent(),
         )
 
-        val book = EpubBookParser().parse(root)
+        val book = parser().parse(root)
 
         assertEquals("Inside Book", book.title)
     }
@@ -380,7 +384,7 @@ class EpubBookParserTest {
         val root = tempFolder.newFolder("same-dream-book")
         writeSameDreamLikeExtractedEpub(root)
 
-        val book = EpubBookParser().parse(root)
+        val book = parser().parse(root)
 
         assertEquals("また、同じ夢を見ていた", book.title)
         assertEquals(9, book.chapters.size)
@@ -393,7 +397,7 @@ class EpubBookParserTest {
         val root = tempFolder.newFolder("missing-title-book")
         writeExtractedEpub(root, title = " ")
 
-        val book = EpubBookParser().parse(root, fallbackTitle = "Source File")
+        val book = parser().parse(root, fallbackTitle = "Source File")
 
         assertEquals("Source File", book.title)
     }
@@ -405,7 +409,7 @@ class EpubBookParserTest {
         writeKadokawaLikeEpubArchive(archive)
         EpubArchiveExtractor().extract(archive, root)
 
-        val book = EpubBookParser().parse(root)
+        val book = parser().parse(root)
 
         assertEquals("他校の氷姫を助けたら、お友達から始める事になりました", book.title)
         assertEquals(16, book.chapters.size)
@@ -454,7 +458,7 @@ class EpubBookParserTest {
         root.resolve("OPS/text/chapter-1.xhtml").writeText(firstChapterHtml)
         root.resolve("OPS/text/chapter-2.xhtml").writeText(secondChapterHtml)
         root.resolve("OPS/styles/book.css").writeText("body {}")
-        root.resolve("OPS/images/cover.jpg").writeBytes(byteArrayOf(1, 2, 3))
+        writeTestEpubCover(root.resolve("OPS/images/cover.jpg"))
         root.resolve("OPS/js/kobo.js").writeText("")
         root.resolve("OPS/package.opf").writeText(
             """
@@ -637,7 +641,7 @@ class EpubBookParserTest {
         }
         root.resolve("item/style/book-style.css").writeText("body { writing-mode: vertical-rl; }")
         root.resolve("item/style/style-chuo.css").writeText(".h-valign-width { -epub-writing-mode: horizontal-tb; }")
-        root.resolve("item/image/cover.jpg").writeBytes(byteArrayOf(1, 2, 3))
+        writeTestEpubCover(root.resolve("item/image/cover.jpg"))
         root.resolve("item/standard.opf").writeText(
             """
             <?xml version="1.0" encoding="UTF-8"?>
@@ -690,7 +694,9 @@ class EpubBookParserTest {
                     """.trimIndent(),
                 )
             }
-            zip.writeTextEntry("item/image/cover.jpg", "cover")
+            zip.putNextEntry(ZipEntry("item/image/cover.jpg"))
+            zip.write(testEpubCoverBytes())
+            zip.closeEntry()
             zip.writeTextEntry(
                 "item/standard.opf",
                 """

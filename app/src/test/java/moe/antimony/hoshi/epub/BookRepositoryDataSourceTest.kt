@@ -246,12 +246,14 @@ class BookRepositoryDataSourceTest {
         val repository = BookRepository(Files.createTempDirectory("hoshi-packed-cover").toFile())
         val root = repository.createBookDirectory("packed-cover")
         writeMinimalEpubArchive(root.resolve("packed-cover.epub"), title = "Packed Cover")
-        val parsed = EpubBookParser().parse(root)
+        val parsed = EpubBookParser(root.resolve("parser-cache")) { file ->
+            javax.imageio.ImageIO.read(file)?.let { it.width to it.height }
+        }.parse(root)
 
         val coverPath = repository.metadataCoverPath(root, parsed)
 
         assertEquals("Books/packed-cover/cover.jpg", coverPath)
-        assertEquals(listOf(1, 2, 3), root.resolve("cover.jpg").readBytes().map(Byte::toInt))
+        org.junit.Assert.assertArrayEquals(parsed.readResource("OPS/images/cover.jpg"), root.resolve("cover.jpg").readBytes())
     }
 
     @Test

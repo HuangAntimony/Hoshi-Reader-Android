@@ -142,8 +142,14 @@ Validation guidance and failure injection methods are in
 - `EpubBookParser` resolves unsupported spine items through cycle-checked manifest
   fallbacks to HTML. Chapter resources, reader facts and media use the resolved
   href; the original href remains a navigation alias. Rebuilt reader facts restore
-  bookmarks from character counts. Parsing unwraps only lossless single-raster SVG
-  covers. On opening, `BookRepository.restoreCoverIfNeeded` reuses the parsed EPUB
+  bookmarks from character counts. Rust exposes explicit cover candidates in
+  EPUB 3 `cover-image` then EPUB 2 `meta name="cover"` order; Kotlin validates
+  local resources and bitmap dimensions, trying later declarations when a
+  preferred cover is unusable. The existing cover-ID heuristic applies only
+  without explicit candidates; body illustrations are never promoted to covers.
+  Parsing unwraps only lossless single-raster SVG covers and preserves complex
+  SVGs when no declared bitmap is usable.
+  On opening, `BookRepository.restoreCoverIfNeeded` reuses the parsed EPUB
   to replace missing/SVG covers with a local bitmap and marks only the cover for
   sync. Publication finishes across cancellation; repair failures stay nonfatal
   and retry on the next opening. Normal covers, books without a usable bitmap

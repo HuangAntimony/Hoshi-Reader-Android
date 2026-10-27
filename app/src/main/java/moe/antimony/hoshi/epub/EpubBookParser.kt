@@ -5,6 +5,7 @@ import uniffi.hoshiepub.TocNode as NativeTocNode
 import uniffi.hoshiepub.ManifestItem
 import uniffi.hoshiepub.parseExtractedEpub
 import java.io.File
+import java.net.URI
 import javax.inject.Inject
 import javax.xml.parsers.DocumentBuilderFactory
 import kotlinx.serialization.json.Json
@@ -136,10 +137,11 @@ class EpubBookParser internal constructor(
 
     private fun NativeEpubBook.toReaderBook(root: File, fallbackTitle: String?, cachedBookInfo: BookInfo?): EpubBook {
         val manifest = manifest().associateBy { it.id }
-        val declaredCoverHref = coverHref()
-            ?: manifest.values.firstOrNull { item ->
+        val coverCandidates = coverHrefs().distinct().ifEmpty {
+            listOfNotNull(manifest.values.firstOrNull { item ->
                 item.id.contains("cover", ignoreCase = true) && item.mediaType.isCoverFallbackImageType()
-            }?.href
+            }?.href)
+        }
         val contentDirectory = File(contentDir())
         val contentDirectoryPrefix = contentDirectory.relativeDirectoryHref(root)
         val guideTocHrefs = root.readGuideTocHrefs()
@@ -185,12 +187,7 @@ class EpubBookParser internal constructor(
         return EpubBook(
             title = title()?.ifBlank { null } ?: fallbackTitle?.takeIf { it.isNotBlank() } ?: root.nameWithoutExtension,
             language = language()?.ifBlank { null },
-            coverHref = declaredCoverHref?.let {
-                val href = contentDirectoryPrefix.resolveManifestHref(it)
-                if (manifest.values.any { item -> item.href == it && item.mediaType.equals("image/svg+xml", ignoreCase = true) }) {
-                    unwrapEpubSvgCover(root, href, rasterDimensions) ?: href
-                } else href
-            },
+            coverHref = selectCover(root, contentDirectoryPrefix, coverCandidates, manifest.values),
             toc = tocItems,
             chapters = chapters,
             resources = resources,
@@ -198,6 +195,27 @@ class EpubBookParser internal constructor(
             bookInfo = reusableBookInfo ?: buildBookInfo(chapters, tocItems, root),
             author = author()?.trim()?.takeIf { it.isNotEmpty() },
         )
+    }
+
+    private fun selectCover(root: File, contentPrefix: String, candidates: List<String>, manifest: Collection<ManifestItem>): String? {
+        var unsupportedSvg: String? = null
+        for (candidate in candidates) {
+            val uri = runCatching { URI(candidate.trim().replace(" ", "%20")) }.getOrNull() ?: continue
+            if (uri.isAbsolute || uri.rawAuthority != null || uri.path.orEmpty().startsWith('/') ||
+                uri.rawQuery != null || uri.rawFragment != null) continue
+            val href = contentPrefix.resolveManifestHref(candidate)
+            val file = root.canonicalFile.safeChildFile(href)?.takeIf { it.isFile && it.length() > 0 } ?: continue
+            val mediaType = manifest.firstOrNull { it.href == candidate }?.mediaType?.lowercase()
+            if (mediaType == "image/svg+xml") {
+                unwrapEpubSvgCover(root, href, rasterDimensions)?.let { return it }
+                // Preserve complex SVGs when no explicitly declared bitmap is usable.
+                if (unsupportedSvg == null) unsupportedSvg = href
+            } else {
+                val dimensions = runCatching { rasterDimensions(file) }.getOrNull() ?: continue
+                if (dimensions.first > 0 && dimensions.second > 0) return href
+            }
+        }
+        return unsupportedSvg
     }
 }
 
