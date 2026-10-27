@@ -18,6 +18,79 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TtsPlaybackControllerTest {
+    @Test fun restartWhilePausedStartsCurrentSentenceAndContinuesNormally() = runTest {
+        fixture { controller, output, _, _ ->
+            controller.startAt(0, 0, singleSentence = true); runCurrent()
+            controller.pause()
+            val preparations = output.prepareCount
+            controller.restartCurrentSentence(); runCurrent()
+            assertTrue(controller.state.value.playing)
+            assertEquals("東京です。", controller.state.value.sentence?.text)
+            assertEquals(preparations + 1, output.prepareCount)
+            output.enterNext(); runCurrent()
+            assertEquals("次です。", controller.state.value.sentence?.text)
+            assertTrue(controller.state.value.playing)
+        }
+    }
+
+    @Test fun restartUsesActualQueuedSentenceAcrossChapterAndRejectsOldCallbacks() = runTest {
+        val chapters = book.copy(chapters = listOf(
+            book.chapters.single().copy(html = "<p>一。</p>"),
+            EpubChapter("two", "two.xhtml", "application/xhtml+xml", "<p>二。三。</p>"),
+        ))
+        fixture(fixtureBook = chapters) { controller, output, _, _ ->
+            controller.play(); runCurrent()
+            val oldTokens = output.queued.keys.toList()
+            output.enterNext(notify = false)
+            controller.restartCurrentSentence(); runCurrent()
+            oldTokens.forEach(output.onTransition)
+            assertEquals("二。", controller.state.value.sentence?.text)
+            assertEquals(1, controller.state.value.sentence?.chapter)
+            assertTrue(controller.state.value.playing)
+            controller.restartCurrentSentence(); runCurrent()
+            assertEquals("二。", controller.state.value.sentence?.text)
+            output.enterNext(); runCurrent()
+            assertEquals("三。", controller.state.value.sentence?.text)
+            assertTrue(controller.state.value.playing)
+        }
+    }
+
+    @Test fun restartAfterLastSentenceStartsItAgain() = runTest {
+        fixture(fixtureBook = book.copy(chapters = listOf(book.chapters.single().copy(html = "<p>末尾。</p>")))) { controller, output, _, _ ->
+            controller.play(); runCurrent()
+            output.onEnded(); runCurrent()
+            assertFalse(controller.state.value.playing)
+            controller.restartCurrentSentence(); runCurrent()
+            assertTrue(controller.state.value.playing)
+            assertEquals("末尾。", controller.state.value.sentence?.text)
+            assertEquals(2, output.prepareCount)
+        }
+    }
+
+    @Test fun restartWhilePausedReconcilesUndeliveredTransitionWithinChapter() = runTest {
+        fixture { controller, output, _, _ ->
+            controller.play(); runCurrent()
+            output.enterNext(notify = false)
+            val resumeLookup = controller.pauseForLookup()
+            controller.restartCurrentSentence(); runCurrent()
+            assertEquals("次です。", controller.state.value.sentence?.text)
+            assertTrue(controller.state.value.playing)
+            controller.pause()
+            resumeLookup(); runCurrent()
+            assertFalse(controller.state.value.playing)
+        }
+    }
+
+    @Test fun restartAfterStopDoesNotStartOrSynthesize() = runTest {
+        fixture { controller, output, audio, _ ->
+            controller.stop()
+            controller.restartCurrentSentence(); runCurrent()
+            assertFalse(controller.state.value.playing)
+            assertEquals(0, output.playCount)
+            assertTrue(audio.requests.isEmpty())
+        }
+    }
+
     @Test fun prefetchStartsSeveralRequestsButQueuesOnlyInSourceOrder() = runTest {
         fixture(store = MemoryStore(prefetchPreferences(20)), fixtureBook = shortSentencesBook) { controller, output, audio, _ ->
             val gates = (1..ttsSynthesisConcurrency).map { CompletableDeferred<Unit>() }

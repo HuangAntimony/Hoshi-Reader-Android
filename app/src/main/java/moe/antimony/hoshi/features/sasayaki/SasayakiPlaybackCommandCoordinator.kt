@@ -79,6 +79,13 @@ class SasayakiPlaybackCommandCoordinator(
         return seek(target, startPlayback = isPlaying, revealCue = true)
     }
 
+    fun restartCurrentCue(currentTime: Double, delay: Double): Boolean {
+        val target = cueNavigation.restartCurrentCueSeekTime(currentTime, delay) ?: return false
+        playbackState.clearStopPlaybackTime()
+        playbackState.setTemporaryPlaybackReturnPosition(null)
+        return seek(target, startPlayback = true, revealCue = true)
+    }
+
     fun skipBackward(
         currentTime: Double,
         seconds: Int,

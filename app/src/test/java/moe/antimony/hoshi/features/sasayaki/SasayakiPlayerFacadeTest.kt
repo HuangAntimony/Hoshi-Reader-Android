@@ -214,6 +214,10 @@ class SasayakiPlayerFacadeTest {
             commands += "previousCue"
         }
 
+        override fun restartCurrentCue() {
+            commands += "restartCurrentCue"
+        }
+
         override fun skipForward(seconds: Int) {
             commands += "skipForward:$seconds"
         }

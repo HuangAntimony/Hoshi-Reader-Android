@@ -32,6 +32,7 @@ import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Replay
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.TravelExplore
 import androidx.compose.material.icons.rounded.Tune
@@ -536,6 +537,7 @@ internal fun ReaderBottomSafeProgress(
     onSasayakiSkipBackward: () -> Unit,
     onSasayakiTogglePlayback: () -> Unit,
     onSasayakiSkipForward: () -> Unit,
+    onRestartSentence: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val progress = readerBottomSafeProgressText(
@@ -562,6 +564,15 @@ internal fun ReaderBottomSafeProgress(
                     .height(sasayakiPlaybackControls.rowHeightDp.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                if (sasayakiPlaybackControls.showRestartSentenceButton) {
+                    ReaderBottomSafePlaybackButton(
+                        controls = sasayakiPlaybackControls,
+                        colors = colors,
+                        icon = Icons.Rounded.Replay,
+                        contentDescription = stringResource(R.string.reader_restart_sentence),
+                        onClick = onRestartSentence,
+                    )
+                }
                 ReaderBottomSafePlaybackButton(
                     controls = sasayakiPlaybackControls,
                     colors = colors,
@@ -601,10 +612,7 @@ internal fun ReaderBottomSafeProgress(
                         .align(Alignment.CenterEnd)
                         .fillMaxWidth()
                         .padding(
-                            start = (
-                                sasayakiPlaybackControls.buttonWidthDp * 3 +
-                                    sasayakiPlaybackControls.horizontalPaddingDp
-                                ).dp,
+                            start = sasayakiPlaybackControls.widthDp.dp,
                             end = sasayakiPlaybackControls.horizontalPaddingDp.dp,
                         )
                 } else {

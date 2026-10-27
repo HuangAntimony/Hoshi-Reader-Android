@@ -113,6 +113,10 @@ class SasayakiPlayer private constructor(
         controller.previousCue()
     }
 
+    fun restartCurrentCue() {
+        controller.restartCurrentCue()
+    }
+
     fun skipForward(seconds: Int) {
         controller.skipForward(seconds)
     }

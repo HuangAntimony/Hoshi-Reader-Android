@@ -20,6 +20,48 @@ class SasayakiPlaybackControllerDeferredCommandTest {
     val temporaryFolder = TemporaryFolder()
 
     @Test
+    fun restartStartsPausedCueAndIgnoresFixedSkipSetting() {
+        val cue = SasayakiMatch("current", 3.0, 5.0, "current", 0, 0, 7)
+        val displayed = mutableListOf<Pair<SasayakiMatch, Boolean>>()
+        val harness = controllerHarness(
+            matchData = SasayakiMatchData(listOf(cue), 0),
+            onCue = { match, reveal, _ -> displayed += match to reveal },
+        )
+        harness.controller.readerSkipButtonAction = SasayakiReaderSkipButtonAction.Seconds30
+
+        harness.controller.restartCurrentCue()
+
+        assertEquals(listOf("seek:3000", "start:1.0"), harness.engine.events)
+        assertTrue(harness.controller.isPlaying)
+        assertEquals(3.0, harness.controller.playback.lastPosition, 0.0)
+        assertTrue(displayed.contains(cue to true))
+
+        harness.engine.events.clear()
+        harness.controller.restartCurrentCue()
+        assertEquals(listOf("pause", "seek:3000", "start:1.0"), harness.engine.events)
+        assertTrue(harness.controller.isPlaying)
+    }
+
+    @Test
+    fun restartWithoutAnyCueDoesNotPrepareOrStartAudio() {
+        val harness = controllerHarness()
+        harness.controller.restartCurrentCue()
+        assertFalse(harness.preparer.prepared)
+        assertTrue(harness.engine.events.isEmpty())
+        assertFalse(harness.controller.isPlaying)
+    }
+
+    @Test
+    fun restartBeforeFirstCueDoesNotPrepareOrStartAudio() {
+        val harness = controllerHarness(matchData = SasayakiMatchData(
+            listOf(SasayakiMatch("first", 10.0, 12.0, "first", 0, 0, 5)), 0,
+        ))
+        harness.controller.restartCurrentCue()
+        assertFalse(harness.preparer.prepared)
+        assertTrue(harness.engine.events.isEmpty())
+    }
+
+    @Test
     fun skipForwardPreparesAudioBeforeSeekingWhenEngineIsNotLoadedYet() {
         val harness = controllerHarness()
 

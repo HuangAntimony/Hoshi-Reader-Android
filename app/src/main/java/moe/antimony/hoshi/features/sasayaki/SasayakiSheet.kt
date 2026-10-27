@@ -837,6 +837,11 @@ internal fun SharedReaderPlaybackSettings(
             checked = settings.reverseVerticalReaderSkipButtons,
             onCheckedChange = { onSettingsChange { current -> current.copy(reverseVerticalReaderSkipButtons = it) } },
         )
+        ReaderSheetSwitchRow(
+            label = stringResource(R.string.reader_show_restart_sentence_button),
+            checked = settings.showReaderRestartSentenceButton,
+            onCheckedChange = { onSettingsChange { current -> current.copy(showReaderRestartSentenceButton = it) } },
+        )
     }
     if (includeAudiobookControls) {
         SasayakiSettingsActionRow(

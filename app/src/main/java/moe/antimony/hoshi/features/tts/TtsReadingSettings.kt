@@ -9,6 +9,7 @@ internal fun SasayakiSettings.withTtsReadingSettings(update: SasayakiSettingsUpd
     return copy(
         showReaderBottomPlaybackControls = value.showReaderBottomPlaybackControls,
         reverseVerticalReaderSkipButtons = value.reverseVerticalReaderSkipButtons,
+        showReaderRestartSentenceButton = value.showReaderRestartSentenceButton,
         autoScroll = value.autoScroll,
         autoPause = value.autoPause,
         imageHoldSeconds = value.imageHoldSeconds,

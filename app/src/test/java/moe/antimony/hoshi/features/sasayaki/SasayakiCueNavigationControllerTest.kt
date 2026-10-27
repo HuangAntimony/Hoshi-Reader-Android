@@ -8,6 +8,25 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class SasayakiCueNavigationControllerTest {
+    @Test
+    fun restartUsesCurrentCueOrLastFinishedCueWithDelay() {
+        val navigation = SasayakiCueNavigationController(match)
+        listOf(
+            10.5 to 10.5, // Exact sentence start.
+            11.5 to 10.5,
+            14.5 to 10.5, // Gap after the first sentence.
+            15.5 to 15.5,
+            26.5 to 22.5, // Beyond the last sentence.
+        ).forEach { (time, expected) ->
+            assertEquals(expected, navigation.restartCurrentCueSeekTime(time, delay = 0.5)!!, 0.0)
+        }
+        assertNull(navigation.restartCurrentCueSeekTime(9.0, delay = 0.5))
+        assertNull(SasayakiCueNavigationController(null).restartCurrentCueSeekTime(20.0, delay = 0.5))
+        assertEquals(0.0, SasayakiCueNavigationController(SasayakiMatchData(
+            listOf(SasayakiMatch("first", 1.0, 4.0, "first", 0, 0, 5)), 0,
+        )).restartCurrentCueSeekTime(0.5, delay = -2.0)!!, 0.0)
+    }
+
     private val match = SasayakiMatchData(
         matches = listOf(
             SasayakiMatch("a", 10.0, 12.5, "alpha", 0, 0, 5),

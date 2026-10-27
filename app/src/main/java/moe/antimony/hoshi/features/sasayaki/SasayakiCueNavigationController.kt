@@ -35,6 +35,14 @@ class SasayakiCueNavigationController(matchData: SasayakiMatchData?) {
     fun cueAtPlaybackTime(time: Double, delay: Double): SasayakiMatch? =
         timeline.cueAt(time - delay)
 
+    fun restartCurrentCueSeekTime(currentTime: Double, delay: Double): Double? {
+        val playbackTime = currentTime - delay
+        val start = timeline.cueAt(playbackTime)?.startTime
+            ?: timeline.previousCue(before = playbackTime)
+            ?: return null
+        return (start + delay).coerceAtLeast(0.0)
+    }
+
     fun findCue(chapterIndex: Int, offset: Int): SasayakiMatch? =
         timeline.findCue(chapterIndex = chapterIndex, offset = offset)
 }

@@ -699,6 +699,9 @@
     <string name="sasayaki_show_bottom_playback_controls_help">在底部安全区显示后退、播放或暂停和快进控制。</string>
     <string name="sasayaki_skip_action">跳转操作</string>
     <string name="sasayaki_reverse_vertical_skip_buttons">纵排时反转</string>
+    <string name="reader_show_restart_sentence_button">显示句首重播按钮</string>
+    <string name="reader_show_restart_sentence_button_help">在底部播放控制左侧增加按钮，从当前句起始重新播放并继续播放后续内容。</string>
+    <string name="reader_restart_sentence">重播当前句</string>
     <string name="sasayaki_reverse_vertical_skip_buttons_help">纵排阅读时，仅交换阅读器底部跳转按钮的实际操作。</string>
     <string name="sasayaki_playback">播放</string>
     <string name="sasayaki_light_theme">浅色主题</string>

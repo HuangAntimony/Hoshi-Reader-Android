@@ -20,6 +20,7 @@ class TtsReadingSettingsTest {
             readerSkipButtonAction = SasayakiReaderSkipButtonAction.Seconds15, copyAudiobookToPrivateStorage = true)
         val edited = SasayakiSettings(autoScroll = false, autoPause = false, imageHoldSeconds = 2.5f,
             showReaderBottomPlaybackControls = false, reverseVerticalReaderSkipButtons = true,
+            showReaderRestartSentenceButton = true,
             lightTextColor = 1, lightBackgroundColor = 2, darkTextColor = 3, darkBackgroundColor = 4)
         assertEquals(edited.copy(enabled = current.enabled, syncEnabled = current.syncEnabled,
             showReaderToggle = current.showReaderToggle, readerSkipButtonAction = current.readerSkipButtonAction,

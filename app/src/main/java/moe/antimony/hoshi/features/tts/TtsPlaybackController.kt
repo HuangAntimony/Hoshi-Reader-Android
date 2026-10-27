@@ -189,6 +189,13 @@ class TtsPlaybackController internal constructor(
     fun previous() = move(-1)
     fun next() = move(1)
     fun repeat() = seek(state.value.index, startPlayback = true)
+    fun restartCurrentSentence() {
+        if (!preferences.settings.enabled || associated || position == null) return
+        pause()
+        // Reconcile an actual playlist transition before clearing its queue tokens.
+        invalidateUpcoming()
+        seek(state.value.index, startPlayback = true)
+    }
     private fun move(direction: Int, natural: Boolean = false) {
         val current = position ?: return
         val source = book ?: return

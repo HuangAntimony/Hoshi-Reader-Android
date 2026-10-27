@@ -131,6 +131,20 @@ fun SasayakiSettingsView(
                                     )
                                 },
                             )
+                            SettingsDivider()
+                            ListItem(
+                                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                                headlineContent = { Text(stringResource(R.string.reader_show_restart_sentence_button)) },
+                                supportingContent = { Text(stringResource(R.string.reader_show_restart_sentence_button_help)) },
+                                trailingContent = {
+                                    Switch(
+                                        checked = loadedSettings.showReaderRestartSentenceButton,
+                                        onCheckedChange = {
+                                            save { current -> current.copy(showReaderRestartSentenceButton = it) }
+                                        },
+                                    )
+                                },
+                            )
                         }
                         SettingsDivider()
                         ListItem(

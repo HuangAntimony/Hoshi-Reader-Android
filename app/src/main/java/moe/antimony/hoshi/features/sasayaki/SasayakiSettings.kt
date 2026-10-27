@@ -49,6 +49,7 @@ data class SasayakiSettings(
     val showReaderBottomPlaybackControls: Boolean = true,
     val readerSkipButtonAction: SasayakiReaderSkipButtonAction = SasayakiReaderSkipButtonAction.Cue,
     val reverseVerticalReaderSkipButtons: Boolean = false,
+    val showReaderRestartSentenceButton: Boolean = false,
     val copyAudiobookToPrivateStorage: Boolean = false,
     val autoScroll: Boolean = true,
     val autoPause: Boolean = true,
@@ -187,6 +188,7 @@ class SasayakiSettingsRepository(
             showReaderBottomPlaybackControls = this[KEY_SHOW_READER_BOTTOM_PLAYBACK_CONTROLS] ?: true,
             readerSkipButtonAction = SasayakiReaderSkipButtonAction.fromStorage(this[KEY_READER_SKIP_BUTTON_ACTION]),
             reverseVerticalReaderSkipButtons = this[KEY_REVERSE_VERTICAL_READER_SKIP_BUTTONS] ?: false,
+            showReaderRestartSentenceButton = this[KEY_SHOW_READER_RESTART_SENTENCE_BUTTON] ?: false,
             copyAudiobookToPrivateStorage = this[KEY_COPY_AUDIOBOOK_TO_PRIVATE_STORAGE] ?: false,
             autoScroll = this[KEY_AUTO_SCROLL] ?: true,
             autoPause = this[KEY_AUTO_PAUSE] ?: true,
@@ -207,6 +209,7 @@ class SasayakiSettingsRepository(
         this[KEY_SHOW_READER_BOTTOM_PLAYBACK_CONTROLS] = settings.showReaderBottomPlaybackControls
         this[KEY_READER_SKIP_BUTTON_ACTION] = settings.readerSkipButtonAction.name
         this[KEY_REVERSE_VERTICAL_READER_SKIP_BUTTONS] = settings.reverseVerticalReaderSkipButtons
+        this[KEY_SHOW_READER_RESTART_SENTENCE_BUTTON] = settings.showReaderRestartSentenceButton
         this[KEY_COPY_AUDIOBOOK_TO_PRIVATE_STORAGE] = settings.copyAudiobookToPrivateStorage
         this[KEY_AUTO_SCROLL] = settings.autoScroll
         this[KEY_AUTO_PAUSE] = settings.autoPause
@@ -231,6 +234,8 @@ class SasayakiSettingsRepository(
         private val KEY_READER_SKIP_BUTTON_ACTION = stringPreferencesKey("sasayakiReaderSkipButtonAction")
         private val KEY_REVERSE_VERTICAL_READER_SKIP_BUTTONS =
             booleanPreferencesKey("sasayakiReverseVerticalReaderSkipButtons")
+        private val KEY_SHOW_READER_RESTART_SENTENCE_BUTTON =
+            booleanPreferencesKey("showReaderRestartSentenceButton")
         private val KEY_COPY_AUDIOBOOK_TO_PRIVATE_STORAGE =
             booleanPreferencesKey("sasayakiCopyAudiobookToPrivateStorage")
         private val KEY_AUTO_SCROLL = booleanPreferencesKey("sasayakiAutoScroll")

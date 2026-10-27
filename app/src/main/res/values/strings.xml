@@ -701,6 +701,9 @@
     <string name="sasayaki_show_bottom_playback_controls_help">Show rewind, play or pause, and fast-forward controls in the bottom safe area.</string>
     <string name="sasayaki_skip_action">Skip Action</string>
     <string name="sasayaki_reverse_vertical_skip_buttons">Reverse in Vertical</string>
+    <string name="reader_show_restart_sentence_button">Show Sentence Replay Button</string>
+    <string name="reader_show_restart_sentence_button_help">Add a button to the left of the bottom playback controls to replay the current sentence and continue playback.</string>
+    <string name="reader_restart_sentence">Replay Current Sentence</string>
     <string name="sasayaki_reverse_vertical_skip_buttons_help">In vertical writing, swap only the bottom reader skip button actions.</string>
     <string name="sasayaki_playback">Playback</string>
     <string name="sasayaki_light_theme">Light Theme</string>

@@ -154,7 +154,11 @@ data class ReaderSasayakiBottomPlaybackControls(
     val buttonWidthDp: Int,
     val iconSizeDp: Int,
     val horizontalPaddingDp: Int,
-)
+    val showRestartSentenceButton: Boolean = false,
+) {
+    val widthDp: Int
+        get() = buttonWidthDp * (if (showRestartSentenceButton) 4 else 3) + horizontalPaddingDp
+}
 
 enum class ReaderSasayakiBottomSkipButtonAction {
     Backward,
@@ -377,6 +381,7 @@ fun readerSasayakiBottomPlaybackControls(
         buttonWidthDp = readerSasayakiBottomPlaybackButtonWidthDp(metrics.bottomSafeAreaDp),
         iconSizeDp = readerSasayakiBottomPlaybackIconSizeDp(metrics.bottomSafeAreaDp),
         horizontalPaddingDp = 18,
+        showRestartSentenceButton = settings.showReaderRestartSentenceButton,
     )
 
 private fun readerSasayakiBottomPlaybackButtonWidthDp(bottomSafeAreaDp: Int): Int =

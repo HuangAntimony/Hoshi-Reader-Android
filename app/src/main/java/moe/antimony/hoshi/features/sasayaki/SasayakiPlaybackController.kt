@@ -39,6 +39,7 @@ internal interface SasayakiPlaybackControllerContract {
     fun resumeAfterAutoPageHold()
     fun nextCue()
     fun previousCue()
+    fun restartCurrentCue()
     fun skipForward(seconds: Int)
     fun skipBackward(seconds: Int)
     fun seekTo(seconds: Double)
@@ -275,6 +276,13 @@ internal class SasayakiPlaybackController(
                 isPlaying = continuePlayback,
             )
         }
+    }
+
+    override fun restartCurrentCue() {
+        // Without a current/preceding cue this action must not even start the service.
+        if (cueNavigation.restartCurrentCueSeekTime(currentTime, delay) == null) return
+        clearAutoPageHoldResume()
+        withPreparedPlayback { playbackCommands.restartCurrentCue(currentTime, delay) }
     }
 
     override fun skipBackward(seconds: Int) {
