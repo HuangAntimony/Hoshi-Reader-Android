@@ -7,6 +7,7 @@ Release notes before v1.3.0 are in [CHANGELOG_ARCHIVE.md](CHANGELOG_ARCHIVE.md).
 
 ### Added
 
+- Optionally exit the reader with a single Back action without first revealing its controls, using a new Behavior setting that is off by default.
 - Revisit the last 100 full-text queries from the Dictionary tab and external lookups, with tap-to-search, individual deletion and clearing, without recording in-book lookups or subsequent character and word selections.
 
 - Sync books, reading progress, highlights, shelves, statistics and audiobook playback with Hoshi on iOS through Google Drive, including devices without Google Play Services, with less startup delay for large bookshelves and without replaying part of the current audiobook cue, losing newly created highlights when local state is synced, leaving deleted books as blank cloud entries or interrupting the bookshelf and progress display during batch imports.

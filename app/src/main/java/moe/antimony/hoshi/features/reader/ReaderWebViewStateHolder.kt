@@ -116,7 +116,7 @@ internal class ReaderWebViewStateHolder(
     }
 
     fun handleBackNavigation(): Boolean {
-        if (focusMode) {
+        if (focusMode && !effectiveSettings.exitReaderOnFirstBack) {
             exitFocusMode()
             return false
         }

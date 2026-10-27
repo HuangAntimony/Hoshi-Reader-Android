@@ -348,6 +348,7 @@ class ReaderSettingsRepositoryTest {
             assertFalse(settings.keepScreenOnWhileReading)
             assertFalse(settings.lockCurrentOrientation)
             assertFalse(settings.openLastReadBookOnLaunch)
+            assertFalse(settings.exitReaderOnFirstBack)
         }
     }
 
@@ -451,6 +452,7 @@ class ReaderSettingsRepositoryTest {
                 keepScreenOnWhileReading = true,
                 lockCurrentOrientation = true,
                 openLastReadBookOnLaunch = true,
+                exitReaderOnFirstBack = true,
             ),
         )
 
@@ -480,6 +482,7 @@ class ReaderSettingsRepositoryTest {
             assertTrue(migrated.keepScreenOnWhileReading)
             assertTrue(migrated.lockCurrentOrientation)
             assertTrue(migrated.openLastReadBookOnLaunch)
+            assertTrue(migrated.exitReaderOnFirstBack)
 
             repository.update { it.copy(fontSize = 31) }
             assertEquals(31, repository.settings.first().fontSize)
@@ -647,6 +650,23 @@ class ReaderSettingsRepositoryTest {
     }
 
     @Test
+    fun firstBackPreferenceDefaultsOffForExistingSettingsAndPersistsBothValues() = runBlocking {
+        repository().use { repository ->
+            repository.editPreferences {
+                this[booleanPreferencesKey("readerSettingsMigratedFromSharedPreferences")] = true
+            }
+            assertFalse(repository.settings.first().exitReaderOnFirstBack)
+
+            for (enabled in listOf(true, false)) {
+                repository.update { it.copy(exitReaderOnFirstBack = enabled) }
+
+                assertEquals(enabled, repository.settings.first().exitReaderOnFirstBack)
+                assertEquals(enabled, repository.preferences()[booleanPreferencesKey("exitReaderOnFirstBack")])
+            }
+        }
+    }
+
+    @Test
     fun profileModeScopesAppearanceFieldsButKeepsBehaviorFieldsGlobal() = runBlocking {
         val profileRepository = ProfileRepository(tempFolder.newFolder("files"))
         repository(profileRepository = profileRepository).use { repository ->
@@ -665,6 +685,7 @@ class ReaderSettingsRepositoryTest {
                     volumeKeysSeekSasayaki = true,
                     lockCurrentOrientation = true,
                     openLastReadBookOnLaunch = true,
+                    exitReaderOnFirstBack = true,
                 )
             }
 
@@ -684,6 +705,7 @@ class ReaderSettingsRepositoryTest {
             assertTrue(inherited.volumeKeysSeekSasayaki)
             assertTrue(inherited.lockCurrentOrientation)
             assertTrue(inherited.openLastReadBookOnLaunch)
+            assertTrue(inherited.exitReaderOnFirstBack)
 
             repository.update {
                 it.copy(
@@ -700,6 +722,7 @@ class ReaderSettingsRepositoryTest {
                     volumeKeysSeekSasayaki = false,
                     lockCurrentOrientation = false,
                     openLastReadBookOnLaunch = false,
+                    exitReaderOnFirstBack = false,
                 )
             }
 
@@ -718,6 +741,7 @@ class ReaderSettingsRepositoryTest {
             assertFalse(japanese.volumeKeysSeekSasayaki)
             assertFalse(japanese.lockCurrentOrientation)
             assertFalse(japanese.openLastReadBookOnLaunch)
+            assertFalse(japanese.exitReaderOnFirstBack)
         }
     }
 

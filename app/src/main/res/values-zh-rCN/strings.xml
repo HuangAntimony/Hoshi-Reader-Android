@@ -306,6 +306,7 @@
     <string name="reader_behavior_volume_keys_navigate_popup_terms">音量键跳转弹窗词条</string>
     <string name="reader_behavior_volume_keys_seek_sasayaki">音量键控制有声书 / TTS</string>
     <string name="reader_behavior_reverse_volume_key_direction">反转音量键方向</string>
+    <string name="reader_behavior_exit_reader_on_first_back">返回直接退出阅读器</string>
     <string name="reader_behavior_keep_screen_on">保持屏幕常亮</string>
     <string name="reader_behavior_lock_current_orientation">锁定当前屏幕方向</string>
     <string name="reader_behavior_open_last_read_book_on_launch">启动时打开最近阅读</string>

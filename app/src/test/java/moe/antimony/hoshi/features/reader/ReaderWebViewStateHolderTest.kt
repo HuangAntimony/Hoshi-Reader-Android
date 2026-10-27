@@ -930,6 +930,52 @@ class ReaderWebViewStateHolderTest {
     }
 
     @Test
+    fun firstBackCanCloseReaderWithoutRevealingChrome() {
+        val holder = stateHolder()
+        holder.syncSettings(ReaderSettings(exitReaderOnFirstBack = true))
+        holder.enterFocusModeForReaderInteraction()
+
+        assertTrue(holder.handleBackNavigation())
+        assertTrue(holder.focusMode)
+    }
+
+    @Test
+    fun backNavigationClosesReaderWithVisibleChromeForEitherPreference() {
+        for (exitOnFirstBack in listOf(false, true)) {
+            val holder = stateHolder()
+            holder.syncSettings(ReaderSettings(exitReaderOnFirstBack = exitOnFirstBack))
+
+            assertTrue(holder.handleBackNavigation())
+            assertFalse(holder.focusMode)
+        }
+    }
+
+    @Test
+    fun changingFirstBackPreferencePreservesContentAndUsesLatestValue() {
+        val holder = stateHolder(initialIndex = 2, initialProgress = 0.4)
+        holder.markWebViewRestored()
+        holder.enterFocusModeForReaderInteraction()
+        val restoreEpoch = holder.webViewRestoreEpoch
+        val position = holder.readerPosition
+
+        holder.syncSettings(ReaderSettings(exitReaderOnFirstBack = true))
+
+        assertTrue(holder.handleBackNavigation())
+        assertTrue(holder.focusMode)
+        assertEquals(restoreEpoch, holder.webViewRestoreEpoch)
+        assertEquals(position, holder.readerPosition)
+        assertFalse(holder.isWebViewRestoring)
+
+        holder.syncSettings(ReaderSettings(exitReaderOnFirstBack = false))
+
+        assertFalse(holder.handleBackNavigation())
+        assertFalse(holder.focusMode)
+        assertEquals(restoreEpoch, holder.webViewRestoreEpoch)
+        assertEquals(position, holder.readerPosition)
+        assertFalse(holder.isWebViewRestoring)
+    }
+
+    @Test
     fun replacingLookupStackKeepsBothNarrationSourcesPausedUntilFinalDismissal() {
         for (tts in listOf(false, true)) {
             val holder = stateHolder()

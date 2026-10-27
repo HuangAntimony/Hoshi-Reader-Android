@@ -146,6 +146,7 @@ data class ReaderSettings(
     val volumeKeysNavigatePopupTerms: Boolean = false,
     val volumeKeysSeekSasayaki: Boolean = false,
     val reverseVolumeKeyDirection: Boolean = false,
+    val exitReaderOnFirstBack: Boolean = false,
     val keepScreenOnWhileReading: Boolean = false,
     val lockCurrentOrientation: Boolean = false,
     val openLastReadBookOnLaunch: Boolean = false,
@@ -502,6 +503,7 @@ class ReaderSettingsStore(context: Context) : ReaderSettingsLegacySource {
         volumeKeysNavigatePopupTerms = preferences.getBoolean("volumeKeysNavigatePopupTerms", false),
         volumeKeysSeekSasayaki = preferences.getBoolean("volumeKeysSeekSasayaki", false),
         reverseVolumeKeyDirection = preferences.getBoolean("reverseVolumeKeyDirection", false),
+        exitReaderOnFirstBack = preferences.getBoolean("exitReaderOnFirstBack", false),
         keepScreenOnWhileReading = preferences.getBoolean("keepScreenOnWhileReading", false),
         lockCurrentOrientation = preferences.getBoolean("lockCurrentOrientation", false),
         openLastReadBookOnLaunch = preferences.getBoolean("openLastReadBookOnLaunch", false),
@@ -577,6 +579,7 @@ class ReaderSettingsStore(context: Context) : ReaderSettingsLegacySource {
             .putBoolean("volumeKeysNavigatePopupTerms", settings.volumeKeysNavigatePopupTerms)
             .putBoolean("volumeKeysSeekSasayaki", settings.volumeKeysSeekSasayaki)
             .putBoolean("reverseVolumeKeyDirection", settings.reverseVolumeKeyDirection)
+            .putBoolean("exitReaderOnFirstBack", settings.exitReaderOnFirstBack)
             .putBoolean("keepScreenOnWhileReading", settings.keepScreenOnWhileReading)
             .putBoolean("lockCurrentOrientation", settings.lockCurrentOrientation)
             .putBoolean("openLastReadBookOnLaunch", settings.openLastReadBookOnLaunch)
@@ -777,6 +780,7 @@ class ReaderSettingsRepository(
             volumeKeysNavigatePopupTerms = this[KEY_VOLUME_KEYS_NAVIGATE_POPUP_TERMS] ?: false,
             volumeKeysSeekSasayaki = this[KEY_VOLUME_KEYS_SEEK_SASAYAKI] ?: false,
             reverseVolumeKeyDirection = this[KEY_REVERSE_VOLUME_KEY_DIRECTION] ?: false,
+            exitReaderOnFirstBack = this[KEY_EXIT_READER_ON_FIRST_BACK] ?: false,
             keepScreenOnWhileReading = this[KEY_KEEP_SCREEN_ON_WHILE_READING] ?: false,
             lockCurrentOrientation = this[KEY_LOCK_CURRENT_ORIENTATION] ?: false,
             openLastReadBookOnLaunch = this[KEY_OPEN_LAST_READ_BOOK_ON_LAUNCH] ?: false,
@@ -853,6 +857,7 @@ class ReaderSettingsRepository(
         this[KEY_VOLUME_KEYS_NAVIGATE_POPUP_TERMS] = settings.volumeKeysNavigatePopupTerms
         this[KEY_VOLUME_KEYS_SEEK_SASAYAKI] = settings.volumeKeysSeekSasayaki
         this[KEY_REVERSE_VOLUME_KEY_DIRECTION] = settings.reverseVolumeKeyDirection
+        this[KEY_EXIT_READER_ON_FIRST_BACK] = settings.exitReaderOnFirstBack
         this[KEY_KEEP_SCREEN_ON_WHILE_READING] = settings.keepScreenOnWhileReading
         this[KEY_LOCK_CURRENT_ORIENTATION] = settings.lockCurrentOrientation
         this[KEY_OPEN_LAST_READ_BOOK_ON_LAUNCH] = settings.openLastReadBookOnLaunch
@@ -869,6 +874,7 @@ class ReaderSettingsRepository(
         this[KEY_VOLUME_KEYS_NAVIGATE_POPUP_TERMS] = settings.volumeKeysNavigatePopupTerms
         this[KEY_VOLUME_KEYS_SEEK_SASAYAKI] = settings.volumeKeysSeekSasayaki
         this[KEY_REVERSE_VOLUME_KEY_DIRECTION] = settings.reverseVolumeKeyDirection
+        this[KEY_EXIT_READER_ON_FIRST_BACK] = settings.exitReaderOnFirstBack
         this[KEY_KEEP_SCREEN_ON_WHILE_READING] = settings.keepScreenOnWhileReading
         this[KEY_LOCK_CURRENT_ORIENTATION] = settings.lockCurrentOrientation
         this[KEY_OPEN_LAST_READ_BOOK_ON_LAUNCH] = settings.openLastReadBookOnLaunch
@@ -989,6 +995,7 @@ class ReaderSettingsRepository(
         private val KEY_VOLUME_KEYS_NAVIGATE_POPUP_TERMS = booleanPreferencesKey("volumeKeysNavigatePopupTerms")
         private val KEY_VOLUME_KEYS_SEEK_SASAYAKI = booleanPreferencesKey("volumeKeysSeekSasayaki")
         private val KEY_REVERSE_VOLUME_KEY_DIRECTION = booleanPreferencesKey("reverseVolumeKeyDirection")
+        private val KEY_EXIT_READER_ON_FIRST_BACK = booleanPreferencesKey("exitReaderOnFirstBack")
         private val KEY_KEEP_SCREEN_ON_WHILE_READING = booleanPreferencesKey("keepScreenOnWhileReading")
         private val KEY_LOCK_CURRENT_ORIENTATION = booleanPreferencesKey("lockCurrentOrientation")
         private val KEY_OPEN_LAST_READ_BOOK_ON_LAUNCH = booleanPreferencesKey("openLastReadBookOnLaunch")

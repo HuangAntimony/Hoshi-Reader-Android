@@ -308,6 +308,7 @@
     <string name="reader_behavior_volume_keys_navigate_popup_terms">Volume Keys Navigate Popup Terms</string>
     <string name="reader_behavior_volume_keys_seek_sasayaki">Volume Keys Control Audiobook / TTS</string>
     <string name="reader_behavior_reverse_volume_key_direction">Reverse Volume Key Direction</string>
+    <string name="reader_behavior_exit_reader_on_first_back">Exit Reader on First Back</string>
     <string name="reader_behavior_keep_screen_on">Keep Screen On</string>
     <string name="reader_behavior_lock_current_orientation">Lock Current Orientation</string>
     <string name="reader_behavior_open_last_read_book_on_launch">Open Last Read Book on Launch</string>

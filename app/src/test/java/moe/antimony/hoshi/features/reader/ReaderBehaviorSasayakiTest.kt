@@ -13,6 +13,7 @@ class ReaderBehaviorSasayakiTest {
                 R.string.reader_behavior_volume_keys_navigate_popup_terms,
                 R.string.reader_behavior_volume_keys_seek_sasayaki,
                 R.string.reader_behavior_reverse_volume_key_direction,
+                R.string.reader_behavior_exit_reader_on_first_back,
                 R.string.reader_behavior_keep_screen_on,
                 R.string.reader_behavior_lock_current_orientation,
                 R.string.reader_behavior_open_last_read_book_on_launch,
