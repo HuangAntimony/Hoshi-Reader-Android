@@ -52,11 +52,6 @@ internal class NakuruTranscriptAligner(book: EpubBook) {
         }
         val times = arrayOfNulls<Timing>(text.size)
         val anchors = mutableListOf(Anchor(0, 0))
-        chapters.firstOrNull { it.length >= 12 }?.let { chapter ->
-            find(speech, normalized.subList(chapter.start, chapter.start + 12), 0, speech.size)?.let {
-                anchors[0] = Anchor(it, chapter.start)
-            }
-        }
         var cursor = 0
         var hit = 0
         for (index in 0..speech.size - 12 step 100) {
@@ -68,6 +63,18 @@ internal class NakuruTranscriptAligner(book: EpubBook) {
             hit = index
             val previous = anchors.last()
             if (index > previous.speech && found > previous.book) anchors += Anchor(index, found)
+        }
+        chapters.firstOrNull { it.length >= 12 }?.let { chapter ->
+            // Establish sequential anchors first: a later repetition of the opening
+            // must not move the origin past speech already located in the book.
+            val next = anchors.getOrNull(1)
+            if (next != null && next.book <= chapter.start) return@let
+            val probe = normalized.subList(chapter.start, chapter.start + 12)
+            // The probe may overlap the next anchor, but its start must precede it.
+            val high = next?.let { minOf(speech.size, it.speech + probe.size - 1) } ?: speech.size
+            find(speech, probe, 0, high)?.let {
+                anchors[0] = Anchor(it, chapter.start)
+            }
         }
         chapters.filter { it.length >= 12 }.forEach { chapter ->
             val probe = normalized.subList(chapter.start, chapter.start + 12)

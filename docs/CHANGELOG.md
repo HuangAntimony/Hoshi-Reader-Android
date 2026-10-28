@@ -46,7 +46,7 @@ Release notes before v1.3.0 are in [CHANGELOG_ARCHIVE.md](CHANGELOG_ARCHIVE.md).
 - Preserve lookup access to dictionaries excluded from aggregate Anki fields, and handle selected-definition fallbacks correctly.
 - Keep audio-source menus inside scaled lookup popups.
 - Show useful error details when operations fail, and improve update checks when download mirrors return invalid responses.
-- Improve Japanese audiobook transcription with Nakuru on 64-bit and 32-bit ARM, resumable component downloads and live cue updates; remove retired model files while preserving book data.
+- Improve Japanese audiobook transcription with Nakuru on 64-bit and 32-bit ARM, resumable component downloads and live cue updates, preserving earlier matches when opening text repeats later during transcription or realignment; remove retired model files while preserving book data.
 
 ## [v1.4.0] - 2026-09-24
 

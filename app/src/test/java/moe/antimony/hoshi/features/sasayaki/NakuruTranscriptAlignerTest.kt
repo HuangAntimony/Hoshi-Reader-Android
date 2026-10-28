@@ -107,6 +107,56 @@ class NakuruTranscriptAlignerTest {
         assertEquals(40, result.matches.count { it.chapterIndex == 11 })
     }
 
+    @Test fun laterExactOpeningPreservesEarlierMatchesInLiveAndFreshAlignment() = runTest {
+        val random = Random(3)
+        val opening = kana(random, 24)
+        val story = sentences(random, 60)
+        val ending = sentences(random, 10)
+        val book = book(listOf(opening), story, listOf(opening) + ending)
+        val speech = Speech(random)
+        speech.say(opening.replaceRange(5, 5, "あ"))
+        story.forEach { speech.say(it) }
+        val beforeRepeat = speech.tokens.size
+        speech.say(opening)
+        ending.forEach { speech.say(it) }
+        val repeatTime = speech.tokens[beforeRepeat].start
+        val live = NakuruTranscriptAligner(book)
+
+        for (count in listOf(beforeRepeat, beforeRepeat + 3, speech.tokens.size)) {
+            val result = live.align(speech.tokens.take(count))
+            assertEquals("The earlier story must remain matched at prefix $count",
+                60, result.matches.count { it.chapterIndex == 1 })
+            assertTrue("The opening must retain its original audio time at prefix $count",
+                result.matches.single { it.chapterIndex == 0 }.endTime < repeatTime)
+        }
+
+        // Realign after completion starts with no previous live matches to preserve.
+        val fresh = NakuruTranscriptAligner(book).align(speech.tokens)
+        assertEquals(60, fresh.matches.count { it.chapterIndex == 1 })
+        assertTrue(fresh.matches.single { it.chapterIndex == 0 }.endTime < repeatTime)
+        assertEquals(11, fresh.matches.count { it.chapterIndex == 2 })
+        assertTrue(fresh.matches.first { it.chapterIndex == 2 }.startTime >= repeatTime - .5)
+        assertEquals(fresh, live.align(speech.tokens))
+    }
+
+    @Test fun openingOverlappingFirstSequentialAnchorSurvivesLongNarrationLeadIn() = runTest {
+        val random = Random(5)
+        val story = List(11) { kana(random, 24) }
+        for (repeatOpening in listOf(false, true)) {
+            val paragraphs = if (repeatOpening) story + story.first() else story
+            val speech = Speech(random)
+            // The opening begins five characters before the next 100-character probe.
+            speech.say("ん".repeat(2095))
+            val openingTime = speech.tokens.last().end
+            paragraphs.forEach { speech.say(it) }
+
+            val result = NakuruTranscriptAligner(book(paragraphs)).align(speech.tokens)
+
+            assertEquals("Repeated opening: $repeatOpening", paragraphs, result.matches.map { it.text })
+            assertTrue(result.matches.first().startTime >= openingTime)
+        }
+    }
+
     private class Speech(private val random: Random) {
         val tokens = mutableListOf<SasayakiToken>()
         private var time = 0.0
