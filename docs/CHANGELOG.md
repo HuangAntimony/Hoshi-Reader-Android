@@ -7,6 +7,8 @@ Release notes before v1.3.0 are in [CHANGELOG_ARCHIVE.md](CHANGELOG_ARCHIVE.md).
 
 ### Added
 
+- Choose AnkiDroid or kuma3 Anki as the card-making client, including deck and note-type fetching, media export, duplicate checks, note browsing and synchronization.
+
 - Optionally show a sentence replay button beside the reader’s bottom playback controls to restart the current Sasayaki or TTS sentence and continue playback.
 - Optionally exit the reader with a single Back action without first revealing its controls, using a new Behavior setting that is off by default.
 - Revisit the last 100 full-text queries from the Dictionary tab and external lookups, with tap-to-search, individual deletion and clearing, without recording in-book lookups or subsequent character and word selections.

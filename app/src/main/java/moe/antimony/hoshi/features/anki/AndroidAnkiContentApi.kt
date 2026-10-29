@@ -1,12 +1,11 @@
 package moe.antimony.hoshi.features.anki
 
 import android.content.Context
+import android.content.ContentValues
 import android.content.Intent
 import android.net.Uri
 import android.util.Log
-import dagger.hilt.android.qualifiers.ApplicationContext
 import com.ichi2.anki.FlashCardsContract
-import com.ichi2.anki.api.AddContentApi
 import java.lang.SecurityException
 import java.math.BigInteger
 import java.net.URLEncoder
@@ -15,29 +14,54 @@ import java.security.MessageDigest
 import java.text.Normalizer
 import java.util.Locale
 import kotlinx.coroutines.CancellationException
-import javax.inject.Inject
 
-class AndroidAnkiContentApi @Inject constructor(
-    @ApplicationContext
+class AndroidAnkiContentApi(
     context: Context,
+    private val client: AnkiDroidClient = AnkiDroidClient.AnkiDroid,
+    private val resolveProviderPackage: (String) -> String? = { authority ->
+        context.applicationContext.packageManager.resolveContentProvider(authority, 0)?.packageName
+    },
 ) : AnkiContentApi {
     private val appContext = context.applicationContext
-    private val api = AddContentApi(appContext)
+    private val resolver = appContext.contentResolver
+    private fun contentUri(path: String): Uri = Uri.parse("content://${client.authority}/$path")
 
     override fun deckList(): Map<Long, String> =
         readAnkiApi(AnkiFetchFailure.DeckListUnavailable) {
-            api.deckList ?: throw AnkiFetchException(AnkiFetchFailure.DeckListUnavailable)
+            val cursor = resolver.query(contentUri("decks"), null, null, null, null)
+                ?: throw AnkiFetchException(AnkiFetchFailure.DeckListUnavailable)
+            cursor.use {
+                buildMap {
+                    while (it.moveToNext()) put(
+                        it.getLong(it.getColumnIndexOrThrow(FlashCardsContract.Deck.DECK_ID)),
+                        it.getString(it.getColumnIndexOrThrow(FlashCardsContract.Deck.DECK_NAME)),
+                    )
+                }
+            }
         }
 
     override fun modelList(): Map<Long, String> =
         readAnkiApi(AnkiFetchFailure.ModelListUnavailable) {
-            api.modelList ?: throw AnkiFetchException(AnkiFetchFailure.ModelListUnavailable)
+            val cursor = resolver.query(contentUri("models"), null, null, null, null)
+                ?: throw AnkiFetchException(AnkiFetchFailure.ModelListUnavailable)
+            cursor.use {
+                buildMap {
+                    while (it.moveToNext()) put(
+                        it.getLong(it.getColumnIndexOrThrow(FlashCardsContract.Model._ID)),
+                        it.getString(it.getColumnIndexOrThrow(FlashCardsContract.Model.NAME)),
+                    )
+                }
+            }
         }
 
     override fun fieldList(modelId: Long): List<String> =
         readAnkiApi(AnkiFetchFailure.ModelFieldsUnavailable) {
-            api.getFieldList(modelId)?.toList()
+            val cursor = resolver.query(contentUri("models/$modelId"), null, null, null, null)
                 ?: throw AnkiFetchException(AnkiFetchFailure.ModelFieldsUnavailable)
+            cursor.use {
+                if (!it.moveToFirst()) throw AnkiFetchException(AnkiFetchFailure.ModelFieldsUnavailable)
+                it.getString(it.getColumnIndexOrThrow(FlashCardsContract.Model.FIELD_NAMES)).split('\u001f')
+            }
         }
 
     override fun findDuplicateNotes(
@@ -55,8 +79,8 @@ class AndroidAnkiContentApi @Inject constructor(
             selectedDeck = deck,
             duplicateScope = duplicateScope,
         )
-        val cursor = appContext.contentResolver.query(
-            FlashCardsContract.Note.CONTENT_URI_V2,
+        val cursor = resolver.query(
+            contentUri("notes_v2"),
             NoteProjection,
             ankiDuplicateNoteSelection(
                 modelId = modelId,
@@ -82,24 +106,52 @@ class AndroidAnkiContentApi @Inject constructor(
         deckId: Long,
         fields: Array<String>,
         tags: Set<String>,
-    ): Long? = api.addNote(modelId, deckId, fields, tags)
+    ): Long? {
+        val values = ContentValues().apply {
+            put(FlashCardsContract.Note.MID, modelId)
+            put(FlashCardsContract.Note.FLDS, fields.joinToString("\u001f"))
+            put(FlashCardsContract.Note.TAGS, tags.joinToString(" "))
+        }
+        val inserted = resolver.insert(contentUri("notes"), values) ?: return null
+        val noteId = inserted.lastPathSegment?.toLongOrNull() ?: return null
+        // kuma3 can return the official authority. Only the ID belongs to this response;
+        // subsequent requests must remain bound to the selected collection.
+        val cardsUri = contentUri("notes/$noteId/cards")
+        val cards = resolver.query(cardsUri, arrayOf(FlashCardsContract.Card.CARD_ORD), null, null, null)
+            ?: return null
+        cards.use {
+            while (it.moveToNext()) {
+                val ordinal = it.getInt(it.getColumnIndexOrThrow(FlashCardsContract.Card.CARD_ORD))
+                val deckValues = ContentValues().apply { put(FlashCardsContract.Card.DECK_ID, deckId) }
+                if (resolver.update(Uri.withAppendedPath(cardsUri, ordinal.toString()), deckValues, null, null) <= 0) {
+                    throw IllegalStateException("${client.displayName} could not move card $ordinal of note $noteId to deck $deckId.")
+                }
+            }
+        }
+        return noteId
+    }
 
-    override fun addMediaFromUri(uriString: String, preferredName: String, mimeType: String): String? =
-        api.addMediaFromUri(
-            Uri.parse(uriString),
-            ankiPreferredMediaName(preferredName),
-            if (mimeType.startsWith("audio/")) "audio" else "image",
-        )
+    override fun addMediaFromUri(uriString: String, preferredName: String, mimeType: String): String? {
+        val fileUri = Uri.parse(uriString)
+        appContext.grantUriPermission(client.packageName, fileUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        val values = ContentValues().apply {
+            put(FlashCardsContract.AnkiMedia.FILE_URI, uriString)
+            put(FlashCardsContract.AnkiMedia.PREFERRED_NAME, ankiPreferredMediaName(preferredName).replace(' ', '_'))
+        }
+        val result = resolver.insert(contentUri("media"), values) ?: return null
+        val name = result.path?.removePrefix("/")?.takeIf { it.isNotEmpty() } ?: return null
+        return if (mimeType.startsWith("audio/")) "[sound:$name]" else "<img src=\"$name\" />"
+    }
 
     override fun sync(): Boolean {
-        appContext.startActivity(ankiDroidSyncIntent())
+        appContext.startActivity(ankiDroidSyncIntent(client.packageName))
         return true
     }
 
     override fun openNotes(query: String): Boolean {
         val spec = ankiDroidBrowserIntentSpec(
             query = query,
-            packageName = AddContentApi.getAnkiDroidPackageName(appContext) ?: "com.ichi2.anki",
+            packageName = client.packageName,
         )
         appContext.startActivity(
             Intent(spec.action, Uri.parse(spec.uri)).apply {
@@ -111,7 +163,7 @@ class AndroidAnkiContentApi @Inject constructor(
     }
 
     override fun isAvailable(): Boolean =
-        AddContentApi.getAnkiDroidPackageName(appContext) != null
+        resolveProviderPackage(client.authority) == client.packageName
 
     private inline fun <T> readAnkiApi(fallbackFailure: AnkiFetchFailure, block: () -> T): T {
         if (!isAvailable()) throw AnkiFetchException(AnkiFetchFailure.ApiUnavailable)
@@ -122,19 +174,19 @@ class AndroidAnkiContentApi @Inject constructor(
         } catch (error: AnkiFetchException) {
             throw error
         } catch (error: SecurityException) {
-            logAnkiApiFailure("AnkiDroid database permission denied.", error)
+            logAnkiApiFailure("${client.displayName} database permission denied.", error)
             throw AnkiFetchException(AnkiFetchFailure.PermissionDenied, cause = error)
         } catch (error: Throwable) {
-            logAnkiApiFailure("AnkiDroid API request failed.", error)
+            logAnkiApiFailure("${client.displayName} API request failed.", error)
             throw AnkiFetchException(fallbackFailure, cause = error)
         }
     }
 
     private fun noteHasCardInDeck(noteId: Long, deckIds: Set<Long>): Boolean {
         if (deckIds.isEmpty()) return false
-        val noteUri = Uri.withAppendedPath(FlashCardsContract.Note.CONTENT_URI, noteId.toString())
+        val noteUri = contentUri("notes/$noteId")
         val cardUri = Uri.withAppendedPath(noteUri, "cards")
-        val cursor = appContext.contentResolver.query(
+        val cursor = resolver.query(
             cardUri,
             CardProjection,
             null,
@@ -161,8 +213,8 @@ private fun logAnkiApiFailure(message: String, error: Throwable) {
     runCatching { Log.w("AndroidAnkiContentApi", message, error) }
 }
 
-internal fun ankiDroidSyncIntent(): Intent =
-    ankiDroidSyncIntentSpec().let { spec ->
+internal fun ankiDroidSyncIntent(packageName: String = AnkiDroidClient.AnkiDroid.packageName): Intent =
+    ankiDroidSyncIntentSpec(packageName).let { spec ->
         Intent(spec.action).apply {
             setPackage(spec.packageName)
             spec.categories.forEach(::addCategory)
@@ -177,10 +229,10 @@ internal data class AnkiDroidSyncIntentSpec(
     val flags: Int,
 )
 
-internal fun ankiDroidSyncIntentSpec(): AnkiDroidSyncIntentSpec =
+internal fun ankiDroidSyncIntentSpec(packageName: String = AnkiDroidClient.AnkiDroid.packageName): AnkiDroidSyncIntentSpec =
     AnkiDroidSyncIntentSpec(
         action = "com.ichi2.anki.DO_SYNC",
-        packageName = "com.ichi2.anki",
+        packageName = packageName,
         categories = setOf(Intent.CATEGORY_DEFAULT),
         flags = Intent.FLAG_ACTIVITY_NEW_TASK or
             Intent.FLAG_ACTIVITY_NO_HISTORY or

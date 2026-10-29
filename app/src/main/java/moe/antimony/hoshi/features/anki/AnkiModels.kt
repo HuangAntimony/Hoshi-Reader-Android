@@ -95,6 +95,8 @@ data class AnkiSettings(
     val schemaVersion: Int = AnkiSettingsSchemaVersion,
     val cardFormats: List<AnkiCardFormat> = emptyList(),
     val backendKind: AnkiBackendKind = AnkiBackendKind.AnkiDroid,
+    val ankiDroidClient: AnkiDroidClient = AnkiDroidClient.AnkiDroid,
+    val ankiDroidClientRevision: Long = 0,
     val selectedDeckId: Long? = null,
     val selectedDeckName: String? = null,
     val selectedNoteTypeId: Long? = null,

@@ -40,6 +40,57 @@ import org.junit.rules.TemporaryFolder
 class AnkiViewModelReadinessTest {
     @get:Rule val files = TemporaryFolder()
 
+    @Test fun latestClientSelectionWinsBeforePendingWritesHaveBeenReadBack() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val settings = DelayedSettings(AnkiSettings())
+        val viewModel = AnkiViewModel(repository(settings))
+        try {
+            settings.firstRead.complete(Unit)
+            runCurrent()
+            // Both selections arrive before the queued writes/readback can run.
+            viewModel.updateAnkiDroidClient(AnkiDroidClient.Kuma3)
+            viewModel.updateAnkiDroidClient(AnkiDroidClient.AnkiDroid)
+            runCurrent()
+            assertEquals(AnkiDroidClient.AnkiDroid, settings.settings.first().ankiDroidClient)
+            assertEquals(AnkiDroidClient.AnkiDroid, viewModel.uiState.value.settings.ankiDroidClient)
+            assertEquals(2L, settings.settings.first().ankiDroidClientRevision)
+        } finally {
+            viewModel.viewModelScope.coroutineContext[Job]!!.cancelAndJoin()
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test fun permissionResultFromBeforeClientSwitchIsIgnoredAndCachesAreCleared() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val settings = DelayedSettings(AnkiSettings(
+            availableDecks = listOf(AnkiDeck(1, "Old deck")),
+            availableNoteTypes = listOf(AnkiNoteType(2, "Old type", listOf("Front"))),
+        ))
+        val viewModel = AnkiViewModel(repository(settings))
+        try {
+            settings.firstRead.complete(Unit)
+            runCurrent()
+            val request = requireNotNull(viewModel.createFetchRequest())
+            assertTrue(viewModel.isFetchRequestCurrent(request))
+            viewModel.updateAnkiDroidClient(AnkiDroidClient.Kuma3)
+            assertFalse(viewModel.isFetchRequestCurrent(request))
+            runCurrent()
+            assertTrue(viewModel.uiState.value.availableDecks.isEmpty())
+            assertTrue(viewModel.uiState.value.availableNoteTypes.isEmpty())
+            viewModel.onFetchPermissionResult(request, false)
+            viewModel.onFetchPermissionResult(request, true)
+            runCurrent()
+            assertEquals(null, viewModel.uiState.value.errorMessage)
+            assertFalse(viewModel.uiState.value.isFetching)
+            viewModel.updateAnkiDroidClient(AnkiDroidClient.AnkiDroid)
+            runCurrent()
+            assertFalse(viewModel.isFetchRequestCurrent(request))
+        } finally {
+            viewModel.viewModelScope.coroutineContext[Job]!!.cancelAndJoin()
+            Dispatchers.resetMain()
+        }
+    }
+
     @Test
     fun firstVisibleSettingsUseTheStoredValuesAndKeepFollowingUpdates() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))

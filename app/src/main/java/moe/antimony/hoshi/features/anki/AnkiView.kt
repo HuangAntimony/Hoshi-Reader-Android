@@ -64,6 +64,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddBox
 import androidx.compose.material.icons.filled.AddCircle
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
@@ -72,6 +74,7 @@ import androidx.compose.material.icons.filled.UnfoldMore
 import androidx.core.content.ContextCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.dictionary.DictionaryType
 import moe.antimony.hoshi.dictionary.DictionaryCategory
@@ -97,30 +100,37 @@ fun AnkiView(
     val viewModel: AnkiViewModel = hiltViewModel()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val nextFormatName = stringResource(R.string.anki_format_default_name, uiState.settings.cardFormats.size + 1)
-    var confirmFetch by remember(uiState.profileId) { mutableStateOf(false) }
+    var confirmFetch by remember(uiState.profileId, uiState.settings.connectionIdentity) { mutableStateOf(false) }
     var pendingDelete by remember(uiState.profileId) { mutableStateOf<AnkiFormatDeleteRequest?>(null) }
+    var pendingPermission by remember { mutableStateOf<AnkiFetchRequest?>(null) }
+    LifecycleResumeEffect(uiState.settings.ankiDroidClient) {
+        viewModel.isAnkiDroidAvailable()
+        onPauseOrDispose { }
+    }
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted ->
-        if (granted) {
-            viewModel.fetchConfiguration()
-        } else {
-            viewModel.showFetchPermissionDenied()
-        }
+        val request = pendingPermission
+        pendingPermission = null
+        if (request != null) viewModel.onFetchPermissionResult(request, granted)
     }
     val fetchAnki = {
-        when (
+        val request = viewModel.createFetchRequest()
+        if (request != null && pendingPermission == null) when (
             ankiFetchAction(
                 backendKind = uiState.settings.backendKind,
                 isAnkiDroidAvailable = viewModel.isAnkiDroidAvailable(),
                 permissionGranted = ContextCompat.checkSelfPermission(
                     context,
-                    AnkiDroidReadWritePermission,
+                    request.identity.client.readWritePermission,
                 ) == PackageManager.PERMISSION_GRANTED,
             )
         ) {
-            AnkiFetchAction.FetchConfiguration -> viewModel.fetchConfiguration()
-            AnkiFetchAction.RequestPermission -> permissionLauncher.launch(AnkiDroidReadWritePermission)
+            AnkiFetchAction.FetchConfiguration -> viewModel.fetchConfiguration(request)
+            AnkiFetchAction.RequestPermission -> {
+                pendingPermission = request
+                permissionLauncher.launch(request.identity.client.readWritePermission)
+            }
             AnkiFetchAction.ShowApiUnavailable -> viewModel.showFetchApiUnavailable()
         }
     }
@@ -142,14 +152,20 @@ fun AnkiView(
                 AnkiCard {
                     ListItem(
                         colors = ListItemDefaults.colors(containerColor = hoshiSurfaces.group),
-                        headlineContent = { Text(if (uiState.settings.backendKind == AnkiBackendKind.AnkiConnect) "AnkiConnect" else "AnkiDroid") },
+                        headlineContent = {
+                            if (uiState.settings.backendKind == AnkiBackendKind.AnkiDroid) {
+                                AnkiClientSelector(uiState.settings.ankiDroidClient, viewModel::updateAnkiDroidClient)
+                            } else {
+                                Text("AnkiConnect")
+                            }
+                        },
                         supportingContent = {
                             Column {
                                 Text(
                                     uiState.errorMessage?.asString() ?: if (uiState.settings.backendKind == AnkiBackendKind.AnkiConnect) {
                                         stringResource(R.string.anki_fetch_decks_ankiconnect)
                                     } else {
-                                        stringResource(R.string.anki_fetch_decks_ankidroid)
+                                        stringResource(R.string.anki_fetch_decks_ankidroid, uiState.settings.ankiDroidClient.displayName)
                                     },
                                 )
                                 if (uiState.errorAction == AnkiErrorAction.OpenPermissionSettings) {
@@ -166,7 +182,7 @@ fun AnkiView(
                             }
                         },
                         trailingContent = {
-                            TextButton(onClick = { confirmFetch = true }, enabled = !uiState.isFetching) {
+                            TextButton(onClick = { confirmFetch = true }, enabled = !uiState.isFetching && pendingPermission == null) {
                                 Text(
                                     if (uiState.isFetching) {
                                         stringResource(R.string.anki_fetching)
@@ -270,8 +286,8 @@ fun AnkiView(
                     if (uiState.settings.backendKind == AnkiBackendKind.AnkiDroid) {
                         AnkiDivider()
                         AnkiSwitchRow(
-                            label = stringResource(R.string.anki_droid_force_sync),
-                            supportingText = stringResource(R.string.anki_droid_force_sync_description),
+                            label = stringResource(R.string.anki_droid_force_sync, uiState.settings.ankiDroidClient.displayName),
+                            supportingText = stringResource(R.string.anki_droid_force_sync_description, uiState.settings.ankiDroidClient.displayName),
                             checked = uiState.settings.ankiDroidForceSync,
                             onCheckedChange = viewModel::updateAnkiDroidForceSync,
                         )
@@ -605,6 +621,42 @@ internal fun ankiPermissionSettingsIntent(packageName: String): Intent =
     )
 
 internal fun ankiPermissionSettingsUri(packageName: String): String = "package:$packageName"
+
+@Composable
+internal fun AnkiClientSelector(client: AnkiDroidClient, onSelect: (AnkiDroidClient) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        Row(
+            modifier = Modifier
+                .clickable { expanded = true }
+                .padding(vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(client.displayName)
+            Icon(
+                Icons.Default.ArrowDropDown,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            AnkiDroidClient.entries.forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(option.displayName) },
+                    trailingIcon = {
+                        if (option == client) Icon(Icons.Default.Check, contentDescription = null)
+                    },
+                    onClick = {
+                        expanded = false
+                        onSelect(option)
+                    },
+                )
+            }
+        }
+    }
+}
 
 @Composable
 private fun AnkiDeckRow(
@@ -952,5 +1004,3 @@ internal object AnkiHandlebarOptions {
                 } else emptyList()
             }
 }
-
-private const val AnkiDroidReadWritePermission = "com.ichi2.anki.permission.READ_WRITE_DATABASE"

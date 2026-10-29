@@ -94,6 +94,16 @@ adb -s "$hoshi_serial" shell am instrument -w -r \
 Report tested API/WebView versions, commands, results, artifact paths and any
 unexecuted checks in the current task.
 
+Anki client checks: `AnkiClientProviderTest` uses in-memory providers and
+`AnkiClientSelectionTest` uses an in-memory selection; neither changes a user's
+Anki collection or saved Hoshi settings. `AnkiKuma3SmokeTest` requires an installed,
+initialized kuma3 release and its database permission granted to the Hoshi test
+target. Opt in explicitly with `-e kuma3Smoke true` alongside its class name in
+the instrumentation command. It uses isolated Hoshi settings, creates a uniquely
+tagged note, checks fetching/mining/duplicates/browsing, saves `cache/kuma3-smoke.png`
+under the target app, and deletes only its tagged note in `finally`; it does not
+sign in or synchronize.
+
 ## Drive metadata timeout isolation
 
 Run `python3 tools/drive-metadata-isolation-fixture.py` on the host and

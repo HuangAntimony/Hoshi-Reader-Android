@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -27,6 +28,11 @@ interface AnkiSettingsRepository {
     val settings: Flow<AnkiSettings>
     val profileIds: Flow<String> get() = flowOf("default")
     suspend fun update(transform: (AnkiSettings) -> AnkiSettings)
+    suspend fun updateIfCurrent(profileId: String, transform: (AnkiSettings) -> AnkiSettings): Boolean {
+        if (profileIds.first() != profileId) return false
+        update(transform)
+        return true
+    }
     suspend fun updateAllProfiles(transform: (AnkiSettings) -> AnkiSettings) {
         update(transform)
     }
@@ -54,20 +60,38 @@ class DataStoreAnkiSettingsRepository(
         }
 
     override suspend fun update(transform: (AnkiSettings) -> AnkiSettings) {
+        val targetProfileId = profileRepository?.state?.value?.effectiveProfile?.id
+        updateProfile(targetProfileId, requireCurrent = false, transform)
+    }
+
+    override suspend fun updateIfCurrent(profileId: String, transform: (AnkiSettings) -> AnkiSettings): Boolean =
+        updateProfile(profileId.takeIf { profileRepository != null }, requireCurrent = true, transform)
+
+    private suspend fun updateProfile(
+        targetProfileId: String?,
+        requireCurrent: Boolean,
+        transform: (AnkiSettings) -> AnkiSettings,
+    ): Boolean {
+        var applied = false
         if (profileRepository == null) {
             dataStore.edit { preferences ->
                 val current = preferences.toAnkiSettings()
                 preferences[KEY_SETTINGS] = json.encodeToString(transform(current))
+                applied = true
             }
         } else {
             dataStore.edit { preferences ->
                 profileSettingsLock.withLock {
-                    val current = readProfileSettingsOrMigrate(preferences.toAnkiSettings())
-                    saveProfileSettings(transform(current))
+                    if (requireCurrent && profileRepository.state.value.effectiveProfile.id != targetProfileId) return@withLock
+                    val current = readProfileSettingsOrMigrate(preferences.toAnkiSettings(), targetProfileId)
+                    if (requireCurrent && profileRepository.state.value.effectiveProfile.id != targetProfileId) return@withLock
+                    saveProfileSettings(transform(current), targetProfileId)
+                    applied = true
                 }
                 profileSettingsVersion.value += 1
             }
         }
+        return applied
     }
 
     override suspend fun updateAllProfiles(transform: (AnkiSettings) -> AnkiSettings) {

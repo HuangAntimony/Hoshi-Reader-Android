@@ -22,7 +22,7 @@ class AnkiRepositoryFetchTest {
             .fetchConfiguration()
 
         assertEquals(
-            AnkiFetchResult.Error(UiText.Joined(listOf(UiText.Resource(R.string.anki_fetch_provider_failure), UiText.Literal("provider disconnected\ndatabase is locked")))),
+            AnkiFetchResult.Error(UiText.Joined(listOf(UiText.Resource(R.string.anki_fetch_provider_failure, "AnkiDroid"), UiText.Literal("provider disconnected\ndatabase is locked")))),
             result,
         )
     }
@@ -52,7 +52,7 @@ class AnkiRepositoryFetchTest {
 
         assertEquals(
             AnkiFetchResult.Error(
-                UiText.Resource(R.string.anki_fetch_api_unavailable),
+                UiText.Resource(R.string.anki_fetch_api_unavailable, "AnkiDroid"),
                 AnkiFetchFailure.ApiUnavailable,
             ),
             result,
@@ -69,7 +69,7 @@ class AnkiRepositoryFetchTest {
 
         assertEquals(
             AnkiFetchResult.Error(
-                UiText.Resource(R.string.anki_fetch_permission_denied),
+                UiText.Resource(R.string.anki_fetch_permission_denied, "AnkiDroid"),
                 AnkiFetchFailure.PermissionDenied,
             ),
             result,
@@ -82,7 +82,7 @@ class AnkiRepositoryFetchTest {
 
         val result = repository.fetchConfiguration()
 
-        assertEquals(AnkiFetchResult.Error(UiText.Resource(R.string.anki_fetch_no_ankidroid_decks)), result)
+        assertEquals(AnkiFetchResult.Error(UiText.Resource(R.string.anki_fetch_no_ankidroid_decks, "AnkiDroid")), result)
     }
 
     @Test
@@ -91,7 +91,7 @@ class AnkiRepositoryFetchTest {
 
         val result = repository.fetchConfiguration()
 
-        assertEquals(AnkiFetchResult.Error(UiText.Resource(R.string.anki_fetch_no_ankidroid_note_types)), result)
+        assertEquals(AnkiFetchResult.Error(UiText.Resource(R.string.anki_fetch_no_ankidroid_note_types, "AnkiDroid")), result)
     }
 
     @Test

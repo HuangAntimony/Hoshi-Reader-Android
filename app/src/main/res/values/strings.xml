@@ -566,7 +566,7 @@
     <string name="audio_local_source_save_failed">Unable to save local audio source settings.</string>
     <string name="audio_no_audio_found">No audio found</string>
     <string name="anki_fetch_decks_ankiconnect">Fetch decks and note types from AnkiConnect.</string>
-    <string name="anki_fetch_decks_ankidroid">Fetch decks and note types from AnkiDroid.</string>
+    <string name="anki_fetch_decks_ankidroid">Fetch decks and note types from %1$s.</string>
     <string name="anki_open_app_settings">Open App Settings</string>
     <string name="anki_fetching">Fetching</string>
     <string name="anki_deck" comment="Anki deck selector label, intentionally matching duplicate scope deck label.">Deck</string>
@@ -576,8 +576,8 @@
     <string name="anki_check_duplicates_all_models">Check for duplicates across all models</string>
     <string name="anki_duplicate_check_scope">Duplicate Check Scope</string>
     <string name="anki_compact_glossaries" comment="Anki setting label, intentionally matching dictionary compact glossaries.">Compact Glossaries</string>
-    <string name="anki_droid_force_sync">Sync AnkiDroid after adding card</string>
-    <string name="anki_droid_force_sync_description">Starts AnkiDroid sync after a card is added. AnkiDroid may ignore syncs run more often than every 5 minutes.</string>
+    <string name="anki_droid_force_sync">Sync %1$s after adding card</string>
+    <string name="anki_droid_force_sync_description">Starts %1$s sync after a card is added. %1$s may ignore syncs run more often than every 5 minutes.</string>
     <string name="anki_fields">Fields</string>
     <string name="anki_tags">Tags</string>
     <string name="anki_handlebar">Handlebar</string>
@@ -620,17 +620,17 @@
     <string name="anki_connect_force_sync">Force Sync on adding card</string>
     <string name="anki_connect_duplicate_scope">Duplicate Scope</string>
     <string name="anki_fetch_configure_failed">Unable to configure Anki.</string>
-    <string name="anki_fetch_api_unavailable">AnkiDroid is unavailable. Install AnkiDroid, then try again.</string>
-    <string name="anki_fetch_permission_denied">AnkiDroid database access was denied. Grant the permission to fetch decks and note types.</string>
-    <string name="anki_fetch_deck_list_unavailable">Unable to read AnkiDroid decks. Open AnkiDroid and try again.</string>
-    <string name="anki_fetch_model_list_unavailable">Unable to read AnkiDroid note types. Open AnkiDroid and try again.</string>
-    <string name="anki_fetch_model_fields_unavailable">Unable to read fields for one or more AnkiDroid note types.</string>
-    <string name="anki_fetch_provider_failure">AnkiDroid did not respond while fetching decks and note types. Open AnkiDroid and try again.</string>
+    <string name="anki_fetch_api_unavailable">%1$s is unavailable. Install %1$s, then try again.</string>
+    <string name="anki_fetch_permission_denied">%1$s database access was denied. Grant the permission to fetch decks and note types.</string>
+    <string name="anki_fetch_deck_list_unavailable">Unable to read %1$s decks. Open %1$s and try again.</string>
+    <string name="anki_fetch_model_list_unavailable">Unable to read %1$s note types. Open %1$s and try again.</string>
+    <string name="anki_fetch_model_fields_unavailable">Unable to read fields for one or more %1$s note types.</string>
+    <string name="anki_fetch_provider_failure">%1$s did not respond while fetching decks and note types. Open %1$s and try again.</string>
     <string name="anki_fetch_connect_ankiconnect_failed">Unable to connect to AnkiConnect. Check the URL and try again.</string>
     <string name="anki_fetch_ankiconnect_provider_failure">AnkiConnect did not respond while fetching decks and note types.</string>
-    <string name="anki_fetch_no_ankidroid_decks">No AnkiDroid decks were found.</string>
+    <string name="anki_fetch_no_ankidroid_decks">No %1$s decks were found.</string>
     <string name="anki_fetch_no_ankiconnect_decks">No AnkiConnect decks were found.</string>
-    <string name="anki_fetch_no_ankidroid_note_types">No AnkiDroid note types were found.</string>
+    <string name="anki_fetch_no_ankidroid_note_types">No %1$s note types were found.</string>
     <string name="anki_fetch_no_ankiconnect_note_types">No AnkiConnect note types were found.</string>
     <string name="anki_connect_invalid_url">Invalid AnkiConnect URL.</string>
     <string name="diagnostics_saved">Diagnostics saved.</string>

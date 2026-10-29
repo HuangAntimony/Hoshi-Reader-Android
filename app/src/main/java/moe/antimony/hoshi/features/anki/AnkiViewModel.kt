@@ -141,6 +141,12 @@ enum class AnkiErrorAction {
     OpenPermissionSettings,
 }
 
+internal data class AnkiFetchRequest(
+    val profileId: String,
+    val identity: AnkiConnectionIdentity,
+    val generation: Long,
+)
+
 @HiltViewModel
 internal class AnkiViewModel @Inject constructor(
     private val repository: AnkiRepository,
@@ -156,12 +162,13 @@ internal class AnkiViewModel @Inject constructor(
     private var configurationJob: Job? = null
     private var connectionJob: Job? = null
     private var exclusionsJob: Job? = null
+    private var fetchRequestGeneration = 0L
 
     init {
         viewModelScope.launch {
             combine(repository.profileIds, settingsRetry) { profileId, _ -> profileId }.onEach { profileId ->
                 if (activeProfileId != profileId) {
-                    configurationJob?.cancel()
+                    invalidateFetchRequests()
                     connectionJob?.cancel()
                     activeProfileId = profileId
                     attemptedAnkiConnectPing = false
@@ -191,6 +198,10 @@ internal class AnkiViewModel @Inject constructor(
                         _uiState.update { it.copy(settingsLoadState = loadState) }
                         return@settings
                     }
+                    if (_uiState.value.settings.connectionIdentity != settings.connectionIdentity) {
+                        invalidateFetchRequests()
+                        _uiState.update { it.copy(decks = emptyList(), noteTypes = emptyList(), errorMessage = null, errorAction = null) }
+                    }
                     val nextIdentity = settings.ankiConnectUrl to settings.ankiConnectApiKey
                     if (settings.backendKind == AnkiBackendKind.AnkiConnect && ankiConnectIdentity != nextIdentity) {
                         ankiConnectIdentity = nextIdentity
@@ -203,7 +214,10 @@ internal class AnkiViewModel @Inject constructor(
                         connectionJob?.cancel()
                         _uiState.value = _uiState.value.copy(isAnkiConnectReachable = false, isConnectingAnkiConnect = false)
                     }
-                    _uiState.update { it.copy(settings = settings, settingsLoadState = loadState) }
+                    _uiState.update { it.copy(
+                        settings = settings, settingsLoadState = loadState,
+                        isAnkiDroidAvailable = repository.isAnkiDroidAvailable(settings.ankiDroidClient),
+                    ) }
                     if (
                         !attemptedAnkiConnectPing &&
                         settings.backendKind == AnkiBackendKind.AnkiConnect &&
@@ -221,13 +235,43 @@ internal class AnkiViewModel @Inject constructor(
         settingsRetry.update { it + 1 }
     }
 
-    fun fetchConfiguration() {
-        val profileId = activeProfileId
+    fun createFetchRequest(): AnkiFetchRequest? {
+        val state = _uiState.value
+        if (state.settingsLoadState !is SettingsLoadState.Loaded) return null
+        return AnkiFetchRequest(activeProfileId ?: return null, state.settings.connectionIdentity, fetchRequestGeneration)
+    }
+
+    fun isFetchRequestCurrent(request: AnkiFetchRequest): Boolean =
+        request == createFetchRequest()
+
+    fun onFetchPermissionResult(request: AnkiFetchRequest, granted: Boolean) {
+        if (!isFetchRequestCurrent(request)) return
+        if (granted) fetchConfiguration(request) else showFetchPermissionDenied()
+    }
+
+    private fun invalidateFetchRequests() {
+        fetchRequestGeneration++
+        configurationJob?.cancel()
+        _uiState.update { it.copy(isFetching = false) }
+    }
+
+    fun updateAnkiDroidClient(client: AnkiDroidClient) {
+        invalidateFetchRequests()
+        viewModelScope.launch { repository.updateSettings { it.withAnkiDroidClient(client) } }
+    }
+
+    fun fetchConfiguration(request: AnkiFetchRequest? = createFetchRequest()) {
+        if (request == null || !isFetchRequestCurrent(request)) return
         configurationJob?.cancel()
         configurationJob = viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isFetching = true, errorMessage = null, errorAction = null)
-            val result = repository.fetchConfiguration()
-            if (activeProfileId != profileId) return@launch
+            val result = try {
+                repository.fetchConfiguration(request.profileId, request.identity)
+            } catch (error: CancellationException) {
+                if (isFetchRequestCurrent(request)) _uiState.update { it.copy(isFetching = false) }
+                throw error
+            }
+            if (!isFetchRequestCurrent(request)) return@launch
             when (result) {
                 is AnkiFetchResult.Success -> _uiState.value = _uiState.value.copy(
                     decks = result.decks,
@@ -250,12 +294,14 @@ internal class AnkiViewModel @Inject constructor(
         }
     }
 
-    fun isAnkiDroidAvailable(): Boolean = repository.isAnkiDroidAvailable()
+    fun isAnkiDroidAvailable(): Boolean = repository.isAnkiDroidAvailable(_uiState.value.settings.ankiDroidClient).also { available ->
+        _uiState.update { it.copy(isAnkiDroidAvailable = available) }
+    }
 
     fun showFetchApiUnavailable() {
         _uiState.value = _uiState.value.copy(
             isFetching = false,
-            errorMessage = UiText.Resource(AnkiFetchFailure.ApiUnavailable.userMessageRes),
+            errorMessage = UiText.Resource(AnkiFetchFailure.ApiUnavailable.userMessageRes, _uiState.value.settings.ankiDroidClient.displayName),
             errorAction = null,
         )
     }
@@ -263,7 +309,7 @@ internal class AnkiViewModel @Inject constructor(
     fun showFetchPermissionDenied() {
         _uiState.value = _uiState.value.copy(
             isFetching = false,
-            errorMessage = UiText.Resource(AnkiFetchFailure.PermissionDenied.userMessageRes),
+            errorMessage = UiText.Resource(AnkiFetchFailure.PermissionDenied.userMessageRes, _uiState.value.settings.ankiDroidClient.displayName),
             errorAction = AnkiErrorAction.OpenPermissionSettings,
         )
     }
@@ -380,12 +426,14 @@ internal class AnkiViewModel @Inject constructor(
     }
 
     fun updateBackendKind(value: AnkiBackendKind) {
+        invalidateFetchRequests()
         viewModelScope.launch {
             repository.updateSettings { it.copy(backendKind = value) }
         }
     }
 
     fun updateAnkiConnectUrl(value: String) {
+        invalidateFetchRequests()
         viewModelScope.launch {
             repository.updateSettings {
                 it.copy(
@@ -398,6 +446,7 @@ internal class AnkiViewModel @Inject constructor(
     }
 
     fun updateAnkiConnectApiKey(value: String) {
+        invalidateFetchRequests()
         viewModelScope.launch {
             repository.updateSettings {
                 it.copy(

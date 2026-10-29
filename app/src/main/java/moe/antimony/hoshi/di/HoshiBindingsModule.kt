@@ -5,10 +5,6 @@ import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
-import moe.antimony.hoshi.features.anki.AndroidAnkiContentApi
-import moe.antimony.hoshi.features.anki.AnkiBackend
-import moe.antimony.hoshi.features.anki.AnkiContentApi
-import moe.antimony.hoshi.features.anki.AnkiDroidBackendAdapter
 import moe.antimony.hoshi.features.bookshelf.AndroidBookshelfRepository
 import moe.antimony.hoshi.features.bookshelf.BookshelfRepository
 import moe.antimony.hoshi.features.dictionary.AndroidDictionarySearchRepository
@@ -69,14 +65,6 @@ internal interface HoshiBindingsModule {
 
     @Binds
     fun bindStatisticsDateProvider(provider: SystemStatisticsDateProvider): StatisticsDateProvider
-
-    @Binds
-    @Singleton
-    fun bindAnkiContentApi(api: AndroidAnkiContentApi): AnkiContentApi
-
-    @Binds
-    @Singleton
-    fun bindAnkiBackend(backend: AnkiDroidBackendAdapter): AnkiBackend
 
     @Binds
     @Singleton

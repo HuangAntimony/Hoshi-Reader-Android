@@ -20,6 +20,21 @@ class ProfileAnkiSettingsRepositoryTest {
     @get:Rule
     val tempFolder = TemporaryFolder()
 
+    @Test fun clientSelectionPersistsPerProfileAndStaleWritesAreRejected() = runBlocking {
+        val profiles = ProfileRepository(tempFolder.newFolder("clients"))
+        val repository = repository(profiles)
+        val originalProfile = profiles.state.value.defaultProfileId
+        repository.update { it.withAnkiDroidClient(AnkiDroidClient.Kuma3) }
+        val english = profiles.createProfile("English", "en")
+        profiles.activateGlobal(english.id)
+        repository.update { it.withAnkiDroidClient(AnkiDroidClient.AnkiDroid) }
+        assertFalse(repository.updateIfCurrent(originalProfile) { it.copy(tags = "stale") })
+        assertEquals(AnkiDroidClient.AnkiDroid, repository(profiles).settings.first().ankiDroidClient)
+        profiles.activateGlobal(originalProfile)
+        assertEquals(AnkiDroidClient.Kuma3, repository(profiles).settings.first().ankiDroidClient)
+        assertFalse(repository.settings.first().tags == "stale")
+    }
+
     @Test
     fun accidentalDuplicatePreferencePersistsPerProfileWhileAllowDuplicatesIsOff() = runBlocking {
         val profiles = ProfileRepository(tempFolder.newFolder("duplicate-settings"))
