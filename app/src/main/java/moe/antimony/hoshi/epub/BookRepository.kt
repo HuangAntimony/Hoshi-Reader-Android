@@ -248,11 +248,12 @@ class BookRepository private constructor(
             .map { (name, _) -> BookShelf(name, books.filter { it.shelves?.get(name)?.value == true }.map { it.id }) }
 
     suspend fun saveShelves(shelves: List<BookShelf>) = storageLock.withLock {
+        val normalized = shelves.map { it.copy(name = it.name.syncKey()) }
+        val names = normalized.map { it.name }.toSet()
+        require(names.size == normalized.size) { "Shelf names must be unique after Unicode normalization" }
         val old = loadShelfList()
         val list = old.toMutableMap()
         val now = System.currentTimeMillis()
-        val normalized = shelves.map { it.copy(name = it.name.syncKey()) }
-        val names = normalized.map { it.name }.toSet()
         val oldNames = old.entries.filter { it.value.value != null }.sortedWith(compareBy({ it.value.value }, { it.key })).map { it.key }
         val orderChanged = oldNames != normalized.map { it.name }
         old.filterValues { it.value != null }.keys.filterNot { it in names }.forEach { list[it] = Timestamped(now, null) }

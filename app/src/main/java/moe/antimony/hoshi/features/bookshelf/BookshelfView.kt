@@ -1,5 +1,6 @@
 package moe.antimony.hoshi.features.bookshelf
 
+import moe.antimony.hoshi.features.sync.syncKey
 import moe.antimony.hoshi.ui.theme.hoshiSurfaces
 import moe.antimony.hoshi.ui.theme.hoshiContainerBorder
 import android.content.Intent
@@ -1986,8 +1987,9 @@ internal fun ShelfManagementDialog(
         onValueChange = { newShelfName = it },
         scrollState = newShelfNameScrollState,
     )
-    val trimmedName = newShelfName.trim()
-    val shelfNames = remember(shelves) { shelves.mapTo(mutableSetOf()) { it.name } }
+    val trimmedName = newShelfName.trim().syncKey()
+    val shelfNames = remember(shelves) { shelves.mapTo(mutableSetOf()) { it.name.syncKey() } }
+    val isDuplicateName = trimmedName in shelfNames
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.bookshelf_manage_shelves)) },
@@ -2102,6 +2104,10 @@ internal fun ShelfManagementDialog(
                             label = { Text(stringResource(R.string.bookshelf_shelf_name)) },
                             lineLimits = hoshiSingleLineTextFieldLineLimits(),
                             scrollState = newShelfNameScrollState,
+                            isError = isDuplicateName,
+                            supportingText = if (isDuplicateName) {
+                                { Text(stringResource(R.string.bookshelf_shelf_name_exists)) }
+                            } else null,
                             colors = hoshiOutlinedTextFieldColors(),
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                             modifier = Modifier.weight(1f),
@@ -2111,7 +2117,7 @@ internal fun ShelfManagementDialog(
                                 onCreateShelf(trimmedName)
                                 newShelfName = ""
                             },
-                            enabled = trimmedName.isNotEmpty(),
+                            enabled = trimmedName.isNotEmpty() && !isDuplicateName,
                         ) {
                             Icon(Icons.Rounded.Add, contentDescription = stringResource(R.string.bookshelf_add_shelf))
                         }
@@ -2146,8 +2152,8 @@ private fun ShelfManagementShelfRow(
             onValueChange = { draftName = it },
             scrollState = draftScrollState,
         )
-        val trimmedName = draftName.trim()
-        val isDuplicateName = trimmedName != shelf.name && trimmedName in shelfNames
+        val trimmedName = draftName.trim().syncKey()
+        val isDuplicateName = trimmedName != shelf.name.syncKey() && trimmedName in shelfNames
         val canSaveName = trimmedName.isNotEmpty() && !isDuplicateName
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -2174,7 +2180,7 @@ private fun ShelfManagementShelfRow(
             }
             IconButton(
                 onClick = {
-                    if (trimmedName != shelf.name) {
+                    if (trimmedName != shelf.name.syncKey()) {
                         onRenameShelf(shelf.name, trimmedName)
                     }
                     isRenaming = false

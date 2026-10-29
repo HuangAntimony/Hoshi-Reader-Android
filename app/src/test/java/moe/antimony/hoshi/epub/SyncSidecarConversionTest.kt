@@ -11,6 +11,79 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SyncSidecarConversionTest {
+    @Test fun collidingShelfNamesAreRejectedBeforeMembershipOrOrderWrites() = runBlocking {
+        val files = Files.createTempDirectory("shelf-name-collision").toFile()
+        try {
+            val repository = BookRepository(files)
+            val root = repository.createBookDirectory("book")
+            val id = "80CC1266-83A1-4A41-89E5-76EF980BDB66"
+            repository.saveMetadata(root, BookMetadata(id, "Book", folder = "book", lastAccess = 0.0))
+            repository.saveShelves(listOf(BookShelf("で", emptyList()), BookShelf("Other", listOf(id))))
+            val shelfBytes = files.resolve("Books/shelves.json").readBytes()
+            val metadataBytes = root.resolve("metadata.json").readBytes()
+            var notifications = 0
+            repository.onBookChange = { _, _ -> notifications++ }
+            repository.onShelvesChange = { notifications++ }
+
+            val failure = runCatching {
+                repository.saveShelves(listOf(BookShelf("で", emptyList()), BookShelf("て\u3099", listOf(id))))
+            }.exceptionOrNull()
+
+            assertTrue("Canonical collisions must be rejected", failure is IllegalArgumentException)
+            assertArrayEquals(shelfBytes, files.resolve("Books/shelves.json").readBytes())
+            assertArrayEquals(metadataBytes, root.resolve("metadata.json").readBytes())
+            assertEquals(0, notifications)
+            assertEquals(
+                listOf(BookShelf("で", emptyList()), BookShelf("Other", listOf(id))),
+                BookRepository(files).loadShelves(),
+            )
+        } finally {
+            files.deleteRecursively()
+        }
+    }
+
+    @Test fun createdAndRenamedShelfNamesAgreeWithStorageAfterReload() = runBlocking {
+        val files = Files.createTempDirectory("shelf-name-roundtrip").toFile()
+        try {
+            val repository = BookRepository(files)
+            val root = repository.createBookDirectory("book")
+            val id = "80CC1266-83A1-4A41-89E5-76EF980BDB66"
+            repository.saveMetadata(root, BookMetadata(id, "Book", folder = "book", lastAccess = 0.0))
+            val secondRoot = repository.createBookDirectory("second-book")
+            val secondId = "8F6AA9BE-E66F-4670-B4B0-BB9BCE630D58"
+            repository.saveMetadata(secondRoot, BookMetadata(secondId, "Second book", folder = "second-book", lastAccess = 0.0))
+            repository.saveShelves(listOf(BookShelf("Other", listOf(id, secondId))))
+            val created = requireNotNull(moe.antimony.hoshi.features.bookshelf.createShelfAndMoveBooksList(
+                repository.loadShelves(), " て\u3099 ", setOf(id),
+            ))
+            repository.saveShelves(created)
+            assertEquals(listOf(BookShelf("Other", listOf(secondId)), BookShelf("で", listOf(id))), created)
+            assertEquals(created, BookRepository(files).loadShelves())
+
+            val renamed = moe.antimony.hoshi.features.bookshelf.renameShelfList(created, "て\u3099", " Cafe\u0301 ")
+            repository.saveShelves(renamed)
+            assertEquals(listOf(BookShelf("Other", listOf(secondId)), BookShelf("Café", listOf(id))), renamed)
+            assertEquals(renamed, BookRepository(files).loadShelves())
+            assertNull(repository.loadShelfList().getValue("で").value)
+            assertEquals(false, repository.loadMetadata(root)!!.shelves!!.getValue("で").value)
+            assertEquals(true, repository.loadMetadata(root)!!.shelves!!.getValue("Café").value)
+
+            val recreated = requireNotNull(moe.antimony.hoshi.features.bookshelf.createShelfAndMoveBooksList(
+                BookRepository(files).loadShelves(), "て\u3099", setOf(secondId),
+            ))
+            repository.saveShelves(recreated)
+            assertEquals(
+                listOf(BookShelf("Other", emptyList()), BookShelf("Café", listOf(id)), BookShelf("で", listOf(secondId))),
+                recreated,
+            )
+            assertEquals(recreated, BookRepository(files).loadShelves())
+            assertEquals(false, repository.loadMetadata(root)!!.shelves!!.getValue("で").value)
+            assertEquals(true, repository.loadMetadata(secondRoot)!!.shelves!!.getValue("で").value)
+        } finally {
+            files.deleteRecursively()
+        }
+    }
+
     @Test fun renamingFirstShelfKeepsOrderMembershipAndDeletionAcrossReload() = runBlocking {
         val files = Files.createTempDirectory("shelf-rename").toFile()
         try {

@@ -538,7 +538,7 @@ internal class BookshelfViewModel : ViewModel {
     }
 
     fun renameShelf(oldName: String, newName: String) {
-        val trimmedName = newName.trim()
+        val trimmedName = newName.trim().syncKey()
         if (trimmedName.isEmpty()) return
         launchBookshelfOperation {
             repository.renameShelf(oldName, trimmedName)
@@ -643,7 +643,7 @@ internal class BookshelfViewModel : ViewModel {
         bookIds: Set<String>,
         clearSelectionOnSuccess: Boolean,
     ) {
-        val trimmedName = name.trim()
+        val trimmedName = name.trim().syncKey()
         if (trimmedName.isEmpty() || bookIds.isEmpty()) return
         if (_uiState.value.shelfCreationMoveStatus is ShelfCreationMoveStatus.Submitting) return
         _uiState.update { it.copy(shelfCreationMoveStatus = ShelfCreationMoveStatus.Submitting) }

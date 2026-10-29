@@ -35,6 +35,7 @@ Release notes before v1.3.0 are in [CHANGELOG_ARCHIVE.md](CHANGELOG_ARCHIVE.md).
 
 ### Fixed
 
+- Keep book assignments intact by correctly detecting duplicate shelf names during creation and renaming.
 - Reduce chapter loading delays by processing large publisher stylesheets faster, avoiding initial layout work before reader styles are ready, speeding up pagination in chapters with extensive ruby annotations, and avoiding repeated chapter scans in visual novel mode.
 - Restore missing illustration chapters and gallery images in EPUBs with XHTML fallbacks, recover bitmap covers from simple SVG wrappers or alternative declared covers when the preferred cover is broken on import or opening existing books, and keep image-only pages visible and properly centered in the reader.
 - Keep word lookups and sentence context within the tapped dictionary list item instead of joining neighboring definitions.

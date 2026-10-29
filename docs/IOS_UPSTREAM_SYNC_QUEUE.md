@@ -17,65 +17,14 @@ details against official documentation when implementing platform-facing slices.
 
 ## Current Queue
 
-### 1. Use consistent shelf names across input, validation and storage
-
-Status: Pending
-
-Commits: `a1c9996` (remaining name handling only).
-
-- Dependency/value: independent; keeps shelf identity consistent across name
-  entry, duplicate checks, membership writes and published UI state.
-- iOS behavior: normalize to NFC before checking/creating the shelf and choosing
-  the move destination.
-- Android current gap: `features/bookshelf/NewShelfMoveDialog.kt`'s
-  `validateNewShelfName`, `BookshelfRepository.kt`'s `createShelf` and
-  `createShelfAndMoveBooksList` only trim names. The rename UI in
-  `BookshelfView.kt` and `renameShelfList` use the same unnormalized comparisons.
-  `epub/BookRepository.kt::saveShelves` normalizes later, without rejecting
-  canonical-name collisions, and resolves membership with `firstOrNull`.
-  Both creating a move target and renaming a shelf can therefore pass duplicate
-  checks but collide on save. `BookshelfViewModel.kt` also publishes the raw
-  returned shelf names after create-and-move, while storage has normalized them.
-  Ordinary moves from a reloaded shelf list reuse saved names and do not require
-  a new name comparison; this is an input/storage boundary gap, not a failure of
-  every shelf operation.
-- Suggested slice: use one canonical identity throughout creation, rename,
-  duplicate validation, move targeting and ViewModel success state; reject
-  canonical-name collisions before membership writes. Retain Android's existing
-  duplicate-name feedback and preserve memberships on rejection.
-- Validation: extend `BookshelfViewModelTest` and storage tests for NFC/NFD
-  duplicates in creation and rename, fresh decomposed names without a collision,
-  subsequent moves before/after reload, single/bulk moves and deleted-name reuse;
-  verify UI/storage name agreement and preserved selection/memberships on rejection.
-
-### 2. Respect manual statistics stops across page turns
-
-Status: Pending
-
-Commits: `58c0e02`.
-
-- Dependency/value: independent; a user's explicit stop must survive automatic
-  page-turn triggers. Existing autostart wiring is sufficient.
-- iOS behavior: manual stop sets a latch; explicit start clears it. Ordinary
-  lifecycle pauses do not count as manual stops.
-- Android current gap: `features/reader/ReaderStatisticsTracker.kt`'s `stop`
-  delegates to `pause`, while `startForPageTurnIfNeeded` checks only `!isTracking`.
-  `ReaderWebView.kt::toggleStatisticsTracking` cannot preserve manual intent.
-- Suggested slice: distinguish manual stop from lifecycle pause in the tracker
-  and both manual controls, retaining Android's independent book-open/page-turn
-  autostart settings.
-- Validation: extend `ReaderStatisticsTrackerTest` and
-  `ReaderStatisticsPersistenceTest`; cover toolbar/sheet controls, normal and
-  Sasayaki page turns, explicit restart and lifecycle pause/resume.
-
-### 3. Clear publisher size limits on the reader viewport
+### 1. Clear publisher size limits on the reader viewport
 
 Status: Pending
 
 Commits: `6403ae3` (remaining root max-size constraints only).
 
 - Dependency/value: independent; establish correct viewport dimensions before
-  adding layout-dependent page-count caches in slice 4.
+  adding layout-dependent page-count caches in slice 2.
 - iOS behavior: generated `html, body` CSS clears publisher `max-width` and
   `max-height` so the reader's viewport dimensions take effect.
 - Android current gap: `features/reader/ReaderContentStyles.kt` sets root width
@@ -89,13 +38,13 @@ Commits: `6403ae3` (remaining root max-size constraints only).
   root max-width/max-height, both writing directions, padding and image pages;
   require real WebView geometry and painting evidence.
 
-### 4. Reader page counts and position labels
+### 2. Reader page counts and position labels
 
 Status: Pending
 
 Commits: `95ce7f5`.
 
-- Dependency/value: follows viewport sizing in slice 3; adds a user-selectable
+- Dependency/value: follows viewport sizing in slice 1; adds a user-selectable
   page unit for book/chapter progress and location labels.
 - iOS behavior: choose Off/Characters/Pages; collect page-start offsets per
   spine, cache them for the layout, and derive book/chapter page counts and
@@ -115,7 +64,7 @@ Commits: `95ce7f5`.
   real WebView checks across chapters, writing directions, font/padding changes,
   images and mode switches, including cache invalidation and restore.
 
-### 5. Dictionary numeric-string frequencies and on-demand media mapping
+### 3. Dictionary numeric-string frequencies and on-demand media mapping
 
 Status: Pending
 
@@ -140,7 +89,7 @@ Commits: `a1babc9` (frequency parsing only), `e266954`.
   session destruction. Measure large-media dictionary memory on a device before
   claiming an improvement; run native packaging checks from VALIDATION.
 
-### 6. Sasayaki playback bounded by the current VN page
+### 4. Sasayaki playback bounded by the current VN page
 
 Status: Pending
 
@@ -163,13 +112,13 @@ Commits: `c2e323b` (page-advance playback only), `69ed0d1`.
   boundary, delay, backward turns, cue-free/image pages, pause and manual seek;
   verify page-turn audio and no unwanted advance on a device.
 
-### 7. Anki media filtering and remote cover reuse
+### 5. Anki media filtering and remote cover reuse
 
 Status: Pending
 
 Commits: `81c60d2` (dictionary media and existing covers only).
 
-- Dependency/value: independent of slice 5; reduces unnecessary media reads and
+- Dependency/value: independent of slice 3; reduces unnecessary media reads and
   uploads during card creation.
 - iOS behavior: upload media referenced by the final rendered fields; reuse a
   cover already stored by AnkiConnect.
@@ -183,7 +132,7 @@ Commits: `81c60d2` (dictionary media and existing covers only).
   `AnkiConnectBackendTest` for selected/excluded glossaries, absent media fields,
   existing/missing covers and lookup-failure fallback; assert request sequences.
 
-### 8. Bookshelf read/unread actions for local and cloud books
+### 6. Bookshelf read/unread actions for local and cloud books
 
 Status: Pending
 
@@ -204,7 +153,7 @@ Commits: `a8d422c`, `d9f1b72` (Mark Read capability only).
   cloud placeholders with/without bookinfo; reload and remote merge must not
   resurrect reset sessions. Extend bookshelf/storage/sync tests and isolated UI checks.
 
-### 9. Transfer queue totals, remaining time and interrupted rows
+### 7. Transfer queue totals, remaining time and interrupted rows
 
 Status: Pending
 
@@ -227,7 +176,7 @@ Commits: `21d5546` (presentation and aggregate accounting only).
   `SyncTransferTrackerTest`, `GoogleDriveSyncManagerTest` and `SyncQueueViewTest`,
   including device scroll retention and E-ink rendering.
 
-### 10. Keep the selected statistics period current across date changes
+### 8. Keep the selected statistics period current across date changes
 
 Status: Pending
 
@@ -247,7 +196,7 @@ Commits: `e2e0f31` (selected-period anchor only).
   current-period rollover, historical browsing, return to latest and reset changes;
   retain existing `StatisticsViewReloadTest` lifecycle coverage.
 
-### 11. Hide the status bar while a fullscreen image is open
+### 9. Hide the status bar while a fullscreen image is open
 
 Status: Pending
 
@@ -264,7 +213,7 @@ Commits: `18072c8` (system status bar only).
 - Validation: extend `ReaderChromeTest`; device checks for gallery and inline
   images, dismissal/back, both focus states and existing navigation-bar behavior.
 
-### 12. Show sub-minute transcription remaining time
+### 10. Show sub-minute transcription remaining time
 
 Status: Pending
 
@@ -286,40 +235,36 @@ Only concrete remaining behavior is listed; covered portions are summarized belo
 
 | Commit | Remaining Android work | Slice |
 | --- | --- | --- |
-| `a1c9996` | Consistent shelf-name identity across creation, rename, moves and storage | 1 |
-| `58c0e02` | Manual statistics-stop latch | 2 |
-| `6403ae3` | Clear publisher root max-size constraints | 3 |
-| `95ce7f5` | Page-count preference, measurements, display and position labels | 4 |
-| `a1babc9` | Numeric-string frequency parsing | 5 |
-| `e266954` | On-demand native dictionary media mapping | 5 |
-| `c2e323b` | Optional VN page-bounded Sasayaki playback | 6 |
-| `69ed0d1` | Stop page playback before the next overlapping cue | 6 |
-| `81c60d2` | Filter dictionary media and reuse uploaded AnkiConnect covers | 7 |
-| `a8d422c` | Confirmed Mark Unread and synced reading-state reset | 8 |
-| `d9f1b72` | Allow Mark Read from retained bookinfo without local EPUB | 8 |
-| `21d5546` | Aggregate transfer accounting and pending/interrupted/grouped rows | 9 |
-| `e2e0f31` | Reconcile selected statistics period on day/reset-time changes | 10 |
-| `18072c8` | Fullscreen-image status-bar visibility | 11 |
-| `3dfa9ef` | Sub-minute transcription ETA label | 12 |
+| `6403ae3` | Clear publisher root max-size constraints | 1 |
+| `95ce7f5` | Page-count preference, measurements, display and position labels | 2 |
+| `a1babc9` | Numeric-string frequency parsing | 3 |
+| `e266954` | On-demand native dictionary media mapping | 3 |
+| `c2e323b` | Optional VN page-bounded Sasayaki playback | 4 |
+| `69ed0d1` | Stop page playback before the next overlapping cue | 4 |
+| `81c60d2` | Filter dictionary media and reuse uploaded AnkiConnect covers | 5 |
+| `a8d422c` | Confirmed Mark Unread and synced reading-state reset | 6 |
+| `d9f1b72` | Allow Mark Read from retained bookinfo without local EPUB | 6 |
+| `21d5546` | Aggregate transfer accounting and pending/interrupted/grouped rows | 7 |
+| `e2e0f31` | Reconcile selected statistics period on day/reset-time changes | 8 |
+| `18072c8` | Fullscreen-image status-bar visibility | 9 |
+| `3dfa9ef` | Sub-minute transcription ETA label | 10 |
 
 ## Suggested Implementation Order
 
-All slices are independent except that slice 4 should build on the corrected
-viewport sizing in slice 3. Address state/layout correctness first, then broader
+All slices are independent except that slice 2 should build on the corrected
+viewport sizing in slice 1. Address state/layout correctness first, then broader
 reader/dictionary/Anki value, followed by independent UI refinements:
 
-1. Use consistent shelf names across input, validation and storage.
-2. Respect manual statistics stops across page turns.
-3. Clear publisher size limits on the reader viewport.
-4. Reader page counts and position labels.
-5. Dictionary numeric-string frequencies and on-demand media mapping.
-6. Sasayaki playback bounded by the current VN page.
-7. Anki media filtering and remote cover reuse.
-8. Bookshelf read/unread actions for local and cloud books.
-9. Transfer queue totals, remaining time and interrupted rows.
-10. Keep the selected statistics period current across date changes.
-11. Hide the status bar while a fullscreen image is open.
-12. Show sub-minute transcription remaining time.
+1. Clear publisher size limits on the reader viewport.
+2. Reader page counts and position labels.
+3. Dictionary numeric-string frequencies and on-demand media mapping.
+4. Sasayaki playback bounded by the current VN page.
+5. Anki media filtering and remote cover reuse.
+6. Bookshelf read/unread actions for local and cloud books.
+7. Transfer queue totals, remaining time and interrupted rows.
+8. Keep the selected statistics period current across date changes.
+9. Hide the status bar while a fullscreen image is open.
+10. Show sub-minute transcription remaining time.
 
 ## Covered Or No Android Action
 
@@ -331,7 +276,8 @@ Project decisions retained for future comparisons:
 | `bd21e24`: fallback accent change | Retain Android's dynamic, custom and E-ink color choices. |
 | `16a2f00`: force custom reader background opaque | Retain configured alpha: `ReaderSettings.backgroundColorCss` and `ReaderSettingsTest.customReaderCssPreservesConfiguredColorAlpha` explicitly preserve it; display-settings migration also preserves released custom colors. |
 | `326e9ea`: two-hour statistics chart floor | Retain Android's explicit one-hour floor in `StatisticsTrendAxis.trendMaxHours`, `StatisticsTrendChartTest` and the current changelog. |
-| `040aaab`: restart statistics on page turns | `ReaderStatisticsTracker` and reader wiring implement page-turn autostart; retain Android's separately configurable book-open/page-turn triggers. Only manual-stop handling remains open. |
+| `040aaab`: restart statistics on page turns | `ReaderStatisticsTracker` and reader wiring implement page-turn autostart; retain Android's separately configurable book-open/page-turn triggers. |
+| `58c0e02`: manual statistics-stop latch | Intentionally excluded as an interaction-design difference: Android retains configured page-turn autostart after a manual stop, with no manual-stop latch. |
 
 Code-backed coverage for the refreshed range:
 
@@ -344,7 +290,7 @@ Code-backed coverage for the refreshed range:
 | `95ce7f5` (chapter/spine distinction) | `ReaderTocRange` already distinguishes spine positions from true TOC chapters, including fragments within a single XHTML file; page-count behavior remains open. |
 | `6403ae3` (centering portion) | `reader/reader-layout-semantics.js::sanitizeInlineBlocks` handles wrappers, struts and image centering; publisher writing modes are stripped. Only root max-size constraints remain open. |
 | `d9f1b72`, `62982b7`, `3d2f77a`, `daf0fd7`, `e596fe1`, `c69f203`, `62e5889`, `1cfbf71`, `ca7e053`, `45ac6e9`, `241c92b`, `1c5d525`, `77eaee3`, `4777715`, `def6cec`, `08bcbb4`, `55988cc` | `SyncStorage`, `GoogleDriveSyncManager`, `GoogleDriveClient`, `BookRepository`, `SyncReloadScheduler` and `SyncAttachPrompt` cover provider separation, sidecars/tombstones, archive covers, shelf recreation, cached versions, coalesced reload, retries, streaming, conflict choices and on-demand downloads. Swift file extraction requires no port. Only the retained-bookinfo Mark Read gate remains from these commits. |
-| `a1c9996` (UI portion) | New-shelf creation during single/bulk moves exists in `NewShelfMoveDialog` and `BookshelfViewModel`; consistent name handling across input, validation, published state and storage remains open. |
+| `a1c9996` | Single/bulk new-shelf moves exist. `NewShelfMoveDialog`, `BookshelfView`, `BookshelfRepository` and `BookshelfViewModel` use NFC names for creation, rename, duplicate checks, move targets and published state; `BookRepository.saveShelves` rejects canonical-name collisions before writing sidecars. |
 | `21d5546` (transport portion), `bb4e92d` | `GoogleDriveFileTransfer`, `DriveUploadSessions` and `BookTransferScheduler` implement resumable uploads and shared bounded upload/download scheduling; upstream job classification adds no further transport gap. |
 | `3f53018`, `e2e0f31` (reload portion), `642ad22` | Bookshelf/statistics repositories dispatch blocking work off main; `StatisticsLifecycleReloader` refreshes on resume. `TtuStatistics.reconciled` and `GoogleDriveSyncManager.mergeBook` remove overlap between legacy totals and sessions. Only selected-period rollover remains open. |
 | `a1babc9` (other portions) | The multilingual engine caches Japanese preprocessing definitions; `DictionaryLookupQueryService` atomically replaces sessions after remove/reorder. iOS does not call the newly added native mutation APIs, so they do not create an Android UI gap. |

@@ -237,10 +237,11 @@ internal class AndroidBookshelfRepository @Inject constructor(
     }
 
     override suspend fun moveBooks(bookIds: Set<String>, shelfName: String?) = withContext(ioDispatcher) {
+        val targetName = shelfName?.syncKey()
         val shelves = bookRepository.loadShelves()
             .map { shelf -> shelf.copy(bookIds = shelf.bookIds.filterNot { it in bookIds }) }
             .map { shelf ->
-                if (shelf.name == shelfName) {
+                if (shelf.name.syncKey() == targetName) {
                     shelf.copy(bookIds = (shelf.bookIds + bookIds).distinct())
                 } else {
                     shelf
@@ -250,10 +251,10 @@ internal class AndroidBookshelfRepository @Inject constructor(
     }
 
     override suspend fun createShelf(name: String) = withContext(ioDispatcher) {
-        val trimmed = name.trim()
+        val trimmed = name.trim().syncKey()
         if (trimmed.isEmpty()) return@withContext
         val shelves = bookRepository.loadShelves()
-        if (shelves.none { it.name == trimmed }) {
+        if (shelves.none { it.name.syncKey() == trimmed }) {
             bookRepository.saveShelves(shelves + BookShelf(trimmed, emptyList()))
         }
     }
@@ -272,7 +273,8 @@ internal class AndroidBookshelfRepository @Inject constructor(
     }
 
     override suspend fun deleteShelf(name: String) = withContext(ioDispatcher) {
-        bookRepository.saveShelves(bookRepository.loadShelves().filterNot { it.name == name })
+        val targetName = name.syncKey()
+        bookRepository.saveShelves(bookRepository.loadShelves().filterNot { it.name.syncKey() == targetName })
     }
 
     override suspend fun renameShelf(oldName: String, newName: String) = withContext(ioDispatcher) {
@@ -457,18 +459,19 @@ internal fun renameShelfList(
     oldName: String,
     newName: String,
 ): List<BookShelf> {
-    val trimmedName = newName.trim()
-    if (trimmedName.isEmpty() || trimmedName == oldName) {
+    val trimmedName = newName.trim().syncKey()
+    val currentName = oldName.syncKey()
+    if (trimmedName.isEmpty() || trimmedName == currentName) {
         return shelves
     }
-    if (shelves.none { it.name == oldName }) {
+    if (shelves.none { it.name.syncKey() == currentName }) {
         return shelves
     }
-    if (shelves.any { it.name == trimmedName }) {
+    if (shelves.any { it.name.syncKey() == trimmedName }) {
         return shelves
     }
     return shelves.map { shelf ->
-        if (shelf.name == oldName) {
+        if (shelf.name.syncKey() == currentName) {
             shelf.copy(name = trimmedName)
         } else {
             shelf
@@ -481,8 +484,8 @@ internal fun createShelfAndMoveBooksList(
     name: String,
     bookIds: Set<String>,
 ): List<BookShelf>? {
-    val trimmedName = name.trim()
-    if (trimmedName.isEmpty() || bookIds.isEmpty() || shelves.any { it.name == trimmedName }) {
+    val trimmedName = name.trim().syncKey()
+    if (trimmedName.isEmpty() || bookIds.isEmpty() || shelves.any { it.name.syncKey() == trimmedName }) {
         return null
     }
     val updatedShelves = shelves.map { shelf ->

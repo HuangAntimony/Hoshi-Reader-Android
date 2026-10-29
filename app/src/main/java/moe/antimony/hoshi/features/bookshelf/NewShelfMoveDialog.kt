@@ -16,6 +16,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.epub.BookShelf
+import moe.antimony.hoshi.features.sync.syncKey
 import moe.antimony.hoshi.ui.asString
 import moe.antimony.hoshi.ui.hoshiOutlinedTextFieldColors
 import moe.antimony.hoshi.ui.hoshiSingleLineTextFieldLineLimits
@@ -31,10 +32,10 @@ internal fun validateNewShelfName(
     name: String,
     shelves: List<BookShelf>,
 ): NewShelfNameValidation {
-    val trimmedName = name.trim()
+    val trimmedName = name.trim().syncKey()
     return when {
         trimmedName.isEmpty() -> NewShelfNameValidation.Blank
-        shelves.any { it.name == trimmedName } -> NewShelfNameValidation.Duplicate
+        shelves.any { it.name.syncKey() == trimmedName } -> NewShelfNameValidation.Duplicate
         else -> NewShelfNameValidation.Valid
     }
 }

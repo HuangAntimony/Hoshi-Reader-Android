@@ -1272,7 +1272,7 @@ class BookshelfViewModelTest {
         val entry = bookEntry("book-a")
         val repository = FakeBookshelfRepository(
             entries = listOf(entry),
-            createShelfAndMoveResult = false,
+            shelves = listOf(BookShelf("で", emptyList()), BookShelf("Other", listOf("book-a"))),
         )
         val viewModel = BookshelfViewModel(repository, testScope())
         viewModel.reloadBookEntries()
@@ -1280,11 +1280,12 @@ class BookshelfViewModelTest {
         viewModel.toggleSelectedBook(entry)
 
         viewModel.beginShelfCreationMoveForSelectedBooks()
-        viewModel.updateShelfCreationMoveName("Manga")
+        viewModel.updateShelfCreationMoveName(" て\u3099 ")
         viewModel.confirmShelfCreationMove()
 
         assertTrue(viewModel.uiState.value.isSelecting)
         assertEquals(setOf("book-a"), viewModel.uiState.value.selectedBookIds)
+        assertEquals(listOf(BookShelf("で", emptyList()), BookShelf("Other", listOf("book-a"))), repository.shelves)
         assertEquals(
             "A shelf with this name already exists.",
             (viewModel.uiState.value.shelfCreationMoveStatus as ShelfCreationMoveStatus.Failed).message.testString(),
@@ -1447,6 +1448,48 @@ class BookshelfViewModelTest {
         assertEquals(NewShelfNameValidation.Blank, validateNewShelfName("   ", shelves))
         assertEquals(NewShelfNameValidation.Duplicate, validateNewShelfName(" Manga ", shelves))
         assertEquals(NewShelfNameValidation.Valid, validateNewShelfName(" Novels ", shelves))
+    }
+
+    @Test
+    fun canonicallyEquivalentShelfNamesAreRejectedBeforeMovingBooks() {
+        val shelves = listOf(BookShelf("で", listOf("book-a")), BookShelf("Other", listOf("book-b")))
+
+        assertEquals(NewShelfNameValidation.Duplicate, validateNewShelfName(" て\u3099 ", shelves))
+        assertNull(createShelfAndMoveBooksList(shelves, "て\u3099", setOf("book-b")))
+        assertEquals(shelves, renameShelfList(shelves, "Other", "て\u3099"))
+        assertEquals(shelves, renameShelfList(shelves, "で", "て\u3099"))
+    }
+
+    @Test
+    fun shelfCreationAndRenameReturnCanonicalNamesWithMembershipsIntact() {
+        val shelves = listOf(BookShelf("Other", listOf("book-a", "book-b")))
+
+        assertEquals(
+            listOf(BookShelf("Other", listOf("book-b")), BookShelf("で", listOf("book-a"))),
+            createShelfAndMoveBooksList(shelves, " て\u3099 ", setOf("book-a")),
+        )
+        assertEquals(
+            listOf(BookShelf("Café", listOf("book-a", "book-b"))),
+            renameShelfList(shelves, "Other", " Cafe\u0301 "),
+        )
+    }
+
+    @Test
+    fun createShelfAndMovePublishesTheSameCanonicalNameInShelfAndSuccessState() {
+        val entry = bookEntry("book-a")
+        val repository = FakeBookshelfRepository(entries = listOf(entry))
+        val viewModel = BookshelfViewModel(repository, testScope())
+
+        viewModel.beginShelfCreationMoveForBook(entry)
+        viewModel.updateShelfCreationMoveName(" て\u3099 ")
+        viewModel.confirmShelfCreationMove()
+
+        assertEquals(listOf(BookShelf("で", listOf("book-a"))), viewModel.uiState.value.shelves)
+        assertEquals(true, viewModel.uiState.value.shelfExpansionState["shelf:で"])
+        assertEquals(
+            ShelfCreationMoveStatus.Succeeded(shelfName = "で", bookCount = 1),
+            viewModel.uiState.value.shelfCreationMoveStatus,
+        )
     }
 
     @Test
