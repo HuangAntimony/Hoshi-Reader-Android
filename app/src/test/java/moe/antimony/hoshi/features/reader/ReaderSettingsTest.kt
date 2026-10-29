@@ -738,6 +738,18 @@ class ReaderSettingsTest {
     }
 
     @Test
+    fun readerRootSizeLimitsAreClearedInEveryMode() {
+        for (mode in ReaderViewMode.entries) for (vertical in listOf(true, false)) {
+            val css = ReaderContentStyles.styleTag(ReaderSettings(viewMode = mode, verticalWriting = vertical))
+            for (selector in listOf("html", "body")) {
+                val declarations = cssDeclarationsForSelector(css, selector)
+                assertEquals("$mode vertical=$vertical $selector max-width", "none !important", declarations["max-width"])
+                assertEquals("$mode vertical=$vertical $selector max-height", "none !important", declarations["max-height"])
+            }
+        }
+    }
+
+    @Test
     fun paginatedReaderCssAllowsFillingPageBottomAcrossParagraphs() {
         val paginatedCss = ReaderContentStyles.styleTag(
             ReaderSettings(viewMode = ReaderViewMode.Paginated),

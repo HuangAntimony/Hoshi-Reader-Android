@@ -247,6 +247,9 @@ dynamic configuration and bridge calls.
 | `reader-vn-selection-projection.js` | Source sentence/lookup context and visible clone projection | VN |
 | `reader-sasayaki.js`, `highlights.js` | Cue presentation and persistent/search highlight operations, with VN projection adapters | Reader modes through their integrations |
 
+- `ReaderContentStyles` owns root viewport sizing in all three modes, clearing
+  publisher `max-width`/`max-height` on `html` and `body` while retaining
+  descendant size limits and the continuous body's reader-configured insets.
 - Raw code-point offsets, normalized matchable offsets and DOM UTF-16 positions
   are different coordinate systems. Convert through the owning index/projection.
 - VN's detached content stream caches media units for the source snapshot;

@@ -1,5 +1,10 @@
 package moe.antimony.hoshi.features.reader
 
+import android.graphics.Bitmap
+import android.graphics.Color
+import android.util.Base64
+import android.util.Log
+import android.view.ViewGroup
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.layout.fillMaxSize
@@ -8,8 +13,11 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import java.io.ByteArrayOutputStream
+import java.io.File
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import kotlin.math.abs
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -21,6 +29,127 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class ReaderViewportWebViewTest {
     @get:Rule val composeRule = createComposeRule()
+
+    @Test
+    fun publisherRootLimitsDoNotShrinkReaderViewport() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val assets = ReaderWebAssets.load(instrumentation.targetContext)
+        lateinit var webView: WebView
+        composeRule.setContent {
+            AndroidView(modifier = Modifier.fillMaxSize(), factory = { context ->
+                WebView(context).also { webView = it; it.settings.javaScriptEnabled = true }
+            })
+        }
+        composeRule.waitForIdle()
+        val publisherCss = sanitizeReaderCss("""
+            html { max-width: 170px; max-height: 190px; }
+            body { max-width: 160px; max-height: 180px; }
+            .bounded { max-width: 73px; max-height: 51px; }
+        """.trimIndent())
+        var fixture = 0
+        try {
+            for (mode in ReaderViewMode.entries) for (vertical in listOf(true, false))
+                for (padding in listOf(0, 18)) for (picture in listOf(false, true)) {
+                val label = "$mode-vertical-$vertical-padding-$padding-picture-$picture"
+                val settings = ReaderSettings(viewMode = mode, verticalWriting = vertical, fontSize = 24,
+                    horizontalPadding = padding, verticalPadding = padding, visualNovelRevealSpeed = 0)
+                val color = Color.rgb(40 + fixture++ * 7, 50, 210)
+                val bitmap = Bitmap.createBitmap(240, 320, Bitmap.Config.ARGB_8888).apply { eraseColor(color) }
+                val bytes = ByteArrayOutputStream().also { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
+                bitmap.recycle()
+                val image = "data:image/png;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP)
+                val body = if (picture) "<p><img src='$image'/></p>" else
+                    "<p><span class='bounded'>「<ruby>読書<rt>どくしょ</rt></ruby>の時間です。」</span></p>"
+                val loaded = CountDownLatch(1)
+                instrumentation.runOnMainSync {
+                    val density = webView.resources.displayMetrics.density
+                    val viewport = readerViewportCssLayout(settings,
+                        (webView.width / density).toInt(), (webView.height / density).toInt()).cssVariables()
+                    val styles = ReaderContentStyles.styleTag(settings = settings, readerCssTemplate = assets.readerCss)
+                    val script = ReaderPaginationScripts.shellScript(settings = settings, assets = assets)
+                    webView.webViewClient = object : WebViewClient() {
+                        override fun onPageFinished(view: WebView, url: String) { loaded.countDown() }
+                    }
+                    webView.loadDataWithBaseURL(null,
+                        "<!doctype html><html><head><meta name='viewport' content='width=device-width,initial-scale=1'/>" +
+                            "<style>$publisherCss</style><script>window.HoshiReaderRestore={postMessage:()=>window.testRestored=true};</script>" +
+                            "$styles<style>$viewport</style>$script</head><body>$body</body></html>",
+                        "text/html", "utf-8", null)
+                }
+                assertTrue("$label loaded", loaded.await(15, TimeUnit.SECONDS))
+                composeRule.waitUntil(15_000) { evaluate(webView, "Boolean(window.testRestored)") == "true" }
+                val geometry = JSONObject(evaluate(webView, """
+                    (() => { const root = getComputedStyle(document.documentElement), body = getComputedStyle(document.body);
+                        const bounded = document.querySelector('.bounded');
+                        return {width: innerWidth, height: innerHeight,
+                            rootWidth: parseFloat(root.width), rootHeight: parseFloat(root.height),
+                            bodyWidth: parseFloat(body.width), bodyHeight: parseFloat(body.height),
+                            boundedWidth: bounded && getComputedStyle(bounded).maxWidth,
+                            boundedHeight: bounded && getComputedStyle(bounded).maxHeight}; })()
+                """.trimIndent()))
+                Log.i("HoshiViewportLimits", "$label $geometry")
+                val width = geometry.getDouble("width")
+                val height = geometry.getDouble("height")
+                assertEquals("$label root width", width, geometry.getDouble("rootWidth"), 1.0)
+                assertEquals("$label root height", height, geometry.getDouble("rootHeight"), 1.0)
+                val widthRatio = if (mode == ReaderViewMode.Continuous && vertical) 1 - padding / 100.0 else 1.0
+                val heightRatio = if (mode == ReaderViewMode.Continuous && !vertical) 1 - padding / 100.0 else 1.0
+                assertEquals("$label body width", width * widthRatio,
+                    geometry.getDouble("bodyWidth"), 1.0)
+                assertEquals("$label body height", height * heightRatio,
+                    geometry.getDouble("bodyHeight"), 1.0)
+                if (picture) {
+                    assertImagePainted(webView, label, color)
+                } else {
+                    assertEquals("$label descendant max-width", "73px", geometry.getString("boundedWidth"))
+                    assertEquals("$label descendant max-height", "51px", geometry.getString("boundedHeight"))
+                }
+            }
+        } finally {
+            instrumentation.runOnMainSync {
+                (webView.parent as? ViewGroup)?.removeView(webView)
+                webView.destroy()
+            }
+        }
+    }
+
+    private fun assertImagePainted(webView: WebView, label: String, color: Int) {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val rect = JSONObject(evaluate(webView, """
+            (() => { const image = [...document.images].find(img => img.getBoundingClientRect().width > 0);
+                const r = image.getBoundingClientRect(); return {left:r.left, top:r.top, width:r.width, height:r.height,
+                    visible:image.naturalWidth > 0 && r.width > 0 && r.height > 0 && r.left >= -1 && r.top >= -1 &&
+                        r.right <= innerWidth + 1 && r.bottom <= innerHeight + 1}; })()
+        """.trimIndent()))
+        assertTrue("$label image bounds $rect", rect.getBoolean("visible"))
+        val ready = CountDownLatch(1)
+        instrumentation.runOnMainSync {
+            webView.postVisualStateCallback(0, object : WebView.VisualStateCallback() {
+                override fun onComplete(requestId: Long) { ready.countDown() }
+            })
+        }
+        assertTrue("$label visual state", ready.await(10, TimeUnit.SECONDS))
+        val scale = webView.width / evaluate(webView, "innerWidth").toDouble()
+        val location = IntArray(2)
+        instrumentation.runOnMainSync { webView.getLocationOnScreen(location) }
+        composeRule.waitUntil(10_000) {
+            val screenshot = instrumentation.uiAutomation.takeScreenshot()
+            val viewport = Bitmap.createBitmap(screenshot, location[0], location[1], webView.width, webView.height)
+            val painted = listOf(0.2, 0.5, 0.8).all { x -> listOf(0.2, 0.5, 0.8).all { y ->
+                val pixel = viewport.getPixel(((rect.getDouble("left") + x * rect.getDouble("width")) * scale).toInt(),
+                    ((rect.getDouble("top") + y * rect.getDouble("height")) * scale).toInt())
+                abs(Color.red(pixel) - Color.red(color)) < 4 && abs(Color.green(pixel) - Color.green(color)) < 4 &&
+                    abs(Color.blue(pixel) - Color.blue(color)) < 4
+            } }
+            if (painted) {
+                val directory = File(instrumentation.targetContext.cacheDir, "viewport-limits-evidence").apply { mkdirs() }
+                directory.resolve("$label.png").outputStream().use { viewport.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            }
+            viewport.recycle()
+            screenshot.recycle()
+            painted
+        }
+    }
 
     @Test
     fun verticalPaginationUsesVisibleHeightAndReachesLastText() {

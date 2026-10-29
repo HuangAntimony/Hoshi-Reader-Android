@@ -216,6 +216,8 @@ internal object ReaderContentStyles {
                 val verticalInset = generatedLayout.viewportVerticalPaddingRatio * 100
                 """
                 html, body {
+                    max-width: none !important;
+                    max-height: none !important;
                     margin: 0 !important;
                     padding: 0 !important;
                     background: var(--hoshi-background-color) !important;
@@ -235,8 +237,6 @@ internal object ReaderContentStyles {
                     height: var(--hoshi-continuous-height, ${(100 - verticalInset * 2).cssNumber()}vh) !important;
                     min-width: 0 !important;
                     min-height: 0 !important;
-                    max-width: none !important;
-                    max-height: none !important;
                     overflow-x: ${if (settings.verticalWriting) "auto" else "hidden"} !important;
                     overflow-y: ${if (settings.verticalWriting) "hidden" else "auto"} !important;
                     scrollbar-width: none;
@@ -262,6 +262,8 @@ internal object ReaderContentStyles {
                     overflow: hidden !important;
                     height: var(--page-height, 100vh) !important;
                     width: var(--page-width, 100vw) !important;
+                    max-width: none !important;
+                    max-height: none !important;
                     margin: 0 !important;
                     padding: 0 !important;
                     background: var(--hoshi-background-color) !important;
@@ -318,6 +320,8 @@ internal object ReaderContentStyles {
                     overflow: hidden !important;
                     height: var(--page-height, 100vh) !important;
                     width: var(--page-width, 100vw) !important;
+                    max-width: none !important;
+                    max-height: none !important;
                     margin: 0 !important;
                     padding: 0 !important;
                     background: var(--hoshi-background-color) !important;
