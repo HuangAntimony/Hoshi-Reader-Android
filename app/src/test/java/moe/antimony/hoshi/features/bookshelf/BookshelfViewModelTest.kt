@@ -10,6 +10,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.epub.BookEntry
+import moe.antimony.hoshi.epub.BookReadingState
 import moe.antimony.hoshi.epub.LegacyBookMigrationProgress
 import moe.antimony.hoshi.epub.BookMetadata
 import moe.antimony.hoshi.epub.BookShelf
@@ -1493,6 +1494,38 @@ class BookshelfViewModelTest {
     }
 
     @Test
+    fun markUnreadRefreshesProgressActionsAndReadingSection() {
+        val entry = bookEntry("book-a")
+        val repository = FakeBookshelfRepository(entries = listOf(entry), progressById = mapOf("book-a" to 0.5),
+            readingStateById = mapOf("book-a" to BookReadingState(0.5, true, true)), settings = BookshelfSettings(showReading = true))
+        val viewModel = BookshelfViewModel(repository, testScope())
+        viewModel.reloadBookEntries()
+        assertTrue(viewModel.uiState.value.bookReadingStateById.getValue("book-a").canMarkUnread)
+
+        viewModel.markUnread(entry)
+
+        assertEquals(listOf(entry), repository.markedUnreadEntries)
+        assertEquals(0.0, viewModel.uiState.value.bookProgressById.getValue("book-a"), 0.0)
+        assertEquals(BookReadingState(canMarkRead = true), viewModel.uiState.value.bookReadingStateById.getValue("book-a"))
+        assertTrue(viewModel.uiState.value.sections.none { it.isReading && entry in it.books })
+    }
+
+    @Test
+    fun failedUnreadResetKeepsPublishedStateAndReportsTheError() {
+        val entry = bookEntry("book-a")
+        val repository = FakeBookshelfRepository(entries = listOf(entry), progressById = mapOf("book-a" to 0.5),
+            readingStateById = mapOf("book-a" to BookReadingState(0.5, true, true)), localUpdateError = IOException("reset failed"))
+        val viewModel = BookshelfViewModel(repository, testScope())
+        viewModel.reloadBookEntries()
+
+        viewModel.markUnread(entry)
+
+        assertEquals(0.5, viewModel.uiState.value.bookProgressById.getValue("book-a"), 0.0)
+        assertTrue(viewModel.uiState.value.bookReadingStateById.getValue("book-a").canMarkUnread)
+        assertTrue(viewModel.uiState.value.errorMessage.testString()?.contains("reset failed") == true)
+    }
+
+    @Test
     fun markReadWritesCompletedBookmarkThroughRepository() {
         val entry = bookEntry("book-a")
         val repository = FakeBookshelfRepository(entries = listOf(entry))
@@ -1605,6 +1638,7 @@ class BookshelfViewModelTest {
         viewModel.reloadBookEntries()
         repository.loadRequests.clear()
         repository.progressById = mapOf("book-a" to 0.75)
+        repository.readingStateById = mapOf("book-a" to BookReadingState(canMarkUnread = true))
 
         viewModel.syncBook(
             entry = entry,
@@ -1615,6 +1649,7 @@ class BookshelfViewModelTest {
         )
 
         assertEquals(mapOf("book-a" to 0.75), viewModel.uiState.value.bookProgressById)
+        assertTrue(viewModel.uiState.value.bookReadingStateById.getValue("book-a").canMarkUnread)
         assertTrue(repository.loadRequests.isEmpty())
         assertEquals(listOf(listOf("book-a")), repository.progressLoadRequests)
         assertEquals(
@@ -1725,6 +1760,7 @@ class BookshelfViewModelTest {
     private class FakeBookshelfRepository(
         var entries: List<BookEntry> = emptyList(),
         var progressById: Map<String, Double> = emptyMap(),
+        var readingStateById: Map<String, BookReadingState> = emptyMap(),
         var openBookId: String = "book-a",
         var syncLibraryError: Throwable? = null,
         var downloadBookOperation: (suspend (BookEntry, (Double) -> Unit) -> Unit)? = null,
@@ -1771,6 +1807,7 @@ class BookshelfViewModelTest {
         val renamedShelves = mutableListOf<Pair<String, String>>()
         val movedShelves = mutableListOf<Pair<Int, Int>>()
         val markedReadEntries = mutableListOf<BookEntry>()
+        val markedUnreadEntries = mutableListOf<BookEntry>()
         val importedRemoteEntries = mutableListOf<ImportedRemoteBook>()
         val deletedRemoteEntries = mutableListOf<RemoteBookEntry>()
         val exportedBooks = mutableListOf<BookEntry>()
@@ -1791,16 +1828,22 @@ class BookshelfViewModelTest {
             return BookshelfLoadResult(
                 entries = plan?.entries ?: entries,
                 progressById = progressById,
+                readingStateById = readingStates(entries),
                 coverSourcesById = coverSourcesById,
                 shelves = shelves,
                 settings = settings,
             )
         }
 
-        override suspend fun loadBookProgress(entries: List<BookEntry>): Map<String, Double> {
+        override suspend fun loadBookReadingStates(entries: List<BookEntry>): Map<String, BookReadingState> {
             progressLoadRequests += entries.map { it.metadata.id }
             progressLoadGate?.await()
-            return entries.associate { it.metadata.id to progressById.getValue(it.metadata.id) }
+            return readingStates(entries)
+        }
+
+        private fun readingStates(entries: List<BookEntry>) = entries.associate { entry ->
+            val id = entry.metadata.id
+            id to (readingStateById[id] ?: BookReadingState()).copy(progress = progressById[id] ?: 0.0)
         }
 
         override suspend fun syncLibrary() { syncLibraryError?.let { throw it } }
@@ -1889,6 +1932,13 @@ class BookshelfViewModelTest {
 
         override suspend fun markRead(entry: BookEntry) {
             markedReadEntries += entry
+        }
+
+        override suspend fun markUnread(entry: BookEntry) {
+            localUpdateError?.let { throw it }
+            markedUnreadEntries += entry
+            progressById = progressById + (entry.metadata.id to 0.0)
+            readingStateById = readingStateById + (entry.metadata.id to BookReadingState(canMarkRead = true))
         }
 
         override suspend fun renameBook(entry: BookEntry, title: String?) {

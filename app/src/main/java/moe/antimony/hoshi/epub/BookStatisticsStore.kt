@@ -80,6 +80,15 @@ class BookStatisticsStore private constructor(
 
     suspend fun loadSessions(bookRoot: File): ReadingSessions = locked { readSessions(bookRoot) }
 
+    internal suspend fun hasLiveSessions(folder: String): Boolean = locked {
+        readCoalesced(folder).values.any { it.value != null }
+    }
+
+    internal suspend fun deleteAll(folder: String) = mutate(folder) { sessions ->
+        val now = System.currentTimeMillis()
+        sessions.mapValues { (_, record) -> if (record.value == null) record else Timestamped(now, null) }
+    }
+
     suspend fun applySessions(bookRoot: File, sessions: ReadingSessions) = locked {
         if (readSessions(bookRoot) != sessions) writeSessions(bookRoot, sessions)
     }
@@ -245,11 +254,13 @@ class BookStatisticsStore private constructor(
     private suspend fun mutate(folder: String, transform: (ReadingSessions) -> ReadingSessions) {
         val records = locked {
             val active = activeRoot(folder)
-            val root = active.takeIf { it.isDirectory } ?: archiveRoot(folder)
-            val stored = readCoalesced(folder)
-            transform(stored).also { records ->
+            val archived = archiveRoot(folder)
+            val root = active.takeIf { it.isDirectory } ?: archived
+            val stored = readSessions(root)
+            val coalesced = if (root == active) SyncBook.mergeRecords(stored, readSessions(archived)) else stored
+            transform(coalesced).also { records ->
                 if (records != stored) writeSessions(root, records)
-                if (root == active && archiveRoot(folder).exists()) removeArchive(archiveRoot(folder))
+                if (root == active && archived.exists()) removeArchive(archived)
             }
         }
         onSave?.invoke(folder, records)

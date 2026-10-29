@@ -176,7 +176,11 @@
     <string name="bookshelf_import_epub">Import EPUB</string>
     <string name="bookshelf_sync" comment="Bookshelf sync action, intentionally matching the Statistics settings Sync heading.">Sync</string>
     <string name="bookshelf_move">Move</string>
-    <string name="bookshelf_mark_read">Mark Read</string>
+    <string name="bookshelf_mark">Mark</string>
+    <string name="bookshelf_unread">Unread</string>
+    <string name="bookshelf_mark_unread">Mark Unread</string>
+    <string name="bookshelf_mark_unread_title_format">Mark \"%1$s\" as unread?</string>
+    <string name="bookshelf_mark_unread_confirmation">This will reset the reading position and clear all reading statistics for this book.</string>
     <string name="bookshelf_export_epub">Export EPUB</string>
     <string name="bookshelf_reading_shelf">Reading Shelf</string>
     <string name="bookshelf_reading_shelf_description">Shows books you\'ve started but not finished.</string>

@@ -111,28 +111,7 @@ Commits: `81c60d2` (dictionary media and existing covers only).
   `AnkiConnectBackendTest` for selected/excluded glossaries, absent media fields,
   existing/missing covers and lookup-failure fallback; assert request sequences.
 
-### 5. Bookshelf read/unread actions for local and cloud books
-
-Status: Pending
-
-Commits: `a8d422c`, `d9f1b72` (Mark Read capability only).
-
-- Dependency/value: independent; session tombstones and sync bookkeeping already
-  support the required reset. Restores control over reading status.
-- iOS behavior: confirmed Mark Unread resets bookmark and live sessions; Mark
-  Read requires cached book information, even without a local EPUB.
-- Android current gap: `features/bookshelf/BookshelfRepository.kt`,
-  `BookshelfViewModel.kt` and `BookshelfView.kt` expose only `markRead`. Its menu
-  gate is `metadata.epub != null`, while `features/sync/SyncStorage.kt`'s
-  `deleteLocalBook` retains bookinfo that the repository could use to mark read.
-- Suggested slice: derive capabilities from repository state; implement confirmed
-  unread reset through `BookStatisticsStore`/`BookRepository`, retaining timestamped
-  deletions, sync notifications and shelf refresh.
-- Validation: partial/completed/statistics-only books; already unread books;
-  cloud placeholders with/without bookinfo; reload and remote merge must not
-  resurrect reset sessions. Extend bookshelf/storage/sync tests and isolated UI checks.
-
-### 6. Transfer queue totals, remaining time and interrupted rows
+### 5. Transfer queue totals, remaining time and interrupted rows
 
 Status: Pending
 
@@ -155,7 +134,7 @@ Commits: `21d5546` (presentation and aggregate accounting only).
   `SyncTransferTrackerTest`, `GoogleDriveSyncManagerTest` and `SyncQueueViewTest`,
   including device scroll retention and E-ink rendering.
 
-### 7. Keep the selected statistics period current across date changes
+### 6. Keep the selected statistics period current across date changes
 
 Status: Pending
 
@@ -175,7 +154,7 @@ Commits: `e2e0f31` (selected-period anchor only).
   current-period rollover, historical browsing, return to latest and reset changes;
   retain existing `StatisticsViewReloadTest` lifecycle coverage.
 
-### 8. Hide the status bar while a fullscreen image is open
+### 7. Hide the status bar while a fullscreen image is open
 
 Status: Pending
 
@@ -192,7 +171,7 @@ Commits: `18072c8` (system status bar only).
 - Validation: extend `ReaderChromeTest`; device checks for gallery and inline
   images, dismissal/back, both focus states and existing navigation-bar behavior.
 
-### 9. Show sub-minute transcription remaining time
+### 8. Show sub-minute transcription remaining time
 
 Status: Pending
 
@@ -220,12 +199,10 @@ Only concrete remaining behavior is listed; covered portions are summarized belo
 | `c2e323b` | Optional VN page-bounded Sasayaki playback | 3 |
 | `69ed0d1` | Stop page playback before the next overlapping cue | 3 |
 | `81c60d2` | Filter dictionary media and reuse uploaded AnkiConnect covers | 4 |
-| `a8d422c` | Confirmed Mark Unread and synced reading-state reset | 5 |
-| `d9f1b72` | Allow Mark Read from retained bookinfo without local EPUB | 5 |
-| `21d5546` | Aggregate transfer accounting and pending/interrupted/grouped rows | 6 |
-| `e2e0f31` | Reconcile selected statistics period on day/reset-time changes | 7 |
-| `18072c8` | Fullscreen-image status-bar visibility | 8 |
-| `3dfa9ef` | Sub-minute transcription ETA label | 9 |
+| `21d5546` | Aggregate transfer accounting and pending/interrupted/grouped rows | 5 |
+| `e2e0f31` | Reconcile selected statistics period on day/reset-time changes | 6 |
+| `18072c8` | Fullscreen-image status-bar visibility | 7 |
+| `3dfa9ef` | Sub-minute transcription ETA label | 8 |
 
 ## Suggested Implementation Order
 
@@ -236,11 +213,10 @@ then broader reader/dictionary/Anki value, followed by independent UI refinement
 2. Dictionary numeric-string frequencies and on-demand media mapping.
 3. Sasayaki playback bounded by the current VN page.
 4. Anki media filtering and remote cover reuse.
-5. Bookshelf read/unread actions for local and cloud books.
-6. Transfer queue totals, remaining time and interrupted rows.
-7. Keep the selected statistics period current across date changes.
-8. Hide the status bar while a fullscreen image is open.
-9. Show sub-minute transcription remaining time.
+5. Transfer queue totals, remaining time and interrupted rows.
+6. Keep the selected statistics period current across date changes.
+7. Hide the status bar while a fullscreen image is open.
+8. Show sub-minute transcription remaining time.
 
 ## Covered Or No Android Action
 
@@ -265,7 +241,8 @@ Code-backed coverage for the refreshed range:
 | `c2e323b`, `59c6120`, `d310ea2`, `0288a79`, `44c92da`, `0cb196a`, `e8d5ffa` | VN layout, settings, sentence limits, first-page handling and reveal cleanup exist in `reader/reader-visual-novel.js`, shared VN assets and reader settings. WebView callbacks use Android state holders. Only optional page-bounded Sasayaki playback remains open. |
 | `95ce7f5` (chapter/spine distinction) | `ReaderTocRange` already distinguishes spine positions from true TOC chapters, including fragments within a single XHTML file; page-count behavior remains open. |
 | `6403ae3` | `ReaderContentStyles` clears publisher root max-width/max-height in all modes while preserving descendant limits and continuous insets. `reader/reader-layout-semantics.js::sanitizeInlineBlocks` handles wrappers, struts and image centering; publisher writing modes are stripped. |
-| `d9f1b72`, `62982b7`, `3d2f77a`, `daf0fd7`, `e596fe1`, `c69f203`, `62e5889`, `1cfbf71`, `ca7e053`, `45ac6e9`, `241c92b`, `1c5d525`, `77eaee3`, `4777715`, `def6cec`, `08bcbb4`, `55988cc` | `SyncStorage`, `GoogleDriveSyncManager`, `GoogleDriveClient`, `BookRepository`, `SyncReloadScheduler` and `SyncAttachPrompt` cover provider separation, sidecars/tombstones, archive covers, shelf recreation, cached versions, coalesced reload, retries, streaming, conflict choices and on-demand downloads. Swift file extraction requires no port. Only the retained-bookinfo Mark Read gate remains from these commits. |
+| `d9f1b72`, `62982b7`, `3d2f77a`, `daf0fd7`, `e596fe1`, `c69f203`, `62e5889`, `1cfbf71`, `ca7e053`, `45ac6e9`, `241c92b`, `1c5d525`, `77eaee3`, `4777715`, `def6cec`, `08bcbb4`, `55988cc` | `SyncStorage`, `GoogleDriveSyncManager`, `GoogleDriveClient`, `BookRepository`, `SyncReloadScheduler` and `SyncAttachPrompt` cover provider separation, sidecars/tombstones, archive covers, shelf recreation, cached versions, coalesced reload, retries, streaming, conflict choices and on-demand downloads. Swift file extraction requires no port. |
+| `a8d422c`, `d9f1b72` (book actions) | `BookContextMenu` groups Read/Unread under Mark. `BookRepository` enables Read from cached bookinfo without a local EPUB. Confirmed Unread resets the bookmark and retains session tombstones through `BookStatisticsStore`; `BookshelfViewModel` refreshes progress and action availability. |
 | `a1c9996` | Single/bulk new-shelf moves exist. `NewShelfMoveDialog`, `BookshelfView`, `BookshelfRepository` and `BookshelfViewModel` use NFC names for creation, rename, duplicate checks, move targets and published state; `BookRepository.saveShelves` rejects canonical-name collisions before writing sidecars. |
 | `21d5546` (transport portion), `bb4e92d` | `GoogleDriveFileTransfer`, `DriveUploadSessions` and `BookTransferScheduler` implement resumable uploads and shared bounded upload/download scheduling; upstream job classification adds no further transport gap. |
 | `3f53018`, `e2e0f31` (reload portion), `642ad22` | Bookshelf/statistics repositories dispatch blocking work off main; `StatisticsLifecycleReloader` refreshes on resume. `TtuStatistics.reconciled` and `GoogleDriveSyncManager.mergeBook` remove overlap between legacy totals and sessions. Only selected-period rollover remains open. |

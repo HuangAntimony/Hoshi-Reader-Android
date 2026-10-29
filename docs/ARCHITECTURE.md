@@ -175,6 +175,15 @@ Validation guidance and failure injection methods are in
   shelf load. Background reloads cannot clear or replace that progress; local/sync
   notifications during import are coalesced into the final refresh, with changes
   arriving during that load refreshed afterward. Cloud transfers continue normally.
+- Bookshelf progress and read/unread capabilities come from `BookRepository`'s
+  persisted reading state, including cached bookinfo on cloud placeholders.
+  Corrupt statistics leave other shelf state available with diagnostics; resets
+  fail without replacing unreadable statistics. Read/unread actions join the
+  reader route's registered pending saves before acquiring the storage lock.
+  Mark Unread resets the bookmark and tombstones live/coalesced archived sessions
+  through `BookStatisticsStore` under the shared storage lock; once writes begin,
+  both sidecars finish across caller cancellation. Shelf reloads and progress
+  refreshes publish updated action availability together with progress.
 - `BookStatisticsStore` is the shared owner for reader sessions, edits, sync and
   archive/restore. UUID-keyed nullable records retain deletions; daily totals
   derive from sessions and reset time. `Books/statistics_archive/` participates

@@ -15,6 +15,9 @@ data class Bookmark(
     val lastModified: Double? = null,
 )
 
+internal val Bookmark.hasReadingProgress: Boolean
+    get() = chapterIndex > 0 || progress > 0 || characterCount > 0
+
 @Serializable
 data class BookInfo(
     val characterCount: Int,
@@ -64,6 +67,12 @@ data class BookEntry(
     val displayTitle: String
         get() = metadata.displayTitle.ifBlank { root.name }
 }
+
+data class BookReadingState(
+    val progress: Double = 0.0,
+    val canMarkRead: Boolean = false,
+    val canMarkUnread: Boolean = false,
+)
 
 enum class BookSortOption {
     Recent,

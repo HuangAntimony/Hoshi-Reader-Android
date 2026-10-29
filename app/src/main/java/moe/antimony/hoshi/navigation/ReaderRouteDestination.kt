@@ -273,7 +273,7 @@ internal fun ReaderRouteDestination(
                             } catch (error: Exception) {
                                 bookmarkScope.launch { operationError = statisticsSaveFailedMessage.withErrorDetails(error) }
                             }
-                        }
+                        }.also { appContainer.bookRepository.trackReaderSave(readyState.bookRoot, it) }
                         scheduleExport(readyState.entry)
                     },
                     onSaveStatistics = { statistics ->
@@ -285,7 +285,7 @@ internal fun ReaderRouteDestination(
                             } catch (error: Exception) {
                                 bookmarkScope.launch { operationError = statisticsSaveFailedMessage.withErrorDetails(error) }
                             }
-                        }
+                        }.also { appContainer.bookRepository.trackReaderSave(readyState.bookRoot, it) }
                         if (readerSettings.statisticsSyncEnabled) scheduleExport(readyState.entry)
                     },
                     onFlushBookmarkSaves = autoSyncExportController::flushSaves,

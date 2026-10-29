@@ -18,6 +18,8 @@ import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -75,6 +77,7 @@ class BookRepository private constructor(
 
     private val archiveExtractor = EpubArchiveExtractor()
     private val importDataSource = BookImportDataSource(filesDir, fileDataSource, ioDispatcher = ioDispatcher, sidecarDataSource = sidecarDataSource)
+    private val pendingReaderSaves = mutableMapOf<File, MutableSet<Job>>()
 
     internal val storageLock get() = statisticsStore.storageLock
     var onBookChange: (suspend (String, moe.antimony.hoshi.features.sync.SyncFileType?) -> Unit)? = null
@@ -368,6 +371,79 @@ class BookRepository private constructor(
         if (total <= 0) return 0.0
         val current = loadBookmark(bookRoot)?.characterCount ?: return 0.0
         return current.toDouble().div(total.toDouble()).coerceIn(0.0, 1.0)
+    }
+
+    suspend fun loadReadingState(bookRoot: File): BookReadingState = withContext(ioDispatcher) {
+        storageLock.withLock {
+            val metadata = loadMetadata(bookRoot) ?: return@withLock BookReadingState()
+            val info = loadBookInfo(bookRoot)
+            val bookmark = loadBookmark(bookRoot)
+            val total = info?.characterCount ?: metadata.characterCount ?: 0
+            val canMarkUnread = bookmark?.hasReadingProgress == true || try {
+                statisticsStore.hasLiveSessions(bookRoot.name)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                ErrorDiagnosticEvents.buffer.record(UiText.Resource(R.string.statistics_operation_failed), error)
+                false
+            }
+            BookReadingState(
+                progress = if (total > 0) (bookmark?.characterCount ?: 0).toDouble().div(total).coerceIn(0.0, 1.0) else 0.0,
+                canMarkRead = info != null,
+                canMarkUnread = canMarkUnread,
+            )
+        }
+    }
+
+    internal fun trackReaderSave(bookRoot: File, job: Job) {
+        val key = bookRoot.canonicalFile
+        synchronized(pendingReaderSaves) {
+            pendingReaderSaves.getOrPut(key) { mutableSetOf() }.add(job)
+        }
+        job.invokeOnCompletion {
+            synchronized(pendingReaderSaves) {
+                pendingReaderSaves[key]?.let { jobs ->
+                    jobs.remove(job)
+                    if (jobs.isEmpty()) pendingReaderSaves.remove(key)
+                }
+            }
+        }
+    }
+
+    private suspend fun awaitReaderSaves(bookRoot: File) {
+        val key = bookRoot.canonicalFile
+        while (true) {
+            val jobs = synchronized(pendingReaderSaves) { pendingReaderSaves[key]?.toList().orEmpty() }
+            if (jobs.isEmpty()) return
+            jobs.joinAll()
+        }
+    }
+
+    suspend fun markRead(bookRoot: File) = withContext(ioDispatcher) {
+        // Reader disposal queues saves in app scope; drain them before taking their storage lock.
+        awaitReaderSaves(bookRoot)
+        storageLock.withLock {
+            if (loadMetadata(bookRoot) == null) return@withLock
+            val info = loadBookInfo(bookRoot) ?: return@withLock
+            saveBookmark(bookRoot, Bookmark(
+                chapterIndex = info.chapterInfo.values.mapNotNull { it.spineIndex }.maxOrNull() ?: 0,
+                progress = 1.0,
+                characterCount = info.characterCount,
+                lastModified = currentAppleReferenceDateSeconds(),
+            ))
+        }
+    }
+
+    suspend fun markUnread(bookRoot: File) = withContext(ioDispatcher) {
+        awaitReaderSaves(bookRoot)
+        storageLock.withLock {
+            if (loadMetadata(bookRoot) == null) return@withLock
+            if (loadBookmark(bookRoot)?.hasReadingProgress != true && !statisticsStore.hasLiveSessions(bookRoot.name)) return@withLock
+            withContext(NonCancellable) {
+                statisticsStore.deleteAll(bookRoot.name)
+                saveBookmark(bookRoot, Bookmark(0, 0.0, 0, currentAppleReferenceDateSeconds()))
+            }
+        }
     }
 
     override fun currentAppleReferenceDateSeconds(): Double = clock.currentAppleReferenceDateSeconds()

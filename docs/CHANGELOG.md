@@ -7,6 +7,7 @@ Release notes before v1.3.0 are in [CHANGELOG_ARCHIVE.md](CHANGELOG_ARCHIVE.md).
 
 ### Added
 
+- Use the bookshelf’s Mark menu to reset books to unread, including their reading position and statistics, or mark cloud books as read when cached book information is available.
 - Choose AnkiDroid or kuma3 Anki as the card-making client, including deck and note-type fetching, media export, duplicate checks, note browsing and synchronization.
 
 - Optionally show a sentence replay button beside the reader’s bottom playback controls to restart the current Sasayaki or TTS sentence and continue playback.

@@ -174,7 +174,11 @@
     <string name="bookshelf_import_epub">导入 EPUB</string>
     <string name="bookshelf_sync" comment="Bookshelf sync action, intentionally matching the Statistics settings Sync heading.">同步</string>
     <string name="bookshelf_move">移动</string>
-    <string name="bookshelf_mark_read">标记已读</string>
+    <string name="bookshelf_mark">标记</string>
+    <string name="bookshelf_unread">未读</string>
+    <string name="bookshelf_mark_unread">标记未读</string>
+    <string name="bookshelf_mark_unread_title_format">将“%1$s”标记为未读？</string>
+    <string name="bookshelf_mark_unread_confirmation">这会重置阅读位置，并清空这本书的所有阅读统计。</string>
     <string name="bookshelf_export_epub">导出 EPUB</string>
     <string name="bookshelf_reading_shelf">正在阅读书架</string>
     <string name="bookshelf_reading_shelf_description">显示已经开始但尚未读完的书籍。</string>

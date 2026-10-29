@@ -553,6 +553,13 @@ internal class BookshelfViewModel : ViewModel {
         }
     }
 
+    fun markUnread(entry: BookEntry) {
+        launchBookshelfOperation {
+            repository.markUnread(entry)
+            reloadBookEntriesSync()
+        }
+    }
+
     fun markRead(entry: BookEntry) {
         launchBookshelfOperation {
             repository.markRead(entry)
@@ -779,6 +786,7 @@ internal class BookshelfViewModel : ViewModel {
                 bookEntries = result.entries,
                 canDeleteLocalBookIds = result.canDeleteLocalBookIds,
                 bookProgressById = result.progressById,
+                bookReadingStateById = result.readingStateById,
                 coverSourcesById = result.coverSourcesById,
                 shelves = result.shelves,
                 sections = bookshelfSections(
@@ -807,13 +815,15 @@ internal class BookshelfViewModel : ViewModel {
         repository.loadBooks(sortOption, ::showLegacyBookMigrationProgress)
 
     private suspend fun refreshBookProgress() {
-        val refreshedProgressById = repository.loadBookProgress(_uiState.value.bookEntries)
+        val refreshedStatesById = repository.loadBookReadingStates(_uiState.value.bookEntries)
         _uiState.update {
             val currentBookIds = it.bookEntries.mapTo(mutableSetOf()) { entry -> entry.metadata.id }
-            val progressById = (it.bookProgressById + refreshedProgressById)
+            val readingStateById = (it.bookReadingStateById + refreshedStatesById).filterKeys(currentBookIds::contains)
+            val progressById = (it.bookProgressById + refreshedStatesById.mapValues { entry -> entry.value.progress })
                 .filterKeys(currentBookIds::contains)
             it.copy(
                 bookProgressById = progressById,
+                bookReadingStateById = readingStateById,
                 sections = bookshelfSections(
                     entries = it.bookEntries,
                     shelves = it.shelves,

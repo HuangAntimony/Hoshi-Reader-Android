@@ -19,6 +19,7 @@ import moe.antimony.hoshi.epub.BookMetadata
 import moe.antimony.hoshi.epub.BookRepository
 import moe.antimony.hoshi.epub.BookShelf
 import moe.antimony.hoshi.epub.BookSortOption
+import moe.antimony.hoshi.epub.BookReadingState
 import moe.antimony.hoshi.epub.Bookmark
 import moe.antimony.hoshi.epub.EpubBook
 import moe.antimony.hoshi.epub.EpubBookParser
@@ -56,7 +57,7 @@ internal interface BookshelfRepository {
         sortOption: BookSortOption,
         onLegacyBookMigrationProgress: (LegacyBookMigrationProgress) -> Unit = {},
     ): BookshelfLoadResult
-    suspend fun loadBookProgress(entries: List<BookEntry>): Map<String, Double>
+    suspend fun loadBookReadingStates(entries: List<BookEntry>): Map<String, BookReadingState>
     suspend fun syncLibrary()
     suspend fun loadRemoteBooks(localEntries: List<BookEntry>): RemoteBookshelfLoadResult
     suspend fun openBook(entry: BookEntry): String
@@ -80,6 +81,7 @@ internal interface BookshelfRepository {
     suspend fun renameShelf(oldName: String, newName: String)
     suspend fun moveShelf(fromIndex: Int, toIndex: Int)
     suspend fun markRead(entry: BookEntry)
+    suspend fun markUnread(entry: BookEntry)
     suspend fun renameBook(entry: BookEntry, title: String?)
     suspend fun setBookProfile(entry: BookEntry, profileId: String?)
     suspend fun changeSort(sortOption: BookSortOption)
@@ -119,9 +121,11 @@ internal class AndroidBookshelfRepository @Inject constructor(
     ): BookshelfLoadResult = withContext(ioDispatcher) {
         val entries = bookRepository.loadBookEntries(sortOption, onLegacyBookMigrationProgress)
         val shelves = bookRepository.loadShelves(entries)
+        val readingStates = loadBookReadingStatesById(entries, bookRepository)
         BookshelfLoadResult(
             entries = entries,
-            progressById = loadBookProgressById(entries, bookRepository),
+            progressById = readingStates.mapValues { it.value.progress },
+            readingStateById = readingStates,
             coverSourcesById = loadBookCoverSourcesById(entries, bookRepository),
             shelves = shelves,
             settings = settingsRepository.settings.first(),
@@ -131,8 +135,8 @@ internal class AndroidBookshelfRepository @Inject constructor(
         )
     }
 
-    override suspend fun loadBookProgress(entries: List<BookEntry>): Map<String, Double> = withContext(ioDispatcher) {
-        loadBookProgressById(entries, bookRepository)
+    override suspend fun loadBookReadingStates(entries: List<BookEntry>): Map<String, BookReadingState> = withContext(ioDispatcher) {
+        loadBookReadingStatesById(entries, bookRepository)
     }
 
     override suspend fun syncLibrary() {
@@ -295,22 +299,9 @@ internal class AndroidBookshelfRepository @Inject constructor(
         bookRepository.saveShelves(shelves)
     }
 
-    override suspend fun markRead(entry: BookEntry) = withContext(ioDispatcher) {
-        val bookInfo = bookRepository.loadBookInfo(entry.root) ?: return@withContext
-        val lastChapter = bookInfo.chapterInfo.values
-            .mapNotNull { it.spineIndex }
-            .maxOrNull()
-            ?: 0
-        bookRepository.saveBookmark(
-            entry.root,
-            Bookmark(
-                chapterIndex = lastChapter,
-                progress = 1.0,
-                characterCount = bookInfo.characterCount,
-                lastModified = bookRepository.currentAppleReferenceDateSeconds(),
-            ),
-        )
-    }
+    override suspend fun markRead(entry: BookEntry) = bookRepository.markRead(entry.root)
+
+    override suspend fun markUnread(entry: BookEntry) = bookRepository.markUnread(entry.root)
 
     override suspend fun renameBook(entry: BookEntry, title: String?) = withContext(ioDispatcher) {
         val metadata = bookRepository.loadMetadata(entry.root) ?: entry.metadata
@@ -636,3 +627,10 @@ internal fun File.toBookCoverSource(): BookCoverSource =
         path = absolutePath,
         cacheKey = "$absolutePath:${lastModified()}:${length()}",
     )
+
+internal suspend fun loadBookReadingStatesById(
+    entries: List<BookEntry>,
+    bookRepository: BookRepository,
+): Map<String, BookReadingState> = entries.associate { entry ->
+    entry.metadata.id to bookRepository.loadReadingState(entry.root)
+}

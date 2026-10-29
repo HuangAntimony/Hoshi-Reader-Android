@@ -376,7 +376,8 @@ class MainShellUiTest {
                 ),
             )
 
-            assertEquals(0.25, loadBookProgressById(listOf(entry), repository).getValue("a"), 0.0001)
+            repository.saveMetadata(root, entry.metadata)
+            assertEquals(0.25, loadBookReadingStatesById(listOf(entry), repository).getValue("a").progress, 0.0001)
         } finally {
             filesDir.deleteRecursively()
         }
