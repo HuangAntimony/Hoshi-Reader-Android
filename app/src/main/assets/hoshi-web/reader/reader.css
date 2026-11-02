@@ -86,6 +86,12 @@ html[data-hoshi-reader-eink-mode="true"] ::highlight(hoshi-selection) {
     text-decoration-thickness: 1.5px;
     text-underline-offset: 2px;
 }
+/* Give inline cues their paint boxes during initial layout. Blink otherwise
+   relays out the chapter when each cue first acquires a background. A transparent
+   outline takes no layout space and preserves the existing span colors below. */
+.hoshi-sasayaki-cue {
+    outline: 1px solid transparent;
+}
 html[data-hoshi-reader-eink-mode="true"] .hoshi-sasayaki-cue.hoshi-sasayaki-active {
     color: inherit !important;
     background-color: transparent !important;
@@ -94,41 +100,8 @@ html:not([data-hoshi-reader-eink-mode="true"]) .hoshi-sasayaki-cue.hoshi-sasayak
     color: var(--hoshi-sasayaki-text-color) !important;
     background-color: var(--hoshi-sasayaki-background-color) !important;
 }
-.hoshi-vn-stage {
-    height: var(--hoshi-reader-visible-height, var(--page-height, 100vh));
-    width: var(--page-width, 100vw);
-    box-sizing: border-box;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--hoshi-text-color);
-    background: var(--hoshi-background-color);
-    writing-mode: inherit;
-}
-.hoshi-vn-screen {
-    box-sizing: border-box;
-    width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: inherit;
-    background: inherit;
-    writing-mode: inherit;
-    overflow: hidden;
-}
-.hoshi-vn-content {
-    box-sizing: border-box;
-    max-width: 100%;
-    max-height: 100%;
-    color: inherit;
-    background: inherit;
-    writing-mode: inherit;
-    overflow: hidden;
-}
-[data-hoshi-visual-novel-unrevealed] {
-    visibility: hidden !important;
-}
+::highlight(hoshi-animation) { color: transparent; }
+.hoshi-animation-hidden { visibility: hidden !important; }
 __HOSHI_HIGHLIGHT_COLOR_CSS__
 a {
     color: rgba(66, 108, 245, 1) !important;

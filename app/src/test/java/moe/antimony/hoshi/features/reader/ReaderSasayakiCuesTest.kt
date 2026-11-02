@@ -6,11 +6,27 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import moe.antimony.hoshi.epub.SasayakiMatch
 import moe.antimony.hoshi.epub.SasayakiMatchData
+import moe.antimony.hoshi.features.tts.TtsText
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
 class ReaderSasayakiCuesTest {
+    @Test
+    fun ttsChapterCuesUseTheSameSourceOffsetsAndIdsAsPlaybackIncludingRuby() {
+        val sentences = TtsText.chapter(3, "<p>前半。<ruby>漢字<rt>かんじ</rt></ruby>の続き。</p><p>最後。</p>")
+        val cues = Json.parseToJsonElement(ReaderSasayakiCues.ttsChapterCuesJson(sentences)).jsonArray
+        assertEquals(sentences.size, cues.size)
+        sentences.zip(cues).forEach { (sentence, value) ->
+            val cue = ReaderSasayakiCues.ttsCue(sentence)
+            val serialized = value.jsonObject
+            assertEquals("tts-3-${sentence.start}", serialized.getValue("id").jsonPrimitive.content)
+            assertEquals(cue.start.toString(), serialized.getValue("start").jsonPrimitive.content)
+            assertEquals(cue.length.toString(), serialized.getValue("length").jsonPrimitive.content)
+        }
+        assertEquals("[]", ReaderSasayakiCues.ttsChapterCuesJson(emptyList()))
+    }
+
     @Test
     fun chapterCuesSerializesOnlyCurrentChapterCuesSortedByStart() {
         val matchData = SasayakiMatchData(

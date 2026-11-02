@@ -883,6 +883,21 @@ internal fun SharedReaderPlaybackSettings(
         checked = settings.autoPause,
         onCheckedChange = { onSettingsChange { current -> current.copy(autoPause = it) } },
     )
+    if (includeAudiobookControls) {
+        HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
+        Text(
+            text = stringResource(R.string.reader_paragraph_mode),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+        )
+        ReaderSheetSwitchRow(
+            label = stringResource(R.string.sasayaki_page_advance),
+            checked = settings.pageAdvance,
+            onCheckedChange = { onSettingsChange { current -> current.copy(pageAdvance = it) } },
+        )
+    }
     HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
     SasayakiColorSheetSection(
         title = stringResource(R.string.sasayaki_light_theme),

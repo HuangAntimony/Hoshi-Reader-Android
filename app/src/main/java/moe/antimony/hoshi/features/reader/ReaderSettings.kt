@@ -29,6 +29,8 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.jsonObject
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.features.display.AppDisplayMigrationPayload
 import moe.antimony.hoshi.features.display.AppDisplaySettings
@@ -97,12 +99,12 @@ data class ReaderSettings(
     val fontSize: Int = 22,
     val furiganaMode: FuriganaMode = FuriganaMode.Off,
     val viewMode: ReaderViewMode = ReaderViewMode.Paginated,
-    val visualNovelRevealSpeed: Int = 45,
-    val visualNovelScreenMode: VisualNovelScreenMode = VisualNovelScreenMode.Block,
-    val visualNovelSentencesPerScreen: Int = 1,
-    val visualNovelPreserveDialogueBubbles: Boolean = false,
-    val visualNovelClickAdvance: Boolean = false,
-    val visualNovelMergeCrossScreenSasayakiCues: Boolean = false,
+    val paragraphMode: Boolean = false,
+    val maxSentencesPerPage: Int = 0,
+    val splitDialogue: Boolean = false,
+    val textAnimation: Boolean = false,
+    val textSpeed: Int = 35,
+    val paragraphClickAdvance: Boolean = false,
     val statisticsAutostartOnBookOpen: Boolean = false,
     val statisticsAutostartOnPageTurn: Boolean = false,
     val statisticsResetMinutes: Int = 0,
@@ -320,23 +322,12 @@ enum class ReaderInterfaceTheme(val label: String) {
 
 enum class ReaderViewMode(val rawValue: String) {
     Paginated("paginated"),
-    Continuous("continuous"),
-    VisualNovel("visualNovel");
+    Continuous("continuous");
 
     companion object {
         fun fromStorage(value: String?, legacyContinuousMode: Boolean = false): ReaderViewMode =
             entries.firstOrNull { it.rawValue == value || it.name == value }
                 ?: if (legacyContinuousMode) Continuous else Paginated
-    }
-}
-
-enum class VisualNovelScreenMode(val rawValue: String, @get:StringRes val labelRes: Int) {
-    Block("block", R.string.reader_visual_novel_screen_mode_block),
-    Sentences("sentences", R.string.reader_visual_novel_screen_mode_sentences);
-
-    companion object {
-        fun fromStorage(value: String?): VisualNovelScreenMode =
-            entries.firstOrNull { it.rawValue == value || it.name == value } ?: Block
     }
 }
 
@@ -409,6 +400,7 @@ class ReaderSettingsStore(context: Context) : ReaderSettingsLegacySource {
     private val preferences = context.getSharedPreferences("reader-settings", Context.MODE_PRIVATE)
 
     override fun load(): ReaderSettings {
+        val paragraph = paragraphSettingsFromPreferences(preferences.all)
         val legacyStatisticsAutostart = migrateLegacyStatisticsAutostart(
             preferences.getString("statisticsAutostartMode", null),
         )
@@ -435,19 +427,16 @@ class ReaderSettingsStore(context: Context) : ReaderSettingsLegacySource {
             preferences.getString("furiganaMode", null),
             preferences.getBoolean("readerHideFurigana", false),
         ),
-        viewMode = ReaderViewMode.fromStorage(
+        viewMode = migrateReaderViewMode(
             preferences.getString("readerViewMode", null),
             legacyContinuousMode = preferences.getBoolean("continuousMode", false),
         ),
-        visualNovelRevealSpeed = preferences.getInt("visualNovelRevealSpeed", 45).coerceVisualNovelRevealSpeed(),
-        visualNovelScreenMode = VisualNovelScreenMode.fromStorage(preferences.getString("visualNovelScreenMode", null)),
-        visualNovelSentencesPerScreen = preferences.getInt("visualNovelSentencesPerScreen", 1).coerceIn(1, 12),
-        visualNovelPreserveDialogueBubbles = preferences.getBoolean("visualNovelPreserveDialogueBubbles", false),
-        visualNovelClickAdvance = preferences.getBoolean("visualNovelClickAdvance", false),
-        visualNovelMergeCrossScreenSasayakiCues = preferences.getBoolean(
-            "visualNovelMergeCrossScreenSasayakiCues",
-            false,
-        ),
+        paragraphMode = paragraph.paragraphMode,
+        maxSentencesPerPage = paragraph.maxSentencesPerPage,
+        splitDialogue = paragraph.splitDialogue,
+        textAnimation = paragraph.textAnimation,
+        textSpeed = paragraph.textSpeed,
+        paragraphClickAdvance = paragraph.paragraphClickAdvance,
         statisticsAutostartOnBookOpen = if (preferences.contains("statisticsAutostartOnBookOpen")) {
             preferences.getBoolean("statisticsAutostartOnBookOpen", false)
         } else {
@@ -530,12 +519,13 @@ class ReaderSettingsStore(context: Context) : ReaderSettingsLegacySource {
             .putBoolean("readerHideFurigana", settings.furiganaMode == FuriganaMode.Hidden)
             .putString("readerViewMode", settings.viewMode.rawValue)
             .putBoolean("continuousMode", settings.continuousMode)
-            .putInt("visualNovelRevealSpeed", settings.visualNovelRevealSpeed.coerceVisualNovelRevealSpeed())
-            .putString("visualNovelScreenMode", settings.visualNovelScreenMode.rawValue)
-            .putInt("visualNovelSentencesPerScreen", settings.visualNovelSentencesPerScreen.coerceIn(1, 12))
-            .putBoolean("visualNovelPreserveDialogueBubbles", settings.visualNovelPreserveDialogueBubbles)
-            .putBoolean("visualNovelClickAdvance", settings.visualNovelClickAdvance)
-            .putBoolean("visualNovelMergeCrossScreenSasayakiCues", settings.visualNovelMergeCrossScreenSasayakiCues)
+            .removeLegacyParagraphSettings()
+            .putBoolean("paragraphMode", settings.paragraphMode)
+            .putInt("maxSentencesPerPage", settings.maxSentencesPerPage.coerceIn(0, 10))
+            .putBoolean("splitDialogue", settings.splitDialogue)
+            .putBoolean("textAnimation", settings.textAnimation)
+            .putInt("textSpeed", settings.textSpeed.coerceParagraphTextSpeed())
+            .putBoolean("paragraphClickAdvance", settings.paragraphClickAdvance)
             .putBoolean("statisticsAutostartOnBookOpen", settings.statisticsAutostartOnBookOpen)
             .putBoolean("statisticsAutostartOnPageTurn", settings.statisticsAutostartOnPageTurn)
             .remove("statisticsAutostartMode")
@@ -688,6 +678,7 @@ class ReaderSettingsRepository(
                 ).name
             }
             preferences.migrateStatisticsAutostartIfNeeded()
+            preferences.migrateLegacyParagraphPreferences()
         }
     }
 
@@ -702,8 +693,9 @@ class ReaderSettingsRepository(
         remove(KEY_STATISTICS_AUTOSTART_MODE)
     }
 
-    private fun Preferences.toReaderSettings(): ReaderSettings =
-        ReaderSettings(
+    private fun Preferences.toReaderSettings(): ReaderSettings {
+        val paragraph = paragraphSettingsFromPreferences(asMap().mapKeys { it.key.name })
+        return ReaderSettings(
             theme = this[KEY_THEME]
                 ?.let { saved -> ReaderTheme.entries.firstOrNull { it.label == saved } }
                 ?: ReaderTheme.System,
@@ -723,16 +715,16 @@ class ReaderSettingsRepository(
                 .orEmpty(),
             fontSize = this[KEY_FONT_SIZE] ?: 22,
             furiganaMode = FuriganaMode.fromStorage(this[KEY_FURIGANA_MODE], this[KEY_HIDE_FURIGANA] ?: false),
-            viewMode = ReaderViewMode.fromStorage(
+            viewMode = migrateReaderViewMode(
                 this[KEY_READER_VIEW_MODE],
                 legacyContinuousMode = this[KEY_CONTINUOUS_MODE] ?: false,
             ),
-            visualNovelRevealSpeed = (this[KEY_VISUAL_NOVEL_REVEAL_SPEED] ?: 45).coerceVisualNovelRevealSpeed(),
-            visualNovelScreenMode = VisualNovelScreenMode.fromStorage(this[KEY_VISUAL_NOVEL_SCREEN_MODE]),
-            visualNovelSentencesPerScreen = (this[KEY_VISUAL_NOVEL_SENTENCES_PER_SCREEN] ?: 1).coerceIn(1, 12),
-            visualNovelPreserveDialogueBubbles = this[KEY_VISUAL_NOVEL_PRESERVE_DIALOGUE_BUBBLES] ?: false,
-            visualNovelClickAdvance = this[KEY_VISUAL_NOVEL_CLICK_ADVANCE] ?: false,
-            visualNovelMergeCrossScreenSasayakiCues = this[KEY_VISUAL_NOVEL_MERGE_CROSS_SCREEN_SASAYAKI_CUES] ?: false,
+            paragraphMode = paragraph.paragraphMode,
+            maxSentencesPerPage = paragraph.maxSentencesPerPage,
+            splitDialogue = paragraph.splitDialogue,
+            textAnimation = paragraph.textAnimation,
+            textSpeed = paragraph.textSpeed,
+            paragraphClickAdvance = paragraph.paragraphClickAdvance,
             statisticsAutostartOnBookOpen = this[KEY_STATISTICS_AUTOSTART_ON_BOOK_OPEN] ?: false,
             statisticsAutostartOnPageTurn = this[KEY_STATISTICS_AUTOSTART_ON_PAGE_TURN] ?: false,
             statisticsResetMinutes = this[KEY_STATISTICS_RESET_MINUTES] ?: 0,
@@ -785,6 +777,7 @@ class ReaderSettingsRepository(
             lockCurrentOrientation = this[KEY_LOCK_CURRENT_ORIENTATION] ?: false,
             openLastReadBookOnLaunch = this[KEY_OPEN_LAST_READ_BOOK_ON_LAUNCH] ?: false,
         )
+    }
 
     private fun MutablePreferences.writeReaderSettings(settings: ReaderSettings) {
         this[KEY_THEME] = settings.theme.label
@@ -807,12 +800,12 @@ class ReaderSettingsRepository(
         this[KEY_HIDE_FURIGANA] = settings.furiganaMode == FuriganaMode.Hidden
         this[KEY_READER_VIEW_MODE] = settings.viewMode.rawValue
         this[KEY_CONTINUOUS_MODE] = settings.continuousMode
-        this[KEY_VISUAL_NOVEL_REVEAL_SPEED] = settings.visualNovelRevealSpeed.coerceVisualNovelRevealSpeed()
-        this[KEY_VISUAL_NOVEL_SCREEN_MODE] = settings.visualNovelScreenMode.rawValue
-        this[KEY_VISUAL_NOVEL_SENTENCES_PER_SCREEN] = settings.visualNovelSentencesPerScreen.coerceIn(1, 12)
-        this[KEY_VISUAL_NOVEL_PRESERVE_DIALOGUE_BUBBLES] = settings.visualNovelPreserveDialogueBubbles
-        this[KEY_VISUAL_NOVEL_CLICK_ADVANCE] = settings.visualNovelClickAdvance
-        this[KEY_VISUAL_NOVEL_MERGE_CROSS_SCREEN_SASAYAKI_CUES] = settings.visualNovelMergeCrossScreenSasayakiCues
+        this[KEY_PARAGRAPH_MODE] = settings.paragraphMode
+        this[KEY_MAX_SENTENCES_PER_PAGE] = settings.maxSentencesPerPage.coerceIn(0, 10)
+        this[KEY_SPLIT_DIALOGUE] = settings.splitDialogue
+        this[KEY_TEXT_ANIMATION] = settings.textAnimation
+        this[KEY_TEXT_SPEED] = settings.textSpeed.coerceParagraphTextSpeed()
+        this[KEY_PARAGRAPH_CLICK_ADVANCE] = settings.paragraphClickAdvance
         this[KEY_STATISTICS_AUTOSTART_ON_BOOK_OPEN] = settings.statisticsAutostartOnBookOpen
         this[KEY_STATISTICS_AUTOSTART_ON_PAGE_TURN] = settings.statisticsAutostartOnPageTurn
         remove(KEY_STATISTICS_AUTOSTART_MODE)
@@ -899,7 +892,11 @@ class ReaderSettingsRepository(
             val file = repository.readerSettingsFile(profileId)
             if (file.isFile) {
                 runCatching {
-                    json.decodeFromString<ProfileReaderAppearanceSettings>(file.readText())
+                    val original = json.parseToJsonElement(file.readText()).jsonObject
+                    val migrated = migrateParagraphSettingsJson(original)
+                    json.decodeFromJsonElement<ProfileReaderAppearanceSettings>(migrated).also {
+                        if (migrated != original) saveProfileAppearanceSettings(it, profileId)
+                    }
                 }.getOrDefault(globalSettings.toProfileAppearanceSettings())
             } else {
                 val migrated = globalSettings.toProfileAppearanceSettings()
@@ -941,14 +938,12 @@ class ReaderSettingsRepository(
         private val KEY_HIDE_FURIGANA = booleanPreferencesKey("readerHideFurigana")
         private val KEY_READER_VIEW_MODE = stringPreferencesKey("readerViewMode")
         private val KEY_CONTINUOUS_MODE = booleanPreferencesKey("continuousMode")
-        private val KEY_VISUAL_NOVEL_REVEAL_SPEED = intPreferencesKey("visualNovelRevealSpeed")
-        private val KEY_VISUAL_NOVEL_SCREEN_MODE = stringPreferencesKey("visualNovelScreenMode")
-        private val KEY_VISUAL_NOVEL_SENTENCES_PER_SCREEN = intPreferencesKey("visualNovelSentencesPerScreen")
-        private val KEY_VISUAL_NOVEL_PRESERVE_DIALOGUE_BUBBLES =
-            booleanPreferencesKey("visualNovelPreserveDialogueBubbles")
-        private val KEY_VISUAL_NOVEL_CLICK_ADVANCE = booleanPreferencesKey("visualNovelClickAdvance")
-        private val KEY_VISUAL_NOVEL_MERGE_CROSS_SCREEN_SASAYAKI_CUES =
-            booleanPreferencesKey("visualNovelMergeCrossScreenSasayakiCues")
+        private val KEY_PARAGRAPH_MODE = booleanPreferencesKey("paragraphMode")
+        private val KEY_MAX_SENTENCES_PER_PAGE = intPreferencesKey("maxSentencesPerPage")
+        private val KEY_SPLIT_DIALOGUE = booleanPreferencesKey("splitDialogue")
+        private val KEY_TEXT_ANIMATION = booleanPreferencesKey("textAnimation")
+        private val KEY_TEXT_SPEED = intPreferencesKey("textSpeed")
+        private val KEY_PARAGRAPH_CLICK_ADVANCE = booleanPreferencesKey("paragraphClickAdvance")
         private val KEY_STATISTICS_AUTOSTART_MODE = stringPreferencesKey("statisticsAutostartMode")
         private val KEY_STATISTICS_AUTOSTART_ON_BOOK_OPEN =
             booleanPreferencesKey("statisticsAutostartOnBookOpen")
@@ -1020,7 +1015,9 @@ internal class ReaderDisplaySettingsMigrationSource(
         val globalFile = profileRepository.readerSettingsFile(globalProfile.id)
         val profileSettings = globalFile.takeIf { it.isFile }?.let { file ->
             runCatching {
-                migrationJson.decodeFromString<ProfileReaderAppearanceSettings>(file.readText())
+                migrationJson.decodeFromJsonElement<ProfileReaderAppearanceSettings>(
+                    migrateParagraphSettingsJson(migrationJson.parseToJsonElement(file.readText()).jsonObject),
+                )
                     .toLegacyDisplaySnapshot()
             }.getOrNull()
         }
@@ -1126,12 +1123,12 @@ private data class ProfileReaderAppearanceSettings(
     val hideFurigana: Boolean = false,
     val viewMode: ReaderViewMode? = null,
     val continuousMode: Boolean = false,
-    val visualNovelRevealSpeed: Int = 45,
-    val visualNovelScreenMode: VisualNovelScreenMode = VisualNovelScreenMode.Block,
-    val visualNovelSentencesPerScreen: Int = 1,
-    val visualNovelPreserveDialogueBubbles: Boolean = false,
-    val visualNovelClickAdvance: Boolean = false,
-    val visualNovelMergeCrossScreenSasayakiCues: Boolean = false,
+    val paragraphMode: Boolean = false,
+    val maxSentencesPerPage: Int = 0,
+    val splitDialogue: Boolean = false,
+    val textAnimation: Boolean = false,
+    val textSpeed: Int = 35,
+    val paragraphClickAdvance: Boolean = false,
     val showStatisticsToggle: Boolean = false,
     val showReadingSpeed: Boolean = false,
     val showReadingTime: Boolean = false,
@@ -1188,12 +1185,12 @@ private fun ReaderSettings.toProfileAppearanceSettings(): ProfileReaderAppearanc
         hideFurigana = furiganaMode == FuriganaMode.Hidden,
         viewMode = viewMode,
         continuousMode = continuousMode,
-        visualNovelRevealSpeed = visualNovelRevealSpeed.coerceVisualNovelRevealSpeed(),
-        visualNovelScreenMode = visualNovelScreenMode,
-        visualNovelSentencesPerScreen = visualNovelSentencesPerScreen.coerceIn(1, 12),
-        visualNovelPreserveDialogueBubbles = visualNovelPreserveDialogueBubbles,
-        visualNovelClickAdvance = visualNovelClickAdvance,
-        visualNovelMergeCrossScreenSasayakiCues = visualNovelMergeCrossScreenSasayakiCues,
+        paragraphMode = paragraphMode,
+        maxSentencesPerPage = maxSentencesPerPage.coerceIn(0, 10),
+        splitDialogue = splitDialogue,
+        textAnimation = textAnimation,
+        textSpeed = textSpeed.coerceParagraphTextSpeed(),
+        paragraphClickAdvance = paragraphClickAdvance,
         showStatisticsToggle = showStatisticsToggle,
         showReadingSpeed = showReadingSpeed,
         showReadingTime = showReadingTime,
@@ -1252,12 +1249,12 @@ private fun ReaderSettings.withProfileAppearance(appearance: ProfileReaderAppear
         } else {
             ReaderViewMode.Paginated
         },
-        visualNovelRevealSpeed = appearance.visualNovelRevealSpeed.coerceVisualNovelRevealSpeed(),
-        visualNovelScreenMode = appearance.visualNovelScreenMode,
-        visualNovelSentencesPerScreen = appearance.visualNovelSentencesPerScreen.coerceIn(1, 12),
-        visualNovelPreserveDialogueBubbles = appearance.visualNovelPreserveDialogueBubbles,
-        visualNovelClickAdvance = appearance.visualNovelClickAdvance,
-        visualNovelMergeCrossScreenSasayakiCues = appearance.visualNovelMergeCrossScreenSasayakiCues,
+        paragraphMode = appearance.paragraphMode,
+        maxSentencesPerPage = appearance.maxSentencesPerPage.coerceIn(0, 10),
+        splitDialogue = appearance.splitDialogue,
+        textAnimation = appearance.textAnimation,
+        textSpeed = appearance.textSpeed.coerceParagraphTextSpeed(),
+        paragraphClickAdvance = appearance.paragraphClickAdvance,
         showStatisticsToggle = appearance.showStatisticsToggle,
         showReadingSpeed = appearance.showReadingSpeed,
         showReadingTime = appearance.showReadingTime,
@@ -1362,9 +1359,3 @@ private fun ReaderSettings.projectLegacyDisplay(display: AppDisplaySettings): Re
 
 internal fun Double.cssNumber(): String =
     String.format(Locale.US, "%.1f", this)
-
-private fun Int.coerceVisualNovelRevealSpeed(): Int =
-    (roundToNearestStep(step = 5)).coerceIn(0, 120)
-
-private fun Int.roundToNearestStep(step: Int): Int =
-    ((this + step / 2) / step) * step

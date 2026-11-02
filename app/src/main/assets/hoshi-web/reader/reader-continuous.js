@@ -491,6 +491,10 @@ __HOSHI_READER_SASAYAKI_SCRIPT__
     });
     return true;
   },
+  paginateWithProgress: function(direction) {
+    var result = this.paginate(direction);
+    return result === 'scrolled' ? this.calculateProgress() : result;
+  },
   paginate: function(direction) {
     window.hoshiHighlights?.clearSearchHighlight?.();
     var vertical = this.isVertical();

@@ -416,20 +416,10 @@
     <string name="reader_appearance_mode" comment="Reader appearance setting label, intentionally matching dictionary mode.">模式</string>
     <string name="reader_appearance_paginated">分页</string>
     <string name="reader_appearance_continuous">连续</string>
-    <string name="reader_appearance_visual_novel">VN</string>
-    <string name="reader_visual_novel_reveal_speed">文字显示速度</string>
-    <string name="reader_visual_novel_reveal_speed_instant">立即</string>
-    <string name="reader_visual_novel_screen_mode">屏幕内容</string>
-    <string name="reader_visual_novel_screen_mode_block">按段落</string>
-    <string name="reader_visual_novel_screen_mode_sentences">按句子</string>
-    <string name="reader_visual_novel_sentences_per_screen">每屏句数</string>
-    <string name="reader_visual_novel_preserve_dialogue">对话保持同屏</string>
-    <string name="reader_visual_novel_click_advance">点击空白处前进</string>
-    <string name="reader_visual_novel_merge_cross_screen_sasayaki_cues">字幕文本同屏</string>
     <string name="reader_appearance_chapter_swipe_distance">章节滑动距离</string>
     <string name="reader_appearance_page_swipe_threshold">翻页滑动阈值</string>
     <string name="reader_appearance_page_swipe_threshold_value">%1$d px</string>
-    <string name="reader_appearance_page_swipe_disabled" comment="分页和 VN 阅读器的滑动阈值状态；有意与其他关闭标签使用相同文案。">关闭</string>
+    <string name="reader_appearance_page_swipe_disabled" comment="分页阅读器的滑动阈值状态；有意与其他关闭标签使用相同文案。">关闭</string>
     <string name="reader_appearance_horizontal_padding">水平边距</string>
     <string name="reader_appearance_vertical_padding">垂直边距</string>
     <string name="reader_appearance_top_safe_area">顶部安全区</string>
@@ -1238,4 +1228,13 @@
     <string name="dictionary_history_delete_failed">删除查词历史条目失败</string>
     <string name="dictionary_history_clear_failed">清空查词历史失败</string>
     <string name="dictionary_history_retry" comment="Retry loading lookup history.">重试</string>
+    <string name="reader_paragraph_mode">段落模式</string>
+    <string name="reader_paragraph_max_sentences">每页最多句数</string>
+    <string name="reader_paragraph_sentence_limit_off" comment="段落句数限制滑杆的关闭状态；有意与其他关闭标签使用相同文案。">关闭</string>
+    <string name="reader_paragraph_split_dialogue">拆分对话</string>
+    <string name="reader_paragraph_text_animation">动画</string>
+    <string name="reader_paragraph_text_speed">文字速度</string>
+    <string name="reader_paragraph_text_speed_value">%1$d/秒</string>
+    <string name="reader_paragraph_click_advance">点击空白处前进</string>
+    <string name="sasayaki_page_advance">翻页时播放当前页</string>
 </resources>

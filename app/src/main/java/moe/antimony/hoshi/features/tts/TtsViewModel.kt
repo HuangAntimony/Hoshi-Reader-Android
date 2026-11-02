@@ -280,6 +280,9 @@ class TtsViewModel @Inject constructor(
     suspend fun sourceSentence(book: moe.antimony.hoshi.epub.EpubBook, chapter: Int, selection: moe.antimony.hoshi.features.reader.ReaderSelectionData): TtsSentence =
         books.selection(book, chapter, selection.sentence, selection.normalizedOffset, selection.sentenceOffset)
 
+    suspend fun chapterSentences(book: moe.antimony.hoshi.epub.EpubBook, chapter: Int): List<TtsSentence> =
+        books.chapter(book, chapter)
+
     suspend fun sentenceAudio(bookId: String?, sentence: suspend () -> TtsSentence): java.io.File? =
         exportWhileEnabled(bookId, sentence = sentence)
 

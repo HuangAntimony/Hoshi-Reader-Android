@@ -123,20 +123,9 @@
     return /^(block|flow-root|flex|grid|list-item|table.*)$/.test(display);
   }
 
-  // VN must capture computed CSS boundaries while the source is still attached.
-  function captureSasayakiBoundaries(root) {
-    var boundaries = new WeakSet();
-    function visit(node) {
-      if (isSasayakiBoundary(node)) boundaries.add(node);
-      Array.from(node.childNodes || []).forEach(visit);
-    }
-    visit(root);
-    return boundaries;
-  }
-
   // Read structure independently of the text walker, which cannot see empty
   // paragraphs, br elements or images between two accepted text nodes.
-  function createSasayakiTextIndex(root, entries, boundaries) {
+  function createSasayakiTextIndex(root, entries) {
     // The caller owns text filtering and character counts; never drop accepted entries.
     var accepted = new Map(entries.map(function(entry) { return [entry.node, entry]; }));
     var epoch = 0;
@@ -154,7 +143,7 @@
       // Ruby annotations are outside the logical base-text flow, including their layout.
       var tag = String(node.tagName || '').toLowerCase();
       if (tag === 'rt' || tag === 'rp') return;
-      var boundary = boundaries ? boundaries.has(node) : isSasayakiBoundary(node);
+      var boundary = isSasayakiBoundary(node);
       if (boundary) epoch += 1;
       Array.from(node.childNodes || []).forEach(visit);
       if (boundary) epoch += 1;
@@ -185,7 +174,6 @@
 
   global.hoshiReaderDomText = {
     selectedTextSegments: selectedTextSegments,
-    captureSasayakiBoundaries: captureSasayakiBoundaries,
     createSasayakiTextIndex: createSasayakiTextIndex,
     sasayakiSegments: sasayakiSegments,
     normalizeReaderText: normalizeReaderText,

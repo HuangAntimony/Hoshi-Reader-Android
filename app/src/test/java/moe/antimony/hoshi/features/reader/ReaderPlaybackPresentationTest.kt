@@ -13,9 +13,9 @@ class ReaderPlaybackPresentationTest {
         var chapter = 0
         var active = true
         val events = mutableListOf<String>()
-        var stops = listOf(ReaderSasayakiMediaStop(screenIndex = 1))
+        var stops = listOf(ReaderSasayakiMediaStop(scroll = 1.0))
         var restore = ReaderPlaybackTargetRestoreResult(false, true, 0.2,
-            listOf(ReaderSasayakiMediaStop(screenIndex = 2)))
+            listOf(ReaderSasayakiMediaStop(scroll = 2.0)))
         var afterHold: () -> Unit = {}
         override suspend fun stopsBeforeCue() = stops
         override suspend fun stopsToChapterEnd(): List<ReaderSasayakiMediaStop> {
@@ -24,7 +24,7 @@ class ReaderPlaybackPresentationTest {
         }
         override suspend fun showStops(stops: List<ReaderSasayakiMediaStop>, countStatistics: Boolean) {
             for (stop in stops) {
-                events += "image:${stop.screenIndex}"
+                events += "image:${stop.scroll?.toInt()}"
                 delay(1000)
                 afterHold()
             }

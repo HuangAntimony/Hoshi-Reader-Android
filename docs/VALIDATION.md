@@ -136,14 +136,66 @@ Stop the fixture and remove only this reverse mapping after testing.
   Single-tap text opens lookup; long press tests native selection/highlights.
 - Standalone reader fixtures must inject measured
   `readerViewportCssLayout(...).cssVariables()` and wait for `HoshiReaderRestore`.
-  Shell injection alone can leave VN with a zero-height viewport.
+  Shell injection alone can leave generated content with an incorrect viewport.
 - Picture fixtures must also wait for visible pixels after the WebView visual-state
   callback. Correct image bounds and a ready bridge can precede compositor paint;
   an immediate `WebView.draw` or screenshot may still be blank. Use a bounded
   screenshot check against the current image before accepting painting or centering
   evidence; a nonblank screenshot can still contain the previous chapter.
 - Use screenshots/recordings for painting, menu visibility and handle movement.
-  CSS Custom Highlights can clip vertical glyph edges despite a correct DOM Range.
+  CSS Custom Highlights can clip vertical glyph edges despite a correct DOM Range;
+  follow the [narration-highlighting prohibition](ARCHITECTURE.md#prohibited-narration-highlighting-changes)
+  and the glyph comparison below.
+- `ReaderParagraphWebViewTest` uses generated documents to check paragraph-only
+  sentence splitting, long-block fragments, ruby/offset integrity and reveal in
+  both writing directions, including late-chapter pages with zero page padding.
+  Centering checks cover both axes and writing directions, unequal explicit lines,
+  natural and explicit wrapping, short continuations, images and page padding.
+  Spacing paragraphs must not add blank pages or displace fragment-anchor jumps;
+  publisher ornaments, media and borders must remain visible. Long-page reveal
+  bounds must match the actual first and last characters on each page.
+  Native page-turn tests require the progress calculation to finish before the first
+  reveal frame and publish the same progress to display and bookmark callbacks.
+  With narration cues installed and layout measured, subsequent page turns must
+  reuse text bounds without walking or measuring the whole chapter again;
+  progress must still measure a text node that crosses the viewport boundary.
+  Paragraph E-ink switches must reload at the displayed character position with
+  cue text and saved highlights intact in both directions. Appearance refresh
+  must not perform bulk DOM wrapping on the old document.
+  Blank-tap advance must keep the new reveal running when the DOM click arrives
+  after native navigation; a separate tap must still finish it without advancing.
+  Fractional WebView scroll coordinates must keep the first text node and cue on
+  the current page and exclude the next page. It freezes only the reveal clock after restore and
+  compares live DOM/geometry plus actual ruby pixels before/after reveal. Gaiji
+  images and generated fallbacks must follow the text boundary, retain geometry,
+  and become visible on completion, cancellation or page turn; other pages stay
+  untouched. Evidence is written under the target app's `cache/paragraph-evidence/`.
+  Narration fixtures install both Sasayaki and TTS chapter cues before restore,
+  then switch cues and follow across pages while reveal runs: the same animation
+  must continue to completion without replacing text nodes. Cross-chapter restore
+  still animates. On the real reader, verify that opening a book with TTS enabled
+  but never started installs no TTS wrappers; first playback installs the chapter
+  once, and subsequent cue updates preserve node identity. Compare highlighted
+  and plain glyph silhouettes using the procedure below.
+  It never accesses
+  books or saved settings. `SasayakiPagePlaybackDeviceTest` uses a scratch audio
+  directory and silent WAV with the real Media3 controller; it detaches Reader
+  callbacks to check page-end stopping, overlap, delay, backward/empty pages and
+  disabling without accessing an application service session. On the real reader,
+  verify that Next Cue crossing a page refreshes its stop boundary while preserving
+  playback state and position, in both normal and E-ink modes; playback must stop
+  at the destination page end without another manual page turn. Switching between
+  ordinary pagination and paragraph mode during playback must preserve following,
+  including when the restored page has no cues or lies outside the current audio
+  range. Use the Contents sheet to jump to another chapter and then turn into its
+  text pages; verify that new-page cues replace the previous range. An explicit
+  turn to a cue-less page must still pause. From that page,
+  Play and Next Cue must resume following and establish the destination page stop.
+  After a page-end pause, wait beyond several playback ticks and confirm that no
+  next-page cue is dispatched; Play must then continue and stop at the next
+  followed page end.
+  Keep restored-page animation and backward-page behavior
+  distinct.
 - Native-handle fixtures need real long-press/drag events with both
   `SOURCE_TOUCHSCREEN` and `TOOL_TYPE_FINGER`. Recovery presses need tap timeout plus
   long-press timeout and a release margin; observe after that deadline.
@@ -155,6 +207,24 @@ Stop the fixture and remove only this reverse mapping after testing.
 - Browser OAuth activity tests use the debug caller fixture and require window
   focus. External-process browser fixtures use framework-only Java to run without
   the target App's dependencies. Test tokens/stores remain isolated from login.
+
+### Narration highlight glyph integrity
+
+- On SM-G9860 / Android 13 / WebView 155.0.8059.43, CSS Custom Highlight narration
+  coloring visibly clipped left-side strokes of vertical glyphs including `駆`,
+  `私` and `追`. Removing only the highlight restored the complete glyphs;
+  restoring it reproduced the clipping. DOM, Range rectangles and scroll position
+  remained identical. This is a paint regression, not evidence of missing text or
+  a pagination error.
+- When checking TTS/Sasayaki rendering, pause on the same sentence and compare
+  highlighted and unhighlighted screenshots with identical font, size, writing
+  direction and position. Inspect whole glyph silhouettes and ruby, including
+  edges extending beyond nominal character boxes. Wait for compositor paint and
+  restore the original highlighting after inspection.
+- Checking only cue strings, DOM identity, geometry or colored-pixel counts misses
+  this failure. A test that sees a blue background does not prove that its kanji
+  remain intact. Keep per-run screenshots outside the repository; renderer changes
+  still require the explicit approval specified in ARCHITECTURE.
 
 ## Performance baseline and diagnosis
 
@@ -168,7 +238,7 @@ For Reader opening, separate `tap -> WebView target -> restore/ready -> visible
 paint`. The first interval covers native routing, EPUB work and WebView creation;
 the second covers web setup/layout/restore. A ready flag does not prove paint.
 Compare relevant controls, such as first/repeated entry, short/long chapters,
-Sasayaki on/off and VN cue merging on/off.
+Sasayaki on/off and paragraph mode on/off.
 
 For a debuggable process, locate its WebView through CDP:
 
@@ -180,8 +250,8 @@ adb -s "$hoshi_serial" forward tcp:9222 "localabstract:webview_devtools_remote_$
 curl --fail http://127.0.0.1:9222/json
 ```
 
-Select the intended `appassets.androidplatform.net` target. VN readiness is
-`window.hoshiReader.ensureReady()`; paginated/continuous expose `didInitialize`.
+Select the intended `appassets.androidplatform.net` target. Both runtimes expose
+`didInitialize`; wait for the restore callback before claiming the document is ready.
 Check `calculateProgress()` after restore and pair it with screenshots for blank
 or incorrect content. Collect `Performance.getMetrics` and a focused CDP CPU
 profile; identify app-owned callers and self/inclusive time.
@@ -189,6 +259,14 @@ Measure latency again without tracing: detailed DevTools timeline events can
 inflate native-to-JavaScript callback costs, especially filtered TreeWalker
 scans. Use separate CPU samples for attribution and compare complete pagination
 metrics and raw/matchable node offsets when optimizing chapter traversal.
+For paragraph/Sasayaki page-turn jank, measure `animateText`, `calculateProgress`
+and `pageSasayakiCues` separately on the same pages with the same installed cues.
+Pair those timings with frame gaps and native-swipe recordings; faster animation
+setup alone does not establish smooth playback or correct visible text.
+Include previously unhighlighted cues: Blink retains an inline paint box after
+its first background highlight, so replaying only warmed cues can hide an initial
+full-chapter layout. Trace first activation separately and compare glyph pixels
+and text bounds when changing cue layout preparation.
 For sparse or variable-frame-rate device recordings, inspect decoded source
 frames with their presentation timestamps. Resampling to a fixed frame rate can
 omit the short final frame that first shows the page; confirm visible-paint timing

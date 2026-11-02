@@ -26,6 +26,8 @@ Release notes before v1.3.0 are in [CHANGELOG_ARCHIVE.md](CHANGELOG_ARCHIVE.md).
 
 ### Changed
 
+- Replace visual novel mode with iOS-style paragraph mode and settings controls, including centered passages and continuation pages, sentence limits, text reveal with synchronized ruby and gaiji that continues through TTS/Sasayaki following without freezing, smoother page turns in chapters with many narration cues, reliable E-ink switching with saved highlights and narration following after layout-mode changes or resuming from unmatched pages, optional blank-tap advance without skipping text animation, automatic statistics start on page turns and Sasayaki playback bounded to the current page even after cue navigation, with its setting grouped under Paragraph Mode, while migrating existing settings.
+
 - Skip Sasayaki and TTS image holds for images referenced three or more times in a book’s main text, while retaining holds for images used once or twice.
 
 - Make Statistics charts easier to read with a one-hour minimum scale and compact previous/next period buttons alongside swipe navigation, with stable single-line period titles and duration/comparison rows when paging.
@@ -36,9 +38,9 @@ Release notes before v1.3.0 are in [CHANGELOG_ARCHIVE.md](CHANGELOG_ARCHIVE.md).
 
 ### Fixed
 
-- Prevent book styles from shrinking the reading area in paginated, continuous and visual novel modes.
+- Prevent book styles from shrinking the reading area in paginated and continuous modes.
 - Keep book assignments intact by correctly detecting duplicate shelf names during creation and renaming.
-- Reduce chapter loading delays by processing large publisher stylesheets faster, avoiding initial layout work before reader styles are ready, speeding up pagination in chapters with extensive ruby annotations, and avoiding repeated chapter scans in visual novel mode.
+- Reduce chapter loading delays by processing large publisher stylesheets faster, avoiding initial layout work before reader styles are ready, speeding up pagination in chapters with extensive ruby annotations.
 - Restore missing illustration chapters and gallery images in EPUBs with XHTML fallbacks, recover bitmap covers from simple SVG wrappers or alternative declared covers when the preferred cover is broken on import or opening existing books, and keep image-only pages visible and properly centered in the reader.
 - Keep word lookups and sentence context within the tapped dictionary list item instead of joining neighboring definitions.
 - Keep the full query visible and tappable in the Dictionary tab even when its beginning has no dictionary match.

@@ -71,6 +71,7 @@ window.hoshiReader = {
     return fallbackOffset;
   },
   notifyRestoreComplete: function() {
+    window.hoshiParagraph?.animatePage();
     if (window.HoshiReaderRestore && window.HoshiReaderRestore.postMessage) {
       window.HoshiReaderRestore.postMessage(__HOSHI_RESTORE_TOKEN_LITERAL__);
     }
@@ -456,14 +457,13 @@ __HOSHI_READER_SASAYAKI_SCRIPT__
     var currentScroll = this.getPagePosition(context);
     var maxAlignedScroll = Math.floor(context.maxScroll / context.pageSize) * context.pageSize;
     if (context.pageSize <= 0) {
-      var emptyMetrics = { minScroll: 0, maxScroll: 0, totalChars: 0, progressStops: [] };
+      var emptyMetrics = { minScroll: 0, maxScroll: 0, totalChars: 0, textRanges: [] };
       this.paginationMetrics = emptyMetrics;
       return emptyMetrics;
     }
     var lastContentEdge = 0;
     var firstContentEdge = null;
-    var progressStops = [];
-    var exploredChars = 0;
+    var textRanges = [];
     var totalChars = 0;
     var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
     var node;
@@ -471,29 +471,34 @@ __HOSHI_READER_SASAYAKI_SCRIPT__
       if (this.isFurigana(node)) continue;
       var nodeLen = this.countChars(node.textContent);
       totalChars += nodeLen;
-      if (nodeLen <= 0) continue;
+      // Reveal includes punctuation-only nodes even though progress does not.
+      if (!node.textContent.trim()) continue;
       var range = document.createRange();
       range.selectNodeContents(node);
       var rects = range.getClientRects();
-      var progressRect = rects[0] || range.getBoundingClientRect();
-      var nodeStartEdge = progressRect && progressRect.width > 0 && progressRect.height > 0
-        ? (context.vertical ? progressRect.top : progressRect.left) + currentScroll
-        : null;
+      var firstRect = rects[0] || range.getBoundingClientRect();
+      var first = (context.vertical ? firstRect.top : firstRect.left) + currentScroll;
+      var minStart = Infinity;
+      var maxEnd = rects.length ? -Infinity : Infinity;
       for (var i = 0; i < rects.length; i++) {
         var rect = rects[i];
         if (rect.width <= 0 || rect.height <= 0) continue;
         var startEdge = (context.vertical ? rect.top : rect.left) + currentScroll;
         var endEdge = (context.vertical ? rect.bottom : rect.right) + currentScroll;
-        firstContentEdge = firstContentEdge === null ? startEdge : Math.min(firstContentEdge, startEdge);
-        lastContentEdge = Math.max(lastContentEdge, endEdge);
+        minStart = Math.min(minStart, startEdge);
+        maxEnd = Math.max(maxEnd, endEdge);
+        if (nodeLen > 0) {
+          firstContentEdge = firstContentEdge === null ? startEdge : Math.min(firstContentEdge, startEdge);
+          lastContentEdge = Math.max(lastContentEdge, endEdge);
+        }
       }
-      if (nodeStartEdge !== null) {
-        progressStops.push({ scroll: nodeStartEdge, exploredChars: exploredChars + nodeLen });
-      }
-      exploredChars += nodeLen;
+      // Keep document order and content coordinates for reveal/progress reuse.
+      // buildNodeOffsets invalidates these measurements whenever text is wrapped.
+      textRanges.push({ node: node, first: first, start: minStart, end: maxEnd, count: nodeLen });
     }
 
-    var media = document.querySelectorAll('img, svg, image, video, canvas');
+    // Paragraph layout can leave a final publisher ornament after the last text.
+    var media = document.querySelectorAll('img, svg, image, video, canvas' + (window.hoshiParagraph?.enabled ? ', p' : ''));
     for (var j = 0; j < media.length; j++) {
       var mediaRect = media[j].getBoundingClientRect();
       if (mediaRect.width <= 0 || mediaRect.height <= 0) continue;
@@ -506,28 +511,26 @@ __HOSHI_READER_SASAYAKI_SCRIPT__
     var minScroll = firstContentEdge === null ? 0 : Math.min(maxAlignedScroll, this.alignContentStartToPage(context, firstContentEdge));
     var lastContentScroll = lastContentEdge <= 0 ? 0 : this.alignToPage(context, lastContentEdge - 1);
     var maxScroll = Math.min(context.maxScroll, lastContentScroll);
-    progressStops.sort(function(a, b) { return a.scroll - b.scroll; });
     var metrics = {
       minScroll: minScroll,
       maxScroll: maxScroll,
       totalChars: totalChars,
-      progressStops: progressStops
+      textRanges: textRanges
     };
     this.paginationMetrics = metrics;
     return metrics;
   },
   calculateProgress: function() {
     var context = this.getScrollContext();
-    var walker = this.createWalker();
-    var totalChars = 0;
+    var scroll = this.getPagePosition(context);
+    var metrics = this.paginationMetrics || this.buildPaginationMetrics();
     var exploredChars = 0;
-    var node;
-    while (node = walker.nextNode()) {
-      var nodeLen = this.countChars(node.textContent);
-      totalChars += nodeLen;
-      if (nodeLen > 0) exploredChars += this.countCharsBeforeViewport(node, context);
+    for (var entry of metrics.textRanges) {
+      if (entry.count <= 0) continue;
+      if (entry.end <= scroll) exploredChars += entry.count;
+      else if (entry.start < scroll) exploredChars += this.countCharsBeforeViewport(entry.node, context);
     }
-    return totalChars > 0 ? exploredChars / totalChars : 0;
+    return metrics.totalChars > 0 ? exploredChars / metrics.totalChars : 0;
   },
   restoreProgress: async function(progress) {
     await document.fonts.ready;
@@ -620,9 +623,15 @@ __HOSHI_READER_SASAYAKI_SCRIPT__
     });
     return true;
   },
+  paginateWithProgress: function(direction) {
+    // Return the accepted page and its progress together, before reveal frames paint.
+    var result = this.paginate(direction);
+    return result === 'scrolled' ? this.calculateProgress() : result;
+  },
   paginate: function(direction) {
     window.hoshiHighlights?.clearSearchHighlight?.();
     if (this.nativeSelectionActive) return "blocked";
+    window.hoshiParagraph?.finishTextAnimation();
     var context = this.getScrollContext();
     if (context.pageSize <= 0) return "limit";
     var currentScroll = this.getPagePosition(context);
@@ -635,6 +644,7 @@ __HOSHI_READER_SASAYAKI_SCRIPT__
         targetForward = Math.min(targetForward, maxPageScroll);
         if (targetForward <= (currentScroll + 1)) return "limit";
         this.setPagePosition(context, targetForward);
+        window.hoshiParagraph?.animatePage();
         return "scrolled";
       }
       return "limit";
@@ -649,6 +659,11 @@ __HOSHI_READER_SASAYAKI_SCRIPT__
     }
   }
 };
+__HOSHI_READER_PARAGRAPH_SCRIPT__
+window.hoshiParagraph.enabled = __HOSHI_PARAGRAPH_ENABLED__;
+if (window.hoshiParagraph.enabled) window.hoshiParagraph.installTapHandler();
+window.hoshiParagraph.configureAnimation(__HOSHI_PARAGRAPH_TEXT_ANIMATION__, __HOSHI_PARAGRAPH_TEXT_SPEED__);
+window.addEventListener('pagehide', () => window.hoshiParagraph.finishTextAnimation());
 __HOSHI_HIGHLIGHTS_SCRIPT__
 window.hoshiReader.initialize = function() {
   if (window.hoshiReader.didInitialize) return;
@@ -677,8 +692,6 @@ window.hoshiReader.initialize = function() {
   spacer.style.display = 'block';
   spacer.style.breakInside = 'avoid';
   document.body.appendChild(spacer);
-  window.hoshiReader.normalizeRubyTextNodes();
-  window.hoshiReader.stabilizeRubyAdjacentTextNodes();
   window.hoshiReaderDocumentPreparation?.resume();
   Promise.all([
     Promise.resolve(document.fonts && document.fonts.ready),
@@ -687,7 +700,13 @@ window.hoshiReader.initialize = function() {
     if (!images.length) return;
     return new Promise(function(resolve) { setTimeout(resolve, 50); });
   }).then(function() {
+    window.hoshiReader.normalizeRubyTextNodes();
+    window.hoshiReader.stabilizeRubyAdjacentTextNodes();
     window.hoshiReaderLayoutSemantics.sanitizeInlineBlocks(document, window.hoshiReader.isVertical());
+    if (window.hoshiParagraph.enabled) {
+      window.hoshiParagraph.layoutParagraphs(__HOSHI_PARAGRAPH_MAX_SENTENCES__, __HOSHI_PARAGRAPH_SPLIT_DIALOGUE__);
+      window.hoshiParagraph.fragmentBlocks();
+    }
     window.hoshiReader.buildNodeOffsets();
     __HOSHI_RESTORE_SCRIPTS__
   });

@@ -44,30 +44,20 @@ class ReaderNativeSelectionContextWebViewTest {
                     ${assets.selectionJapaneseJs}
                     ${assets.selectionJs}
                     ${assets.readerTextSemanticsJs}
-                    ${assets.readerDomTextJs}
-                    ${assets.readerVnContentStreamJs}
-                    ${assets.readerVnRangeMapJs}
-                    ${assets.readerVnSelectionProjectionJs}</script></head><body>
+                    ${assets.readerDomTextJs}</script></head><body>
                     <p id="rendered">前。<span id="edge">瑞</span><ruby id="ruby">瑞<rp>(</rp><rt><span>みず</span></rt><rp>)</rp>々<rt>みず</rt></ruby>しさ😀です。</p>
                     <script>
                     const rendered = document.getElementById('rendered');
-                    const stream = hoshiReaderVnContentStream.create(rendered);
-                    window.hoshiReader = {nodeStartOffsets:stream.sourceTextOffsets,
-                        isMatchableChar:hoshiReaderTextSemantics.isMatchableChar};
-                    const source = rendered.cloneNode(true);
-                    source.append('画面外の続き');
-                    source.lastChild.previousSibling.textContent = 'しさ😀です、';
-                    const sourceStream = hoshiReaderVnContentStream.create(source);
-                    const reader = {contentStream:sourceStream,
-                        countChars:hoshiReaderTextSemantics.countChars,
-                        countRawChars:hoshiReaderTextSemantics.countRawChars};
-                    reader.rangeMap = hoshiReaderVnRangeMap.create(reader);
-                    for (const entry of stream.textEntries) {
-                        reader.rangeMap.registerCloneTextOffset(entry.node, entry.startChar, entry.startRaw);
+                    const offsets = new WeakMap();
+                    const walker = document.createTreeWalker(rendered, NodeFilter.SHOW_TEXT);
+                    let node, count = 0;
+                    while (node = walker.nextNode()) {
+                        if (node.parentElement.closest('rt, rp')) continue;
+                        offsets.set(node, count); count += hoshiReaderTextSemantics.countChars(node.textContent);
                     }
-                    window.projection = hoshiReaderVnSelectionProjection.create(reader);
-                    window.checkContext = (kind, projected, backward) => {
-                        hoshiSelection.configure({textProjection:projected ? projection : null});
+                    window.hoshiReader = {nodeStartOffsets: offsets,
+                        isMatchableChar: hoshiReaderTextSemantics.isMatchableChar};
+                    window.checkContext = (kind, backward) => {
                         const ruby = document.getElementById('ruby');
                         const annotation = ruby.querySelector('rt span').firstChild;
                         const body = ruby.childNodes[4];
@@ -94,7 +84,6 @@ class ReaderNativeSelectionContextWebViewTest {
                 """.trimIndent(), "text/html", "utf-8", null)
             }
             assertTrue(loaded.await(15, TimeUnit.SECONDS))
-            for (projected in listOf(true, false)) {
                 for (vertical in listOf(true, false)) {
                     evaluate(webView, "document.body.style.writingMode='${if (vertical) "vertical-rl" else "horizontal-tb"}'")
                     for (backward in listOf(false, true)) {
@@ -103,22 +92,21 @@ class ReaderNativeSelectionContextWebViewTest {
                             Triple("textEnd", "瑞々", 2), Triple("wholeRuby", "瑞々", 2),
                             Triple("plain", "さ😀", 5),
                         )) {
-                            val label = "$kind projected=$projected vertical=$vertical backward=$backward"
-                            val result = JSONObject(evaluate(webView, "checkContext('$kind',$projected,$backward)"))
+                            val label = "$kind vertical=$vertical backward=$backward"
+                            val result = JSONObject(evaluate(webView, "checkContext('$kind',$backward)"))
                             assertTrue("$label keeps native endpoints", result.getBoolean("unchanged"))
                             assertTrue("$label returns context", !result.isNull("result"))
                             val context = result.getJSONObject("result")
                             assertEquals(label, text, context.getString("text"))
                             assertEquals(label, offset, context.getInt("normalizedOffset"))
-                            assertEquals(label, if (projected) "瑞瑞々しさ😀です、画面外の続き" else "瑞瑞々しさ😀です。",
+                            assertEquals(label, "瑞瑞々しさ😀です。",
                                 context.getString("sentence"))
                         }
-                        val annotation = JSONObject(evaluate(webView, "checkContext('annotationOnly',$projected,$backward)"))
+                        val annotation = JSONObject(evaluate(webView, "checkContext('annotationOnly',$backward)"))
                         assertTrue("Annotation-only selection has no body context", annotation.isNull("result"))
                         assertTrue(annotation.getBoolean("unchanged"))
                     }
                 }
-            }
         } finally {
             instrumentation.runOnMainSync { webView.destroy() }
         }

@@ -22,7 +22,7 @@ class ReaderSelectionCommandTest {
             maxLength = 16,
         )
 
-        assertEquals("window.hoshiSelection.selectText(12.5, 24.25, 16)", command.source)
+        assertEquals("(window.hoshiParagraph?.enabled ? window.hoshiParagraph : window.hoshiSelection).selectText(12.5, 24.25, 16)", command.source)
     }
 
     @Test

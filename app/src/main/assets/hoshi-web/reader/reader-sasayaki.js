@@ -11,6 +11,10 @@
     });
   },
    applySasayakiCues: function(cues) {
+     var cueJson = JSON.stringify(cues);
+     if (this.appliedCueJson === cueJson) return;
+     window.hoshiParagraph?.finishTextAnimation();
+     this.appliedCueJson = cueJson;
      var activeCueId = this.activeCueId;
      this.resetSasayakiCues();
      var cueRanges = this.collectSasayakiCueRanges(cues);
@@ -31,7 +35,9 @@
       return this.cueGeometryRanges.get(cue.id) || [];
     }
      var existing = this.sasayakiInlineTargetsForCue(cue.id);
-     if (existing.length) return existing;
+     // Paragraph reveal retains text-node offsets. Install its chapter cues before
+     // restore, as on iOS; following must never split those nodes underneath it.
+     if (existing.length || window.hoshiParagraph?.enabled) return existing;
      var cueRanges = this.collectSasayakiCueRanges([cue]);
      this.rememberSasayakiCueSources(cueRanges);
      var geometryRanges = this.buildSasayakiGeometryRanges(cueRanges).get(cue.id) || [];
@@ -77,7 +83,7 @@
                (this.cueWrappers.get(cueId) || []).length > 0;
            },
            ensureSasayakiInlineTargetsForCue: function(cueId) {
-             if (this.isEInkMode()) return;
+             if (this.isEInkMode() || window.hoshiParagraph?.enabled) return;
              var source = this.cueSourceRanges.get(cueId);
              if (!source) return;
              if (!this.sasayakiInlineTargetsForCue(cueId).length) {

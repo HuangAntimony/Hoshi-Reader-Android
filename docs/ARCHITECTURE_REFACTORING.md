@@ -40,14 +40,9 @@ mining/audio and reader lifecycle. Existing selection, popup, resource and state
 owners are listed in the architecture map. Extract one remaining responsibility
 at a time and preserve document generations, restore and playback contracts.
 
-Reader web assets also retain two candidates for reuse:
-
-- Paginated/continuous restore duplicate character-target calculation;
-  `textOffsetForCharCount` also appears in VN. Extract equivalent operations
-  while keeping page, scroll and VN screen landing with their mode owners.
-- Live-DOM highlight traversal and VN raw-range projection may share segment
-  operations where their coordinate semantics match. Preserve VN source-to-clone
-  registration through that boundary.
+Paginated/continuous restore still duplicate character-target calculation.
+Extract equivalent operations while keeping page and scroll landing with their
+mode owners.
 
 Completion means the affected behavior has one owner used by production callers,
 with mode-specific regression coverage. Painting and gesture claims use the

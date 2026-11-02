@@ -145,27 +145,11 @@ class LocalizationResourceTest {
     }
 
     @Test
-    fun visualNovelReaderSettingsUseConciseLabels() {
-        val defaultResources = readStringResources(File(resDir, "values/strings.xml"))
-        val zhResources = readStringResources(File(resDir, "values-zh-rCN/strings.xml"))
-
-        assertEquals("Text Reveal Speed", defaultResources.strings.getValue("reader_visual_novel_reveal_speed").value)
-        assertEquals("Instant", defaultResources.strings.getValue("reader_visual_novel_reveal_speed_instant").value)
-        assertEquals("Screen Content", defaultResources.strings.getValue("reader_visual_novel_screen_mode").value)
-        assertEquals("Block", defaultResources.strings.getValue("reader_visual_novel_screen_mode_block").value)
-        assertEquals("Sentences", defaultResources.strings.getValue("reader_visual_novel_screen_mode_sentences").value)
-        assertEquals("Sentences per Screen", defaultResources.strings.getValue("reader_visual_novel_sentences_per_screen").value)
-        assertEquals("Keep Dialogue Together", defaultResources.strings.getValue("reader_visual_novel_preserve_dialogue").value)
-        assertEquals("Tap Blank Area to Advance", defaultResources.strings.getValue("reader_visual_novel_click_advance").value)
-
-        assertEquals("文字显示速度", zhResources.strings.getValue("reader_visual_novel_reveal_speed").value)
-        assertEquals("立即", zhResources.strings.getValue("reader_visual_novel_reveal_speed_instant").value)
-        assertEquals("屏幕内容", zhResources.strings.getValue("reader_visual_novel_screen_mode").value)
-        assertEquals("按段落", zhResources.strings.getValue("reader_visual_novel_screen_mode_block").value)
-        assertEquals("按句子", zhResources.strings.getValue("reader_visual_novel_screen_mode_sentences").value)
-        assertEquals("每屏句数", zhResources.strings.getValue("reader_visual_novel_sentences_per_screen").value)
-        assertEquals("对话保持同屏", zhResources.strings.getValue("reader_visual_novel_preserve_dialogue").value)
-        assertEquals("点击空白处前进", zhResources.strings.getValue("reader_visual_novel_click_advance").value)
+    fun paragraphReaderLabelsAreLocalized() {
+        val en = readStringResources(File(resDir, "values/strings.xml"))
+        val zh = readStringResources(File(resDir, "values-zh-rCN/strings.xml"))
+        assertEquals("Paragraph Mode", en.strings.getValue("reader_paragraph_mode").value)
+        assertEquals("点击空白处前进", zh.strings.getValue("reader_paragraph_click_advance").value)
     }
 
     @Test

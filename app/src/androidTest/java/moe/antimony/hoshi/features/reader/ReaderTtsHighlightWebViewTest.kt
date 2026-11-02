@@ -48,9 +48,9 @@ class ReaderTtsHighlightWebViewTest {
         composeRule.waitForIdle()
         val json = Json { ignoreUnknownKeys = true }
         try {
-            for (mode in ReaderViewMode.entries) for (vertical in listOf(false, true)) {
-                val description = "$mode vertical=$vertical"
-                val settings = ReaderSettings(viewMode = mode, verticalWriting = vertical, visualNovelRevealSpeed = 0)
+            for (paragraph in listOf(false, true)) for (mode in ReaderViewMode.entries.filter { !paragraph || it == ReaderViewMode.Paginated }) for (vertical in listOf(false, true)) {
+                val description = "$mode paragraph=$paragraph vertical=$vertical"
+                val settings = ReaderSettings(viewMode = mode, paragraphMode = paragraph, verticalWriting = vertical, textAnimation = false)
                 val loaded = CountDownLatch(1)
                 val styles = ReaderContentStyles.styleTag(settings = settings, sasayakiBackgroundColor = 0xFF0000FF, readerCssTemplate = assets.readerCss)
                 val script = ReaderPaginationScripts.shellScript(settings = settings, assets = assets)
@@ -134,7 +134,7 @@ class ReaderTtsHighlightWebViewTest {
                     autoScroll = true, passiveRestore = true)
                 assertEquals(ReaderTtsPresentation.Highlight, restored)
                 evaluate(webView, ReaderPaginationScripts.highlightSasayakiCueInvocation(cue,
-                    reveal = restored == ReaderTtsPresentation.Follow, preserveReveal = true))
+                    reveal = restored == ReaderTtsPresentation.Follow))
                 assertEquals("$description restore preserves the chosen page", chosenProgress,
                     ReaderPaginationScripts.doubleResult(evaluate(webView, ReaderPaginationScripts.progressInvocation())))
                 assertTrue("$description restore does not reveal the narration", redPixelCount() > 1000)
@@ -160,9 +160,9 @@ class ReaderTtsHighlightWebViewTest {
         }
         composeRule.waitForIdle()
         try {
-            for (mode in ReaderViewMode.entries) for (vertical in listOf(false, true)) {
-                val description = "$mode vertical=$vertical"
-                val settings = ReaderSettings(viewMode = mode, verticalWriting = vertical, visualNovelRevealSpeed = 0)
+            for (paragraph in listOf(false, true)) for (mode in ReaderViewMode.entries.filter { !paragraph || it == ReaderViewMode.Paginated }) for (vertical in listOf(false, true)) {
+                val description = "$mode paragraph=$paragraph vertical=$vertical"
+                val settings = ReaderSettings(viewMode = mode, paragraphMode = paragraph, verticalWriting = vertical, textAnimation = false)
                 val loaded = CountDownLatch(1)
                 val styles = ReaderContentStyles.styleTag(settings = settings, sasayakiBackgroundColor = 0xFF0000FF, readerCssTemplate = assets.readerCss)
                 val script = ReaderPaginationScripts.shellScript(settings = settings, assets = assets)
@@ -182,7 +182,7 @@ class ReaderTtsHighlightWebViewTest {
                 composeRule.waitUntil(15_000) {
                     evaluate(webView, "Boolean(window.testRestored)") == "true"
                 }
-                // Wait for production restore (including the VN clone and font layout).
+                // Wait for production restore (including font layout).
                 evaluate(webView, "window.hoshiReader.buildNodeOffsets(); true")
                 val baseline = bluePixelCount()
                 val sentences = moe.antimony.hoshi.features.tts.TtsText.chapter(0,

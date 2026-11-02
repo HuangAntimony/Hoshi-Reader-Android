@@ -34,8 +34,8 @@ class ReaderNativeHighlightWebViewTest {
         }
         composeRule.waitForIdle()
         try {
-            for (mode in ReaderViewMode.entries) for (vertical in listOf(false, true)) {
-                val settings = ReaderSettings(viewMode = mode, verticalWriting = vertical, visualNovelRevealSpeed = 0)
+            for (paragraph in listOf(false, true)) for (mode in ReaderViewMode.entries.filter { !paragraph || it == ReaderViewMode.Paginated }) for (vertical in listOf(false, true)) {
+                val settings = ReaderSettings(viewMode = mode, paragraphMode = paragraph, verticalWriting = vertical, textAnimation = false)
                 val loaded = CountDownLatch(1)
                 instrumentation.runOnMainSync {
                     val density = webView.resources.displayMetrics.density
@@ -62,7 +62,7 @@ class ReaderNativeHighlightWebViewTest {
                     Triple("elementStart", "々", 3), Triple("elementEnd", "瑞々", 2),
                     Triple("annotationOnly", "", 0),
                 )) for (backward in listOf(false, true)) {
-                    val description = "$mode vertical=$vertical $kind backward=$backward"
+                    val description = "$mode paragraph=$paragraph vertical=$vertical $kind backward=$backward"
                     val response = JSONObject(evaluate(webView, """
                         (() => {
                             const h=hoshiHighlights, ruby=document.querySelector('ruby');

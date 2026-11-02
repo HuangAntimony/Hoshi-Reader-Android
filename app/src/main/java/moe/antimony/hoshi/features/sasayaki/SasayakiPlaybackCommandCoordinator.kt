@@ -6,6 +6,7 @@ class SasayakiPlaybackCommandCoordinator(
     private val playbackState: SasayakiPlaybackStateCoordinator,
     private val playbackLifecycle: SasayakiPlaybackLifecycleController,
     private val cueNavigation: SasayakiCueNavigationController,
+    private val beforeSeek: (Double) -> Unit = {},
 ) {
     fun toggle(
         isPlaying: Boolean,
@@ -141,8 +142,9 @@ class SasayakiPlaybackCommandCoordinator(
         savePosition: Boolean = true,
         displayCue: SasayakiMatch? = null,
         revealCue: Boolean = false,
-    ): Boolean =
-        playbackLifecycle.beginSeek(
+    ): Boolean {
+        beforeSeek(seconds)
+        return playbackLifecycle.beginSeek(
             seconds = seconds,
             startPlayback = startPlayback,
             updateCue = updateCue,
@@ -150,4 +152,5 @@ class SasayakiPlaybackCommandCoordinator(
             displayCue = displayCue,
             revealCue = revealCue,
         )
+    }
 }

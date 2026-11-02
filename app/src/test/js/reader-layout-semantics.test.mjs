@@ -276,7 +276,7 @@ test('image paragraphs preserve fitting margins, mixed text, gaiji, and generate
     }
 });
 
-test('VN source images are sanitized before the displayed clone receives its media class', () => {
+test('large publisher images are sanitized before receiving their media class', () => {
     const { paragraph } = imageParagraph({ classified: false });
     assert.equal(paragraph.style.getPropertyValue('margin-left'), '0px');
 });
@@ -289,7 +289,7 @@ test('image overflow without positive block margins preserves the publisher marg
     }
 });
 
-test('layout sanitizer uses the displayed VN screen content bounds when given an element scope', () => {
+test('layout sanitizer uses the content bounds when given an element scope', () => {
     const body = new TestElement('body');
     body.clientWidth = body.clientHeight = 1000;
     const screen = new TestElement('div');

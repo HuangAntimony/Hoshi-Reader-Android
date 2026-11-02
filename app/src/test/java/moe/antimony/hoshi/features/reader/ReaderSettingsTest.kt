@@ -780,75 +780,13 @@ class ReaderSettingsTest {
     }
 
     @Test
-    fun visualNovelReaderCssResetsNestedColumnCounts() {
-        val visualNovelCss = ReaderContentStyles.styleTag(
-            ReaderSettings(viewMode = ReaderViewMode.VisualNovel),
-        )
-        val declarations = cssDeclarationsForSelector(visualNovelCss, ".hoshi-vn-content *")
-
-        assertEquals("auto !important", declarations["column-count"])
-        assertEquals("auto !important", declarations["-webkit-column-count"])
-    }
-
-    @Test
-    fun visualNovelReaderCssCentersWithinVisibleViewport() {
-        val css = ReaderContentStyles.styleTag(
-            ReaderSettings(
-                viewMode = ReaderViewMode.VisualNovel,
-                verticalWriting = true,
-                fontSize = 28,
-                verticalPadding = 8,
-                horizontalPadding = 12,
-            ),
-        )
-
-        val stage = cssDeclarationsForSelector(css, ".hoshi-vn-stage")
-        val screen = cssDeclarationsForSelector(css, ".hoshi-vn-screen")
-        val content = cssDeclarationsForSelector(css, ".hoshi-vn-content")
-        val contentSvg = cssDeclarationsForSelector(css, ".hoshi-vn-content svg")
-
-        assertEquals("var(--hoshi-reader-visible-height, var(--page-height, 100vh)) !important", stage["height"])
-        assertEquals("flex !important", screen["display"])
-        assertEquals("center !important", screen["align-items"])
-        assertEquals("center !important", screen["justify-content"])
-        assertEquals("100% !important", screen["height"])
-        assertEquals("var(--hoshi-vertical-padding-block, 4.0vh) 6.0vw !important", screen["padding"])
-        assertEquals("var(--hoshi-vertical-padding-block, 4.0vh) !important", screen["padding-bottom"])
-        assertEquals("100% !important", content["max-width"])
-        assertEquals("100% !important", content["max-height"])
-        assertEquals("visible !important", content["overflow"])
-        assertEquals("allow-end !important", content["hanging-punctuation"])
-        assertEquals("var(--hoshi-image-max-width, 88vw) !important", contentSvg["width"])
-        assertEquals("var(--hoshi-image-max-height, var(--page-height, 100vh)) !important", contentSvg["height"])
-        assertFalse(content.containsValue("calc(100% - 28px) !important"))
-    }
-
-    @Test
-    fun visualNovelContentKeepsTheReaderHangingPunctuationContractWhenTextIsNotJustified() {
-        val paginatedCss = ReaderContentStyles.styleTag(
-            ReaderSettings(viewMode = ReaderViewMode.Paginated),
-        )
-        val visualNovelCss = ReaderContentStyles.styleTag(
-            ReaderSettings(viewMode = ReaderViewMode.VisualNovel),
-        )
-        val visualNovelContent = cssDeclarationsForSelector(visualNovelCss, ".hoshi-vn-content")
-
-        assertTrue(paginatedCss.contains("hanging-punctuation: allow-end !important;"))
-        assertFalse(paginatedCss.contains("hanging-punctuation: none !important;"))
-        assertEquals("allow-end !important", visualNovelContent["hanging-punctuation"])
-        assertFalse(visualNovelCss.contains("hanging-punctuation: none !important;"))
-    }
-
-    @Test
-    fun visualNovelContentDoesNotForceHangingPunctuationWhenTextIsJustified() {
-        val visualNovelCss = ReaderContentStyles.styleTag(
-            ReaderSettings(viewMode = ReaderViewMode.VisualNovel, justifyText = true),
-        )
-        val visualNovelContent = cssDeclarationsForSelector(visualNovelCss, ".hoshi-vn-content")
-
-        assertFalse(visualNovelContent.containsKey("hanging-punctuation"))
-        assertFalse(visualNovelCss.contains("hanging-punctuation: allow-end !important;"))
-        assertFalse(visualNovelCss.contains("hanging-punctuation: none !important;"))
+    fun paragraphUsesPaginatedColumnsAndUpstreamFragmentStyling() {
+        val css = ReaderContentStyles.styleTag(ReaderSettings(paragraphMode = true))
+        assertTrue(css.contains("column-fill: auto !important"))
+        assertTrue(css.contains("p.hoshi-paragraph"))
+        assertTrue(css.contains(".hoshi-fragment + .hoshi-fragment"))
+        assertFalse(ReaderContentStyles.styleTag(ReaderSettings()).contains("p.hoshi-paragraph"))
+        assertFalse(ReaderContentStyles.styleTag(ReaderSettings(viewMode = ReaderViewMode.Continuous, paragraphMode = true)).contains("p.hoshi-paragraph"))
     }
 
     @Test

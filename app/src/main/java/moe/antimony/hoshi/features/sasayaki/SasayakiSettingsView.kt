@@ -202,6 +202,24 @@ fun SasayakiSettingsView(
                             },
                         )
                         SettingsDivider()
+                        Text(
+                            text = stringResource(R.string.reader_paragraph_mode),
+                            color = colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                        )
+                        ListItem(
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                            headlineContent = { Text(stringResource(R.string.sasayaki_page_advance)) },
+                            trailingContent = {
+                                Switch(
+                                    checked = loadedSettings.pageAdvance,
+                                    onCheckedChange = { save { current -> current.copy(pageAdvance = it) } },
+                                )
+                            },
+                        )
+                        SettingsDivider()
                         SasayakiColorSettingsSection(
                             title = stringResource(R.string.sasayaki_light_theme),
                             rows = SasayakiColorRow.lightRows,

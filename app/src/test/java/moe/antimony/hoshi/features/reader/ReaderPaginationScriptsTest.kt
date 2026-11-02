@@ -9,9 +9,9 @@ import org.junit.Test
 
 class ReaderPaginationScriptsTest {
     @Test
-    fun generatedVisualNovelScriptDoesNotExposeTemplatePlaceholders() {
+    fun generatedParagraphScriptDoesNotExposeTemplatePlaceholders() {
         val script = ReaderPaginationScripts.shellScript(
-            settings = ReaderSettings(viewMode = ReaderViewMode.VisualNovel),
+            settings = ReaderSettings(paragraphMode = true),
         )
 
         assertFalse(script.contains("__HOSHI_"))
@@ -37,12 +37,14 @@ class ReaderPaginationScriptsTest {
 
     @Test
     fun recognizesWebViewNavigationResults() {
+        assertEquals(ReaderNavigationResult.Advanced, ReaderPaginationScripts.navigationResult("0.625"))
+        assertEquals(ReaderNavigationResult.Advanced, ReaderPaginationScripts.navigationResult("0"))
+        assertEquals(ReaderNavigationResult.Advanced, ReaderPaginationScripts.navigationResult("1"))
         assertTrue(ReaderPaginationScripts.didScroll("\"scrolled\""))
         assertFalse(ReaderPaginationScripts.didScroll("\"limit\""))
         assertFalse(ReaderPaginationScripts.didScroll(null))
 
         assertEquals(ReaderNavigationResult.Advanced, ReaderPaginationScripts.navigationResult("\"scrolled\""))
-        assertEquals(ReaderNavigationResult.Revealed, ReaderPaginationScripts.navigationResult("\"revealed\""))
         assertEquals(ReaderNavigationResult.Blocked, ReaderPaginationScripts.navigationResult("\"blocked\""))
         assertEquals(ReaderNavigationResult.Limit, ReaderPaginationScripts.navigationResult("\"limit\""))
         assertEquals(ReaderNavigationResult.Limit, ReaderPaginationScripts.navigationResult(null))
@@ -153,7 +155,7 @@ class ReaderPaginationScriptsTest {
         )
 
         assertEquals(
-            """window.hoshiReader.highlightSasayakiCue({id:"cue\"1",start:42,length:7}, true, false)""",
+            """window.hoshiReader.highlightSasayakiCue({id:"cue\"1",start:42,length:7}, true)""",
             command,
         )
     }

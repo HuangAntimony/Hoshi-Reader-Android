@@ -129,6 +129,11 @@ class SasayakiPlayer private constructor(
         controller.seekTo(seconds)
     }
 
+    fun handlePageChanged(chapterIndex: Int, cueIds: List<String>, play: Boolean?) =
+        controller.handlePageChanged(chapterIndex, cueIds, play)
+
+    fun clearPageRange() = controller.clearPageRange()
+
     fun updateMatchData(matchData: SasayakiMatchData?) {
         controller.updateMatchData(matchData)
     }

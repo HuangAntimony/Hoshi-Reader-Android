@@ -51,6 +51,7 @@ data class SasayakiSettings(
     val reverseVerticalReaderSkipButtons: Boolean = false,
     val showReaderRestartSentenceButton: Boolean = false,
     val copyAudiobookToPrivateStorage: Boolean = false,
+    val pageAdvance: Boolean = false,
     val autoScroll: Boolean = true,
     val autoPause: Boolean = true,
     val transcriptionPreset: SasayakiTranscriptionPreset = SasayakiTranscriptionPreset.Balanced,
@@ -99,6 +100,7 @@ class SasayakiSettingsStore(context: Context) : SasayakiSettingsLegacySource {
             ),
             reverseVerticalReaderSkipButtons = preferences.getBoolean(KEY_REVERSE_VERTICAL_READER_SKIP_BUTTONS, false),
             copyAudiobookToPrivateStorage = preferences.getBoolean(KEY_COPY_AUDIOBOOK_TO_PRIVATE_STORAGE, false),
+            pageAdvance = preferences.getBoolean(KEY_PAGE_ADVANCE, false),
             autoScroll = preferences.getBoolean(KEY_AUTO_SCROLL, true),
             autoPause = preferences.getBoolean(KEY_AUTO_PAUSE, true),
             imageHoldSeconds = normalizeSasayakiImageHoldSeconds(
@@ -119,6 +121,7 @@ class SasayakiSettingsStore(context: Context) : SasayakiSettingsLegacySource {
             .putString(KEY_READER_SKIP_BUTTON_ACTION, settings.readerSkipButtonAction.name)
             .putBoolean(KEY_REVERSE_VERTICAL_READER_SKIP_BUTTONS, settings.reverseVerticalReaderSkipButtons)
             .putBoolean(KEY_COPY_AUDIOBOOK_TO_PRIVATE_STORAGE, settings.copyAudiobookToPrivateStorage)
+            .putBoolean(KEY_PAGE_ADVANCE, settings.pageAdvance)
             .putBoolean(KEY_AUTO_SCROLL, settings.autoScroll)
             .putBoolean(KEY_AUTO_PAUSE, settings.autoPause)
             .putFloat(KEY_IMAGE_HOLD_SECONDS, normalizeSasayakiImageHoldSeconds(settings.imageHoldSeconds))
@@ -137,6 +140,7 @@ class SasayakiSettingsStore(context: Context) : SasayakiSettingsLegacySource {
         const val KEY_READER_SKIP_BUTTON_ACTION = "sasayakiReaderSkipButtonAction"
         const val KEY_REVERSE_VERTICAL_READER_SKIP_BUTTONS = "sasayakiReverseVerticalReaderSkipButtons"
         const val KEY_COPY_AUDIOBOOK_TO_PRIVATE_STORAGE = "sasayakiCopyAudiobookToPrivateStorage"
+        const val KEY_PAGE_ADVANCE = "pageAdvance"
         const val KEY_AUTO_SCROLL = "sasayakiAutoScroll"
         const val KEY_AUTO_PAUSE = "sasayakiAutoPause"
         const val KEY_IMAGE_HOLD_SECONDS = "sasayakiImageHoldSeconds"
@@ -190,6 +194,7 @@ class SasayakiSettingsRepository(
             reverseVerticalReaderSkipButtons = this[KEY_REVERSE_VERTICAL_READER_SKIP_BUTTONS] ?: false,
             showReaderRestartSentenceButton = this[KEY_SHOW_READER_RESTART_SENTENCE_BUTTON] ?: false,
             copyAudiobookToPrivateStorage = this[KEY_COPY_AUDIOBOOK_TO_PRIVATE_STORAGE] ?: false,
+            pageAdvance = this[KEY_PAGE_ADVANCE] ?: false,
             autoScroll = this[KEY_AUTO_SCROLL] ?: true,
             autoPause = this[KEY_AUTO_PAUSE] ?: true,
             transcriptionPreset = SasayakiTranscriptionPreset.fromStorage(this[KEY_TRANSCRIPTION_PRESET]),
@@ -211,6 +216,7 @@ class SasayakiSettingsRepository(
         this[KEY_REVERSE_VERTICAL_READER_SKIP_BUTTONS] = settings.reverseVerticalReaderSkipButtons
         this[KEY_SHOW_READER_RESTART_SENTENCE_BUTTON] = settings.showReaderRestartSentenceButton
         this[KEY_COPY_AUDIOBOOK_TO_PRIVATE_STORAGE] = settings.copyAudiobookToPrivateStorage
+        this[KEY_PAGE_ADVANCE] = settings.pageAdvance
         this[KEY_AUTO_SCROLL] = settings.autoScroll
         this[KEY_AUTO_PAUSE] = settings.autoPause
         this[KEY_TRANSCRIPTION_PRESET] = settings.transcriptionPreset.name
@@ -238,6 +244,7 @@ class SasayakiSettingsRepository(
             booleanPreferencesKey("showReaderRestartSentenceButton")
         private val KEY_COPY_AUDIOBOOK_TO_PRIVATE_STORAGE =
             booleanPreferencesKey("sasayakiCopyAudiobookToPrivateStorage")
+        private val KEY_PAGE_ADVANCE = booleanPreferencesKey("pageAdvance")
         private val KEY_AUTO_SCROLL = booleanPreferencesKey("sasayakiAutoScroll")
         private val KEY_AUTO_PAUSE = booleanPreferencesKey("sasayakiAutoPause")
         private val KEY_TRANSCRIPTION_PRESET = stringPreferencesKey("sasayakiTranscriptionPreset")

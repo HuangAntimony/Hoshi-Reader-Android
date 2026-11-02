@@ -48,11 +48,11 @@ class ReaderViewportWebViewTest {
         """.trimIndent())
         var fixture = 0
         try {
-            for (mode in ReaderViewMode.entries) for (vertical in listOf(true, false))
+            for (paragraph in listOf(false, true)) for (mode in ReaderViewMode.entries.filter { !paragraph || it == ReaderViewMode.Paginated }) for (vertical in listOf(true, false))
                 for (padding in listOf(0, 18)) for (picture in listOf(false, true)) {
-                val label = "$mode-vertical-$vertical-padding-$padding-picture-$picture"
-                val settings = ReaderSettings(viewMode = mode, verticalWriting = vertical, fontSize = 24,
-                    horizontalPadding = padding, verticalPadding = padding, visualNovelRevealSpeed = 0)
+                val label = "$mode-paragraph-$paragraph-vertical-$vertical-padding-$padding-picture-$picture"
+                val settings = ReaderSettings(viewMode = mode, paragraphMode = paragraph, verticalWriting = vertical, fontSize = 24,
+                    horizontalPadding = padding, verticalPadding = padding, textAnimation = false)
                 val color = Color.rgb(40 + fixture++ * 7, 50, 210)
                 val bitmap = Bitmap.createBitmap(240, 320, Bitmap.Config.ARGB_8888).apply { eraseColor(color) }
                 val bytes = ByteArrayOutputStream().also { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()

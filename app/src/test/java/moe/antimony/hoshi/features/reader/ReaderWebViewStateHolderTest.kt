@@ -647,6 +647,26 @@ class ReaderWebViewStateHolderTest {
     }
 
     @Test
+    fun paragraphEInkSwitchReloadsAtDisplayedPositionInBothDirections() {
+        for (eInk in listOf(false, true)) {
+            val settings = ReaderSettings(paragraphMode = true, eInkMode = eInk)
+            val holder = ReaderWebViewStateHolder(settings, ReaderChapterPosition(1, 0.1))
+            holder.markWebViewRestored()
+            holder.recordDisplayedProgress(0.35)
+            val epoch = holder.webViewRestoreEpoch
+
+            holder.syncSettings(settings.copy(eInkMode = !eInk))
+
+            assertEquals(ReaderChapterPosition(1, 0.35), holder.readerPosition.loadPosition)
+            assertEquals(epoch + 1, holder.webViewRestoreEpoch)
+            assertTrue(holder.isWebViewRestoring)
+            assertFalse(holder.canAcceptReaderNavigationInput())
+        }
+        val continuous = ReaderSettings(viewMode = ReaderViewMode.Continuous, paragraphMode = true)
+        assertEquals(continuous.readerContentReloadKey(), continuous.copy(eInkMode = true).readerContentReloadKey())
+    }
+
+    @Test
     fun appliedPopupSettingsDoNotReloadWebView() {
         val holder = stateHolder(initialIndex = 1)
         holder.markWebViewRestored()
@@ -702,55 +722,52 @@ class ReaderWebViewStateHolderTest {
     }
 
     @Test
-    fun readerContentReloadKeyChangesForVisualNovelModeAndSplitSettings() {
+    fun readerContentReloadKeyChangesForParagraphModeAndSplitSettings() {
         val base = ReaderSettings()
-        val visualNovel = base.copy(viewMode = ReaderViewMode.VisualNovel)
+        val paragraph = base.copy(paragraphMode = true)
 
-        assertFalse(base.readerContentReloadKey() == visualNovel.readerContentReloadKey())
+        assertFalse(base.readerContentReloadKey() == paragraph.readerContentReloadKey())
         assertFalse(
-            visualNovel.readerContentReloadKey() ==
-                visualNovel.copy(visualNovelScreenMode = VisualNovelScreenMode.Sentences).readerContentReloadKey(),
+            paragraph.readerContentReloadKey() ==
+                paragraph.copy(maxSentencesPerPage = 1).readerContentReloadKey(),
         )
         assertFalse(
-            visualNovel.readerContentReloadKey() ==
-                visualNovel.copy(visualNovelSentencesPerScreen = 4).readerContentReloadKey(),
+            paragraph.readerContentReloadKey() ==
+                paragraph.copy(maxSentencesPerPage = 4).readerContentReloadKey(),
         )
         assertFalse(
-            visualNovel.readerContentReloadKey() ==
-                visualNovel.copy(visualNovelPreserveDialogueBubbles = true).readerContentReloadKey(),
+            paragraph.readerContentReloadKey() ==
+                paragraph.copy(splitDialogue = true).readerContentReloadKey(),
         )
-        assertFalse(
-            visualNovel.readerContentReloadKey() ==
-                visualNovel.copy(visualNovelMergeCrossScreenSasayakiCues = true).readerContentReloadKey(),
-        )
+        assertEquals(paragraph.readerContentReloadKey(), paragraph.copy(textAnimation = true).readerContentReloadKey())
     }
 
     @Test
-    fun readerContentReloadKeyIgnoresVisualNovelRevealSpeed() {
-        val base = ReaderSettings(viewMode = ReaderViewMode.VisualNovel)
-        val changedSpeed = base.copy(visualNovelRevealSpeed = 0)
+    fun readerContentReloadKeyIgnoresParagraphRevealSpeed() {
+        val base = ReaderSettings(paragraphMode = true)
+        val changedSpeed = base.copy(textAnimation = false)
 
         assertEquals(base.readerContentReloadKey(), changedSpeed.readerContentReloadKey())
     }
 
     @Test
-    fun syncedVisualNovelRevealSpeedDoesNotReloadWebView() {
+    fun syncedParagraphRevealSpeedDoesNotReloadWebView() {
         val holder = stateHolder(initialIndex = 1)
         holder.markWebViewRestored()
         val previousEpoch = holder.webViewRestoreEpoch
 
-        holder.syncSettings(ReaderSettings(visualNovelRevealSpeed = 80))
+        holder.syncSettings(ReaderSettings(textSpeed = 80))
 
         assertFalse(holder.isWebViewRestoring)
         assertEquals(previousEpoch, holder.webViewRestoreEpoch)
-        assertEquals(80, holder.effectiveSettings.visualNovelRevealSpeed)
+        assertEquals(80, holder.effectiveSettings.textSpeed)
     }
 
     @Test
-    fun readerContentReloadKeyIgnoresVisualNovelClickAdvanceSetting() {
-        val base = ReaderSettings(viewMode = ReaderViewMode.VisualNovel)
+    fun readerContentReloadKeyIgnoresParagraphClickAdvanceSetting() {
+        val base = ReaderSettings(paragraphMode = true)
 
-        assertEquals(base.readerContentReloadKey(), base.copy(visualNovelClickAdvance = false).readerContentReloadKey())
+        assertEquals(base.readerContentReloadKey(), base.copy(paragraphClickAdvance = false).readerContentReloadKey())
     }
 
     @Test
@@ -798,12 +815,12 @@ class ReaderWebViewStateHolderTest {
     }
 
     @Test
-    fun readerAppearanceUpdateKeyTracksVisualNovelRevealSpeedWithoutReloadingContent() {
+    fun readerAppearanceUpdateKeyTracksParagraphRevealSpeedWithoutReloadingContent() {
         val base = ReaderSettings(
-            viewMode = ReaderViewMode.VisualNovel,
-            visualNovelRevealSpeed = 45,
+            paragraphMode = true,
+            textSpeed = 45,
         )
-        val changedSpeed = base.copy(visualNovelRevealSpeed = 90)
+        val changedSpeed = base.copy(textSpeed = 90)
 
         assertEquals(base.readerContentReloadKey(), changedSpeed.readerContentReloadKey())
         assertFalse(

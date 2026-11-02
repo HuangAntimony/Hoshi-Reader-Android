@@ -390,21 +390,18 @@ private fun ReaderAppearanceContent(
                 AppearanceSection(title = stringResource(R.string.reader_appearance_layout), palette = palette) {
                     val paginatedLabel = stringResource(R.string.reader_appearance_paginated)
                     val continuousLabel = stringResource(R.string.reader_appearance_continuous)
-                    val visualNovelLabel = stringResource(R.string.reader_appearance_visual_novel)
                     SegmentedRow(
                         label = stringResource(R.string.reader_appearance_mode),
-                        options = listOf(paginatedLabel, continuousLabel, visualNovelLabel),
+                        options = listOf(paginatedLabel, continuousLabel),
                         selected = when (settings.viewMode) {
                             ReaderViewMode.Paginated -> paginatedLabel
                             ReaderViewMode.Continuous -> continuousLabel
-                            ReaderViewMode.VisualNovel -> visualNovelLabel
                         },
                         onSelected = { label ->
                             onSettingsChange { current ->
                                 current.copy(
                                     viewMode = when (label) {
                                         continuousLabel -> ReaderViewMode.Continuous
-                                        visualNovelLabel -> ReaderViewMode.VisualNovel
                                         else -> ReaderViewMode.Paginated
                                     },
                                 )
@@ -426,7 +423,58 @@ private fun ReaderAppearanceContent(
                                 }
                             },
                         )
-                    } else if (readerAppearanceShowsPageSwipeThreshold(settings.viewMode)) {
+                    }
+                    if (settings.viewMode == ReaderViewMode.Paginated) {
+                        AppearanceDivider(palette)
+                        SwitchRow(
+                            label = stringResource(R.string.reader_paragraph_mode),
+                            checked = settings.paragraphMode,
+                            onCheckedChange = { checked -> onSettingsChange { it.copy(paragraphMode = checked) } },
+                        )
+                        if (settings.paragraphMode) {
+                            AppearanceDivider(palette)
+                            SliderRow(
+                                label = stringResource(R.string.reader_paragraph_max_sentences),
+                                value = if (settings.maxSentencesPerPage == 0) stringResource(R.string.reader_paragraph_sentence_limit_off) else settings.maxSentencesPerPage.toString(),
+                                sliderValue = settings.maxSentencesPerPage.toFloat(),
+                                valueRange = 0f..10f,
+                                steps = 9,
+                                onValueChange = { value -> onSettingsChange { it.copy(maxSentencesPerPage = round(value).toInt().coerceIn(0, 10)) } },
+                            )
+                            if (settings.maxSentencesPerPage > 0) {
+                                AppearanceDivider(palette)
+                                SwitchRow(
+                                    label = stringResource(R.string.reader_paragraph_split_dialogue),
+                                    checked = settings.splitDialogue,
+                                    onCheckedChange = { checked -> onSettingsChange { it.copy(splitDialogue = checked) } },
+                                )
+                            }
+                            AppearanceDivider(palette)
+                            SwitchRow(
+                                label = stringResource(R.string.reader_paragraph_text_animation),
+                                checked = settings.textAnimation,
+                                onCheckedChange = { checked -> onSettingsChange { it.copy(textAnimation = checked) } },
+                            )
+                            if (settings.textAnimation) {
+                                AppearanceDivider(palette)
+                                SliderRow(
+                                    label = stringResource(R.string.reader_paragraph_text_speed),
+                                    value = stringResource(R.string.reader_paragraph_text_speed_value, settings.textSpeed),
+                                    sliderValue = settings.textSpeed.toFloat(),
+                                    valueRange = 25f..100f,
+                                    steps = 14,
+                                    onValueChange = { value -> onSettingsChange { it.copy(textSpeed = value.toInt().coerceParagraphTextSpeed()) } },
+                                )
+                            }
+                            AppearanceDivider(palette)
+                            SwitchRow(
+                                label = stringResource(R.string.reader_paragraph_click_advance),
+                                checked = settings.paragraphClickAdvance,
+                                onCheckedChange = { checked -> onSettingsChange { it.copy(paragraphClickAdvance = checked) } },
+                            )
+                        }
+                    }
+                    if (readerAppearanceShowsPageSwipeThreshold(settings.viewMode)) {
                         AppearanceDivider(palette)
                         SliderRow(
                             label = stringResource(R.string.reader_appearance_page_swipe_threshold),
@@ -447,100 +495,6 @@ private fun ReaderAppearanceContent(
                                     current.copy(
                                         pageSwipeThresholdPx = readerAppearancePageSwipeThresholdFromSlider(value),
                                     )
-                                }
-                            },
-                        )
-                    }
-                    if (settings.viewMode == ReaderViewMode.VisualNovel) {
-                        AppearanceDivider(palette)
-                        SliderRow(
-                            label = stringResource(R.string.reader_visual_novel_reveal_speed),
-                            value = if (settings.visualNovelRevealSpeed == 0) {
-                                stringResource(R.string.reader_visual_novel_reveal_speed_instant)
-                            } else {
-                                settings.visualNovelRevealSpeed.toString()
-                            },
-                            sliderValue = settings.visualNovelRevealSpeed.toFloat(),
-                            valueRange = 0f..120f,
-                            steps = 23,
-                            onValueChange = { value ->
-                                onSettingsChange { current ->
-                                    current.copy(visualNovelRevealSpeed = (round(value / 5) * 5).toInt())
-                                }
-                            },
-                        )
-                        AppearanceDivider(palette)
-                        val blockLabel = stringResource(R.string.reader_visual_novel_screen_mode_block)
-                        val sentencesLabel = stringResource(R.string.reader_visual_novel_screen_mode_sentences)
-                        SegmentedRow(
-                            label = stringResource(R.string.reader_visual_novel_screen_mode),
-                            options = listOf(blockLabel, sentencesLabel),
-                            selected = when (settings.visualNovelScreenMode) {
-                                VisualNovelScreenMode.Block -> blockLabel
-                                VisualNovelScreenMode.Sentences -> sentencesLabel
-                            },
-                            onSelected = { label ->
-                                onSettingsChange { current ->
-                                    current.copy(
-                                        visualNovelScreenMode = if (label == sentencesLabel) {
-                                            VisualNovelScreenMode.Sentences
-                                        } else {
-                                            VisualNovelScreenMode.Block
-                                        },
-                                    )
-                                }
-                            },
-                            palette = palette,
-                        )
-                        if (settings.visualNovelScreenMode == VisualNovelScreenMode.Sentences) {
-                            AppearanceDivider(palette)
-                            StepperRow(
-                                label = stringResource(R.string.reader_visual_novel_sentences_per_screen),
-                                value = settings.visualNovelSentencesPerScreen.toString(),
-                                onDecrease = {
-                                    onSettingsChange { current ->
-                                        current.copy(
-                                            visualNovelSentencesPerScreen =
-                                                (current.visualNovelSentencesPerScreen - 1).coerceAtLeast(1),
-                                        )
-                                    }
-                                },
-                                onIncrease = {
-                                    onSettingsChange { current ->
-                                        current.copy(
-                                            visualNovelSentencesPerScreen =
-                                                (current.visualNovelSentencesPerScreen + 1).coerceAtMost(12),
-                                        )
-                                    }
-                                },
-                                palette = palette,
-                            )
-                            AppearanceDivider(palette)
-                            SwitchRow(
-                                label = stringResource(R.string.reader_visual_novel_preserve_dialogue),
-                                checked = settings.visualNovelPreserveDialogueBubbles,
-                                onCheckedChange = { checked ->
-                                    onSettingsChange { current ->
-                                        current.copy(visualNovelPreserveDialogueBubbles = checked)
-                                    }
-                                },
-                            )
-                        }
-                        AppearanceDivider(palette)
-                        SwitchRow(
-                            label = stringResource(R.string.reader_visual_novel_click_advance),
-                            checked = settings.visualNovelClickAdvance,
-                            onCheckedChange = { checked ->
-                                onSettingsChange { current -> current.copy(visualNovelClickAdvance = checked) }
-                            },
-                        )
-                        AppearanceDivider(palette)
-                        SwitchRow(
-                            label = stringResource(R.string.reader_visual_novel_merge_cross_screen_sasayaki_cues),
-                            checked = settings.visualNovelMergeCrossScreenSasayakiCues,
-                            onCheckedChange = { checked ->
-                                onSettingsChange { current ->
-                                    current.copy(visualNovelMergeCrossScreenSasayakiCues = checked)
                                 }
                             },
                         )
@@ -587,7 +541,7 @@ private fun ReaderAppearanceContent(
                             }
                         },
                     )
-                    if (settings.viewMode != ReaderViewMode.VisualNovel) {
+                    if (!settings.paragraphMode || settings.viewMode != ReaderViewMode.Paginated) {
                         AppearanceDivider(palette)
                         SwitchRow(
                             label = stringResource(R.string.reader_appearance_avoid_page_break),
@@ -991,7 +945,7 @@ internal fun readerAppearanceBottomSafeAreaFromSlider(value: Float): Int =
         .coerceReaderBottomSafeAreaDp()
 
 internal fun readerAppearanceShowsPageSwipeThreshold(viewMode: ReaderViewMode): Boolean =
-    viewMode == ReaderViewMode.Paginated || viewMode == ReaderViewMode.VisualNovel
+    viewMode == ReaderViewMode.Paginated
 
 internal fun readerAppearancePageSwipeThresholdSliderSteps(): Int =
     (ReaderPageSwipeThresholdMaxPx - ReaderPageSwipeThresholdMinPx) /

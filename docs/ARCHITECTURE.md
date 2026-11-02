@@ -26,7 +26,7 @@ Names without an extension are searchable types, not necessarily filenames.
 | Reading statistics | `epub/BookStatisticsStore.kt`, `features/statistics/` | Session transactions, archives, aggregation and dashboard state |
 | Reader lifecycle, progress, restore | `features/reader/ReaderWebView.kt`, `features/reader/ReaderChapterWebView.kt`, `features/reader/ReaderWebViewStateHolder.kt` | WebView attachment, document generations, navigation and accepted position |
 | Reader commands and resources | `ReaderPaginationScripts.kt`, `ReaderWebAssets.kt`, `ReaderWebResourceBridge.kt` in `features/reader/` | Typed commands, asset composition and safe resource loading |
-| Reader layout, VN, highlighting | Web `reader/` (ownership table below) | Mode runtimes and shared text/media semantics |
+| Reader layout, paragraph mode, highlighting | Web `reader/` (ownership table below) | Mode runtimes and shared text/media semantics |
 | Selection, native handles, lookup context | `features/reader/ReaderSelectionBridge.kt`, Web `shared/selection*.js` | Selection state, source offsets and native menu integration |
 | Popup stack, history, geometry | `features/reader/ReaderLookupPopupBridge.kt`, Web `popup/reader-popup-host.js`, `popup/popup.js` | Shared iframe lookup host and native service bridge |
 | Dictionary import/query | `dictionary/DictionaryRepository.kt`, `dictionary/DictionaryNativeBridge.kt`, `dictionary/DictionaryLookupQueryService.kt` | Native session and repository boundary; algorithms live in the bridge submodule |
@@ -243,40 +243,110 @@ dynamic configuration and bridge calls.
 
 | Web asset under `reader/` | Owns | Consumers |
 | --- | --- | --- |
-| `reader-text-semantics.js` | Normalization, raw/matchable counts and character predicate, Sasayaki punctuation ownership and search range semantics | All three modes |
+| `reader-text-semantics.js` | Normalization, raw/matchable counts and character predicate, Sasayaki punctuation ownership and search range semantics | Paginated (including paragraph) and continuous |
 | `reader-dom-text.js` | Live DOM ruby normalization, selected body-text slices and Sasayaki structural boundaries | Paginated/continuous normalization; selection and Sasayaki adapters across modes |
-| `reader-media-semantics.js` | Image/gaiji setup, SVG ratio, blur/tint, tap bridge, scoped loading and image-hold eligibility | All three modes |
-| `reader-layout-semantics.js` | Publisher inline-block/empty-strut sanitation, pure-image wrapper centering and overflowing image paragraph margins | All three modes before offsets/restore; VN also sanitizes displayed clones after media setup |
+| `reader-media-semantics.js` | Image/gaiji setup, SVG ratio, blur/tint, tap bridge, scoped loading and image-hold eligibility | Paginated (including paragraph) and continuous |
+| `reader-layout-semantics.js` | Publisher inline-block/empty-strut sanitation, pure-image wrapper centering and overflowing image paragraph margins | Both modes before offsets/restore |
 | `reader-document-preparation.js` | Defer initial publisher layout until reader viewport/styles are installed | Chapter WebView document-start hook; all modes resume before content geometry/font readiness |
 | `reader-paginated.js` | Columns, snapping, page metrics and page restore | Paginated |
 | `reader-continuous.js` | Inset body scrolling, viewport bounds and scroll restore | Continuous |
-| `reader-visual-novel.js` | Block/sentence screens, fitting, reveal, cross-screen cue merge and navigation | VN |
-| `reader-vn-content-stream.js` | Complete source text, ruby entries, raw/matchable offsets and standalone media | VN |
-| `reader-vn-range-map.js` | Source-to-clone offsets and rendered highlight/cue ranges | VN |
-| `reader-vn-selection-projection.js` | Source sentence/lookup context and visible clone projection | VN |
-| `reader-sasayaki.js`, `highlights.js` | Cue presentation and persistent/search highlight operations, with VN projection adapters | Reader modes through their integrations |
+| `reader-paragraph.js` | iOS paragraph splitting/centering, cross-column fragments, Range reveal and current-page cue IDs | Paginated when paragraph mode is enabled |
+| `reader-sasayaki.js`, `highlights.js` | Live-DOM cue presentation and persistent/search highlight operations | Both modes |
 
-- `ReaderContentStyles` owns root viewport sizing in all three modes, clearing
+### Prohibited narration-highlighting changes
+
+- **Do not change the TTS/Sasayaki highlighting implementation without explicit
+  user approval.** Permission to fix animation, migrate paragraph mode or refactor
+  Reader does not authorize replacing its highlighting renderer. Preserve the
+  established inline cue wrappers for normal text/background coloring and the
+  existing E-ink geometry overlay.
+- **Do not replace TTS/Sasayaki coloring with CSS Custom Highlights
+  (`CSS.highlights` / `::highlight`), including in paragraph mode.** Android
+  WebView can clip the painted edges of vertical Japanese glyphs through this
+  path. The regression was reproduced with complete cue text, unchanged DOM,
+  unchanged Range rectangles and unchanged page position: removing the Custom
+  Highlight restored the missing strokes; reapplying it clipped them again.
+  Correct ranges, stable layout and visible highlight pixels therefore do not
+  establish rendering correctness. See the
+  [glyph comparison procedure](VALIDATION.md#narration-highlight-glyph-integrity).
+- Range objects used for offsets/geometry and the existing paragraph reveal
+  mechanism do not authorize reusing Custom Highlights for narration coloring.
+  Fix animation conflicts at the animation/DOM-mutation boundary; do not trade
+  away intact glyphs or silently introduce another renderer as a workaround.
+
+### Reader runtime contracts
+
+- `ReaderContentStyles` owns root viewport sizing in both modes, clearing
   publisher `max-width`/`max-height` on `html` and `body` while retaining
   descendant size limits and the continuous body's reader-configured insets.
 - Raw code-point offsets, normalized matchable offsets and DOM UTF-16 positions
-  are different coordinate systems. Convert through the owning index/projection.
-- VN's detached content stream caches media units for the source snapshot;
-  consumers treat the list and descriptors as read-only. Source changes require
-  `rebuild()`, which invalidates media discovery alongside text indexes.
-- VN lookup/mining uses complete source sentences; the current clone supplies
-  hit testing, visible ranges and anchors only. Paginated/continuous do not
-  consume VN stream/range-map instances. New sharing requires equivalent
-  semantics and tested production consumers.
-  VN image setup may scope to the current screen without waiting for image load,
-  through the shared media owner. Text, media classification and clone mapping
-  stay with the owners above.
-  Connecting other mode runtimes to VN stream/range-map instances requires an
-  explicit design and validation plan first.
-- `EpubBook.imageReferenceCounts` lazily caches original image references across distinct linear, non-navigation spine documents for that book snapshot; first access runs on a resource/loading worker. `ReaderWebResourceBridge` serves the counts at `/reader-media/image-references.json` before Reader runtime initialization. Shared media semantics suppress holds at three references without changing layout; VN keeps media screens and filters their hold eligibility. TTS source extraction consumes the same counts, including background and cross-chapter barriers. Unknown counts preserve holds.
+  are different coordinate systems. Convert through the live DOM text index.
+- Paragraph mode extends the ordinary paginated DOM. After fonts/images and layout
+  cleanup, split only inside paragraphs, center blocks, mark cross-column fragments,
+  build character indexes, install cues/highlights and restore position. Vertical
+  Android pagination uses Y/page-height; horizontal pagination uses X/page-width.
+  Paragraphs and continuation fragments use the same page-sized CSS block box,
+  `align-content`, intrinsic inline sizing and automatic inline margins to center
+  content in both axes, retaining the common starting edge of explicit lines.
+  Fragment wrappers provide per-page layout containers; Android does not require
+  the iOS selection workaround that originally motivated them. Spacing-only
+  paragraphs keep their anchors in flow without occupying page space.
+  Continuous/ordinary pagination do not run paragraph preprocessing.
+- Paginated `paginationMetrics` retains text-node bounds in content coordinates
+  and document order. Progress and paragraph reveal reuse that same layout pass;
+  progress measures individual characters only for nodes crossing the viewport
+  boundary. Punctuation-only nodes participate in reveal, while ruby annotations
+  stay outside the body-text index. `buildNodeOffsets()` invalidates the metrics
+  after cue/highlight wrapping or unwrapping; content reflow replaces the document.
+- Inline narration cue spans reserve their paint boxes with a transparent outline
+  during initial layout. Blink otherwise creates a box on the first background
+  highlight and invalidates the containing layout, making each new cue reflow a
+  long chapter (see Blink's [inline box creation](https://chromium.googlesource.com/chromium/src.git/+/de2d3a5fc72ebf0c3f84c8c5aff4088112812165/third_party/blink/renderer/core/layout/layout_inline.cc)).
+  The outline takes no layout space; active foreground/background
+  coloring still uses the existing span classes, and E-ink still uses its overlay.
+- Paragraph reveal uses a Custom Highlight Range and elapsed-time animation frames;
+  its clock starts at the first frame timestamp. Native page-turn commands return
+  the new character progress in the same JS task, before reveal frames paint;
+  a delayed second progress query must not interrupt the reveal.
+  Gaiji images and generated fallback spans toggle visibility at the same text
+  boundary; their layout space and character offsets stay unchanged. Completing
+  or cancelling reveal restores all pending gaiji. Frames never split nodes or
+  change text. Restore (including previous chapter) and forward page turns animate;
+  same-chapter backward turns show complete text.
+  Like iOS, same-document narration following neither starts nor finishes an
+  existing reveal: its Range remains on the original page, so following to another
+  page shows that destination's text in full. Automatic cross-chapter restores
+  still animate. Paragraph Sasayaki cues must be
+  loaded before document setup. TTS chapter cues are prepared only after this
+  reading session has actually started TTS, then installed before following or
+  restoring the next document; enabling the TTS preference alone adds no work.
+  Both reuse the existing inline highlighter with chapter targets installed before
+  reveal. Paragraph following never lazily wraps missing cues. Cue-source changes
+  finish the old reveal before replacing nodes; ordinary cue changes do not.
+  Paragraph E-ink changes reload the chapter at the displayed character position
+  through the existing restore gate. Do not convert the chapter's cue DOM during
+  appearance refresh: saved highlights can invalidate cached text segments, and
+  bulk wrapping with existing live geometry ranges can stall WebView. Restore
+  persistent highlights before building narration cues so their node splitting
+  cannot distort the initial E-ink ranges.
+  The first tap during reveal only completes it. Native and DOM callbacks share
+  one decision per tap, so a delayed click cannot finish a new page's reveal.
+  Afterwards lookup/media/link/popup operations retain priority; optional blank tap
+  calls the same native navigation entry as swipe/keys. Native selection and restore
+  locks apply to every entry.
+- `ReaderParagraphSettingsMigration` converts legacy VN preferences and profile JSON
+  before enum decoding, including display migration/backup reads. New fields win,
+  only new fields are written, and blank-tap false is preserved. Paragraph layout
+  fields reload content; animation/speed/blank-tap updates do not. Character-based
+  bookmarks, highlights and sync formats are unchanged.
+- `EpubBook.imageReferenceCounts` lazily caches original image references across distinct linear, non-navigation spine documents for that book snapshot; first access runs on a resource/loading worker. `ReaderWebResourceBridge` serves the counts at `/reader-media/image-references.json` before Reader runtime initialization. Shared media semantics suppress holds at three references without changing layout. TTS source extraction consumes the same counts, including background and cross-chapter barriers. Unknown counts preserve holds.
 - `ReaderWebViewStateHolder` owns document/restore generations. Stale bridge
   callbacks cannot alter a replacement document. Renderer recovery preserves
   the latest accepted position and rebuilds WebView-local state.
+- Reader navigation callbacks passed through Compose use lambdas when invoking
+  local functions that capture changing values. Local function references can
+  compare equal despite different captures, leaving `rememberUpdatedState` with
+  a pre-load null statistics tracker or outdated settings.
 - `HoshiReaderWebView` installs one document-start preparation script when supported
   and removes it on release. It only defers top-level `/epub/` documents at the
   appassets origin, preserving the publisher's inline display property. Mode
@@ -318,6 +388,7 @@ dynamic configuration and bridge calls.
 | Backup restore | `BackupSettingsView` coordinates `HoshiBackupRepository` with sync: stop sync before Books replacement, reset bookkeeping on success, disable sync on failure before restarting the manager. |
 | Playback | Sasayaki and TTS services own their Media3 player/session. Media3 manages foreground-service and notification lifecycle; controls use that session. Reader supplies presentation callbacks and explicit exit/stop. Playback and its notification start on explicit audio interaction. The Sasayaki process-local connection remains a documented refactor target. |
 | Reader presentation | `ReaderPlaybackPresentation` owns chapter/media traversal shared by Sasayaki/TTS. Reader interaction cancels pending presentation for both; TTS presentation is a child of playback, so abandoning an image/restore resumes speech while pausing playback cancels both. Late Reader callbacks require the presentation to remain active. TTS document restoration only highlights without navigating or revealing; playback and foreground resume may follow the sentence. Image holds require auto-scroll, including TTS background fallback. `ReaderLookupPauseState` owns lookup interruption/resume across popup replacement. |
+| Paragraph audio | `ReaderParagraphPlaybackState` rejects stale page queries by request/document/restore generation and retains manual cross-chapter direction. `SasayakiPlaybackController` owns the transient `SasayakiPageRange`, independent of audition stops. Every accepted page-cue query replaces the range, including chapter jumps, restore and reflow; passive updates neither seek nor change transport. Forward turns seek/play, backward turns seek paused, and empty pages pause without seeking. As on iOS, page range only defines a stop boundary: crossing its end pauses before cue dispatch; it must never filter cue display or following by membership or current time. Resuming after a page-end stop can follow into the next page. The boundary persists in the service when Reader detaches. Disabling page advance, leaving paragraph mode, changing books, clearing matches or seeking outside the range clears it. When Sasayaki following moves to another page, Reader refreshes that page's range without seeking or changing the playing/paused state; following within the same page adds no query. |
 | Transcription | `SasayakiTranscriptionCoordinator` serializes recognition, checkpoints and matching. Live matches stay in memory and take precedence over synced matches in the active reader. Completion, pause and failure finalize the latest successful match under the storage lock; only changed persisted matches notify sync. Deletion/replacement joins the task and suppresses final writes. Its work is process-bound; the reader-route VM pauses/saves on disposal. Process death retains the previous persisted match and transcript checkpoints for resumption and realignment. |
 | TTS text | `TtsBookRepository` extracts full chapter source. `TtsText`/dialogue/replacement transforms preserve source offsets and original Anki text. Chapter-wide paired outer Japanese quotes create separate playback units alongside existing sentence/block boundaries; nested quotes and ruby spans remain intact. All units share navigation, prefetch and sentence-pause behavior. Replacements operate per playback unit; full selections/Anki exports retain their selected text across units. Synthesis/cache is owned by `TtsAudioRepository`; distinct playback requests share a two-slot budget, identical audio identities serialize through reference-counted key locks, and cache clearing drains writers while a generation/barrier rejects obsolete work. |
 | TTS transport | `TtsPlaybackController` queues ready units through `TtsPlaybackOutput` into the service-owned Media3 playlist, including ordinary chapter boundaries. Actual media transitions select the current unit; asynchronous Reader highlighting/following does not gate ordinary audio. Explicit sentence pauses and image holds remain barriers; `TtsBookRepository` retains trailing images and detects image-only intervening chapters. Queue exhaustion appends to the prepared player; manual navigation resets playback. Settings changes discard future units after reconciling the actual current token, and suspended prefetch rechecks its epoch and live queue tail before appending. Prefetch uses a bounded two-request pipeline within the configured sentence horizon, publishes results in source order without waiting for farther chapter discovery, and continues caching later units after a failed unit without skipping it in playback. |

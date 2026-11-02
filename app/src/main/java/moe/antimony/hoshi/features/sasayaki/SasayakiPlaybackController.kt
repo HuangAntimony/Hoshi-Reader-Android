@@ -44,6 +44,8 @@ internal interface SasayakiPlaybackControllerContract {
     fun skipBackward(seconds: Int)
     fun seekTo(seconds: Double)
     fun updateMatchData(matchData: SasayakiMatchData?)
+    fun handlePageChanged(chapterIndex: Int, cueIds: List<String>, play: Boolean?)
+    fun clearPageRange()
     fun restoreCueDisplay()
     fun findCue(chapterIndex: Int, offset: Int): SasayakiMatch?
     fun playCue(cue: SasayakiMatch, stop: Boolean)
@@ -94,8 +96,9 @@ internal class SasayakiPlaybackController(
     )
     private val tickRunnable = object : Runnable {
         override fun run() {
+            if (!isPlaying) return
             tick()
-            handler?.postDelayed(this, 125L)
+            if (isPlaying) handler?.postDelayed(this, 125L)
         }
     }
     private val playbackLifecycle = SasayakiPlaybackLifecycleController(
@@ -109,6 +112,10 @@ internal class SasayakiPlaybackController(
         playbackState = playbackState,
         playbackLifecycle = playbackLifecycle,
         cueNavigation = cueNavigation,
+        beforeSeek = { target ->
+            if (!issuingPageSeek) cancelPendingPageSeek()
+            if (pageRange?.contains(target, delay) == false) clearPageRange()
+        },
     )
     private val playbackEvents = SasayakiPlaybackEventCoordinator(
         playbackState = playbackState,
@@ -129,6 +136,13 @@ internal class SasayakiPlaybackController(
         initialHasAudio = audioSourceRepository.playbackSource(playbackPersistence.playback) != null,
     )
     private val cuePresentation = SasayakiCuePresentationState()
+    private var released = false
+    private var issuingPageSeek = false
+    private var pendingPageSeek: Long? = null
+    private var pageChapter: Int? = null
+    private var pageCueIds: Set<String>? = null
+    private var pageRange: SasayakiPageRange? = null
+    private var pageRequest = 0L
     private var autoPageHoldResumePending = false
     private var hasCues = matchData?.matches?.isNotEmpty() == true
 
@@ -161,6 +175,7 @@ internal class SasayakiPlaybackController(
     }
 
     override fun applySyncedPlayback(value: SasayakiPlaybackData) {
+        clearPageRange()
         playbackPersistence.applySyncedPlayback(value)
         playbackState.applySyncedPosition(value.lastPosition)
         playbackLifecycle.setRate(value.rate)
@@ -178,6 +193,7 @@ internal class SasayakiPlaybackController(
     }
 
     override fun importAudio(audioUri: Uri, copiedAudioFileName: String?) {
+        clearPageRange()
         clearAutoPageHoldResume()
         teardownPlayer(clearCue = false)
         playbackPersistence.importAudio(audioUri, copiedAudioFileName)
@@ -185,6 +201,7 @@ internal class SasayakiPlaybackController(
     }
 
     override fun clearAudio() {
+        clearPageRange()
         clearAutoPageHoldResume()
         audioSourceRepository.clearAudioSource(playback, appContext.contentResolver)
         teardownPlayer(clearCue = true)
@@ -203,6 +220,7 @@ internal class SasayakiPlaybackController(
     }
 
     override fun pausePlayback(restoreTemporaryPosition: Boolean) {
+        cancelPendingPageSeek()
         clearAutoPageHoldResume()
         deferredPlaybackCommand.cancel()
         onForegroundPlaybackRequestedChanged(false)
@@ -307,6 +325,8 @@ internal class SasayakiPlaybackController(
 
     override fun updateMatchData(matchData: SasayakiMatchData?) {
         this.matchData = matchData
+        if (matchData == null) clearPageRange()
+        else pageChapter?.let { handlePageChanged(it, pageCueIds.orEmpty().toList(), null) }
         hasCues = matchData?.matches?.isNotEmpty() == true
         cueNavigation.updateMatchData(matchData)
         val cue = if (hasAudio && hasMatch) {
@@ -314,7 +334,61 @@ internal class SasayakiPlaybackController(
         } else {
             null
         }
-        applyCueDisplayAction(cueDisplay.refresh(cue, getCurrentChapterIndex()))
+        cueDisplayActionDispatcher.apply(cueDisplay.refresh(cue, getCurrentChapterIndex()))
+    }
+
+    override fun clearPageRange() {
+        cancelPendingPageSeek()
+        pageChapter = null
+        pageCueIds = null
+        pageRange = null
+        pageRequest++
+    }
+
+    override fun handlePageChanged(chapterIndex: Int, cueIds: List<String>, play: Boolean?) {
+        if (released) return
+        val range = sasayakiPageRange(matchData?.matches.orEmpty(), chapterIndex, cueIds)
+        pageChapter = chapterIndex
+        pageCueIds = cueIds.toSet()
+        if (play != null) {
+            pausePlayback(restoreTemporaryPosition = false)
+            playbackState.clearStopPlaybackTime()
+            playbackState.setTemporaryPlaybackReturnPosition(null)
+        }
+        if (pageRange != range || play != null) {
+            cancelPendingPageSeek()
+            pageRequest++
+        }
+        pageRange = range
+        if (play == null || range == null || range.audioEnd(delay, duration) <= range.audioStart(delay, duration)) return
+        val request = pageRequest
+        withPreparedPlayback {
+            if (request != pageRequest) return@withPreparedPlayback false
+            issuingPageSeek = true
+            try {
+                pendingPageSeek = request
+                playbackCommands.seek(
+                    seconds = range.audioStart(delay, duration),
+                    startPlayback = play,
+                    updateCue = false,
+                )
+            } finally {
+                issuingPageSeek = false
+            }
+        }
+    }
+
+    private fun cancelPendingPageSeek() {
+        if (pendingPageSeek != null) playbackState.cancelPendingSeek()
+        pendingPageSeek = null
+    }
+
+    private fun stopAtPageEnd(previousTime: Double): Boolean {
+        val end = pageRange?.audioEnd(delay, duration) ?: return false
+        // Stop on crossing the boundary, not on every update after it (including resume).
+        if (previousTime >= end || currentTime < end) return false
+        if (isPlaying) pausePlayback(restoreTemporaryPosition = false)
+        return true
     }
 
     override fun restoreCueDisplay() {
@@ -355,6 +429,8 @@ internal class SasayakiPlaybackController(
     }
 
     override fun release() {
+        released = true
+        clearPageRange()
         clearAutoPageHoldResume()
         deferredPlaybackCommand.cancel()
         teardownPlayer(clearCue = true)
@@ -425,6 +501,9 @@ internal class SasayakiPlaybackController(
         )
 
     private fun handleSeekComplete() {
+        val pageSeek = pendingPageSeek
+        pendingPageSeek = null
+        if (pageSeek != null && pageSeek != pageRequest) { playbackState.cancelPendingSeek(); return }
         playbackEvents.handleSeekComplete(
             hasAudio = hasAudio,
             hasMatch = hasMatch,
@@ -433,7 +512,7 @@ internal class SasayakiPlaybackController(
             autoScroll = cuePresentation.autoScroll,
             hasPlayedOnce = cuePresentation.hasPlayedOnce,
             startPlayback = ::startPlayback,
-            applyCueDisplayAction = ::applyCueDisplayAction,
+            applyCueDisplayAction = cueDisplayActionDispatcher::apply,
         )
     }
 
@@ -476,7 +555,9 @@ internal class SasayakiPlaybackController(
     }
 
     private fun tick() {
+        val previousTime = currentTime
         val tick = playbackLifecycle.updateTick() ?: return
+        if (stopAtPageEnd(previousTime)) return
         if (tick.shouldSavePosition) {
             playbackPersistence.savePosition(currentTime)
         }
@@ -492,7 +573,7 @@ internal class SasayakiPlaybackController(
             autoScroll = cuePresentation.autoScroll,
             hasPlayedOnce = cuePresentation.hasPlayedOnce,
             source = SasayakiCueRevealSource.NaturalPlayback,
-            applyCueDisplayAction = ::applyCueDisplayAction,
+            applyCueDisplayAction = cueDisplayActionDispatcher::apply,
         )
     }
 
@@ -508,6 +589,7 @@ internal class SasayakiPlaybackController(
     }
 
     private fun handlePlayerPositionChanged(positionMs: Int, durationMs: Int) {
+        val previousTime = currentTime
         val shouldSavePosition = playbackLifecycle.syncPlayerPosition(
             currentPositionMs = positionMs,
             durationMs = durationMs,
@@ -515,7 +597,7 @@ internal class SasayakiPlaybackController(
         if (shouldSavePosition) {
             playbackPersistence.savePosition(currentTime)
         }
-        updateCue(currentTime, forceDisplay = true)
+        if (!stopAtPageEnd(previousTime)) updateCue(currentTime, forceDisplay = true)
     }
 
     private fun updateCue(time: Double, forceDisplay: Boolean = false) {
@@ -528,12 +610,8 @@ internal class SasayakiPlaybackController(
             autoScroll = cuePresentation.autoScroll,
             hasPlayedOnce = cuePresentation.hasPlayedOnce,
             forceDisplay = forceDisplay,
-            applyCueDisplayAction = ::applyCueDisplayAction,
+            applyCueDisplayAction = cueDisplayActionDispatcher::apply,
         )
-    }
-
-    private fun applyCueDisplayAction(action: SasayakiCueDisplayAction) {
-        cueDisplayActionDispatcher.apply(action)
     }
 
     private fun restoreTemporaryPlaybackPositionIfNeeded() {
@@ -548,7 +626,7 @@ internal class SasayakiPlaybackController(
         pausePlayback(restoreTemporaryPosition = true)
         playbackLifecycle.releaseEngine()
         audioAvailability.markAudioUnavailable()
-        if (clearCue) applyCueDisplayAction(cueDisplay.clear())
+        if (clearCue) cueDisplayActionDispatcher.apply(cueDisplay.clear())
     }
 
     private companion object {

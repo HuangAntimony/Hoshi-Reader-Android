@@ -83,6 +83,8 @@ class SasayakiPlaybackStateCoordinator(initialPosition: Double) {
         )
     }
 
+    fun cancelPendingSeek() { pendingSeek = null }
+
     fun completeSeek(): SasayakiPendingSeek? {
         val seek = pendingSeek ?: return null
         pendingSeek = null

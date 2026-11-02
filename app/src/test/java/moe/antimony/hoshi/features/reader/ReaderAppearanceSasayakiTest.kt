@@ -86,7 +86,6 @@ class ReaderAppearanceSasayakiTest {
     @Test
     fun pageSwipeThresholdIsVisibleOnlyForPagedReaderModes() {
         assertTrue(readerAppearanceShowsPageSwipeThreshold(ReaderViewMode.Paginated))
-        assertTrue(readerAppearanceShowsPageSwipeThreshold(ReaderViewMode.VisualNovel))
         assertTrue(!readerAppearanceShowsPageSwipeThreshold(ReaderViewMode.Continuous))
     }
 

@@ -55,7 +55,7 @@
       if (String(image.tagName).toLowerCase() === 'img') {
         var classes = image.getAttribute('class') || '';
         if (/gaiji/i.test(classes)) return;
-        // VN sanitizes its source before media setup marks the displayed clone.
+        // Recognize large publisher images even before image classes are installed.
         if (!/(^|\s)block-img(\s|$)/.test(classes)
           && !(image.naturalWidth > 256 || image.naturalHeight > 256)) return;
       }

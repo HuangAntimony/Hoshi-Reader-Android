@@ -234,6 +234,8 @@ class SasayakiPlayerFacadeTest {
             commands += "updateMatchData:${matchData?.matches?.size ?: 0}"
         }
 
+        override fun handlePageChanged(chapterIndex: Int, cueIds: List<String>, play: Boolean?) {}
+        override fun clearPageRange() {}
         override fun restoreCueDisplay() = Unit
 
         override fun findCue(chapterIndex: Int, offset: Int): SasayakiMatch? {

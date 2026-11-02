@@ -40,9 +40,9 @@ class ReaderSearchHighlightWebViewTest {
         }
         composeRule.waitForIdle()
         try {
-            for (mode in ReaderViewMode.entries) for (vertical in listOf(false, true)) {
-                val description = "$mode vertical=$vertical"
-                val settings = ReaderSettings(viewMode = mode, verticalWriting = vertical, visualNovelRevealSpeed = 0)
+            for (paragraph in listOf(false, true)) for (mode in ReaderViewMode.entries.filter { !paragraph || it == ReaderViewMode.Paginated }) for (vertical in listOf(false, true)) {
+                val description = "$mode paragraph=$paragraph vertical=$vertical"
+                val settings = ReaderSettings(viewMode = mode, paragraphMode = paragraph, verticalWriting = vertical, textAnimation = false)
                 val loaded = CountDownLatch(1)
                 val styles = ReaderContentStyles.styleTag(settings = settings, readerCssTemplate = assets.readerCss)
                 val script = ReaderPaginationScripts.shellScript(settings = settings, assets = assets)
@@ -62,7 +62,7 @@ class ReaderSearchHighlightWebViewTest {
                 composeRule.waitUntil(15_000) {
                     evaluate(webView, "Boolean(window.testRestored)") == "true"
                 }
-                // Wait for production restore (including the VN clone and font layout).
+                // Wait for production restore (including font layout).
                 evaluate(webView, "window.hoshiReader.buildNodeOffsets(); true")
                 val baseline = bluePixelCount()
                 val result = JSONObject(evaluate(webView, """

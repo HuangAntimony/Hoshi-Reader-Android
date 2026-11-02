@@ -59,10 +59,10 @@ class ReaderDocumentPreparationWebViewTest {
         bitmap.recycle()
         val image = "data:image/png;base64," + Base64.encodeToString(imageBytes, Base64.NO_WRAP)
         try {
-            for (mode in ReaderViewMode.entries) for (vertical in listOf(true, false)) for (picture in listOf(false, true)) {
+            for (paragraph in listOf(false, true)) for (mode in ReaderViewMode.entries.filter { !paragraph || it == ReaderViewMode.Paginated }) for (vertical in listOf(true, false)) for (picture in listOf(false, true)) {
                 val label = "deferred=$deferred $mode vertical=$vertical picture=$picture"
-                val settings = ReaderSettings(viewMode = mode, verticalWriting = vertical, fontSize = 24,
-                    horizontalPadding = 3, verticalPadding = 3, visualNovelRevealSpeed = 0)
+                val settings = ReaderSettings(viewMode = mode, paragraphMode = paragraph, verticalWriting = vertical, fontSize = 24,
+                    horizontalPadding = 3, verticalPadding = 3, textAnimation = false)
                 val body = if (picture) "<p><img src='$image'/></p>" else
                     "<p>「<ruby>読書<rt>どくしょ</rt></ruby>の時間です。本文を読みます。」</p>".repeat(160)
                 val html = """<html xmlns="http://www.w3.org/1999/xhtml" style="display: block !important"><head><meta name="viewport" content="width=1600"/><title>Fixture</title></head><body>$body</body></html>"""
@@ -109,8 +109,7 @@ class ReaderDocumentPreparationWebViewTest {
                 assertEquals(label, "important", after.getString("priority"))
                 assertTrue("$label $after", after.getDouble("width") > 0)
                 assertTrue("$label viewport", after.getDouble("viewport") < 1600)
-                // VN progress includes the displayed block; the fixture has 160 equal paragraphs.
-                val initialProgress = if (mode == ReaderViewMode.VisualNovel && !picture) 1.0 / 160 else 0.0
+                val initialProgress = 0.0
                 assertEquals("$label initial position", initialProgress, after.getDouble("progress"), 0.001)
                 if (picture) {
                     val painted = CountDownLatch(1)

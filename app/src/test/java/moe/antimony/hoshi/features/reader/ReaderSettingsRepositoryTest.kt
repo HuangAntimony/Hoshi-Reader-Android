@@ -4,6 +4,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -301,12 +302,11 @@ class ReaderSettingsRepositoryTest {
             assertEquals(FuriganaMode.Off, settings.furiganaMode)
             assertEquals(ReaderViewMode.Paginated, settings.viewMode)
             assertFalse(settings.continuousMode)
-            assertEquals(45, settings.visualNovelRevealSpeed)
-            assertEquals(VisualNovelScreenMode.Block, settings.visualNovelScreenMode)
-            assertEquals(1, settings.visualNovelSentencesPerScreen)
-            assertFalse(settings.visualNovelPreserveDialogueBubbles)
-            assertFalse(settings.visualNovelClickAdvance)
-            assertFalse(settings.visualNovelMergeCrossScreenSasayakiCues)
+            assertEquals(35, settings.textSpeed)
+            assertEquals(0, settings.maxSentencesPerPage)
+            assertFalse(settings.splitDialogue)
+            assertFalse(settings.paragraphClickAdvance)
+            assertFalse(settings.textAnimation)
             assertFalse(settings.blurImages)
             assertFalse(settings.statisticsAutostartOnBookOpen)
             assertFalse(settings.statisticsAutostartOnPageTurn)
@@ -512,13 +512,12 @@ class ReaderSettingsRepositoryTest {
                     ),
                     fontSize = 24,
                     furiganaMode = FuriganaMode.Hidden,
-                    viewMode = ReaderViewMode.VisualNovel,
-                    visualNovelRevealSpeed = 80,
-                    visualNovelScreenMode = VisualNovelScreenMode.Sentences,
-                    visualNovelSentencesPerScreen = 3,
-                    visualNovelPreserveDialogueBubbles = true,
-                    visualNovelClickAdvance = false,
-                    visualNovelMergeCrossScreenSasayakiCues = true,
+                    paragraphMode = true,
+                    textSpeed = 80,
+                    maxSentencesPerPage = 3,
+                    splitDialogue = true,
+                    paragraphClickAdvance = false,
+                    textAnimation = true,
                     blurImages = true,
                     statisticsAutostartOnBookOpen = true,
                     statisticsAutostartOnPageTurn = true,
@@ -578,14 +577,13 @@ class ReaderSettingsRepositoryTest {
             assertEquals("wght-400-normal", saved.fontVariantSelections["recommended:kleeone"])
             assertEquals(24, saved.fontSize)
             assertEquals(FuriganaMode.Hidden, saved.furiganaMode)
-            assertEquals(ReaderViewMode.VisualNovel, saved.viewMode)
+            assertEquals(ReaderViewMode.Paginated, saved.viewMode)
             assertFalse(saved.continuousMode)
-            assertEquals(80, saved.visualNovelRevealSpeed)
-            assertEquals(VisualNovelScreenMode.Sentences, saved.visualNovelScreenMode)
-            assertEquals(3, saved.visualNovelSentencesPerScreen)
-            assertTrue(saved.visualNovelPreserveDialogueBubbles)
-            assertFalse(saved.visualNovelClickAdvance)
-            assertTrue(saved.visualNovelMergeCrossScreenSasayakiCues)
+            assertEquals(80, saved.textSpeed)
+            assertEquals(3, saved.maxSentencesPerPage)
+            assertTrue(saved.splitDialogue)
+            assertFalse(saved.paragraphClickAdvance)
+            assertTrue(saved.textAnimation)
             assertTrue(saved.blurImages)
             assertTrue(saved.statisticsAutostartOnBookOpen)
             assertTrue(saved.statisticsAutostartOnPageTurn)
@@ -679,7 +677,12 @@ class ReaderSettingsRepositoryTest {
                     pageSwipeThresholdPx = 96,
                     topSafeAreaDp = 46,
                     bottomSafeAreaDp = 44,
-                    visualNovelMergeCrossScreenSasayakiCues = true,
+                    paragraphMode = true,
+                    maxSentencesPerPage = 4,
+                    splitDialogue = true,
+                    textSpeed = 70,
+                    paragraphClickAdvance = true,
+                    textAnimation = true,
                     volumeKeysTurnPages = true,
                     volumeKeysNavigatePopupTerms = true,
                     volumeKeysSeekSasayaki = true,
@@ -699,7 +702,12 @@ class ReaderSettingsRepositoryTest {
             assertEquals(96, inherited.pageSwipeThresholdPx)
             assertEquals(46, inherited.topSafeAreaDp)
             assertEquals(44, inherited.bottomSafeAreaDp)
-            assertTrue(inherited.visualNovelMergeCrossScreenSasayakiCues)
+            assertTrue(inherited.paragraphMode)
+            assertEquals(4, inherited.maxSentencesPerPage)
+            assertTrue(inherited.splitDialogue)
+            assertEquals(70, inherited.textSpeed)
+            assertTrue(inherited.paragraphClickAdvance)
+            assertTrue(inherited.textAnimation)
             assertTrue(inherited.volumeKeysTurnPages)
             assertTrue(inherited.volumeKeysNavigatePopupTerms)
             assertTrue(inherited.volumeKeysSeekSasayaki)
@@ -716,7 +724,12 @@ class ReaderSettingsRepositoryTest {
                     pageSwipeThresholdPx = 120,
                     topSafeAreaDp = 58,
                     bottomSafeAreaDp = 60,
-                    visualNovelMergeCrossScreenSasayakiCues = false,
+                    paragraphMode = false,
+                    maxSentencesPerPage = 2,
+                    splitDialogue = false,
+                    textSpeed = 35,
+                    paragraphClickAdvance = false,
+                    textAnimation = false,
                     volumeKeysTurnPages = false,
                     volumeKeysNavigatePopupTerms = false,
                     volumeKeysSeekSasayaki = false,
@@ -735,7 +748,12 @@ class ReaderSettingsRepositoryTest {
             assertEquals(96, japanese.pageSwipeThresholdPx)
             assertEquals(46, japanese.topSafeAreaDp)
             assertEquals(44, japanese.bottomSafeAreaDp)
-            assertTrue(japanese.visualNovelMergeCrossScreenSasayakiCues)
+            assertTrue(japanese.paragraphMode)
+            assertEquals(4, japanese.maxSentencesPerPage)
+            assertTrue(japanese.splitDialogue)
+            assertEquals(70, japanese.textSpeed)
+            assertTrue(japanese.paragraphClickAdvance)
+            assertTrue(japanese.textAnimation)
             assertFalse(japanese.volumeKeysTurnPages)
             assertFalse(japanese.volumeKeysNavigatePopupTerms)
             assertFalse(japanese.volumeKeysSeekSasayaki)
@@ -778,6 +796,48 @@ class ReaderSettingsRepositoryTest {
         }
         repository(profileRepository = profiles, fileName = "furigana-reopened.preferences_pb").use { repository ->
             assertEquals(FuriganaMode.Dimmed, repository.settings.first().furiganaMode)
+        }
+    }
+
+    @Test
+    fun oldDataStoreValuesMigrateOnceAndNewValuesWin() = runBlocking {
+        repository().use { repository ->
+            repository.editPreferences {
+                this[booleanPreferencesKey("readerSettingsMigratedFromSharedPreferences")] = true
+                this[stringPreferencesKey("readerViewMode")] = "visualNovel"
+                this[stringPreferencesKey("visualNovelScreenMode")] = "sentences"
+                this[intPreferencesKey("visualNovelSentencesPerScreen")] = 12
+                this[intPreferencesKey("visualNovelRevealSpeed")] = 0
+                this[booleanPreferencesKey("visualNovelClickAdvance")] = true
+                this[booleanPreferencesKey("paragraphClickAdvance")] = false
+            }
+            val settings = repository.settings.first()
+            assertEquals(ReaderViewMode.Paginated, settings.viewMode)
+            assertTrue(settings.paragraphMode)
+            assertEquals(10, settings.maxSentencesPerPage)
+            assertTrue(settings.splitDialogue)
+            assertFalse(settings.textAnimation)
+            assertEquals(35, settings.textSpeed)
+            assertFalse(settings.paragraphClickAdvance)
+            assertFalse(repository.preferences().asMap().keys.any { it.name.startsWith("visualNovel") })
+            assertEquals(settings, repository.settings.first())
+        }
+    }
+
+    @Test
+    fun restoredLegacyProfileIsDecodedBeforeEnumAndWrittenWithNewKeys() = runBlocking {
+        val profiles = ProfileRepository(tempFolder.newFolder("paragraph-backup"))
+        val file = profiles.readerSettingsFile()
+        file.parentFile?.mkdirs()
+        file.writeText("""{"viewMode":"VisualNovel","fontSize":31,"visualNovelRevealSpeed":0,"visualNovelClickAdvance":false}""")
+        repository(profileRepository = profiles).use { repository ->
+            val migrated = repository.settings.first()
+            assertEquals(31, migrated.fontSize)
+            assertTrue(migrated.paragraphMode)
+            assertFalse(migrated.paragraphClickAdvance)
+            assertFalse(migrated.textAnimation)
+            assertFalse(file.readText().contains("visualNovel"))
+            assertTrue(file.readText().contains("paragraphClickAdvance"))
         }
     }
 

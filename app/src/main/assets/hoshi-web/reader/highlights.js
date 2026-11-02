@@ -82,10 +82,6 @@ window.hoshiHighlights = {
     });
     return { action: 'recolored', id: id };
   },
-  // VN substitutes source segments here; rendering still uses collectSegments.
-  collectTextSegments: function(offset, length) {
-    return this.collectSegments(offset, length);
-  },
   readingForNode: function(node) {
     var base = node;
     var ruby = node.parentElement && node.parentElement.closest('ruby');
@@ -97,7 +93,7 @@ window.hoshiHighlights = {
     return null;
   },
   textForRange: function(offset, length) {
-    var segments = this.collectTextSegments(offset, length);
+    var segments = this.collectSegments(offset, length);
     var text = '';
     var annotated = '';
     var reading = null;
@@ -203,7 +199,7 @@ window.hoshiHighlights = {
   applyHighlights: function(highlights) {
     for (var i = 0; i < highlights.length; i++) {
       this.wrapHighlight(highlights[i]);
-      // VN projects each subsequent range through offsets of the newly split nodes.
+      // Wrapping splits live text nodes; refresh their offsets before the next range.
       window.hoshiReader.buildNodeOffsets();
     }
     this.refreshSearchHighlight();

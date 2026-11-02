@@ -46,7 +46,7 @@ This project brings [Hoshi Reader](https://github.com/Manhhao/Hoshi-Reader) to A
 
 ### Reading
 
-- Read vertically or horizontally in paginated, continuous, or visual-novel mode.
+- Read vertically or horizontally in paginated or continuous mode; paragraph mode centers each page's content and adds sentence limits, optional text animation and tap-blank-to-advance.
 - Download or import fonts and customize layout and furigana display.
 - Search the full book, jump between chapters, and turn pages with volume keys.
 - Browse illustrations fullscreen or in a gallery, with zoom, save, and share actions.
@@ -78,7 +78,7 @@ This project brings [Hoshi Reader](https://github.com/Manhhao/Hoshi-Reader) to A
 
 ### Audiobook Read-Along (Sasayaki)
 
-- Align audiobook subtitles with book text for sentence highlighting and automatic page turning, with adjustable speed and background playback.
+- Align audiobook subtitles with book text for sentence highlighting and automatic page turning, with adjustable speed, background playback and optional page-by-page playback in paragraph mode.
 - Transcribe Japanese audiobooks on-device to generate subtitles.
 
 ### Text-To-Speech

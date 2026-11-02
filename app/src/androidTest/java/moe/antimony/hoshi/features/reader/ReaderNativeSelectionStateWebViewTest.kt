@@ -31,7 +31,12 @@ class ReaderNativeSelectionStateWebViewTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
 
     @Test
-    fun selectionKeepsPageAndNativeGesturesLockedWhenMenuCloses() {
+    fun selectionKeepsPageAndNativeGesturesLockedWhenMenuCloses() = checkSelectionLock(false)
+
+    @Test
+    fun paragraphSelectionKeepsPageAndNativeGesturesLockedWhenMenuCloses() = checkSelectionLock(true)
+
+    private fun checkSelectionLock(paragraph: Boolean) {
         val assets = ReaderWebAssets.load(instrumentation.targetContext)
         lateinit var webView: HoshiReaderWebView
         composeRule.setContent {
@@ -47,7 +52,7 @@ class ReaderNativeSelectionStateWebViewTest {
         try {
             val loaded = CountDownLatch(1)
             instrumentation.runOnMainSync {
-                val settings = ReaderSettings(verticalWriting = true, fontSize = 27)
+                val settings = ReaderSettings(verticalWriting = true, fontSize = 27, paragraphMode = paragraph)
                 val density = webView.resources.displayMetrics.density
                 val viewport = readerViewportCssLayout(settings,
                     (webView.width / density).toInt(), (webView.height / density).toInt()).cssVariables()

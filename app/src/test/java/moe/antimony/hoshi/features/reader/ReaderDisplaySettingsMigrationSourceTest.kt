@@ -28,6 +28,19 @@ class ReaderDisplaySettingsMigrationSourceTest {
     val tempFolder = TemporaryFolder()
 
     @Test
+    fun legacyVnEnumDoesNotDiscardProfileDisplayAppearance() = runBlocking {
+        val profiles = ProfileRepository(tempFolder.newFolder("legacy-vn-display"))
+        val file = profiles.readerSettingsFile()
+        file.parentFile?.mkdirs()
+        file.writeText("""{"viewMode":"VisualNovel","theme":"Dark","customBackgroundColor":4279312947}""")
+        dataStore("legacy-vn-display").use { handle ->
+            val payload = ReaderDisplaySettingsMigrationSource(handle.dataStore, null, profiles).loadMigrationPayload()
+            assertEquals(LegacyDisplayTheme.Dark, payload.activeSettings?.theme)
+            assertEquals(4279312947L, payload.activeSettings?.customBackgroundColor)
+        }
+    }
+
+    @Test
     fun migrationReadsOnlyGlobalActiveProfileEvenWhenLoadedBookProfileIsInvalid() = runBlocking {
         val filesDir = tempFolder.newFolder("global-profile-files")
         val profiles = ProfileRepository(filesDir)

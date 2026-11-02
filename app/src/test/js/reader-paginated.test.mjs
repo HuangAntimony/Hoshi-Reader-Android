@@ -27,6 +27,12 @@ function readerMediaSemanticsSource() {
 function readerSource(url, options = {}) {
     const readerSasayaki = fs.readFileSync(readerSasayakiUrl, 'utf8');
     return fs.readFileSync(url, 'utf8')
+        .replace('__HOSHI_READER_PARAGRAPH_SCRIPT__', fs.readFileSync(new URL('../../main/assets/hoshi-web/reader/reader-paragraph.js', import.meta.url), 'utf8'))
+        .replaceAll('__HOSHI_PARAGRAPH_ENABLED__', 'false')
+        .replaceAll('__HOSHI_PARAGRAPH_TEXT_ANIMATION__', 'false')
+        .replaceAll('__HOSHI_PARAGRAPH_TEXT_SPEED__', '35')
+        .replaceAll('__HOSHI_PARAGRAPH_MAX_SENTENCES__', '0')
+        .replaceAll('__HOSHI_PARAGRAPH_SPLIT_DIALOGUE__', 'false')
         .replace('__HOSHI_HIGHLIGHTS_SCRIPT__', options.highlightsScript ?? '')
         .replace('__HOSHI_READER_VIEWPORT_SCRIPT__', fs.readFileSync(readerViewportUrl, 'utf8'))
         .replace('__HOSHI_READER_SASAYAKI_SCRIPT__', readerSasayaki)
@@ -529,7 +535,7 @@ function loadReader(body, sourceUrl = readerPaginatedUrl, options = {}) {
     const css = options.css ?? { highlights: { delete() {}, set() {} } };
     vm.runInNewContext(readerSource(sourceUrl, options), {
         CSS: css,
-        Highlight: Set,
+        Highlight: class extends Set { constructor(...ranges) { super(ranges); } },
         URL,
         document,
         Node: { ELEMENT_NODE: 1, TEXT_NODE: 3 },
@@ -538,10 +544,11 @@ function loadReader(body, sourceUrl = readerPaginatedUrl, options = {}) {
             callback();
             return 0;
         },
-        requestAnimationFrame(callback) {
+        requestAnimationFrame: options.requestAnimationFrame ?? function(callback) {
             callback();
             return 0;
         },
+        cancelAnimationFrame() {},
         window,
     });
     return { reader: window.hoshiReader, document, head, window };
@@ -675,12 +682,101 @@ for (const vertical of [true, false]) {
 
         const metrics = reader.buildPaginationMetrics();
 
-        assert.deepEqual(JSON.parse(JSON.stringify(metrics)), {
-            minScroll: 0, maxScroll: 1600, totalChars: 3,
-            progressStops: [{ scroll: 110, exploredChars: 1 }, { scroll: 1710, exploredChars: 3 }],
-        });
+        assert.equal(metrics.minScroll, 0);
+        assert.equal(metrics.maxScroll, 1600);
+        assert.equal(metrics.totalChars, 3);
+        assert.deepEqual(Array.from(metrics.textRanges, ({ node, first, start, end, count }) =>
+            [body.childNodes.indexOf(node), first, start, end, count]), [
+            [0, 110, 110, 930, 1], [1, 100, Infinity, Infinity, 1], [2, 1710, 1710, 1730, 1],
+        ]);
         assert.deepEqual(reads, [1, 1, 1]);
         assert.equal(fallbackReads, 1);
+    });
+}
+
+for (const vertical of [true, false]) {
+    test(`page progress and reveal reuse layout measurements with vertical=${vertical}`, () => {
+        const body = new TestElement('body');
+        const highlights = new Map();
+        const { reader, window } = loadReader(body, readerPaginatedUrl, {
+            css: { highlights }, requestAnimationFrame: () => 1,
+        });
+        let scroll = 0;
+        let measurements = 0;
+        reader.getScrollContext = () => ({ vertical, pageSize: 800, maxScroll: 159200 });
+        reader.getPagePosition = () => scroll;
+        const pages = [];
+        for (let page = 0; page < 200; page++) {
+            const wrapper = new TestElement('span');
+            wrapper.className = 'hoshi-sasayaki-cue';
+            const text = new TestText('甲𠮷。');
+            const punctuation = new TestText('！？');
+            for (const node of [text, punctuation]) {
+                Object.defineProperty(node, 'rects', { get() {
+                    measurements++;
+                    const position = page * 800 + 20 - scroll;
+                    return [testRect(position, position + 40, position, position + 40)];
+                } });
+                wrapper.appendChild(node);
+            }
+            const rt = new TestElement('rt');
+            rt.appendChild(new TestText('こうよし'));
+            wrapper.appendChild(rt);
+            body.appendChild(wrapper);
+            pages.push({ text, punctuation });
+        }
+        reader.buildPaginationMetrics();
+        measurements = 0;
+
+        for (const page of [0, 199, 1, 100]) {
+            scroll = page * 800;
+            assert.equal(reader.calculateProgress(), page / 200);
+            window.hoshiParagraph.animateText(35);
+            const range = [...highlights.get('hoshi-animation')][0];
+            assert.equal(range.startContainer, pages[page].text);
+            assert.equal(range.startOffset, 1);
+            assert.equal(range.endContainer, pages[page].punctuation, 'punctuation-only nodes still animate');
+        }
+        assert.equal(measurements, 0, 'turns must not remeasure the chapter after layout');
+
+        const replacement = new TestText('新しい本文');
+        replacement.rects = [testRect(20, 60, 20, 60)];
+        for (const child of [...body.childNodes]) body.removeChild(child);
+        body.appendChild(replacement);
+        reader.buildNodeOffsets();
+        assert.equal(reader.calculateProgress(), 0, 'DOM changes invalidate layout measurements');
+        window.hoshiParagraph.animateText(35);
+        assert.equal([...highlights.get('hoshi-animation')][0].endContainer, replacement);
+    });
+
+    test(`progress still measures text straddling the viewport with vertical=${vertical}`, () => {
+        const body = new TestElement('body');
+        const { reader } = loadReader(body);
+        let scroll = 0;
+        reader.getScrollContext = () => ({ vertical, pageSize: 800, maxScroll: 1600 });
+        reader.getPagePosition = () => scroll;
+        const before = new TestText('前');
+        const after = new TestText('後');
+        const crossing = new TestText('甲𠮷乙');
+        let outsideReads = 0;
+        for (const [node, position] of [[before, 20], [after, 1000]]) {
+            Object.defineProperty(node, 'rects', { get() {
+                outsideReads++;
+                return [testRect(position - scroll, position + 20 - scroll, position - scroll, position + 20 - scroll)];
+            } });
+            body.appendChild(node);
+        }
+        // DOM order need not match geometric order; both sides must be counted.
+        body.appendChild(crossing);
+        crossing.rangeRects = (start, end) => [[0, 740], [1, 780], [3, 840]]
+            .filter(([offset]) => offset >= start && offset < end)
+            .map(([, position]) => testRect(position - scroll, position + 20 - scroll, position - scroll, position + 20 - scroll));
+        reader.buildPaginationMetrics();
+        outsideReads = 0;
+        scroll = 800;
+
+        assert.equal(reader.calculateProgress(), 3 / 5);
+        assert.equal(outsideReads, 0, 'only crossing text needs character geometry');
     });
 }
 
@@ -853,7 +949,7 @@ test('paginated restoreProgress at chapter start avoids eager pagination metrics
     };
     reader.buildPaginationMetrics = () => {
         builtMetrics += 1;
-        return { minScroll: 800, maxScroll: 3200, totalChars: 1, progressStops: [] };
+        return { minScroll: 800, maxScroll: 3200, totalChars: 1, textRanges: [] };
     };
 
     await reader.restoreProgress(0);
@@ -1172,7 +1268,7 @@ test('paginated forward navigation reaches final partial page', () => {
         pageSize: 800,
         maxScroll: 3450,
     });
-    reader.paginationMetrics = { minScroll: 0, maxScroll: 3450, totalChars: 1, progressStops: [] };
+    reader.paginationMetrics = { minScroll: 0, maxScroll: 3450, totalChars: 1, textRanges: [] };
     reader.refreshSasayakiCuePresentation = () => {};
 
     const result = reader.paginate('forward');
@@ -1180,6 +1276,34 @@ test('paginated forward navigation reaches final partial page', () => {
     assert.equal(result, 'scrolled');
     assert.equal(body.scrollTop, 3450);
 });
+
+for (const sourceUrl of [readerPaginatedUrl, readerContinuousUrl]) {
+    test(`native page turn returns progress in the same call (${sourceUrl.pathname.split('/').pop()})`, () => {
+        const body = new TestElement('body');
+        body.scrollTop = 0;
+        for (const [text, top] of [['甲乙', 40], ['丙丁', 840]]) {
+            const node = new TestText(text);
+            Object.defineProperty(node, 'rects', { get: () => [testRect(top - body.scrollTop, top + 40 - body.scrollTop)] });
+            body.appendChild(node);
+        }
+        body.scrollBy = delta => { body.scrollTop = Math.max(0, Math.min(800, body.scrollTop + delta.top)); };
+        const { reader } = loadReader(body, sourceUrl, { writingMode: 'horizontal-tb' });
+        reader.getScrollContext = () => ({ vertical: true, scrollEl: body, pageSize: 800, maxScroll: 800 });
+        if (sourceUrl === readerPaginatedUrl) reader.buildPaginationMetrics();
+        reader.refreshSasayakiCuePresentation = () => {};
+
+        assert.equal(reader.paginateWithProgress('forward'), 0.5);
+        assert.equal(body.scrollTop, 800);
+        assert.equal(reader.paginateWithProgress('backward'), 0);
+        assert.equal(body.scrollTop, 0);
+        reader.calculateProgress = () => assert.fail('rejected navigation must not scan progress');
+        assert.equal(reader.paginateWithProgress('backward'), 'limit');
+        if (sourceUrl === readerPaginatedUrl) {
+            reader.nativeSelectionActive = true;
+            assert.equal(reader.paginateWithProgress('forward'), 'blocked');
+        }
+    });
+}
 
 test('paginated backward navigation leaves final partial page by one page', () => {
     const body = new TestElement('body');
@@ -1191,7 +1315,7 @@ test('paginated backward navigation leaves final partial page by one page', () =
         pageSize: 800,
         maxScroll: 3450,
     });
-    reader.paginationMetrics = { minScroll: 0, maxScroll: 3450, totalChars: 1, progressStops: [] };
+    reader.paginationMetrics = { minScroll: 0, maxScroll: 3450, totalChars: 1, textRanges: [] };
     reader.refreshSasayakiCuePresentation = () => {};
 
     const result = reader.paginate('backward');
@@ -1289,6 +1413,49 @@ test('Sasayaki highlight applies active DOM state without CSS Highlight API', ()
         assert.equal(wrapper.textContent, '蒸し暑い');
         assert.equal(cssHighlightSetCount, 0);
     }
+});
+
+test('paragraph following never installs a missing cue or changes the running animation', () => {
+    const body = new TestElement('body');
+    body.appendChild(new TestText('前半後半'));
+    const { reader, window } = loadReader(body);
+    reader.isEInkMode = () => false;
+    reader.applySasayakiCues([{ id: 'first', start: 0, length: 2 }]);
+    window.hoshiParagraph.enabled = true;
+    window.hoshiParagraph.finishTextAnimation = () => { throw new Error('following ended animation'); };
+    window.hoshiParagraph.animatePage = () => { throw new Error('following restarted animation'); };
+    reader.collectSasayakiCueRanges = () => { throw new Error('following modified chapter cue targets'); };
+    reader.highlightSasayakiCue('first', false);
+    const missing = { id: 'late', start: 2, length: 2 };
+    assert.equal(reader.sasayakiCueTargetScroll(missing), null);
+    assert.equal(reader.highlightSasayakiCue(missing, true), null);
+    assert.deepEqual([...reader.cueWrappers.keys()], ['first']);
+});
+
+test('paragraph appearance refresh leaves cue installation to document setup', () => {
+    const body = new TestElement('body');
+    body.appendChild(new TestText('前半後半'));
+    const { reader, window } = loadReader(body);
+    window.hoshiParagraph.enabled = true;
+    reader.isEInkMode = () => true;
+    reader.applySasayakiCues([{ id: 'first', start: 0, length: 2 }, { id: 'last', start: 2, length: 2 }]);
+    reader.isEInkMode = () => false;
+    reader.prepareSasayakiInlineTargets = () => { throw new Error('appearance refresh rewrote chapter DOM'); };
+    reader.refreshSasayakiCuePresentation();
+    assert.equal(body.textContent, '前半後半');
+    assert.equal(reader.cueWrappers.size, 0);
+});
+
+test('unmatched chapter cues do not repeatedly cancel paragraph animation on appearance refresh', () => {
+    const body = new TestElement('body');
+    body.appendChild(new TestText('本文'));
+    const { reader, window } = loadReader(body);
+    window.hoshiParagraph.enabled = true;
+    reader.isEInkMode = () => false;
+    reader.applySasayakiCues([{ id: 'unmatched', start: 100, length: 2 }]);
+    window.hoshiParagraph.finishTextAnimation = () => { throw new Error('refresh ended animation'); };
+    reader.refreshSasayakiCuePresentation();
+    assert.equal(reader.cueWrappers.size, 0);
 });
 
 test('non e-ink Sasayaki chapter load keeps iOS-style wrappers without e-ink geometry', () => {

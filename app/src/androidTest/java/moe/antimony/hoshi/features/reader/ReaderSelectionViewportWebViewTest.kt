@@ -66,10 +66,15 @@ class ReaderSelectionViewportWebViewTest {
     }
 
     @Test
-    fun draggingRubyHandleKeepsSelectionWithinDraggedText() {
+    fun draggingRubyHandleKeepsSelectionWithinDraggedText() = checkRubyHandleDrag(false)
+
+    @Test
+    fun draggingRubyHandleInParagraphModeKeepsSelectionWithinDraggedText() = checkRubyHandleDrag(true)
+
+    private fun checkRubyHandleDrag(paragraph: Boolean) {
         val webView = createWebView()
         try {
-            loadFixture(webView, vertical = true)
+            loadFixture(webView, vertical = true, paragraph = paragraph)
             val tail = JSONObject(evaluate(webView, "document.getElementById('tail').getBoundingClientRect().toJSON()"))
             val position = evaluate(webView, "hoshiReader.getPagePosition(hoshiReader.getScrollContext())").toDouble()
             val location = IntArray(2)
@@ -698,13 +703,13 @@ class ReaderSelectionViewportWebViewTest {
         return webView
     }
 
-    private fun loadFixture(webView: HoshiReaderWebView, vertical: Boolean, plain: Boolean = false, crossParagraph: Boolean = false, rubyBoundary: Boolean = false, fontSize: Int = 27) {
+    private fun loadFixture(webView: HoshiReaderWebView, vertical: Boolean, plain: Boolean = false, crossParagraph: Boolean = false, rubyBoundary: Boolean = false, fontSize: Int = 27, paragraph: Boolean = false) {
         val assets = ReaderWebAssets.load(instrumentation.targetContext)
         val loaded = CountDownLatch(1)
         instrumentation.runOnMainSync {
             webView.prepareForDocument("selection-$vertical")
             webView.tag = "selection-$vertical"
-            val settings = ReaderSettings(verticalWriting = vertical, fontSize = fontSize)
+            val settings = ReaderSettings(verticalWriting = vertical, fontSize = fontSize, paragraphMode = paragraph)
             val density = webView.resources.displayMetrics.density
             val viewport = readerViewportCssLayout(settings,
                 (webView.width / density).toInt(), (webView.height / density).toInt()).cssVariables()

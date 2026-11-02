@@ -96,7 +96,9 @@ internal fun ChapterWebView(
     readerSettings: ReaderSettings,
     chapterHighlightsJson: String?,
     chapterSasayakiCuesJson: String?,
-    preserveSasayakiCueLayout: Boolean = false,
+    chapterCuesReady: Boolean = true,
+    onNavigatePage: (ReaderNavigationDirection) -> Boolean,
+    onPageCuesReady: (WebView) -> Unit,
     sasayakiTextColor: Long,
     sasayakiBackgroundColor: Long,
     onTextSelected: (ReaderSelectionData, selectionRects: (Int, (List<ReaderSelectionRect>) -> Unit) -> Unit) -> Unit,
@@ -115,6 +117,9 @@ internal fun ChapterWebView(
     onBeforeRestoreVisible: (WebView) -> ReaderRestoreBeforeVisibleAction? = { null },
     modifier: Modifier = Modifier,
 ) {
+    val currentOnNavigatePage = rememberUpdatedState(onNavigatePage)
+    val currentOnPageCuesReady = rememberUpdatedState(onPageCuesReady)
+    val currentChapterCues = rememberUpdatedState(if (chapterCuesReady) chapterSasayakiCuesJson ?: "[]" else null)
     val currentOnRendererTerminated = rememberUpdatedState(onRendererTerminated)
     val currentOnTextSelected = rememberUpdatedState(onTextSelected)
     val currentOnSaveBookmark = rememberUpdatedState(onSaveBookmark)
@@ -257,12 +262,16 @@ internal fun ChapterWebView(
             beforeVisible = currentOnBeforeRestoreVisible.value(restoredWebView),
         )
     }
-    LaunchedEffect(readerWebView, restoreToken, chapterSasayakiCuesJson, preserveSasayakiCueLayout, isWebViewRestoring) {
+    LaunchedEffect(readerWebView, restoreToken, chapterSasayakiCuesJson, chapterCuesReady, isWebViewRestoring) {
         val webView = readerWebView ?: return@LaunchedEffect
-        val cuesJson = chapterSasayakiCuesJson ?: return@LaunchedEffect
-        if (isWebViewRestoring) return@LaunchedEffect
+        val cuesJson = chapterSasayakiCuesJson ?: "[]"
+        if (isWebViewRestoring || !chapterCuesReady) return@LaunchedEffect
         if (webView.tag != restoreToken) return@LaunchedEffect
-        webView.applyReaderSasayakiCues(restoreToken, cuesJson, preserveSasayakiCueLayout)
+        webView.applyReaderSasayakiCues(restoreToken, cuesJson) {
+            if (webView.tag == restoreToken && !currentIsWebViewRestoring.value && currentChapterCues.value == cuesJson) {
+                currentOnPageCuesReady.value(webView)
+            }
+        }
     }
     val handleRendererTerminated: (WebView) -> Unit = { view ->
         val readerView = view as HoshiReaderWebView
@@ -340,6 +349,7 @@ internal fun ChapterWebView(
                     val selectionResult = ReaderSelectionResult.fromWebViewResult(result)
                     when {
                         selectionResult.isImageTap || selectionResult.isLinkTap -> Unit
+                        selectionResult.isTextTap -> currentOnClearLookupPopup.value()
                         selectionResult.selectedNothing -> onBlankTap()
                     }
                 }
@@ -426,7 +436,6 @@ internal fun ChapterWebView(
                     }
                 }
                 ReaderViewMode.Paginated,
-                ReaderViewMode.VisualNovel,
                 -> {
                     continuousScrollProgressScheduler.reset(webView::removeCallbacks)
                     readerPendingProgressSaveCallbacks.remove(webView)?.let(webView::removeCallbacks)
@@ -441,16 +450,10 @@ internal fun ChapterWebView(
 
                             override fun onTap(x: Float, y: Float) {
                                 selectAt(x, y) {
-                                    if (readerSettings.viewMode == ReaderViewMode.VisualNovel && readerSettings.visualNovelClickAdvance) {
+                                    if (readerSettings.viewMode == ReaderViewMode.Paginated && readerSettings.paragraphMode && readerSettings.paragraphClickAdvance) {
                                         currentOnReaderInteraction.value()
                                         currentOnClearLookupPopup.value()
-                                        webView.navigatePageForDirection(
-                                            direction = ReaderNavigationDirection.Forward,
-                                            onNextChapter = currentOnNextChapter.value,
-                                            onPreviousChapter = currentOnPreviousChapter.value,
-                                            onDisplayedProgress = currentOnDisplayProgress.value,
-                                            onSaveProgress = currentOnSaveBookmark.value,
-                                        )
+                                        currentOnNavigatePage.value(ReaderNavigationDirection.Forward)
                                     } else {
                                         currentOnReaderTapOutside.value()
                                     }
@@ -464,13 +467,7 @@ internal fun ChapterWebView(
                                     isVerticalWriting = readerSettings.verticalWriting,
                                     swipeDirection = ReaderSwipeDirection.Left,
                                 )
-                                webView.navigatePageForDirection(
-                                    direction = direction,
-                                    onNextChapter = currentOnNextChapter.value,
-                                    onPreviousChapter = currentOnPreviousChapter.value,
-                                    onDisplayedProgress = currentOnDisplayProgress.value,
-                                    onSaveProgress = currentOnSaveBookmark.value,
-                                )
+                                currentOnNavigatePage.value(direction)
                             }
 
                             override fun onRightSwipe() {
@@ -480,20 +477,14 @@ internal fun ChapterWebView(
                                     isVerticalWriting = readerSettings.verticalWriting,
                                     swipeDirection = ReaderSwipeDirection.Right,
                                 )
-                                webView.navigatePageForDirection(
-                                    direction = direction,
-                                    onNextChapter = currentOnNextChapter.value,
-                                    onPreviousChapter = currentOnPreviousChapter.value,
-                                    onDisplayedProgress = currentOnDisplayProgress.value,
-                                    onSaveProgress = currentOnSaveBookmark.value,
-                                )
+                                currentOnNavigatePage.value(direction)
                             }
                         }
                     }
                 }
             }
             webView.evaluateJavascript(readerAppearanceScript, null)
-            if (!readerWebViewReadyToLoad(webViewViewportSize)) return@AndroidView
+            if (!readerWebViewReadyToLoad(webViewViewportSize) || !chapterCuesReady) return@AndroidView
             if (webView.tag != restoreToken) {
                 if (!currentIsWebViewRestoring.value) {
                     currentOnRestoreStarted.value()
@@ -575,7 +566,8 @@ internal data class ReaderAppearanceUpdateKey(
     val eInkLineColorCss: String,
     val eInkModeCss: String,
     val verticalWritingCss: String,
-    val visualNovelRevealSpeed: Int,
+    val textAnimation: Boolean,
+    val textSpeed: Int,
     val sasayakiTextColorCss: String,
     val sasayakiBackgroundColorCss: String,
 )
@@ -592,7 +584,8 @@ internal fun readerAppearanceUpdateKey(
         eInkLineColorCss = if (settings.usesDarkInterface(systemDark)) "#fff" else "#000",
         eInkModeCss = if (settings.eInkMode) "1" else "0",
         verticalWritingCss = if (settings.verticalWriting) "1" else "0",
-        visualNovelRevealSpeed = settings.visualNovelRevealSpeed.coerceIn(0, 120),
+        textAnimation = settings.textAnimation,
+        textSpeed = settings.textSpeed.coerceParagraphTextSpeed(),
         sasayakiTextColorCss = sasayakiTextColor.toReaderCssColor(),
         sasayakiBackgroundColorCss = sasayakiBackgroundColor.toReaderCssColor(includeAlpha = true),
     )
@@ -1270,7 +1263,8 @@ private fun readerAppearanceScript(
     val eInkLineColor = readerJavaScriptStringLiteral(appearanceUpdateKey.eInkLineColorCss)
     val eInkMode = readerJavaScriptStringLiteral(appearanceUpdateKey.eInkModeCss)
     val verticalWriting = readerJavaScriptStringLiteral(appearanceUpdateKey.verticalWritingCss)
-    val visualNovelRevealSpeed = appearanceUpdateKey.visualNovelRevealSpeed
+    val textAnimation = appearanceUpdateKey.textAnimation
+    val textSpeed = appearanceUpdateKey.textSpeed
     val sasayakiText = readerJavaScriptStringLiteral(appearanceUpdateKey.sasayakiTextColorCss)
     val sasayakiBackground = readerJavaScriptStringLiteral(appearanceUpdateKey.sasayakiBackgroundColorCss)
     return """
@@ -1281,7 +1275,7 @@ private fun readerAppearanceScript(
           document.documentElement.style.setProperty('--hoshi-reader-eink-mode', $eInkMode);
           document.documentElement.dataset.hoshiReaderEinkMode = $eInkMode === '1' ? 'true' : 'false';
           document.documentElement.style.setProperty('--hoshi-reader-vertical-writing', $verticalWriting);
-          window.hoshiReader?.setRevealSpeed?.($visualNovelRevealSpeed);
+          window.hoshiParagraph?.configureAnimation($textAnimation, $textSpeed);
           document.documentElement.style.setProperty('--hoshi-sasayaki-text-color', $sasayakiText);
           document.documentElement.style.setProperty('--hoshi-sasayaki-background-color', $sasayakiBackground);
           window.hoshiReader?.refreshSasayakiCuePresentation?.();
@@ -1321,39 +1315,31 @@ internal fun WebView.navigatePage(
     onLimit: () -> Boolean,
     onDisplayedProgress: (progress: Double) -> Unit,
     onSaveProgress: (progress: Double) -> Unit,
+    onTurnAccepted: () -> Unit = {},
+    onTurnCompleted: () -> Unit = {},
 ) {
+    val documentToken = tag
+    val requestId = nextReaderPageTurnProgressRequestId()
+    readerPageTurnProgressRequestIds[this] = requestId
     evaluateJavascript(ReaderPaginationScripts.paginateInvocation(direction)) { result ->
-        when (ReaderPaginationScripts.navigationResult(result)) {
+        if (tag != documentToken) return@evaluateJavascript
+        val navigationResult = ReaderPaginationScripts.navigationResult(result)
+        // A later blocked/limit request cannot undo an actual turn's audio pause.
+        if (navigationResult == ReaderNavigationResult.Advanced) onTurnAccepted()
+        if (readerPageTurnProgressRequestIds[this] != requestId) return@evaluateJavascript
+        readerPageTurnProgressRequestIds.remove(this)
+        when (navigationResult) {
             ReaderNavigationResult.Advanced -> {
-                val webView = this
-                val requestId = nextReaderPageTurnProgressRequestId()
-                readerPageTurnProgressRequestIds[webView] = requestId
-                webView.postVisualStateCallback(
-                    requestId,
-                    object : WebView.VisualStateCallback() {
-                        override fun onComplete(requestId: Long) {
-                            if (readerPageTurnProgressRequestIds[webView] != requestId) return
-                            webView.postOnAnimation {
-                                webView.evaluateJavascript(ReaderPaginationScripts.progressInvocation()) { progressResult ->
-                                    if (readerPageTurnProgressRequestIds[webView] != requestId) return@evaluateJavascript
-                                    readerPageTurnProgressRequestIds.remove(webView)
-                                    val progress = ReaderPaginationScripts.doubleResult(progressResult) ?: return@evaluateJavascript
-                                    onDisplayedProgress(progress)
-                                    when (readerProgressPersistenceAction(ReaderProgressPersistenceEvent.PaginatedPageTurnCompleted)) {
-                                        ReaderProgressPersistenceAction.DisplayOnly -> Unit
-                                        ReaderProgressPersistenceAction.SaveBookmark -> onSaveProgress(progress)
-                                    }
-                                }
-                            }
-                        }
-                    },
-                )
+                val progress = ReaderPaginationScripts.doubleResult(result) ?: return@evaluateJavascript
+                onTurnCompleted()
+                onDisplayedProgress(progress)
+                when (readerProgressPersistenceAction(ReaderProgressPersistenceEvent.PaginatedPageTurnCompleted)) {
+                    ReaderProgressPersistenceAction.DisplayOnly -> Unit
+                    ReaderProgressPersistenceAction.SaveBookmark -> onSaveProgress(progress)
+                }
             }
-            ReaderNavigationResult.Revealed, ReaderNavigationResult.Blocked -> {
-                readerPageTurnProgressRequestIds.remove(this)
-            }
+            ReaderNavigationResult.Blocked -> Unit
             ReaderNavigationResult.Limit -> {
-                readerPageTurnProgressRequestIds.remove(this)
                 onLimit()
             }
         }
@@ -1363,20 +1349,6 @@ internal fun WebView.navigatePage(
 private fun nextReaderPageTurnProgressRequestId(): Long {
     readerPageTurnProgressRequestId += 1
     return readerPageTurnProgressRequestId
-}
-
-private fun WebView.navigatePageForDirection(
-    direction: ReaderNavigationDirection,
-    onNextChapter: () -> Boolean,
-    onPreviousChapter: () -> Boolean,
-    onDisplayedProgress: (progress: Double) -> Unit,
-    onSaveProgress: (progress: Double) -> Unit,
-) {
-    val onLimit = when (direction) {
-        ReaderNavigationDirection.Forward -> onNextChapter
-        ReaderNavigationDirection.Backward -> onPreviousChapter
-    }
-    navigatePage(direction, onLimit, onDisplayedProgress, onSaveProgress)
 }
 
 internal fun WebView.flushPendingProgressSave() {
@@ -1684,11 +1656,11 @@ private fun WebView.evaluateReaderSetupScript(
     evaluateJavascript(source, null)
 }
 
-private fun WebView.applyReaderSasayakiCues(loadKey: String, cuesJson: String, preserveLayout: Boolean) {
-    val appliedCues = ReaderAppliedSasayakiCues(loadKey, cuesJson, preserveLayout)
-    if (readerAppliedSasayakiCues[this] == appliedCues) return
+private fun WebView.applyReaderSasayakiCues(loadKey: String, cuesJson: String, onReady: () -> Unit) {
+    val appliedCues = ReaderAppliedSasayakiCues(loadKey, cuesJson)
+    if (readerAppliedSasayakiCues[this] == appliedCues) { onReady(); return }
     readerAppliedSasayakiCues[this] = appliedCues
-    evaluateJavascript(ReaderPaginationScripts.applySasayakiCuesInvocation(cuesJson, preserveLayout), null)
+    evaluateJavascript(ReaderPaginationScripts.applySasayakiCuesInvocation(cuesJson)) { onReady() }
 }
 
 private fun releaseReaderWebView(webView: HoshiReaderWebView) {
@@ -1705,6 +1677,7 @@ private fun releaseReaderWebView(webView: HoshiReaderWebView) {
     webView.removeJavascriptInterface("HoshiTextSelection")
     webView.removeJavascriptInterface("HoshiReaderRestore")
     webView.removeJavascriptInterface("HoshiReaderImage")
+    webView.evaluateJavascript("window.hoshiParagraph?.finishTextAnimation()", null)
     webView.stopLoading()
     (webView.parent as? ViewGroup)?.removeView(webView)
     webView.destroy()
@@ -1713,7 +1686,6 @@ private fun releaseReaderWebView(webView: HoshiReaderWebView) {
 private data class ReaderAppliedSasayakiCues(
     val loadKey: String,
     val cuesJson: String,
-    val preserveLayout: Boolean,
 )
 
 private val readerRestoreGenerations = WeakHashMap<WebView, Long>()

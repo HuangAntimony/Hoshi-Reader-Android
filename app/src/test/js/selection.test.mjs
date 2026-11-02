@@ -373,100 +373,6 @@ test('shared selection can preserve reader link and image tap tokens', () => {
     assert.equal(selection.imageTapResult(), 'image');
 });
 
-test('shared selection reads semantic text while keeping projected visible ranges', () => {
-    const sourceText = '現在激しい抵抗を見せていた。';
-    const { document, selection, textNode: sourceNode, window } = loadSelection(sourceText);
-    const renderedNode = {
-        nodeType: 3,
-        textContent: '激',
-        parentElement: null,
-    };
-    let projectedRanges = null;
-    let posted = null;
-    document.pointElement = hitElement([]);
-    window.getSelection = () => null;
-    selection.getCharacterAtPoint = () => ({ node: renderedNode, offset: 0 });
-    selection.postTextSelected = (payload) => {
-        posted = payload;
-    };
-    selection.configure({
-        textProjection: {
-            toSemanticHit(renderedHit) {
-                assert.equal(renderedHit.node, renderedNode);
-                return { node: sourceNode, offset: sourceText.indexOf('激') };
-            },
-            normalizedOffsetForHit() {
-                return 314;
-            },
-            visibleRangesForSemanticRanges(ranges) {
-                projectedRanges = ranges;
-                return [{ node: renderedNode, start: 0, end: 1 }];
-            },
-        },
-    });
-    window.scanNonJapaneseText = false;
-
-    const selected = selection.selectText(1, 1, 80);
-
-    assert.equal(selected, '激しい抵抗を見せていた');
-    assert.equal(posted.text, '激しい抵抗を見せていた');
-    assert.equal(posted.sentence, sourceText);
-    assert.equal(posted.sentenceOffset, sourceText.indexOf('激'));
-    assert.equal(posted.normalizedOffset, 314);
-    assert.equal(projectedRanges.length, 1);
-    assert.equal(projectedRanges[0].node, sourceNode);
-    assert.equal(selection.selection.ranges[0].node, renderedNode);
-});
-
-test('shared selection fails closed when a configured text projection cannot map the hit', () => {
-    const { document, selection, textNode, window } = loadSelection('激');
-    document.pointElement = hitElement([]);
-    window.getSelection = () => null;
-    selection.getCharacterAtPoint = () => ({ node: textNode, offset: 0 });
-    selection.configure({
-        textProjection: {
-            toSemanticHit() {
-                return null;
-            },
-        },
-    });
-    window.scanNonJapaneseText = false;
-
-    assert.equal(selection.selectText(1, 1, 80), null);
-    assert.equal(selection.selection, null);
-});
-
-test('english selection can start before the visible clone fragment and continue in source text', () => {
-    const sourceText = 'A difficult resistance.';
-    const { document, selection, textNode: sourceNode, window } = loadSelection(sourceText);
-    const renderedNode = {
-        nodeType: 3,
-        textContent: 'A diff',
-        parentElement: null,
-    };
-    document.pointElement = hitElement([]);
-    window.getSelection = () => null;
-    selection.getCharacterAtPoint = () => ({ node: renderedNode, offset: 5 });
-    selection.configure({
-        language: 'en',
-        textProjection: {
-            toSemanticHit() {
-                return { node: sourceNode, offset: 5 };
-            },
-            normalizedOffsetForHit() {
-                return 5;
-            },
-            visibleRangesForSemanticRanges() {
-                return [{ node: renderedNode, start: 2, end: 6 }];
-            },
-        },
-    });
-
-    assert.equal(selection.selectText(1, 1, 80), 'difficult resistance');
-    assert.equal(selection.selection.startOffset, 2);
-    assert.equal(selection.selection.ranges[0].node, renderedNode);
-});
-
 test('shared selection treats missing language policy as a no-scan boundary', () => {
     const selection = loadSharedSelectionWithoutPolicy();
 
@@ -828,23 +734,6 @@ test('Toggle setup marks only annotated ruby and other modes leave reveal marker
 });
 
 
-test('VN reveal also updates source ruby group so clones retain reveal on return', () => {
-    const { document, selection, window } = loadSelection('日本語。');
-    window.getSelection = () => null;
-    const clones = rubyGroupFixture();
-    const sources = rubyGroupFixture();
-    selection.configure({ textProjection: {
-        sourceRubyForRenderedRuby: (ruby) => sources[clones.indexOf(ruby)],
-    } });
-    document.pointElement = clones[2];
-    assert.equal(selection.selectText(10, 10, 16), 'furigana');
-    for (const index of [0, 2, 3]) {
-        assert.equal(clones[index].classList.contains('furigana-hidden'), false);
-        assert.equal(sources[index].classList.contains('furigana-hidden'), false);
-    }
-    assert.equal(sources[5].classList.contains('furigana-hidden'), true);
-});
-
 test('ruby reveal stops at styled siblings and non-ASCII whitespace as in iOS', () => {
     const { selection } = loadSelection('日本語。');
     for (const separator of [{ nodeType: 1, localName: 'span' }, { nodeType: 3, nodeValue: '\u00a0' }]) {
@@ -858,26 +747,6 @@ test('ruby reveal stops at styled siblings and non-ASCII whitespace as in iOS', 
         assert.equal(nodes[2].classList.contains('furigana-hidden'), false);
     }
 });
-
-test('native pronunciation selection uses full source sentence and excludes ruby annotations', () => {
-    const { selection, textNode, window } = loadSelection('東京へ行きました。');
-    const source = { node: textNode, offset: 0 };
-    selection.configure({ textProjection: {
-        toSemanticHit: () => source,
-        normalizedOffsetForHit: () => 42,
-    }});
-    window.getSelection = () => ({ rangeCount: 1, getRangeAt: () => ({
-        collapsed: false, startContainer: textNode, startOffset: 0,
-        endContainer: textNode, endOffset: 2, commonAncestorContainer: textNode,
-        comparePoint: () => 0, intersectsNode: node => node === textNode,
-        getBoundingClientRect: () => ({ x: 0, y: 0, width: 10, height: 20 }),
-    }) });
-    const result = selection.nativeSelectionContext();
-    assert.equal(result.text, '東京');
-    assert.equal(result.sentence, '東京へ行きました。');
-    assert.equal(result.normalizedOffset, 42);
-});
-
 
 test('native selection locks the reader before notifying Android, independent of menu visibility', () => {
     const { selection, window, changeNativeSelection } = loadSelection('本文');
