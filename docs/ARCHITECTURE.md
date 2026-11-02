@@ -77,6 +77,8 @@ Names without an extension are searchable types, not necessarily filenames.
   Reader behavior, theme/E-ink, statistics goals and TTS preferences are global.
   `ReaderSettingsRepository` combines display and profile reading state;
   `ReaderSettingsHostViewModel` gates both Activity hosts on confirmed settings.
+  Statistics reads the repository's dedicated global reset-time flow, without
+  loading profile appearance or display settings for each book/session operation.
 - Controls submit field transformations against the latest repository state.
   TTS/Sasayaki repositories apply them to the latest state inside DataStore edits.
   Reader profile writes capture the target profile before suspension and keep
@@ -160,12 +162,16 @@ Validation guidance and failure injection methods are in
   Book discovery rechecks each directory and completes its legacy metadata/EPUB
   migration under the same storage lock; an earlier directory snapshot must not
   recreate or return a book that has since been deleted.
+  Directory ordering snapshots modification times before sorting; comparators
+  must not reread timestamps that concurrent sidecar writes can change.
 - Bookshelf loading reuses the migrated `BookEntry` snapshot for shelf membership
   instead of rereading every book's metadata. `SyncStorage.prepareLibrary` prepares
   only missing live bookkeeping and checks empty archives; live-book sessions are loaded/migrated
   when needed by sync/statistics, not eagerly under the startup storage lock.
   A live directory with a deleted sync record is marked pending during preparation
   so the next sync reapplies its state even when the remote version is cached.
+  Sync directory lookup checks the normalized exact path first, enumerating the
+  library only for legacy Unicode-equivalent names that need fallback resolution.
 - Shelf identity uses NFC (`syncKey`): trim new name input, then use the canonical
   name for duplicate checks, creation, rename, move targets and published UI state.
   Existing identity lookups normalize without trimming stored names.
@@ -175,6 +181,8 @@ Validation guidance and failure injection methods are in
   shelf load. Background reloads cannot clear or replace that progress; local/sync
   notifications during import are coalesced into the final refresh, with changes
   arriving during that load refreshed afterward. Cloud transfers continue normally.
+  A final shelf-load failure is reported as a shelf refresh error independently
+  of per-book import results.
 - Bookshelf progress and read/unread capabilities come from `BookRepository`'s
   persisted reading state, including cached bookinfo on cloud placeholders.
   Corrupt statistics leave other shelf state available with diagnostics; resets
@@ -184,6 +192,15 @@ Validation guidance and failure injection methods are in
   through `BookStatisticsStore` under the shared storage lock; once writes begin,
   both sidecars finish across caller cancellation. Shelf reloads and progress
   refreshes publish updated action availability together with progress.
+  Opening updates cached recency immediately. Returning refreshes only that
+  book's metadata, reading state and cover after joining registered Reader saves;
+  return results are versioned per book, so opening another book does not discard
+  a pending update. Reopening the same book rejects its older snapshot, and
+  concurrent full loads wait for all pending return reads before superseding them.
+  Sync changes received during Reader remain dirty and trigger a full load after the single
+  book is published. Local and remote load generations are independent, so a
+  Reader round trip does not discard pending remote results. Stored sort
+  preferences reorder the loaded snapshot without another library read.
 - `BookStatisticsStore` is the shared owner for reader sessions, edits, sync and
   archive/restore. UUID-keyed nullable records retain deletions; daily totals
   derive from sessions and reset time. `Books/statistics_archive/` participates

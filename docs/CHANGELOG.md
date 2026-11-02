@@ -38,6 +38,8 @@ Release notes before v1.3.0 are in [CHANGELOG_ARCHIVE.md](CHANGELOG_ARCHIVE.md).
 
 ### Fixed
 
+- Refresh a book's recent-reading order and progress promptly when returning to the bookshelf, including quick switches between books, and reduce loading delays for large libraries.
+- Prevent intermittent bookshelf sorting errors after successful EPUB imports, and distinguish refresh failures from import failures.
 - Prevent book styles from shrinking the reading area in paginated and continuous modes.
 - Keep book assignments intact by correctly detecting duplicate shelf names during creation and renaming.
 - Reduce chapter loading delays by processing large publisher stylesheets faster, avoiding initial layout work before reader styles are ready, speeding up pagination in chapters with extensive ruby annotations.

@@ -57,10 +57,11 @@ internal interface BookshelfRepository {
         sortOption: BookSortOption,
         onLegacyBookMigrationProgress: (LegacyBookMigrationProgress) -> Unit = {},
     ): BookshelfLoadResult
+    suspend fun loadBook(entry: BookEntry): BookshelfBookSnapshot?
     suspend fun loadBookReadingStates(entries: List<BookEntry>): Map<String, BookReadingState>
     suspend fun syncLibrary()
     suspend fun loadRemoteBooks(localEntries: List<BookEntry>): RemoteBookshelfLoadResult
-    suspend fun openBook(entry: BookEntry): String
+    suspend fun openBook(entry: BookEntry): BookEntry
     suspend fun downloadBook(entry: BookEntry, onProgress: (Double) -> Unit)
     suspend fun importBook(uri: Uri): String
     suspend fun exportBook(entry: BookEntry, uri: Uri)
@@ -135,6 +136,10 @@ internal class AndroidBookshelfRepository @Inject constructor(
         )
     }
 
+    override suspend fun loadBook(entry: BookEntry): BookshelfBookSnapshot? = withContext(ioDispatcher) {
+        loadBookshelfBookSnapshot(entry, bookRepository)
+    }
+
     override suspend fun loadBookReadingStates(entries: List<BookEntry>): Map<String, BookReadingState> = withContext(ioDispatcher) {
         loadBookReadingStatesById(entries, bookRepository)
     }
@@ -167,13 +172,11 @@ internal class AndroidBookshelfRepository @Inject constructor(
         if (current.epub == null) hoshiSync.downloadBook(current, onProgress)
     }
 
-    override suspend fun openBook(entry: BookEntry): String = withContext(ioDispatcher) {
+    override suspend fun openBook(entry: BookEntry): BookEntry = withContext(ioDispatcher) {
         val metadata = bookRepository.loadMetadata(entry.root) ?: entry.metadata
-        bookRepository.saveMetadata(
-            entry.root,
-            metadata.copy(lastAccess = bookRepository.currentAppleReferenceDateSeconds()),
-        )
-        readerBookId(entry.root)
+        val opened = metadata.copy(lastAccess = bookRepository.currentAppleReferenceDateSeconds())
+        bookRepository.saveMetadata(entry.root, opened)
+        entry.copy(metadata = opened)
     }
 
     override suspend fun importBook(uri: Uri): String = withContext(ioDispatcher) {
@@ -611,6 +614,19 @@ internal suspend fun loadRemoteCoverSources(
 
 private fun moe.antimony.hoshi.features.sync.DriveFile.withIosThumbnailSize(): moe.antimony.hoshi.features.sync.DriveFile =
     copy(thumbnailLink = thumbnailLink?.replace(Regex("""=s\d+$"""), "=s768"))
+
+internal suspend fun loadBookshelfBookSnapshot(
+    entry: BookEntry,
+    bookRepository: BookRepository,
+): BookshelfBookSnapshot? {
+    bookRepository.awaitReaderSaves(entry.root)
+    return bookRepository.storageLock.withLock {
+        val metadata = bookRepository.loadMetadata(entry.root) ?: return@withLock null
+        if (metadata.id != entry.metadata.id) return@withLock null
+        val current = entry.copy(metadata = metadata)
+        BookshelfBookSnapshot(current, bookRepository.loadReadingState(entry.root), bookRepository.coverFile(current)?.toBookCoverSource())
+    }
+}
 
 internal suspend fun loadBookCoverSourcesById(
     entries: List<BookEntry>,

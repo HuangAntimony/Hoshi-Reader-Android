@@ -65,7 +65,7 @@ class BookStatisticsStore private constructor(
         @IoDispatcher ioDispatcher: CoroutineDispatcher,
         settings: ReaderSettingsRepository,
         storageLock: BookStorageLock,
-    ) : this(filesDir, ioDispatcher, { settings.settings.first().statisticsResetMinutes }, storageLock)
+    ) : this(filesDir, ioDispatcher, { settings.statisticsResetMinutes.first() }, storageLock)
 
     constructor(filesDir: File, ioDispatcher: CoroutineDispatcher) : this(filesDir, ioDispatcher, { 0 }, BookStorageLock())
 

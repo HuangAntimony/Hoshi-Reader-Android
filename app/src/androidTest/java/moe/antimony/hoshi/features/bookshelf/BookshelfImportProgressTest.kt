@@ -75,7 +75,7 @@ class BookshelfImportProgressTest {
             initialized = true
             compose.setContent {
                 val state by viewModel.uiState.collectAsState()
-                HoshiReaderTheme(eInkMode = eInk) { ImportFixtureShelf(state) }
+                HoshiReaderTheme(eInkMode = eInk) { BookshelfFixture(state) }
             }
             compose.runOnIdle {
                 viewModel.viewModelScope.launch {
@@ -154,7 +154,7 @@ class BookshelfImportProgressTest {
 }
 
 @androidx.compose.runtime.Composable
-private fun ImportFixtureShelf(state: BookshelfUiState) {
+internal fun BookshelfFixture(state: BookshelfUiState) {
     BooksTab(
         layoutSpec = MainShellLayoutSpec.forWidthDp(400),
         bookEntries = state.bookEntries,

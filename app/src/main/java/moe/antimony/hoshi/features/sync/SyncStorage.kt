@@ -421,7 +421,7 @@ class SyncStorage @Inject constructor(
 
     suspend fun bookDirectory(folder: String, archived: Boolean = false): File = withContext(ioDispatcher) {
         val directory = if (archived) booksDirectory.resolve("statistics_archive") else booksDirectory
-        directory.listFiles().orEmpty().firstOrNull { it.name.syncKey() == folder.syncKey() } ?: directory.resolve(folder)
+        findSyncBookDirectory(directory, folder)
     }
 
     suspend fun resolveBookDirectory(folder: String): File = transaction {
@@ -444,4 +444,12 @@ class SyncStorage @Inject constructor(
     companion object {
         const val DistantPast = -62_135_769_600_000L
     }
+}
+
+internal fun findSyncBookDirectory(directory: File, folder: String): File {
+    val key = folder.syncKey()
+    val exact = directory.resolve(key)
+    return exact.takeIf { it.exists() }
+        ?: directory.listFiles().orEmpty().firstOrNull { it.name.syncKey() == key }
+        ?: exact
 }

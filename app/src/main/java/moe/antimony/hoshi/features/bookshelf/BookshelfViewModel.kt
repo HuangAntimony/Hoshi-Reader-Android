@@ -17,6 +17,7 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -61,6 +62,8 @@ internal class BookshelfViewModel : ViewModel {
         syncReload = SyncReloadScheduler(viewModelScope, { syncStorage.applyReaderState != null }, ::reloadBookEntries)
         viewModelScope.launch {
             syncStorage.booksChanged.collect {
+                libraryRevision += 1
+                libraryReloadRequired = true
                 if (uiState.value.hasLoadedBooks) {
                     if (importInProgress) reloadAfterImport = true else syncReload?.schedule()
                 }
@@ -107,9 +110,61 @@ internal class BookshelfViewModel : ViewModel {
     @Volatile private var importInProgress = false
     private var reloadAfterImport = false
     private var reloadGeneration = 0
+    private var libraryRevision = 0
+    private var libraryReloadRequired = false
+    private var returningBook: BookEntry? = null
+    private val returningBookLoads = mutableSetOf<Deferred<BookshelfBookSnapshot?>>()
+    private val bookRefreshGenerations = mutableMapOf<String, Int>()
+    private var remoteLoadGeneration = 0
     private var remoteLoadJob: Job? = null
     private val remoteImportsInFlight = mutableSetOf<String>()
     private val remoteDeletesInFlight = mutableSetOf<String>()
+
+    fun onBookshelfVisible() {
+        val opened = returningBook
+        if (opened == null || !_uiState.value.hasLoadedBooks || importInProgress) {
+            reloadBookEntries()
+            return
+        }
+        syncReload?.cancel()
+        launchBookshelfOperation {
+            val id = opened.metadata.id
+            val generation = ++reloadGeneration
+            bookRefreshGenerations[id] = generation
+            // Reader exit saves run in application scope. The repository joins them before reading.
+            val load = workScope.async { repository.loadBook(opened) }
+            returningBookLoads += load
+            val snapshot = try {
+                load.await()
+            } finally {
+                returningBookLoads -= load
+            }
+            // Another book can open/return while this book is still saving.
+            // Only a newer refresh of this book or a full load supersedes its snapshot.
+            if (bookRefreshGenerations[id] != generation) return@launchBookshelfOperation
+            bookRefreshGenerations.remove(id)
+            if (returningBook == opened) returningBook = null
+            _uiState.update { state ->
+                val entries = state.bookEntries.mapNotNull { entry ->
+                    if (entry.metadata.id == id) snapshot?.entry else entry
+                }.sortedBooks(state.sortOption)
+                val progress = state.bookProgressById - id + (snapshot?.let { mapOf(id to it.readingState.progress) } ?: emptyMap())
+                val readingStates = state.bookReadingStateById - id + (snapshot?.let { mapOf(id to it.readingState) } ?: emptyMap())
+                val covers = state.coverSourcesById - id + (snapshot?.coverSource?.let { mapOf(id to it) } ?: emptyMap())
+                state.copy(
+                    bookEntries = entries,
+                    bookProgressById = progress,
+                    bookReadingStateById = readingStates,
+                    coverSourcesById = covers,
+                    selectedBookIds = if (snapshot == null) state.selectedBookIds - id else state.selectedBookIds,
+                    canDeleteLocalBookIds = if (snapshot?.entry?.metadata?.epub == null) state.canDeleteLocalBookIds - id else state.canDeleteLocalBookIds,
+                    sections = bookshelfSections(entries, state.shelves, progress, state.showReading, state.sortOption),
+                )
+            }
+            // Sync may have changed other books while Reader suppressed scheduled reloads.
+            if (libraryReloadRequired) reloadBookEntriesSync()
+        }
+    }
 
     fun reloadBookEntries() {
         reloadBookEntries(_uiState.value.sortOption)
@@ -117,12 +172,13 @@ internal class BookshelfViewModel : ViewModel {
 
     fun refreshRemoteBooks() {
         if (!_uiState.value.hasLoadedBooks) return
+        remoteLoadGeneration += 1
         remoteLoadJob?.cancel()
         workScope.launch {
             _uiState.update { it.copy(errorMessage = null) }
             try {
                 repository.syncLibrary()
-                reloadRemoteBookEntries(_uiState.value.bookEntries, reloadGeneration, suppressTransientNetworkErrors = false)
+                reloadRemoteBookEntries(_uiState.value.bookEntries, suppressTransientNetworkErrors = false)
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
@@ -154,9 +210,22 @@ internal class BookshelfViewModel : ViewModel {
             _uiState.update { it.copy(errorMessage = null) }
             try {
                 download?.await()?.getOrThrow()
-                val bookId = repository.openBook(entry)
+                val opened = repository.openBook(entry)
                 if (cloud) reloadBookEntriesSync()
-                _uiState.update { it.copy(openReaderBookId = bookId, openReaderSkipSync = cloud) }
+                returningBook = opened
+                // A load started before this write must not restore the old access time.
+                reloadGeneration += 1
+                bookRefreshGenerations.remove(opened.metadata.id)
+                _uiState.update { state ->
+                    val entries = state.bookEntries.map { if (it.metadata.id == entry.metadata.id) opened else it }
+                        .sortedBooks(state.sortOption)
+                    state.copy(
+                        bookEntries = entries,
+                        sections = bookshelfSections(entries, state.shelves, state.bookProgressById, state.showReading, state.sortOption),
+                        openReaderBookId = opened.metadata.id,
+                        openReaderSkipSync = cloud,
+                    )
+                }
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
@@ -289,7 +358,16 @@ internal class BookshelfViewModel : ViewModel {
             if (reloadAfterImport) {
                 reloadAfterImport = false
                 syncReload?.cancel()
-                reloadBookEntriesSync()
+                try {
+                    reloadBookEntriesSync()
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    val refreshError = UiText.Resource(R.string.bookshelf_update_failed).withErrorDetails(error)
+                    _uiState.update { state ->
+                        state.copy(errorMessage = state.errorMessage?.let { UiText.Joined(listOf(it, refreshError), "\n\n") } ?: refreshError)
+                    }
+                }
             }
         }
     }
@@ -771,15 +849,23 @@ internal class BookshelfViewModel : ViewModel {
     }
 
     private suspend fun reloadBookEntriesSync(sortOption: BookSortOption = _uiState.value.sortOption) {
-        val generation = ++reloadGeneration
-        remoteLoadJob?.cancel()
-        val firstResult = loadBookEntries(sortOption)
-        val result = if (firstResult.settings.sortOption != sortOption) {
-            loadBookEntries(firstResult.settings.sortOption)
-        } else {
-            firstResult
+        // Sorting/sync can request a full load while Reader exit is still saving.
+        // Do not invalidate the single-book refresh and then publish pre-save progress.
+        while (true) {
+            val pending = returningBookLoads.filterNot { it.isCompleted }
+            if (pending.isEmpty()) break
+            pending.joinAll()
         }
+        bookRefreshGenerations.clear()
+        val generation = ++reloadGeneration
+        val revision = libraryRevision
+        libraryReloadRequired = true
+        remoteLoadGeneration += 1
+        remoteLoadJob?.cancel()
+        val loaded = loadBookEntries(sortOption)
+        val result = loaded.copy(entries = loaded.entries.sortedBooks(loaded.settings.sortOption))
         if (generation != reloadGeneration) return
+        libraryReloadRequired = revision != libraryRevision
         _uiState.update {
             val validSelectedIds = it.selectedBookIds.intersect(result.entries.mapTo(mutableSetOf()) { entry -> entry.metadata.id })
             it.copy(
@@ -808,7 +894,7 @@ internal class BookshelfViewModel : ViewModel {
                 blockingProgressMessage = if (importInProgress) it.blockingProgressMessage else null,
             )
         }
-        reloadRemoteBookEntries(result.entries, generation, suppressTransientNetworkErrors = true)
+        reloadRemoteBookEntries(result.entries, suppressTransientNetworkErrors = true)
     }
 
     private suspend fun loadBookEntries(sortOption: BookSortOption): BookshelfLoadResult =
@@ -852,13 +938,14 @@ internal class BookshelfViewModel : ViewModel {
 
     private fun reloadRemoteBookEntries(
         localEntries: List<BookEntry>,
-        generation: Int,
         suppressTransientNetworkErrors: Boolean,
     ) {
+        val generation = ++remoteLoadGeneration
+        remoteLoadJob?.cancel()
         remoteLoadJob = workScope.launch {
             try {
                 val remoteResult = repository.loadRemoteBooks(localEntries)
-                if (generation != reloadGeneration) return@launch
+                if (generation != remoteLoadGeneration) return@launch
                 _uiState.update {
                     it.copy(
                         remoteBookEntries = remoteResult.remoteEntries.sortedRemoteBooks(it.sortOption),
@@ -868,7 +955,7 @@ internal class BookshelfViewModel : ViewModel {
                 }
             } catch (error: Throwable) {
                 if (error is CancellationException) throw error
-                if (generation != reloadGeneration) return@launch
+                if (generation != remoteLoadGeneration) return@launch
                 if (suppressTransientNetworkErrors && error.isTransientDriveNetworkFailure()) return@launch
                 _uiState.update {
                     it.copy(
@@ -953,3 +1040,8 @@ private fun SyncResult.bookshelfMessage(): UiText? =
         is SyncResult.Synced -> UiText.Resource(R.string.bookshelf_already_synced_format, title)
         SyncResult.Skipped -> null
     }
+
+internal fun List<BookEntry>.sortedBooks(sortOption: BookSortOption): List<BookEntry> = when (sortOption) {
+    BookSortOption.Recent -> sortedByDescending { it.metadata.lastAccess }
+    BookSortOption.Title -> sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.displayTitle })
+}

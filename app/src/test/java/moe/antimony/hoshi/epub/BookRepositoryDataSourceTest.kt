@@ -11,6 +11,21 @@ import java.nio.file.Files
 import java.util.zip.ZipFile
 
 class BookRepositoryDataSourceTest {
+    @Test fun directorySortReadsEachTimestampOnlyOnceEvenWhenFilesChange() {
+        val reads = IntArray(80)
+        val directories = (0 until 80).map { index ->
+            object : java.io.File("book-$index") {
+                override fun lastModified(): Long {
+                    reads[index]++
+                    return if (reads[index] == 1) (index % 7).toLong() else 1_000L + index
+                }
+            }
+        }
+        val expected = directories.indices.sortedByDescending { it % 7 }.map(directories::get)
+        assertEquals(expected, sortBookDirectories(directories))
+        assertTrue(reads.all { it == 1 })
+    }
+
     @Test
     fun shelvesUseTheLoadedBookSnapshotAndRefreshOnNextLoad() = runBlocking {
         val filesDir = Files.createTempDirectory("hoshi-shelf-snapshot").toFile()

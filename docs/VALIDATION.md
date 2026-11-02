@@ -295,6 +295,21 @@ Report before/after measurements and scope of the claim. Remove temporary adb
 forwards (`adb -s "$hoshi_serial" forward --remove tcp:9222`) and restore only
 task-owned device changes; keep logs/recordings outside the repository.
 
+`BookshelfLargeLibraryTest` generates 600 isolated book sidecars and private
+settings/profile stores, then measures entry discovery, reading states, covers,
+missing sync-record preparation and an existing-record preparation concurrent
+with loading. Run its explicit class with the data-preserving instrumentation
+procedure above; collect `HoshiShelfPerf` logcat markers. It exercises the real
+settings/statistics/storage owners without accessing the installed library,
+account or network. Fixture generation is excluded, filesystem caches are warm,
+and these repository timings do not establish release Activity cold-start time.
+`BookshelfReaderReturnTest` renders a generated 600-entry shelf in ordinary and
+E-ink modes, waits on a real scratch bookmark save, and checks visible progress
+and recent order without a second whole-library load. Screenshots are written
+to target cache `reader-return-evidence/`; its `HoshiShelfReturn` timing starts
+when the save is released and includes test polling/render assertions, not the
+full Reader navigation or a physical E-ink panel refresh.
+
 For large publisher CSS, run `ReaderCssPerformanceDeviceTest` with the explicit
 instrumentation procedure above. It checks generated stylesheet output and a
 generous latency budget without opening an Activity or accessing user data.

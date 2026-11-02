@@ -43,6 +43,24 @@ class SyncStorageTest {
         shelves = mapOf("Shelf" to Timestamped(100, true)),
     ).let { if (deleted) it.delete() else it }
 
+    @Test fun exactDirectoryLookupDoesNotEnumerateLargeLibrary() {
+        val parent = temporary.newFolder("directory-lookup")
+        val book = parent.resolve("Book").apply { mkdirs() }
+        var listings = 0
+        val counted = object : File(parent.path) {
+            override fun listFiles(): Array<File>? { listings++; return super.listFiles() }
+        }
+        assertEquals(book, findSyncBookDirectory(counted, "Book"))
+        assertEquals(0, listings)
+    }
+
+    @Test fun directoryLookupRetainsUnicodeEquivalentFallback() {
+        val parent = temporary.newFolder("unicode-lookup")
+        val decomposed = parent.resolve("Cafe\u0301").apply { mkdirs() }
+        assertTrue(java.nio.file.Files.isSameFile(decomposed.toPath(), findSyncBookDirectory(parent, "Café").toPath()))
+        assertEquals(parent.resolve("missing"), findSyncBookDirectory(parent, "missing"))
+    }
+
     @Test fun readingBackOurOwnSnapshotDoesNotEraseAPendingHighlightBeforeTheNextEdit() = runBlocking {
         val root = local()
         val a = ReaderHighlight("A", 10, 0, "one", HighlightColor.Yellow, 0.0)

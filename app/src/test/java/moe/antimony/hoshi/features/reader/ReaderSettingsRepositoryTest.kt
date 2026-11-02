@@ -42,6 +42,23 @@ class ReaderSettingsRepositoryTest {
     @get:Rule
     val tempFolder = TemporaryFolder()
 
+    @Test fun statisticsReadsGlobalResetTimeWithoutLoadingDisplayOrProfile() = runBlocking {
+        val root = tempFolder.newFolder("statistics-global")
+        val profiles = ProfileRepository(root)
+        val legacy = FakeLegacyReaderSettingsSource(ReaderSettings(statisticsResetMinutes = 105))
+        repository(legacySource = legacy, profileRepository = profiles,
+            displaySettings = flow { error("statistics must not load display settings") }).use { handle ->
+            val statistics = moe.antimony.hoshi.epub.BookStatisticsStore(
+                root, Dispatchers.IO, handle.repository, moe.antimony.hoshi.epub.BookStorageLock(),
+            )
+            assertFalse(statistics.hasLiveSessions("unread"))
+            assertEquals(105, statistics.resetMinutes())
+            handle.editPreferences { this[intPreferencesKey("statisticsResetMinutes")] = 135 }
+            assertEquals(135, statistics.resetMinutes())
+            assertFalse(profiles.readerSettingsFile().exists())
+        }
+    }
+
     @Test
     fun displayMigrationFinishesBeforeCreatingProfileAppearanceFile() = runBlocking {
         val profiles = ProfileRepository(tempFolder.newFolder("migration-order"))
@@ -867,7 +884,7 @@ class ReaderSettingsRepositoryTest {
     }
 
     private class RepositoryHandle(
-        private val repository: ReaderSettingsRepository,
+        val repository: ReaderSettingsRepository,
         private val dataStore: DataStore<Preferences>,
         private val scope: CoroutineScope,
     ) : AutoCloseable {

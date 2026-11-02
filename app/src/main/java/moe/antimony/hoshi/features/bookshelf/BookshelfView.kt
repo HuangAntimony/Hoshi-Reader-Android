@@ -251,7 +251,7 @@ fun BookshelfView(
     }
 
     LaunchedEffect(refreshKey) {
-        booksViewModel.reloadBookEntries()
+        booksViewModel.onBookshelfVisible()
     }
 
     LaunchedEffect(syncSettings.enabled, syncSettings.provider, refreshKey) {

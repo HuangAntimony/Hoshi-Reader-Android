@@ -606,6 +606,12 @@ class ReaderSettingsRepository(
         ?.distinctUntilChanged()
         ?: flowOf("default")
 
+    // Statistics is global; checking a book must not reload profile appearance or display state.
+    val statisticsResetMinutes: Flow<Int> = dataStore.data
+        .onStart { migrateSettingsIfNeeded() }
+        .map { it[KEY_STATISTICS_RESET_MINUTES] ?: 0 }
+        .distinctUntilChanged()
+
     private val profileSettings: Flow<ReaderSettings> =
         if (profileRepository == null) {
             dataStore.data

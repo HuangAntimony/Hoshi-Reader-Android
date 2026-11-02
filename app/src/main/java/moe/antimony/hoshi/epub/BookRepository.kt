@@ -410,7 +410,7 @@ class BookRepository private constructor(
         }
     }
 
-    private suspend fun awaitReaderSaves(bookRoot: File) {
+    internal suspend fun awaitReaderSaves(bookRoot: File) {
         val key = bookRoot.canonicalFile
         while (true) {
             val jobs = synchronized(pendingReaderSaves) { pendingReaderSaves[key]?.toList().orEmpty() }
@@ -610,6 +610,11 @@ interface SasayakiSidecarRepository {
     suspend fun saveSasayakiPlayback(bookRoot: File, playback: SasayakiPlaybackData)
 }
 
+internal fun sortBookDirectories(directories: List<File>): List<File> =
+    directories.map { it to it.lastModified() }
+        .sortedByDescending { it.second }
+        .map { it.first }
+
 class BookFileDataSource(
     filesDir: File,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
@@ -623,7 +628,7 @@ class BookFileDataSource(
         booksDirectory
             .listFiles()
             ?.filter { it.isDirectory && !it.name.startsWith(".") && it.name != STATISTICS_ARCHIVE_DIRECTORY }
-            ?.sortedByDescending { it.lastModified() }
+            ?.let(::sortBookDirectories)
             .orEmpty()
     }
 

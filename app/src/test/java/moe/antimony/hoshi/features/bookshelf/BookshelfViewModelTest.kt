@@ -1043,6 +1043,278 @@ class BookshelfViewModelTest {
         assertNull(viewModel.uiState.value.blockingProgressMessage.testString())
     }
 
+    @Test fun successfulImportReportsFinalReloadFailureAsShelfFailure() {
+        val failure = IOException("reload fixture failure")
+        val repository = FakeBookshelfRepository(localLoadError = failure)
+        val viewModel = BookshelfViewModel(repository, testScope())
+        var imported = 0
+        viewModel.importBooks(listOf("one", "two").map { name ->
+            PendingBookImport(name, "$name.epub") { imported++; name }
+        })
+        assertEquals(2, imported)
+        val events = ErrorDiagnosticEvents.buffer.drain()
+        assertEquals(UiText.Resource(R.string.bookshelf_update_failed), events.single().operation)
+        assertTrue(events.single().error === failure)
+        assertFalse(viewModel.uiState.value.isLoading)
+    }
+
+    @Test fun returningFromReaderRefreshesOnlyOpenedBookAndPublishesProgress() {
+        val first = bookEntry("first")
+        val second = bookEntry("second").let { it.copy(metadata = it.metadata.copy(epub = "second.epub")) }
+        val repository = FakeBookshelfRepository(entries = listOf(first, second), openBookId = "second", settings = BookshelfSettings(showReading = true))
+        val viewModel = BookshelfViewModel(repository, testScope())
+        viewModel.onBookshelfVisible()
+        viewModel.openBook(second)
+        viewModel.consumeOpenReaderEvent()
+        repository.progressById = mapOf("second" to 0.65)
+        viewModel.onBookshelfVisible()
+        assertEquals(listOf("second"), repository.singleBookRequests)
+        assertEquals(1, repository.loadRequests.size)
+        assertEquals(0.65, viewModel.uiState.value.bookProgressById.getValue("second"), 0.0)
+        assertEquals(listOf("second"), viewModel.uiState.value.sections.first { it.isReading }.books.map { it.metadata.id })
+    }
+
+    @Test fun returningFromDeletedReaderBookRemovesCachedEntry() {
+        val entry = bookEntry("book-a").let { it.copy(metadata = it.metadata.copy(epub = "book.epub")) }
+        val repository = FakeBookshelfRepository(entries = listOf(entry))
+        val viewModel = BookshelfViewModel(repository, testScope())
+        viewModel.onBookshelfVisible()
+        viewModel.openBook(entry)
+        repository.entries = emptyList()
+        viewModel.onBookshelfVisible()
+        assertTrue(viewModel.uiState.value.bookEntries.isEmpty())
+        assertEquals(listOf("book-a"), repository.singleBookRequests)
+    }
+
+    @Test fun readerRoundTripDoesNotDiscardPendingRemoteBooks() {
+        val entry = bookEntry("book-a").let { it.copy(metadata = it.metadata.copy(epub = "book.epub")) }
+        val remote = remoteEntry("drive-folder", "Remote Book")
+        val remoteGate = CompletableDeferred<Unit>()
+        val repository = FakeBookshelfRepository(entries = listOf(entry), remoteEntries = listOf(remote), remoteLoadGate = remoteGate)
+        val viewModel = BookshelfViewModel(repository, testScope())
+        viewModel.onBookshelfVisible()
+        viewModel.openBook(entry)
+        viewModel.onBookshelfVisible()
+        remoteGate.complete(Unit)
+        assertEquals(listOf(remote), viewModel.uiState.value.remoteBookEntries)
+        assertEquals(1, repository.remoteLoadRequests.size)
+    }
+
+    @Test fun fullReloadDuringReaderExitWaitsForPendingProgress() {
+        val entry = bookEntry("book-a").let { it.copy(metadata = it.metadata.copy(epub = "book.epub")) }
+        val saveGate = CompletableDeferred<Unit>()
+        val repository = FakeBookshelfRepository(entries = listOf(entry), singleBookLoadGate = saveGate)
+        val viewModel = BookshelfViewModel(repository, testScope())
+        viewModel.onBookshelfVisible()
+        viewModel.openBook(entry)
+        viewModel.onBookshelfVisible()
+        viewModel.reloadBookEntries()
+        assertEquals(1, repository.loadRequests.size)
+        repository.progressById = mapOf("book-a" to 0.65)
+        saveGate.complete(Unit)
+        assertEquals(2, repository.loadRequests.size)
+        assertEquals(0.65, viewModel.uiState.value.bookProgressById.getValue("book-a"), 0.0)
+    }
+
+    @Test fun openingAnotherBookPreservesPreviousReturnProgress() {
+        val a = bookEntry("book-a").let { it.copy(metadata = it.metadata.copy(epub = "a.epub")) }
+        val b = bookEntry("book-b").let { it.copy(metadata = it.metadata.copy(epub = "b.epub")) }
+        val gate = CompletableDeferred<Unit>()
+        val repository = FakeBookshelfRepository(
+            entries = listOf(a, b),
+            progressById = mapOf("book-a" to 0.1, "book-b" to 0.2),
+            openBookId = "book-a", singleBookLoadGate = gate,
+            settings = BookshelfSettings(showReading = true),
+        )
+        val viewModel = BookshelfViewModel(repository, testScope())
+        viewModel.onBookshelfVisible()
+        viewModel.openBook(a)
+        viewModel.consumeOpenReaderEvent()
+        repository.progressById = mapOf("book-a" to 1.0, "book-b" to 0.2)
+        repository.readingStateById = mapOf("book-a" to BookReadingState(canMarkRead = true, canMarkUnread = true))
+        viewModel.onBookshelfVisible()
+        repository.openBookId = "book-b"
+        viewModel.openBook(b)
+        viewModel.consumeOpenReaderEvent()
+        gate.complete(Unit)
+        repository.progressById = mapOf("book-a" to 1.0, "book-b" to 0.5)
+        viewModel.onBookshelfVisible()
+        assertEquals(0.5, viewModel.uiState.value.bookProgressById.getValue("book-b"), 0.0)
+        assertEquals(1.0, viewModel.uiState.value.bookProgressById.getValue("book-a"), 0.0)
+        assertTrue(viewModel.uiState.value.bookReadingStateById.getValue("book-a").canMarkUnread)
+        assertEquals(listOf("book-b"), viewModel.uiState.value.sections.first { it.isReading }.books.map { it.metadata.id })
+        assertEquals(1, repository.loadRequests.size)
+    }
+
+    @Test fun overlappingBookReturnsPublishBothProgressSnapshots() {
+        val a = bookEntry("book-a").let { it.copy(metadata = it.metadata.copy(epub = "a.epub")) }
+        val b = bookEntry("book-b").let { it.copy(metadata = it.metadata.copy(epub = "b.epub")) }
+        val aGate = CompletableDeferred<Unit>()
+        val bGate = CompletableDeferred<Unit>()
+        val repository = FakeBookshelfRepository(entries = listOf(a, b), singleBookLoadGate = aGate)
+        val viewModel = BookshelfViewModel(repository, testScope())
+        viewModel.onBookshelfVisible()
+        viewModel.openBook(a)
+        viewModel.onBookshelfVisible()
+        repository.openBookId = "book-b"
+        viewModel.openBook(b)
+        repository.singleBookLoadGate = bGate
+        repository.progressById = mapOf("book-a" to 0.65, "book-b" to 0.5)
+        viewModel.onBookshelfVisible()
+        bGate.complete(Unit)
+        assertEquals(0.5, viewModel.uiState.value.bookProgressById.getValue("book-b"), 0.0)
+        aGate.complete(Unit)
+        assertEquals(0.65, viewModel.uiState.value.bookProgressById.getValue("book-a"), 0.0)
+        assertEquals(0.5, viewModel.uiState.value.bookProgressById.getValue("book-b"), 0.0)
+        assertEquals(1, repository.loadRequests.size)
+    }
+
+    @Test fun fullReloadWaitsForAllOverlappingReaderReturns() {
+        checkFullReloadWaitsForReaderReturns(reloadBeforeSecondReturn = false)
+    }
+
+    @Test fun fullReloadAlsoWaitsForReaderReturnsStartedWhileItWasWaiting() {
+        checkFullReloadWaitsForReaderReturns(reloadBeforeSecondReturn = true)
+    }
+
+    private fun checkFullReloadWaitsForReaderReturns(reloadBeforeSecondReturn: Boolean) {
+        val a = bookEntry("book-a").let { it.copy(metadata = it.metadata.copy(epub = "a.epub")) }
+        val b = bookEntry("book-b").let { it.copy(metadata = it.metadata.copy(epub = "b.epub")) }
+        val aGate = CompletableDeferred<Unit>()
+        val bGate = CompletableDeferred<Unit>()
+        val repository = FakeBookshelfRepository(entries = listOf(a, b), singleBookLoadGate = aGate)
+        val viewModel = BookshelfViewModel(repository, testScope())
+        viewModel.onBookshelfVisible()
+        viewModel.openBook(a)
+        viewModel.onBookshelfVisible()
+        if (reloadBeforeSecondReturn) viewModel.reloadBookEntries()
+        repository.openBookId = "book-b"
+        viewModel.openBook(b)
+        repository.singleBookLoadGate = bGate
+        viewModel.onBookshelfVisible()
+        if (!reloadBeforeSecondReturn) viewModel.reloadBookEntries()
+        repository.progressById = if (reloadBeforeSecondReturn) mapOf("book-a" to 0.65) else mapOf("book-b" to 0.5)
+        (if (reloadBeforeSecondReturn) aGate else bGate).complete(Unit)
+        val loadCountBeforeBothSaved = repository.loadRequests.size
+        repository.progressById = mapOf("book-a" to 0.65, "book-b" to 0.5)
+        (if (reloadBeforeSecondReturn) bGate else aGate).complete(Unit)
+        assertEquals(1, loadCountBeforeBothSaved)
+        assertEquals(2, repository.loadRequests.size)
+        assertEquals(0.65, viewModel.uiState.value.bookProgressById.getValue("book-a"), 0.0)
+        assertEquals(0.5, viewModel.uiState.value.bookProgressById.getValue("book-b"), 0.0)
+    }
+
+    @Test fun reopeningSameBookRejectsItsEarlierReturnSnapshot() {
+        val a = bookEntry("book-a").let { it.copy(metadata = it.metadata.copy(lastAccess = 1.0, epub = "a.epub")) }
+        val snapshotGate = CompletableDeferred<Unit>()
+        val repository = FakeBookshelfRepository(entries = listOf(a), singleBookSnapshotGate = snapshotGate)
+        val viewModel = BookshelfViewModel(repository, testScope())
+        viewModel.onBookshelfVisible()
+        viewModel.openBook(a)
+        repository.progressById = mapOf("book-a" to 0.65)
+        viewModel.onBookshelfVisible()
+        repository.entries = listOf(a.copy(metadata = a.metadata.copy(lastAccess = 20.0)))
+        viewModel.openBook(a)
+        snapshotGate.complete(Unit)
+        assertEquals(20.0, viewModel.uiState.value.bookEntries.single().metadata.lastAccess, 0.0)
+        repository.progressById = mapOf("book-a" to 0.8)
+        viewModel.onBookshelfVisible()
+        assertEquals(0.8, viewModel.uiState.value.bookProgressById.getValue("book-a"), 0.0)
+        assertEquals(1, repository.loadRequests.size)
+    }
+
+    @Test fun olderLibraryLoadCannotUndoOpenedBookRecencyOrReturnedProgress() {
+        val first = bookEntry("first").let { it.copy(metadata = it.metadata.copy(lastAccess = 10.0, epub = "first.epub")) }
+        val second = bookEntry("second").let { it.copy(metadata = it.metadata.copy(lastAccess = 1.0, epub = "second.epub")) }
+        val oldLoad = CompletableDeferred<Unit>()
+        val repository = FakeBookshelfRepository(
+            entries = listOf(first, second), openBookId = "second",
+            loadPlans = ArrayDeque(listOf(
+                FakeBookshelfRepository.LoadPlan(null, listOf(first, second)),
+                FakeBookshelfRepository.LoadPlan(oldLoad, listOf(first, second)),
+            )),
+        )
+        val viewModel = BookshelfViewModel(repository, testScope())
+        viewModel.onBookshelfVisible()
+        viewModel.reloadBookEntries()
+        repository.entries = listOf(first, second.copy(metadata = second.metadata.copy(lastAccess = 20.0)))
+        viewModel.openBook(second)
+        repository.progressById = mapOf("second" to 0.65)
+        viewModel.onBookshelfVisible()
+        oldLoad.complete(Unit)
+        assertEquals(listOf("second", "first"), viewModel.uiState.value.bookEntries.map { it.metadata.id })
+        assertEquals(20.0, viewModel.uiState.value.bookEntries.first().metadata.lastAccess, 0.0)
+        assertEquals(0.65, viewModel.uiState.value.bookProgressById.getValue("second"), 0.0)
+    }
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    @Test fun syncChangesDuringReadingRefreshAfterPublishingReturnedProgress() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(dispatcher)
+        val root = java.nio.file.Files.createTempDirectory("hoshi-reader-sync-refresh").toFile()
+        val storage = SyncStorage(root, BookRepository(root, dispatcher), dispatcher)
+        val entry = bookEntry("book-a").let { it.copy(metadata = it.metadata.copy(epub = "book.epub")) }
+        val added = bookEntry("synced-book")
+        val reloadGate = CompletableDeferred<Unit>()
+        val repository = FakeBookshelfRepository(
+            entries = listOf(entry),
+            loadPlans = ArrayDeque(listOf(
+                FakeBookshelfRepository.LoadPlan(null, listOf(entry)),
+                FakeBookshelfRepository.LoadPlan(reloadGate, listOf(entry, added)),
+            )),
+        )
+        val viewModel = BookshelfViewModel(repository, storage)
+        try {
+            runCurrent()
+            viewModel.onBookshelfVisible()
+            runCurrent()
+            viewModel.openBook(entry)
+            runCurrent()
+            storage.applyReaderState = { _, _, _, _, _ -> }
+            storage.notifyBooksChanged()
+            runCurrent()
+            advanceTimeBy(2_000)
+            runCurrent()
+            assertEquals(1, repository.loadRequests.size)
+            repository.entries = listOf(entry, added)
+            repository.progressById = mapOf("book-a" to 0.65)
+            storage.applyReaderState = null
+            viewModel.onBookshelfVisible()
+            runCurrent()
+            assertEquals(0.65, viewModel.uiState.value.bookProgressById.getValue("book-a"), 0.0)
+            assertEquals(listOf("book-a"), viewModel.uiState.value.bookEntries.map { it.metadata.id })
+            assertEquals(2, repository.loadRequests.size)
+            reloadGate.complete(Unit)
+            runCurrent()
+            assertEquals(setOf("book-a", "synced-book"), viewModel.uiState.value.bookEntries.map { it.metadata.id }.toSet())
+        } finally {
+            viewModel.viewModelScope.coroutineContext[Job]!!.cancelAndJoin()
+            Dispatchers.resetMain()
+            root.deleteRecursively()
+        }
+    }
+
+    @Test fun storedTitleSortDoesNotReadWholeLibraryTwice() {
+        val repository = FakeBookshelfRepository(entries = listOf(bookEntry("Z"), bookEntry("A")), settings = BookshelfSettings(sortOption = BookSortOption.Title))
+        val viewModel = BookshelfViewModel(repository, testScope())
+        viewModel.reloadBookEntries()
+        assertEquals(listOf("A", "Z"), viewModel.uiState.value.bookEntries.map { it.metadata.id })
+        assertEquals(1, repository.loadRequests.size)
+    }
+
+    @Test fun openingLoadedBookUpdatesCachedRecentOrderImmediately() {
+        val first = bookEntry("first").let { it.copy(metadata = it.metadata.copy(lastAccess = 10.0, epub = "first.epub")) }
+        val second = bookEntry("second").let { it.copy(metadata = it.metadata.copy(lastAccess = 1.0, epub = "second.epub")) }
+        val repository = FakeBookshelfRepository(entries = listOf(first, second), openBookId = second.metadata.id)
+        val viewModel = BookshelfViewModel(repository, testScope())
+        viewModel.reloadBookEntries()
+        repository.entries = listOf(first, second.copy(metadata = second.metadata.copy(lastAccess = 20.0)))
+        viewModel.openBook(second)
+        assertEquals(listOf("second", "first"), viewModel.uiState.value.bookEntries.map { it.metadata.id })
+        assertEquals(20.0, viewModel.uiState.value.bookEntries.first().metadata.lastAccess, 0.0)
+        assertEquals(1, repository.loadRequests.size)
+    }
+
     @Test
     fun importingBooksProcessesEachItemWithCountProgressAndDoesNotOpenReader() {
         val repository = FakeBookshelfRepository()
@@ -1785,6 +2057,8 @@ class BookshelfViewModelTest {
         val syncGate: CompletableDeferred<Unit>? = null,
         val syncResult: SyncResult? = null,
         val progressLoadGate: CompletableDeferred<Unit>? = null,
+        var singleBookLoadGate: CompletableDeferred<Unit>? = null,
+        val singleBookSnapshotGate: CompletableDeferred<Unit>? = null,
         val createShelfAndMoveResult: Boolean = true,
         val createShelfAndMoveGate: CompletableDeferred<Unit>? = null,
         val createShelfAndMoveError: Throwable? = null,
@@ -1796,6 +2070,7 @@ class BookshelfViewModelTest {
             val entries: List<BookEntry>,
         )
 
+        val singleBookRequests = mutableListOf<String>()
         val loadRequests = mutableListOf<BookSortOption>()
         val progressLoadRequests = mutableListOf<List<String>>()
         val remoteLoadRequests = mutableListOf<List<String>>()
@@ -1835,6 +2110,15 @@ class BookshelfViewModelTest {
             )
         }
 
+        override suspend fun loadBook(entry: BookEntry): BookshelfBookSnapshot? {
+            singleBookRequests += entry.metadata.id
+            singleBookLoadGate?.await()
+            val current = entries.firstOrNull { it.metadata.id == entry.metadata.id } ?: return null
+            val snapshot = BookshelfBookSnapshot(current, readingStates(listOf(current)).getValue(current.metadata.id), coverSourcesById[current.metadata.id])
+            singleBookSnapshotGate?.await()
+            return snapshot
+        }
+
         override suspend fun loadBookReadingStates(entries: List<BookEntry>): Map<String, BookReadingState> {
             progressLoadRequests += entries.map { it.metadata.id }
             progressLoadGate?.await()
@@ -1859,7 +2143,10 @@ class BookshelfViewModelTest {
             )
         }
 
-        override suspend fun openBook(entry: BookEntry): String = openBookId
+        override suspend fun openBook(entry: BookEntry): BookEntry =
+            (entries.firstOrNull { it.metadata.id == entry.metadata.id } ?: entry).let {
+                it.copy(metadata = it.metadata.copy(id = openBookId))
+            }
 
         override suspend fun downloadBook(entry: BookEntry, onProgress: (Double) -> Unit) {
             downloadBookOperation?.invoke(entry, onProgress)
