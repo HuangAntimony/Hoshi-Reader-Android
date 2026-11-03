@@ -20,7 +20,6 @@ class ReaderWebAssetsTest {
             "hoshi-web/reader/reader-text-semantics.js",
             "hoshi-web/reader/reader-dom-text.js",
             "hoshi-web/reader/reader-media-semantics.js",
-            "hoshi-web/reader/reader-layout-semantics.js",
             "hoshi-web/reader/highlights.js",
             "hoshi-web/reader/reader.css",
             "hoshi-web/popup/popup.js",

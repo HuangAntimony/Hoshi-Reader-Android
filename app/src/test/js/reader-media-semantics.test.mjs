@@ -140,8 +140,8 @@ function image(attributes = {}) {
     return img;
 }
 
-function loadMediaSemanticsContext() {
-    const window = {};
+function loadMediaSemanticsContext({ fetch, counts } = {}) {
+    const window = { fetch, hoshiReaderImageReferenceCounts: counts };
     const documentElement = new TestElement('html');
     const document = {
         baseURI: 'https://example.invalid/chapter.xhtml',
@@ -195,6 +195,45 @@ function loadMediaSemanticsContext() {
 function loadMediaSemantics() {
     return loadMediaSemanticsContext().media;
 }
+
+test('image counts start immediately, share readiness, and update media holds after JSON is ready', async () => {
+    let resolveJson;
+    const requests = [];
+    const { media } = loadMediaSemanticsContext({ fetch(url) {
+        requests.push(url);
+        return Promise.resolve({ ok: true, json: () => new Promise(resolve => { resolveJson = resolve; }) });
+    } });
+    const img = new TestElement('img', { src: 'https://appassets.androidplatform.net/epub/images/divider.jpg' });
+    const ready = media.loadImageReferenceCounts();
+    assert.deepEqual(requests, ['https://appassets.androidplatform.net/reader-media/image-references.json']);
+    assert.equal(media.loadImageReferenceCounts(), ready);
+    let finished = false;
+    ready.then(() => { finished = true; });
+    await Promise.resolve();
+    assert.equal(finished, false);
+    assert.equal(media.shouldHoldMedia(img), true);
+    resolveJson({ 'images/divider.jpg': 3 });
+    await ready;
+    assert.equal(media.shouldHoldMedia(img), false);
+});
+
+test('unknown image counts preserve ordinary holds on request or JSON failure', async () => {
+    for (const fetch of [
+        () => Promise.reject(new Error('unavailable')),
+        () => Promise.resolve({ ok: false, json: () => assert.fail('non-OK body') }),
+        () => Promise.resolve({ ok: true, json: () => Promise.reject(new Error('invalid JSON')) }),
+    ]) {
+        const { media } = loadMediaSemanticsContext({ fetch });
+        await media.loadImageReferenceCounts();
+        assert.equal(media.shouldHoldMedia(new TestElement('img', { src: 'https://appassets.androidplatform.net/epub/images/divider.jpg' })), true);
+    }
+});
+
+test('supplied image counts remain available without a fetch', async () => {
+    const { media } = loadMediaSemanticsContext({ counts: { 'images/divider.jpg': 3 }, fetch: () => assert.fail('counts already supplied') });
+    await media.loadImageReferenceCounts();
+    assert.equal(media.shouldHoldMedia(new TestElement('img', { src: 'https://appassets.androidplatform.net/epub/images/divider.jpg' })), false);
+});
 
 function clickEvent() {
     return {

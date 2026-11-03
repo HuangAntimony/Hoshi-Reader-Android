@@ -26,6 +26,8 @@ Release notes before v1.3.0 are in [CHANGELOG_ARCHIVE.md](CHANGELOG_ARCHIVE.md).
 
 ### Changed
 
+- Remove automatic layout corrections for publisher paragraph containers, blank spacers and image margins.
+
 - Replace visual novel mode with iOS-style paragraph mode and settings controls, including centered passages and continuation pages, sentence limits, text reveal with synchronized ruby and gaiji that continues through TTS/Sasayaki following without freezing, smoother page turns in chapters with many narration cues, reliable E-ink switching with saved highlights and narration following after layout-mode changes or resuming from unmatched pages, optional blank-tap advance without skipping text animation, automatic statistics start on page turns and Sasayaki playback bounded to the current page even after cue navigation, with its setting grouped under Paragraph Mode, while migrating existing settings.
 
 - Skip Sasayaki and TTS image holds for images referenced three or more times in a book’s main text, while retaining holds for images used once or twice.
@@ -42,8 +44,8 @@ Release notes before v1.3.0 are in [CHANGELOG_ARCHIVE.md](CHANGELOG_ARCHIVE.md).
 - Prevent intermittent bookshelf sorting errors after successful EPUB imports, and distinguish refresh failures from import failures.
 - Prevent book styles from shrinking the reading area in paginated and continuous modes.
 - Keep book assignments intact by correctly detecting duplicate shelf names during creation and renaming.
-- Reduce chapter loading delays by processing large publisher stylesheets faster, avoiding initial layout work before reader styles are ready, speeding up pagination in chapters with extensive ruby annotations.
-- Restore missing illustration chapters and gallery images in EPUBs with XHTML fallbacks, recover bitmap covers from simple SVG wrappers or alternative declared covers when the preferred cover is broken on import or opening existing books, and keep image-only pages visible and properly centered in the reader.
+- Reduce chapter loading delays by processing large publisher stylesheets faster, preparing ruby and paragraphs before initial layout, loading image-reference counts in parallel, and speeding up pagination in chapters with extensive ruby annotations.
+- Restore missing illustration chapters and gallery images in EPUBs with XHTML fallbacks, and recover bitmap covers from simple SVG wrappers or alternative declared covers when the preferred cover is broken on import or opening existing books.
 - Keep word lookups and sentence context within the tapped dictionary list item instead of joining neighboring definitions.
 - Keep the full query visible and tappable in the Dictionary tab even when its beginning has no dictionary match.
 - Start reading statistics reliably when Sasayaki turns pages automatically, including after statistics finish loading or autostart settings change, without treating subpixel adjustments on the same page as page turns.

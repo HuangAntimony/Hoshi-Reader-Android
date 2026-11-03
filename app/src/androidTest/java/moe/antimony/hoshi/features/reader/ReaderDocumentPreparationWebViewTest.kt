@@ -95,6 +95,15 @@ class ReaderDocumentPreparationWebViewTest {
                         const style = document.createElement('style');
                         style.textContent = ${readerJavaScriptStringLiteral(css)};
                         document.head.appendChild(style);
+                        if (window.hoshiReaderDocumentPreparation) {
+                          const resume = window.hoshiReaderDocumentPreparation.resume;
+                          window.hoshiReaderDocumentPreparation.resume = function() {
+                            window.preparedWhileHidden = document.documentElement.style.display === 'none'
+                              && [...document.querySelectorAll('ruby')].every(ruby => ruby.firstChild.nodeType === 1)
+                              && (!$paragraph || [...document.querySelectorAll('p')].every(p => p.classList.contains('hoshi-paragraph')));
+                            resume();
+                          };
+                        }
                         $script
                     """.trimIndent(), null)
                 }
@@ -106,6 +115,7 @@ class ReaderDocumentPreparationWebViewTest {
                       progress: window.hoshiReader.calculateProgress()})
                 """.trimIndent()))
                 assertEquals(label, "block", after.getString("display"))
+                if (deferred) assertEquals("$label final DOM before first layout", "true", evaluate(webView, "window.preparedWhileHidden"))
                 assertEquals(label, "important", after.getString("priority"))
                 assertTrue("$label $after", after.getDouble("width") > 0)
                 assertTrue("$label viewport", after.getDouble("viewport") < 1600)

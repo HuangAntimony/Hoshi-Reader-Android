@@ -2,7 +2,6 @@ __HOSHI_READER_VIEWPORT_SCRIPT__
 __HOSHI_READER_TEXT_SEMANTICS_SCRIPT__
 __HOSHI_READER_DOM_TEXT_SCRIPT__
 __HOSHI_READER_MEDIA_SEMANTICS_SCRIPT__
-__HOSHI_READER_LAYOUT_SEMANTICS_SCRIPT__
 
  window.hoshiReader = {
    cueWrappers: new Map(),
@@ -525,6 +524,15 @@ window.hoshiReader.initialize = function() {
   style.setProperty('--hoshi-continuous-top', (window.innerHeight * __HOSHI_CONTINUOUS_VERTICAL_PADDING_RATIO__) + 'px');
   style.setProperty('--hoshi-continuous-width', (window.innerWidth * (1 - 2 * __HOSHI_CONTINUOUS_HORIZONTAL_PADDING_RATIO__)) + 'px');
   style.setProperty('--hoshi-continuous-height', (window.innerHeight * (1 - 2 * __HOSHI_CONTINUOUS_VERTICAL_PADDING_RATIO__)) + 'px');
+  var imageReferencesReady = window.hoshiReaderMediaSemantics.loadImageReferenceCounts();
+  var images = Array.from(document.querySelectorAll('img'));
+  var imageSetupPromise = window.hoshiReaderMediaSemantics.setupReaderImages(document, {
+    blurImages: __HOSHI_BLUR_IMAGES__,
+    imageBridge: window.HoshiReaderImage,
+    waitForImages: true
+  });
+  window.hoshiReader.normalizeRubyTextNodes();
+  window.hoshiReader.stabilizeRubyAdjacentTextNodes();
   window.hoshiReaderDocumentPreparation?.resume();
   var viewport = window.hoshiReader.contentViewport();
   document.documentElement.style.setProperty('--hoshi-vertical-padding-block', (viewport.height * __HOSHI_VERTICAL_PADDING_BLOCK_RATIO__) + 'px');
@@ -533,12 +541,6 @@ window.hoshiReader.initialize = function() {
   document.documentElement.style.setProperty('--hoshi-reader-visible-height', viewport.height + 'px');
   document.documentElement.style.setProperty('--hoshi-image-max-width', Math.max(1, Math.floor(viewport.width * __HOSHI_IMAGE_WIDTH_VIEWPORT_RATIO__) - __HOSHI_IMAGE_WIDTH_REDUCTION_PX__) + 'px');
   document.documentElement.style.setProperty('--hoshi-image-max-height', Math.max(1, Math.floor(viewport.height * __HOSHI_IMAGE_HEIGHT_VIEWPORT_RATIO__)) + 'px');
-  var images = Array.from(document.querySelectorAll('img'));
-  var imageSetupPromise = window.hoshiReaderMediaSemantics.setupReaderImages(document, {
-    blurImages: __HOSHI_BLUR_IMAGES__,
-    imageBridge: window.HoshiReaderImage,
-    waitForImages: true
-  });
   Promise.all([
     Promise.resolve(document.fonts && document.fonts.ready),
     imageSetupPromise
@@ -546,10 +548,9 @@ window.hoshiReader.initialize = function() {
     if (!images.length) return;
     return new Promise(function(resolve) { setTimeout(resolve, 50); });
   }).then(function() {
-    window.hoshiReaderLayoutSemantics.sanitizeInlineBlocks(document, window.hoshiReader.isVertical());
-    window.hoshiReader.normalizeRubyTextNodes();
-    window.hoshiReader.stabilizeRubyAdjacentTextNodes();
     window.hoshiReader.buildNodeOffsets();
+    return imageReferencesReady;
+  }).then(function() {
     __HOSHI_RESTORE_SCRIPTS__
   });
 };

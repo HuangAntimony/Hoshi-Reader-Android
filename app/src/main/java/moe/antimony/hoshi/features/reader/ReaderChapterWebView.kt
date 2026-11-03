@@ -1196,12 +1196,6 @@ private fun readerSetupScript(
             document.head.appendChild(popupHostScript);
           }
           window.hoshiSelection.setupFurigana(${readerJavaScriptStringLiteral(settings.furiganaMode.name)});
-          try {
-            var imageReferences = await fetch('https://appassets.androidplatform.net/reader-media/image-references.json');
-            if (imageReferences.ok) window.hoshiReaderImageReferenceCounts = await imageReferences.json();
-          } catch (_error) {
-            // Unknown counts preserve ordinary image holds.
-          }
           $paginationScript
         })();
     """.trimIndent()

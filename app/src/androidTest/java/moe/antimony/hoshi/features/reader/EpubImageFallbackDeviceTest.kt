@@ -5,8 +5,6 @@ import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.util.Base64
 import android.util.Log
-import android.webkit.WebResourceRequest
-import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.layout.fillMaxSize
@@ -204,7 +202,7 @@ class EpubImageFallbackDeviceTest {
             val repository = BookRepository(scratch.resolve("library"))
             val thumbnails = BookCoverThumbnailStore(scratch, AndroidBookCoverThumbnailEncoder(), Dispatchers.IO)
             val samples = listOf(Triple("saekano", 37, 15), Triple("sakurasou", 24, 21), Triple("collab", 9, 3))
-            val books = samples.map { (name, chapters, images) ->
+            samples.forEach { (name, chapters, images) ->
                 val book = parser.parsePacked(File(directory, "$name.epub"))
                 assertEquals(name, chapters, book.chapters.size)
                 assertEquals(name, images, book.bookInfo.images!!.size)
@@ -227,18 +225,6 @@ class EpubImageFallbackDeviceTest {
                 assertEquals(book.bookInfo, warm.bookInfo)
                 assertTrue(warm.chapters.all { it.html.isEmpty() })
                 Log.i("HoshiEpubFallback", "$name chapters=$chapters images=$images cover=$cover")
-                name to warm
-            }
-            withWebView { webView ->
-                books.forEach { (name, book) ->
-                    for (mode in ReaderViewMode.entries) for (vertical in listOf(true, false)) {
-                        val chapters = listOfNotNull(book.chapters.first(), book.chapters.find { it.href.endsWith("p-003002.xhtml") })
-                        chapters.forEachIndexed { index, chapter ->
-                            renderAndCheck(webView, requireNotNull(book.readResource(chapter.href)).decodeToString(),
-                                mode, vertical, "$name-$index-${mode.name}-$vertical", book, chapter.href)
-                        }
-                    }
-                }
             }
         } finally { scratch.deleteRecursively() }
     }
@@ -297,12 +283,10 @@ class EpubImageFallbackDeviceTest {
         }
     }
 
-    private fun renderAndCheck(webView: WebView, html: String, mode: ReaderViewMode, vertical: Boolean,
-        label: String, book: EpubBook? = null, href: String = "fixture.xhtml") {
+    private fun renderAndCheck(webView: WebView, html: String, mode: ReaderViewMode, vertical: Boolean, label: String) {
         val assets = ReaderWebAssets.load(instrumentation.targetContext)
         val settings = ReaderSettings(viewMode = mode, verticalWriting = vertical, horizontalPadding = 3, verticalPadding = 0, fontSize = 27)
         val loaded = CountDownLatch(1)
-        val bridge = book?.let { ReaderWebResourceBridge(it) { null } }
         instrumentation.runOnMainSync {
             val density = webView.resources.displayMetrics.density
             val viewport = readerViewportCssLayout(settings, (webView.width / density).toInt(), (webView.height / density).toInt()).cssVariables()
@@ -311,10 +295,8 @@ class EpubImageFallbackDeviceTest {
             val setup = "<script>window.HoshiReaderRestore={postMessage:()=>window.testRestored=true};window.HoshiReaderImage={postMessage:src=>window.testImageTapped=src};</script>$styles<style>$viewport</style>$script"
             webView.webViewClient = object : WebViewClient() {
                 override fun onPageFinished(view: WebView, url: String) { loaded.countDown() }
-                override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? =
-                    bridge?.resourceForUrl(request.url.toString())?.toWebResourceResponse()
             }
-            webView.loadDataWithBaseURL("https://appassets.androidplatform.net/epub/$href", html.replace("</head>", "$setup</head>"), "text/html", "UTF-8", null)
+            webView.loadDataWithBaseURL("https://appassets.androidplatform.net/epub/fixture.xhtml", html.replace("</head>", "$setup</head>"), "text/html", "UTF-8", null)
         }
         assertTrue("$label load", loaded.await(15, TimeUnit.SECONDS))
         composeRule.waitUntil(15_000) { evaluate(webView, "Boolean(window.testRestored)") == "true" }
@@ -328,10 +310,6 @@ class EpubImageFallbackDeviceTest {
         """.trimIndent()))
         assertTrue("$label $state", state.getBoolean("visible"))
         assertTrue("$label tap $state", state.getBoolean("tapped"))
-        if (label.startsWith("saekano-0-") && vertical) {
-            assertEquals("$label centered", state.getDouble("viewportHeight") / 2,
-                state.getDouble("y") + state.getDouble("height") / 2, 2.0)
-        }
         val painted = CountDownLatch(1)
         instrumentation.runOnMainSync {
             webView.postVisualStateCallback(0, object : WebView.VisualStateCallback() {

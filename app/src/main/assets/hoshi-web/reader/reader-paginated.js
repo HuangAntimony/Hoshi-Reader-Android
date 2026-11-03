@@ -2,7 +2,6 @@ __HOSHI_READER_VIEWPORT_SCRIPT__
 __HOSHI_READER_TEXT_SEMANTICS_SCRIPT__
 __HOSHI_READER_DOM_TEXT_SCRIPT__
 __HOSHI_READER_MEDIA_SEMANTICS_SCRIPT__
-__HOSHI_READER_LAYOUT_SEMANTICS_SCRIPT__
 
 window.hoshiReader = {
   pageHeight: 0,
@@ -680,6 +679,7 @@ window.hoshiReader.initialize = function() {
   document.documentElement.style.setProperty('--hoshi-image-max-height', Math.max(1, Math.floor(window.innerHeight * __HOSHI_IMAGE_HEIGHT_VIEWPORT_RATIO__)) + 'px');
   window.hoshiReader.pageHeight = pageHeight;
   window.hoshiReader.pageWidth = pageWidth;
+  var imageReferencesReady = window.hoshiReaderMediaSemantics.loadImageReferenceCounts();
   var images = Array.from(document.querySelectorAll('img'));
   var imageSetupPromise = window.hoshiReaderMediaSemantics.setupReaderImages(document, {
     blurImages: __HOSHI_BLUR_IMAGES__,
@@ -692,6 +692,13 @@ window.hoshiReader.initialize = function() {
   spacer.style.display = 'block';
   spacer.style.breakInside = 'avoid';
   document.body.appendChild(spacer);
+  // Prepare the final DOM while document-start preparation still suppresses
+  // publisher layout. Only cross-page fragment detection needs visible geometry.
+  window.hoshiReader.normalizeRubyTextNodes();
+  window.hoshiReader.stabilizeRubyAdjacentTextNodes();
+  if (window.hoshiParagraph.enabled) {
+    window.hoshiParagraph.layoutParagraphs(__HOSHI_PARAGRAPH_MAX_SENTENCES__, __HOSHI_PARAGRAPH_SPLIT_DIALOGUE__);
+  }
   window.hoshiReaderDocumentPreparation?.resume();
   Promise.all([
     Promise.resolve(document.fonts && document.fonts.ready),
@@ -700,14 +707,12 @@ window.hoshiReader.initialize = function() {
     if (!images.length) return;
     return new Promise(function(resolve) { setTimeout(resolve, 50); });
   }).then(function() {
-    window.hoshiReader.normalizeRubyTextNodes();
-    window.hoshiReader.stabilizeRubyAdjacentTextNodes();
-    window.hoshiReaderLayoutSemantics.sanitizeInlineBlocks(document, window.hoshiReader.isVertical());
     if (window.hoshiParagraph.enabled) {
-      window.hoshiParagraph.layoutParagraphs(__HOSHI_PARAGRAPH_MAX_SENTENCES__, __HOSHI_PARAGRAPH_SPLIT_DIALOGUE__);
       window.hoshiParagraph.fragmentBlocks();
     }
     window.hoshiReader.buildNodeOffsets();
+    return imageReferencesReady;
+  }).then(function() {
     __HOSHI_RESTORE_SCRIPTS__
   });
 };

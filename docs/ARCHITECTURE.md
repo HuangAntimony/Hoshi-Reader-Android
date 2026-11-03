@@ -262,9 +262,8 @@ dynamic configuration and bridge calls.
 | --- | --- | --- |
 | `reader-text-semantics.js` | Normalization, raw/matchable counts and character predicate, Sasayaki punctuation ownership and search range semantics | Paginated (including paragraph) and continuous |
 | `reader-dom-text.js` | Live DOM ruby normalization, selected body-text slices and Sasayaki structural boundaries | Paginated/continuous normalization; selection and Sasayaki adapters across modes |
-| `reader-media-semantics.js` | Image/gaiji setup, SVG ratio, blur/tint, tap bridge, scoped loading and image-hold eligibility | Paginated (including paragraph) and continuous |
-| `reader-layout-semantics.js` | Publisher inline-block/empty-strut sanitation, pure-image wrapper centering and overflowing image paragraph margins | Both modes before offsets/restore |
-| `reader-document-preparation.js` | Defer initial publisher layout until reader viewport/styles are installed | Chapter WebView document-start hook; all modes resume before content geometry/font readiness |
+| `reader-media-semantics.js` | Image/gaiji setup, SVG ratio, blur/tint, tap bridge, scoped loading, asynchronous image-reference counts and image-hold eligibility | Paginated (including paragraph) and continuous |
+| `reader-document-preparation.js` | Defer initial publisher layout until reader viewport/styles and ruby/paragraph DOM are prepared | Chapter WebView document-start hook; all modes resume before content geometry/font readiness |
 | `reader-paginated.js` | Columns, snapping, page metrics and page restore | Paginated |
 | `reader-continuous.js` | Inset body scrolling, viewport bounds and scroll restore | Continuous |
 | `reader-paragraph.js` | iOS paragraph splitting/centering, cross-column fragments, Range reveal and current-page cue IDs | Paginated when paragraph mode is enabled |
@@ -298,9 +297,15 @@ dynamic configuration and bridge calls.
   descendant size limits and the continuous body's reader-configured insets.
 - Raw code-point offsets, normalized matchable offsets and DOM UTF-16 positions
   are different coordinate systems. Convert through the live DOM text index.
-- Paragraph mode extends the ordinary paginated DOM. After fonts/images and layout
-  cleanup, split only inside paragraphs, center blocks, mark cross-column fragments,
-  build character indexes, install cues/highlights and restore position. Vertical
+- Reader initialization starts image-reference counts alongside image setup and
+  DOM preparation. Ruby normalization and paragraph sentence/block preparation run
+  before document preparation resumes display, avoiding layout of the unprepared
+  chapter. Then await fonts/images before measuring cross-column fragments and
+  building character indexes; image counts must settle before cues/highlights and
+  position restore so media holds use the correct counts. Unknown counts preserve
+  ordinary holds. No counts request blocks structural DOM preparation.
+- Paragraph mode extends the ordinary paginated DOM: split only inside paragraphs,
+  center blocks and mark cross-column fragments. Vertical
   Android pagination uses Y/page-height; horizontal pagination uses X/page-width.
   Paragraphs and continuation fragments use the same page-sized CSS block box,
   `align-content`, intrinsic inline sizing and automatic inline margins to center
@@ -356,7 +361,14 @@ dynamic configuration and bridge calls.
   only new fields are written, and blank-tap false is preserved. Paragraph layout
   fields reload content; animation/speed/blank-tap updates do not. Character-based
   bookmarks, highlights and sync formats are unchanged.
-- `EpubBook.imageReferenceCounts` lazily caches original image references across distinct linear, non-navigation spine documents for that book snapshot; first access runs on a resource/loading worker. `ReaderWebResourceBridge` serves the counts at `/reader-media/image-references.json` before Reader runtime initialization. Shared media semantics suppress holds at three references without changing layout. TTS source extraction consumes the same counts, including background and cross-chapter barriers. Unknown counts preserve holds.
+- `EpubBook.imageReferenceCounts` lazily caches original image references across
+  distinct linear, non-navigation spine documents for that book snapshot; first
+  access runs on a resource/loading worker. `ReaderWebResourceBridge` serves the
+  counts at `/reader-media/image-references.json`. Shared media semantics start
+  loading them during Reader initialization and wait for completion before
+  cues/highlights and position restore. They suppress holds at three references
+  without changing layout. TTS source extraction consumes the same counts,
+  including background and cross-chapter barriers. Unknown counts preserve holds.
 - `ReaderWebViewStateHolder` owns document/restore generations. Stale bridge
   callbacks cannot alter a replacement document. Renderer recovery preserves
   the latest accepted position and rebuilds WebView-local state.

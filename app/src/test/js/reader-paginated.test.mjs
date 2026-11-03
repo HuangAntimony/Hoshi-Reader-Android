@@ -28,7 +28,7 @@ function readerSource(url, options = {}) {
     const readerSasayaki = fs.readFileSync(readerSasayakiUrl, 'utf8');
     return fs.readFileSync(url, 'utf8')
         .replace('__HOSHI_READER_PARAGRAPH_SCRIPT__', fs.readFileSync(new URL('../../main/assets/hoshi-web/reader/reader-paragraph.js', import.meta.url), 'utf8'))
-        .replaceAll('__HOSHI_PARAGRAPH_ENABLED__', 'false')
+        .replaceAll('__HOSHI_PARAGRAPH_ENABLED__', String(options.paragraphMode ?? false))
         .replaceAll('__HOSHI_PARAGRAPH_TEXT_ANIMATION__', 'false')
         .replaceAll('__HOSHI_PARAGRAPH_TEXT_SPEED__', '35')
         .replaceAll('__HOSHI_PARAGRAPH_MAX_SENTENCES__', '0')
@@ -39,10 +39,6 @@ function readerSource(url, options = {}) {
         .replace('__HOSHI_READER_TEXT_SEMANTICS_SCRIPT__', options.textSemanticsScript ?? readerTextSemanticsSource())
         .replace('__HOSHI_READER_DOM_TEXT_SCRIPT__', options.domTextScript ?? readerDomTextSource())
         .replace('__HOSHI_READER_MEDIA_SEMANTICS_SCRIPT__', options.mediaSemanticsScript ?? readerMediaSemanticsSource())
-        .replace(
-            '__HOSHI_READER_LAYOUT_SEMANTICS_SCRIPT__',
-            options.layoutSemanticsScript ?? 'window.hoshiReaderLayoutSemantics = { sanitizeInlineBlocks: function() {} };',
-        )
         .replaceAll('__HOSHI_RESTORE_TOKEN_LITERAL__', JSON.stringify('restore-token'))
         .replaceAll('__HOSHI_CONTINUOUS_HORIZONTAL_PADDING_RATIO__', String(options.horizontalPaddingRatio ?? 0))
         .replaceAll('__HOSHI_CONTINUOUS_VERTICAL_PADDING_RATIO__', String(options.verticalPaddingRatio ?? 0))
@@ -884,6 +880,7 @@ test('paged and continuous readers use shared media setup', () => {
         const mediaSemanticsScript = `
           window.__mediaSetupCalls = [];
           window.hoshiReaderMediaSemantics = {
+            loadImageReferenceCounts: function() { return Promise.resolve(); },
             setupReaderImages: function(scope, options) {
               window.__mediaSetupCalls.push({
                 documentScope: scope === document,
@@ -959,18 +956,22 @@ test('paginated restoreProgress at chapter start avoids eager pagination metrics
     assert.equal(builtMetrics, 0);
 });
 
-test('reader initialization waits for fonts and images before sanitizing layout, offsets, and restore scripts', async () => {
-    for (const sourceUrl of [readerPaginatedUrl, readerContinuousUrl]) {
+test('reader initialization waits for fonts and images before indexing and restoring', async () => {
+    for (const [sourceUrl, paragraphMode] of [[readerPaginatedUrl, false], [readerPaginatedUrl, true], [readerContinuousUrl, false]]) for (const fontsFirst of [false, true]) {
         const body = new TestElement('body');
-        body.appendChild(new TestText('本文'));
+        const { paragraph, ruby } = rubyParagraph();
+        body.appendChild(paragraph);
         const events = [];
         let resolveFonts;
-        let resolveImages;
         const fontsReady = new Promise((resolve) => {
             resolveFonts = resolve;
         });
         const mediaSemanticsScript = `
           window.hoshiReaderMediaSemantics = {
+            loadImageReferenceCounts: function() {
+              window.__events.push('references');
+              return new Promise(function(resolve) { window.__resolveReferences = resolve; });
+            },
             setupReaderImages: function() {
               window.__events.push('setup');
               return new Promise(function(resolve) {
@@ -979,44 +980,56 @@ test('reader initialization waits for fonts and images before sanitizing layout,
             }
           };
         `;
-        const layoutSemanticsScript = `
-          window.hoshiReaderLayoutSemantics = {
-            sanitizeInlineBlocks: function(scope, vertical) {
-              window.__events.push(scope === document && vertical ? 'sanitize-vertical' : 'sanitize-horizontal');
-            }
-          };
-        `;
         const restoreScripts = "window.__events.push('restore'); window.hoshiReader.restoreProgress(0);";
-        const { reader, window } = loadReader(body, sourceUrl, {
+        const { reader, window, document } = loadReader(body, sourceUrl, {
             mediaSemanticsScript,
-            layoutSemanticsScript,
             fontsReady,
+            paragraphMode,
             restoreScripts,
             restoreMessages: [],
         });
         window.__events = events;
+        window.hoshiReaderDocumentPreparation = { resume() {
+            assert.equal(ruby.firstChild.tagName, 'SPAN', 'ruby prepared before first layout');
+            events.push('resume');
+        } };
+        Object.defineProperty(document.fonts, 'ready', { get() {
+            assert.ok(events.includes('resume'), 'font readiness is read after restoring display');
+            return fontsReady;
+        } });
+        if (paragraphMode) {
+            window.hoshiParagraph.layoutParagraphs = () => events.push('paragraph');
+            window.hoshiParagraph.fragmentBlocks = () => events.push('fragments');
+        }
         reader.buildNodeOffsets = () => {
             events.push('offsets');
         };
 
         reader.initialize();
-        resolveImages = window.__resolveImages;
+        reader.initialize();
         await Promise.resolve();
 
-        assert.deepEqual(events, ['setup']);
+        const prepared = ['references', 'setup', ...(paragraphMode ? ['paragraph'] : []), 'resume'];
+        assert.deepEqual(events, prepared);
 
-        resolveImages();
+        if (fontsFirst) resolveFonts();
+        else window.__resolveImages();
         for (let i = 0; i < 3; i += 1) {
             await Promise.resolve();
         }
-        assert.deepEqual(events, ['setup']);
+        assert.deepEqual(events, prepared);
 
-        resolveFonts();
+        if (fontsFirst) window.__resolveImages();
+        else resolveFonts();
         for (let i = 0; i < 10; i += 1) {
             await Promise.resolve();
         }
 
-        assert.deepEqual(events.slice(0, 4), ['setup', 'sanitize-vertical', 'offsets', 'restore']);
+        const measured = [...prepared, ...(paragraphMode ? ['fragments'] : []), 'offsets'];
+        assert.deepEqual(events, measured, 'slow image counts must not block layout/indexing');
+        window.__resolveReferences();
+        for (let i = 0; i < 10; i += 1) await Promise.resolve();
+        assert.deepEqual(events, [...measured, 'restore'], 'counts must be ready before restore/media holds');
     }
 });
 

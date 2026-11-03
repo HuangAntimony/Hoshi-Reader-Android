@@ -20,9 +20,22 @@
   }
 
   var imageReferenceCounts = global.hoshiReaderImageReferenceCounts || {};
+  var imageReferenceCountsPromise;
 
   function setImageReferenceCounts(counts) {
     imageReferenceCounts = counts || {};
+  }
+
+  function loadImageReferenceCounts() {
+    if (!imageReferenceCountsPromise) {
+      imageReferenceCountsPromise = global.hoshiReaderImageReferenceCounts || typeof global.fetch !== 'function'
+        ? Promise.resolve()
+        : global.fetch('https://appassets.androidplatform.net/reader-media/image-references.json')
+          .then(function(response) { return response.ok ? response.json() : null; })
+          .then(setImageReferenceCounts)
+          .catch(function() { /* Unknown counts preserve ordinary image holds. */ });
+    }
+    return imageReferenceCountsPromise;
   }
 
   function shouldHoldMedia(element) {
@@ -300,6 +313,7 @@
   global.hoshiReaderMediaSemantics = {
     isGaijiImage: isGaijiImage,
     setImageReferenceCounts: setImageReferenceCounts,
+    loadImageReferenceCounts: loadImageReferenceCounts,
     shouldHoldMedia: shouldHoldMedia,
     setupReaderImage: setupReaderImage,
     setupReaderImages: setupReaderImages

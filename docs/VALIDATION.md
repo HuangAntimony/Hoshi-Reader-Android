@@ -259,6 +259,12 @@ Measure latency again without tracing: detailed DevTools timeline events can
 inflate native-to-JavaScript callback costs, especially filtered TreeWalker
 scans. Use separate CPU samples for attribution and compare complete pagination
 metrics and raw/matchable node offsets when optimizing chapter traversal.
+For initialization ordering changes, run `ReaderDocumentPreparationWebViewTest`
+with and without the document-start hook, plus paragraph/image geometry checks.
+Use a separate timeline trace to distinguish full `Layout` events from style
+updates while the root is hidden. A chapter without fragment breaks should not
+need another full layout just to detect that there are no breaks; chapters with
+real continuation fragments can legitimately need another layout after wrapping.
 For paragraph/Sasayaki page-turn jank, measure `animateText`, `calculateProgress`
 and `pageSasayakiCues` separately on the same pages with the same installed cues.
 Pair those timings with frame gaps and native-swipe recordings; faster animation

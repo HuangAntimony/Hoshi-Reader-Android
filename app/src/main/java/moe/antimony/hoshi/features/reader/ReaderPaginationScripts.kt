@@ -114,7 +114,6 @@ internal object ReaderPaginationScripts {
             .replace("__HOSHI_READER_TEXT_SEMANTICS_SCRIPT__", source.readerTextSemantics)
             .replace("__HOSHI_READER_DOM_TEXT_SCRIPT__", source.readerDomText)
             .replace("__HOSHI_READER_MEDIA_SEMANTICS_SCRIPT__", source.readerMediaSemantics)
-            .replace("__HOSHI_READER_LAYOUT_SEMANTICS_SCRIPT__", source.readerLayoutSemantics)
             .replace("__HOSHI_RESTORE_TOKEN_LITERAL__", restoreToken.javaScriptStringLiteral())
             .replace("__HOSHI_READER_PARAGRAPH_SCRIPT__", source.paragraph)
             .replace("__HOSHI_PARAGRAPH_ENABLED__", settings.paragraphMode.toString())
@@ -146,7 +145,6 @@ private data class ReaderPaginationAssetSource(
     val readerTextSemantics: String,
     val readerDomText: String,
     val readerMediaSemantics: String,
-    val readerLayoutSemantics: String,
     val highlights: String,
 ) {
     companion object {
@@ -161,7 +159,6 @@ private data class ReaderPaginationAssetSource(
                     readerTextSemantics = assets.readerTextSemanticsJs,
                     readerDomText = assets.readerDomTextJs,
                     readerMediaSemantics = assets.readerMediaSemanticsJs,
-                    readerLayoutSemantics = assets.readerLayoutSemanticsJs,
                     highlights = assets.highlightsJs,
                 )
             }
@@ -181,7 +178,6 @@ private object SourceTreeReaderPaginationAssets {
             readerTextSemantics = readSourceAsset("hoshi-web/reader/reader-text-semantics.js"),
             readerDomText = readSourceAsset("hoshi-web/reader/reader-dom-text.js"),
             readerMediaSemantics = readSourceAsset("hoshi-web/reader/reader-media-semantics.js"),
-            readerLayoutSemantics = readSourceAsset("hoshi-web/reader/reader-layout-semantics.js"),
             highlights = readSourceAsset("hoshi-web/reader/highlights.js"),
         )
     }
