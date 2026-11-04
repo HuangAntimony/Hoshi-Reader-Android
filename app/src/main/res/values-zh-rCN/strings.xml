@@ -482,6 +482,9 @@
     <string name="sync_google_device_code">Google 设备代码</string>
     <string name="sync_device_code_copied">设备代码已复制</string>
     <string name="sync_connect_google_drive">连接 Google Drive</string>
+    <string name="sync_restore_google_drive_authorization">恢复 Google Drive 授权</string>
+    <string name="sync_status_authorization_recovery">等待授权恢复</string>
+    <string name="sync_authorization_recovery_pending">Google Drive 授权暂待恢复。正在自动重试，也可在同步设置中恢复授权。</string>
     <string name="sync_device_code_setup">ッツ 同步设置</string>
     <string name="sync_ttu_google_cloud_setup">ッツ 同步教程</string>
     <string name="sync_device_code_intro">Google Drive 同步使用设备代码流程，因此这个 Android 应用可以使用 ッツ 同步教程中说明的同一个用户自有 Google Cloud 项目。</string>

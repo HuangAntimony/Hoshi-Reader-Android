@@ -48,9 +48,12 @@ data class SyncSettings(
 
 sealed interface DriveAuthStatus {
     data object Connected : DriveAuthStatus
+    data object RecoveryRequired : DriveAuthStatus
     data object NotConnected : DriveAuthStatus
     data object MissingConfiguration : DriveAuthStatus
     data class Failed(val message: String) : DriveAuthStatus
+
+    val isLinked: Boolean get() = this == Connected || this == RecoveryRequired
 }
 
 sealed interface DriveAuthorizationResult {
@@ -135,6 +138,9 @@ open class GoogleDriveUnavailableException(override val cause: Throwable) : Exce
 
 /** A Hoshi metadata HTTP exchange failed; it does not invalidate unrelated payload transfers. */
 internal class GoogleDriveMetadataNetworkException(cause: java.io.IOException) : GoogleDriveUnavailableException(cause)
+
+/** Payload socket/response I/O remains identifiable after credential redaction. */
+internal class DrivePayloadNetworkIOException(message: String) : java.io.IOException(message)
 
 internal fun shouldAttemptDriveRequest(
     hasActiveNetwork: Boolean,

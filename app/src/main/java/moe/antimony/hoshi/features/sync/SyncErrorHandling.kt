@@ -18,6 +18,7 @@ fun Throwable.syncMessage(operation: UiText? = null): UiText {
 private fun Throwable.syncSummary(): UiText = when (this) {
     is GoogleDriveUnavailableException -> cause.syncSummary()
     is SyncFormatError -> UiText.Resource(R.string.sync_unsupported_format)
+    is NativeDriveAuthorizationRecoveryException -> UiText.Resource(R.string.sync_authorization_recovery_pending)
     is DriveAuthorizationRequiredException -> UiText.Resource(R.string.sync_connect_google_drive)
     else -> UiText.Resource(R.string.bookshelf_sync_failed)
 }

@@ -3,8 +3,6 @@ package moe.antimony.hoshi.features.sync
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.booleanPreferencesKey
-import androidx.datastore.preferences.core.edit
 import java.io.File
 import java.io.IOException
 import kotlinx.coroutines.CancellationException
@@ -29,22 +27,24 @@ class GoogleDriveNativeLoginTest {
     @Before fun clearDiagnostics() { ErrorDiagnosticEvents.buffer.drain() }
     @After fun drainDiagnostics() { ErrorDiagnosticEvents.buffer.drain() }
 
-    @Test fun authorizationRequiredRestoresConnectAndPersistsAfterRestart() = runTest {
+    @Test fun authorizationResolutionPreservesLinkAndCanRecoverSilentlyAfterRestart() = runTest {
         val file = temporary.root.resolve("native-login.preferences_pb")
         val login = LoginStore(file)
-        val original = DriveAuthorizationRequiredException(IOException("Consent revoked", IOException("Drive scope removed")))
+        val original = runCatching {
+            nativeDriveToken(null, true, emptyList(), NativeDriveAuthorizationContext(true, 0, true, true, true))
+        }.exceptionOrNull()!!
         try {
             login.connect()
             assertFalse(syncConnectionActions(login.dataStore.nativeDriveStatus(), false).showConnect)
             val visible = syncOperationError { login.dataStore.nativeDriveAccessToken { throw original } }
 
-            assertEquals(DriveAuthStatus.NotConnected, login.dataStore.nativeDriveStatus())
+            assertEquals(DriveAuthStatus.RecoveryRequired, login.dataStore.nativeDriveStatus())
             val actions = syncConnectionActions(login.dataStore.nativeDriveStatus(), false)
             assertTrue(actions.showConnect)
             assertTrue(actions.connectEnabled)
-            assertFalse(actions.showSignOut)
+            assertTrue(actions.showSignOut)
             val details = visible.details()
-            for (detail in listOf("Consent revoked", "Drive scope removed")) assertTrue(details, details.contains(detail))
+            for (detail in listOf("requiresResolution=true", "validated=true")) assertTrue(details, details.contains(detail))
             assertSame(original, ErrorDiagnosticEvents.buffer.drain().single().error)
         } finally {
             login.close()
@@ -52,8 +52,14 @@ class GoogleDriveNativeLoginTest {
 
         val restarted = LoginStore(file)
         try {
-            assertEquals(DriveAuthStatus.NotConnected, restarted.dataStore.nativeDriveStatus())
+            assertEquals(DriveAuthStatus.RecoveryRequired, restarted.dataStore.nativeDriveStatus())
+            assertTrue(restarted.dataStore.nativeDriveStatus().isLinked)
             assertTrue(syncConnectionActions(restarted.dataStore.nativeDriveStatus(), false).showConnect)
+            assertEquals("recovered-token", restarted.dataStore.nativeDriveAccessToken { "recovered-token" })
+            assertEquals("A token alone must not remove the durable root verification barrier", DriveAuthStatus.RecoveryRequired, restarted.dataStore.nativeDriveStatus())
+            restarted.dataStore.completeNativeDriveRecovery()
+            assertEquals(DriveAuthStatus.Connected, restarted.dataStore.nativeDriveStatus())
+            assertFalse(syncConnectionActions(restarted.dataStore.nativeDriveStatus(), false).showConnect)
         } finally {
             restarted.close()
         }
@@ -67,6 +73,25 @@ class GoogleDriveNativeLoginTest {
             assertEquals(DriveAuthStatus.Connected, login.dataStore.nativeDriveStatus())
             assertTrue(syncConnectionActions(login.dataStore.nativeDriveStatus(), false).showSignOut)
             assertTrue(ErrorDiagnosticEvents.buffer.drain().isEmpty())
+        } finally {
+            login.close()
+        }
+    }
+
+    @Test fun explicitSignOutDuringRecoveryCannotBeUndoneByALateToken() = runTest {
+        val login = LoginStore(temporary.root.resolve("native-login.preferences_pb"))
+        try {
+            login.connect()
+            runCatching {
+                login.dataStore.nativeDriveAccessToken {
+                    nativeDriveToken(null, true, emptyList(), NativeDriveAuthorizationContext(true, 0, true, true, true))
+                }
+            }
+            assertEquals(DriveAuthStatus.RecoveryRequired, login.dataStore.nativeDriveStatus())
+            login.dataStore.setNativeDriveConnected(false)
+            login.dataStore.nativeDriveAccessToken { "late-token" }
+            assertEquals(DriveAuthStatus.NotConnected, login.dataStore.nativeDriveStatus())
+            assertFalse(login.dataStore.nativeDriveStatus().isLinked)
         } finally {
             login.close()
         }
@@ -111,7 +136,7 @@ class GoogleDriveNativeLoginTest {
         private val scope = CoroutineScope(Dispatchers.IO + Job())
         val dataStore: DataStore<Preferences> = PreferenceDataStoreFactory.create(scope = scope) { file }
 
-        suspend fun connect() { dataStore.edit { it[booleanPreferencesKey("connected")] = true } }
+        suspend fun connect() { dataStore.setNativeDriveConnected(true) }
 
         suspend fun close() { scope.coroutineContext[Job]!!.cancelAndJoin() }
     }

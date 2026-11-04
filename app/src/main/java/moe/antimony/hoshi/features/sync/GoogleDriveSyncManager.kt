@@ -1,5 +1,6 @@
 package moe.antimony.hoshi.features.sync
 
+import android.os.SystemClock
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
@@ -38,6 +39,8 @@ import moe.antimony.hoshi.epub.BookMetadata
 import moe.antimony.hoshi.epub.BookRepository
 import moe.antimony.hoshi.epub.writeBookJson
 import moe.antimony.hoshi.ui.UiText
+import moe.antimony.hoshi.ui.ErrorDiagnosticEvents
+import moe.antimony.hoshi.ui.diagnosticMessage
 
 @Serializable
 data class GoogleDriveSyncCache(
@@ -49,6 +52,7 @@ data class GoogleDriveSyncCache(
     val bookFolders: Map<String, String> = emptyMap(),
     val attachPending: Boolean = false,
     val replacedRoot: Boolean = false,
+    val verifyConnection: Boolean = false,
 )
 
 data class GoogleDriveSyncState(
@@ -101,12 +105,17 @@ private class Listing {
     val files = mutableMapOf<Pair<String, String>, GoogleDriveFile>()
     val created = mutableSetOf<String>()
     var published = false
+    val networkFailures = mutableSetOf<String>()
 }
 
 /** [text] contains either a user-facing precondition or already-recorded failure details. */
 class GoogleDriveSyncException(val text: UiText, cause: Throwable? = null) : Exception(cause)
 
 private class AttachPending : Exception()
+
+private class AuthorizationRecoveryCancellation(val failure: Exception) : CancellationException("Google Drive authorization recovery interrupted the download") {
+    init { initCause(failure) }
+}
 
 @Singleton
 class GoogleDriveSyncManager internal constructor(
@@ -124,6 +133,9 @@ class GoogleDriveSyncManager internal constructor(
     private val revokeAccess: suspend () -> Unit,
     private val clearTtuCache: () -> Unit,
     private val fileTransfer: DriveFileTransfer,
+    nowMillis: () -> Long = { System.nanoTime() / 1_000_000 },
+    private val authorizationRecoveryRequired: suspend () -> Boolean = { false },
+    private val completeAuthorizationRecovery: suspend () -> Unit = {},
 ) {
     @Inject constructor(
         store: SyncStorage,
@@ -140,7 +152,8 @@ class GoogleDriveSyncManager internal constructor(
         @MainDispatcher mainDispatcher: CoroutineDispatcher,
         @IoDispatcher ioDispatcher: CoroutineDispatcher,
     ) : this(store, drive, client, settings, books, filesDir, cacheDir, scope, mainDispatcher, ioDispatcher,
-        { auth.status(SyncProvider.Gdrive) == DriveAuthStatus.Connected }, auth::revokeAccess, ttu::clearCache, fileTransfer)
+        { auth.status(SyncProvider.Gdrive).isLinked }, auth::revokeAccess, ttu::clearCache, fileTransfer,
+        SystemClock::elapsedRealtime, auth::recoveryRequired, auth::completeRecovery)
 
     private val mutableState = MutableStateFlow(GoogleDriveSyncState())
     val state = mutableState.asStateFlow()
@@ -152,6 +165,8 @@ class GoogleDriveSyncManager internal constructor(
     private var pollTask: Job? = null
     private var debounceTask: Job? = null
     private var stopped = false
+    private var authorizing = false
+    private val networkRetry = DriveSyncRetry(nowMillis)
     private var unsupportedFormat = false
     private var transfers = listOf<SyncQueueItem>()
     private var progress: SyncProgress? = null
@@ -190,20 +205,23 @@ class GoogleDriveSyncManager internal constructor(
 
     private suspend fun enabled(): Boolean {
         val config = settings.settings.first()
-        return config.enabled && config.provider == SyncProvider.Gdrive && isAuthenticated() && !stopped && !cache.attachPending
+        return config.enabled && config.provider == SyncProvider.Gdrive && isAuthenticated() && !stopped && !authorizing && !cache.attachPending
     }
 
     suspend fun start(): Unit = withContext(mainDispatcher) {
         initialization.await()
+        if (authorizing) return@withContext
         client.resume()
         stopped = false
         pollTask?.cancel()
         if (!enabled()) return@withContext
         pollTask = scope.launch {
-            sync()
+            syncAutomatically()
             while (true) {
-                delay(if (BuildConfig.DEBUG) 5_000 else 120_000)
-                sync()
+                val interval = if (BuildConfig.DEBUG) 5_000L else 120_000L
+                val remaining = networkRetry.remainingMillis()
+                delay(if (remaining > 0) minOf(interval, remaining) else interval)
+                syncAutomatically()
             }
         }
     }
@@ -215,12 +233,12 @@ class GoogleDriveSyncManager internal constructor(
 
     suspend fun pause(): Unit = withContext(mainDispatcher) {
         pausePolling()
-        sync()
+        syncAutomatically()
     }
 
     suspend fun syncInBackground(): Unit = withContext(mainDispatcher) {
         if (!enabled()) return@withContext
-        sync()
+        syncAutomatically()
         // A state pass can enqueue files, whose uploads need another state pass.
         // Drain the whole chain before reporting its final outcome to WorkManager.
         while (true) {
@@ -228,9 +246,16 @@ class GoogleDriveSyncManager internal constructor(
             if (tasks.isEmpty()) break
             for (task in tasks) task.join()
         }
-        runError?.let { throw it }
+        fun failure(error: Throwable, message: UiText): Nothing {
+            // Automatic outage diagnostics were already recorded (or deliberately suppressed).
+            if (error.isSyncRetryableFailure()) throw GoogleDriveSyncException(message, error)
+            throw error
+        }
+        runError?.let { failure(it, state.value.errorMessage ?: UiText.Resource(R.string.bookshelf_sync_failed)) }
         val errors = bookErrors.values.map { it.cause }
-        (errors.firstOrNull { it.isRetryableBackgroundSyncFailure() } ?: errors.firstOrNull())?.let { throw it }
+        (errors.firstOrNull { it.isRetryableBackgroundSyncFailure() } ?: errors.firstOrNull())?.let {
+            failure(it, bookErrors.values.first { book -> book.cause === it }.message)
+        }
     }
 
     suspend fun stop(): Unit = withContext(mainDispatcher) {
@@ -275,7 +300,8 @@ class GoogleDriveSyncManager internal constructor(
         initialization.await()
         stop()
         fileTransfer.reset()
-        cache = GoogleDriveSyncCache(root = cache.root, attachPending = cache.attachPending, replacedRoot = cache.replacedRoot)
+        cache = GoogleDriveSyncCache(root = cache.root, attachPending = cache.attachPending,
+            replacedRoot = cache.replacedRoot, verifyConnection = cache.verifyConnection)
         saveCache()
         withContext(ioDispatcher) { clearTtuCache() }
         start()
@@ -328,33 +354,76 @@ class GoogleDriveSyncManager internal constructor(
             store.resetSyncState()
         }
         cache = GoogleDriveSyncCache(replacedRoot = cache.replacedRoot)
+        networkRetry.reset()
         unsupportedFormat = false
         mutableState.value = GoogleDriveSyncState()
         saveCache()
     }
 
+    /** Keep the old association until the newly authorized account's root has been checked. */
+    suspend fun authorizationChanged(): Unit = withContext(mainDispatcher) {
+        initialization.await()
+        fileTransfer.reset()
+        cache = cache.copy(verifyConnection = true, attachPending = false)
+        networkRetry.reset()
+        mutableState.value = state.value.copy(attachPending = false, attachDismissed = false)
+        saveCache()
+    }
+
+    suspend fun reauthorize(accept: suspend () -> Unit): Unit = withContext(mainDispatcher) {
+        check(!authorizing)
+        authorizing = true
+        try {
+            stop()
+            authorizationChanged()
+            accept()
+        } finally {
+            withContext(NonCancellable) {
+                authorizing = false
+                start()
+            }
+        }
+    }
+
     suspend fun schedule(): Unit = withContext(mainDispatcher) {
         if (!enabled() || stateTask != null || debounceTask != null) return@withContext
         debounceTask = scope.launch {
-            delay(if (BuildConfig.DEBUG) 2_000 else 30_000)
+            delay(maxOf(if (BuildConfig.DEBUG) 2_000L else 30_000L, networkRetry.remainingMillis()))
             debounceTask = null
-            sync()
+            syncAutomatically()
         }
     }
 
     suspend fun sync(book: BookMetadata? = null) {
-        syncPass(book)
+        requestSync(book, automatic = false)
     }
 
+    suspend fun syncAutomatically(book: BookMetadata? = null) {
+        requestSync(book, automatic = true)
+    }
+
+    suspend fun onNetworkAvailable(): Unit = withContext(mainDispatcher) {
+        requestSync(book = null, automatic = true, force = true)
+    }
+
+    private suspend fun requestSync(book: BookMetadata?, automatic: Boolean, force: Boolean = false): Boolean = withContext(mainDispatcher) {
+        // Forced requests release the deadline even when they join an existing pass.
+        if (!automatic || force) networkRetry.allowNow()
+        syncPass(book, automatic) { networkRetry.startAttempt(respectBackoff = automatic && !force) }
+    }
+
+    // Publication continues admitted work without opening another retry window.
     // False means no new pass completed: disabled, joined another pass, or superseded.
-    private suspend fun syncPass(book: BookMetadata?): Boolean = withContext(mainDispatcher) {
+    private suspend fun syncPass(book: BookMetadata?, automatic: Boolean = false, admit: (() -> Boolean)? = null): Boolean = withContext(mainDispatcher) {
         initialization.await()
+        preserveAuthorizationVerification()
         if (!enabled()) return@withContext false
         val previous = stateTask
         if (book == null && previous != null) {
             previous.join()
             return@withContext false
         }
+        if (admit?.invoke() == false) return@withContext false
         debounceTask?.cancel()
         debounceTask = null
         if (book != null) previous?.cancel()
@@ -362,10 +431,11 @@ class GoogleDriveSyncManager internal constructor(
             try {
                 previous?.join()
                 currentCoroutineContext().ensureActive()
-                mutableState.value = state.value.copy(errorMessage = null)
+                if (!automatic) mutableState.value = state.value.copy(errorMessage = null)
                 runError = null
                 try {
-                    syncState(book)
+                    syncState(book, automatic)
+                    mutableState.value = state.value.copy(errorMessage = null)
                 } finally {
                     withContext(NonCancellable) { saveCache() }
                 }
@@ -374,18 +444,23 @@ class GoogleDriveSyncManager internal constructor(
             } catch (error: AttachPending) {
                 fileTransferTask?.cancel()
             } catch (error: Exception) {
-                failRun(error)
+                failRun(error, automatic)
                 if (error !is GoogleDriveMetadataNetworkException) fileTransferTask?.cancel()
             } finally {
                 val current = currentCoroutineContext()[Job]!!
                 if (stateTask === current) {
-                    stateTask = null
+                    try {
+                        // Keep ownership across the suspending handoff so retry state never sees a false idle.
+                        if (!current.isCancelled) startFileSync(automatic, completingState = current)
+                    } finally {
+                        if (stateTask === current) stateTask = null
+                        publish()
+                    }
                     if (!current.isCancelled) {
                         val succeeded = state.value.errorMessage == null && bookErrors.keys.none { it.second == SyncPhase.State }
                         if (book != null || (succeeded && store.transaction { store.state.books.values.any { it.pending } || store.state.shelvesPending })) schedule()
-                        startFileSync()
+                        settleRetryIfIdle()
                     }
-                    publish()
                 }
             }
         }
@@ -397,19 +472,26 @@ class GoogleDriveSyncManager internal constructor(
         !task.isCancelled
     }
 
-    private suspend fun syncState(book: BookMetadata?) {
+    private suspend fun syncState(book: BookMetadata?, automatic: Boolean) {
+        if (cache.verifyConnection) {
+            loadLayout()
+            cache = cache.copy(verifyConnection = false)
+            saveCache()
+            completeAuthorizationRecovery()
+        }
         if (book != null) {
             if (cache.stateFolder.isEmpty()) loadLayout()
             val key = book.folder!!.syncKey()
-            recordBook(key, SyncPhase.State, runCatching { syncBook(key) })
+            recordBook(key, SyncPhase.State, runCatching { syncBook(key) }, automatic)
             return
         }
         val remote = changes()
         val pending = store.transaction { store.state.books.filterValues { it.pending }.keys }
-        val keys = (remote.changed.keys + remote.listed?.keys.orEmpty() + pending - ".shelves").sorted()
+        val retry = bookErrors.filter { it.key.second == SyncPhase.State && it.value.cause.isRetryableBackgroundSyncFailure() }.keys.map { it.first }
+        val keys = (remote.changed.keys + remote.listed?.keys.orEmpty() + pending + retry - ".shelves").sorted()
         concurrent(keys) { key ->
             val files = remote.files(key, cache.bookVersions[key])
-            recordBook(key, SyncPhase.State, runCatching { syncBook(key, files) })
+            recordBook(key, SyncPhase.State, runCatching { syncBook(key, files) }, automatic)
         }
         val failed = keys.any { (it to SyncPhase.State) in bookErrors }
         if (!failed && store.transaction { store.state.books.values.none { !it.attached && !it.deleted } }) {
@@ -425,13 +507,17 @@ class GoogleDriveSyncManager internal constructor(
         for (item in items) launch { limit.withPermit { action(item) } }
     }
 
-    private suspend fun startFileSync() {
-        if (!enabled() || unsupportedFormat || state.value.errorMessage != null || stateTask != null || cache.bookFolder.isEmpty()) return
+    private suspend fun startFileSync(automatic: Boolean = true, completingState: Job? = null) {
+        initialization.await()
+        preserveAuthorizationVerification()
+        if (!enabled() || cache.verifyConnection || unsupportedFormat || state.value.errorMessage != null ||
+            (stateTask != null && stateTask !== completingState) || cache.bookFolder.isEmpty()) return
         if (fileTransferTask != null) return enqueue(reset = false)
         val task = scope.launch(start = CoroutineStart.LAZY) {
             try {
-                do {
-                    val published = runFileSync()
+                transferLoop@ do {
+                    val result = runFileSync(automatic)
+                    val published = result.published
                     progress = null
                     publish()
                     val queued = jobs.isNotEmpty()
@@ -440,19 +526,22 @@ class GoogleDriveSyncManager internal constructor(
                     // Keep ownership until a fresh full pass completes, even if a
                     // reader-open sync supersedes it. Terminal errors still end the run.
                     if (published) {
-                        while (!syncPass(book = null)) {
+                        while (!syncPass(book = null, automatic = automatic)) {
                             currentCoroutineContext().ensureActive()
-                            if (!enabled()) break
+                            if (!enabled()) break@transferLoop
                         }
                     }
-                } while ((published || queued) && enabled() && !unsupportedFormat && state.value.errorMessage == null)
+                    if (result.networkFailures.isNotEmpty()) break@transferLoop
+                } while ((published || queued) && enabled() && !unsupportedFormat && state.value.errorMessage == null &&
+                    bookErrors.keys.none { it.second == SyncPhase.State })
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
-                failRun(error)
+                failRun(error, automatic)
             } finally {
                 fileTransferTask = null
                 progress = null
+                if (!currentCoroutineContext()[Job]!!.isCancelled) settleRetryIfIdle()
                 publish()
             }
         }
@@ -463,10 +552,10 @@ class GoogleDriveSyncManager internal constructor(
 
     suspend fun downloadAll(): Unit = withContext(mainDispatcher) {
         downloads = downloads + store.transaction { store.state.books.filterValues { it.missingEpub }.keys }
-        startFileSync()
+        requestSync(book = null, automatic = false)
     }
 
-    private suspend fun runFileSync(): Boolean {
+    private suspend fun runFileSync(automatic: Boolean): Listing {
         val records = store.transaction { store.state.books.toMap() }
         val root = cache.root
         fileTransfer.discardObsolete { upload ->
@@ -479,7 +568,7 @@ class GoogleDriveSyncManager internal constructor(
         enqueue(reset = true)
         val listing = if (progress == null) Listing() else listFiles()
         try {
-            coroutineScope { repeat(8) { launch { work(listing) } } }
+            coroutineScope { repeat(8) { launch { work(listing, automatic) } } }
         } finally {
             withContext(NonCancellable) { saveCache() }
         }
@@ -490,13 +579,14 @@ class GoogleDriveSyncManager internal constructor(
                 saveCache()
             } catch (error: CancellationException) {
                 throw error
-            } catch (_: Exception) {
+            } catch (error: Exception) {
+                if (error.stopsRun) throw error
             }
         }
-        return listing.published
+        return listing
     }
 
-    private suspend fun work(listing: Listing) {
+    private suspend fun work(listing: Listing, automatic: Boolean) {
         while (true) {
             currentCoroutineContext().ensureActive()
             val version = wakeSignal.value
@@ -507,19 +597,31 @@ class GoogleDriveSyncManager internal constructor(
                 continue
             }
             val job = jobs.removeAt(index)
+            if (job.key in listing.networkFailures) continue
             active++
             publish()
+            var skipped = false
             val result = runCatching {
                 scheduler.withBook(job.key) {
                     lock(job.key)
                     try {
-                        if (job.epub) downloadFile(job.key, SyncFileType.epub, listing) else syncFiles(job.key, listing)
+                        if (job.key in listing.networkFailures) skipped = true
+                        else if (job.epub) downloadFile(job.key, SyncFileType.epub, listing) else syncFiles(job.key, listing, automatic)
+                    } catch (error: Exception) {
+                        // Publish the failure before releasing this book to a waiting duplicate.
+                        if (error.isSyncNetworkFailure()) listing.networkFailures += job.key
+                        throw error
                     } finally {
                         unlock(job.key)
                     }
                 }
             }
-            val failure = runCatching { recordBook(job.key, SyncPhase.File, result) }.exceptionOrNull()
+            if (skipped) {
+                active--
+                wake()
+                continue
+            }
+            val failure = runCatching { recordBook(job.key, SyncPhase.File, result, automatic) }.exceptionOrNull()
             val succeeded = failure == null && (job.key to SyncPhase.File) !in bookErrors
             val deferred = !job.epub && succeeded && wantsEpub(job.key)
             active--
@@ -574,13 +676,13 @@ class GoogleDriveSyncManager internal constructor(
         publish()
     }
 
-    private suspend fun syncFiles(key: String, listing: Listing) {
+    private suspend fun syncFiles(key: String, listing: Listing, automatic: Boolean) {
         val failures = mutableListOf<Pair<UiText, Throwable>>()
         suspend fun attempt(operation: (String) -> UiText, action: suspend () -> Unit) {
             val error = runCatching { action() }.exceptionOrNull() ?: return
             if (error.stopsRun) throw error
             val title = bookTitle(key, store.state.books[key]?.deleted == true)
-            failures += error.syncMessage(operation(title)) to error
+            failures += reportFailure(error, operation(title), automatic) to error
         }
         for (type in SyncFileType.entries) {
             currentCoroutineContext().ensureActive()
@@ -610,7 +712,7 @@ class GoogleDriveSyncManager internal constructor(
         publish()
     }
 
-    private suspend fun recordBook(key: String, phase: SyncPhase, result: Result<Unit>) {
+    private suspend fun recordBook(key: String, phase: SyncPhase, result: Result<Unit>, automatic: Boolean = false) {
         val error = result.exceptionOrNull()
         if (error == null) {
             bookErrors = bookErrors - (key to phase)
@@ -619,16 +721,48 @@ class GoogleDriveSyncManager internal constructor(
         currentCoroutineContext().ensureActive()
         if (error.stopsRun) throw error
         val title = bookTitle(key, store.state.books[key]?.deleted == true)
-        bookErrors = bookErrors + ((key to phase) to BookError(title, error.syncMessage(UiText.Resource(R.string.sync_book_failed_format, title)), error))
+        bookErrors = bookErrors + ((key to phase) to BookError(title, reportFailure(error, UiText.Resource(R.string.sync_book_failed_format, title), automatic), error))
     }
 
     private suspend fun bookTitle(key: String, deleted: Boolean): String =
         store.transaction { books.loadMetadata(store.bookDirectory(key, deleted))?.displayTitle?.ifBlank { null } } ?: key
 
-    private fun failRun(error: Exception) {
+    private fun reportFailure(error: Throwable, operation: UiText? = null, automatic: Boolean = false): UiText {
+        if (error is GoogleDriveSyncException) return error.syncMessage(operation)
+        networkRetry.recordFailure(error)
+        if (!automatic || !error.isSyncRetryableFailure()) return error.syncMessage(operation)
+        val summary = operation ?: UiText.Resource(
+            if (error.isSyncAuthorizationRecovery()) R.string.sync_authorization_recovery_pending else R.string.bookshelf_sync_failed)
+        if (networkRetry.shouldRecord(recovery = error.isSyncAuthorizationRecovery())) ErrorDiagnosticEvents.buffer.record(summary, error)
+        return UiText.Joined(listOf(summary, UiText.Literal(error.diagnosticMessage())))
+    }
+
+    private suspend fun failRun(error: Exception, automatic: Boolean = false) {
+        val recovery = error.isSyncAuthorizationRecovery()
+        if (recovery) cache = cache.copy(verifyConnection = true)
+        // Publish before persistence can suspend, so an old failure cannot overwrite a newer recovery.
         runError = error
-        mutableState.value = state.value.copy(errorMessage = error.syncMessage())
+        mutableState.value = state.value.copy(errorMessage = reportFailure(error, automatic = automatic))
         if (error is SyncFormatError) unsupportedFormat = true
+        if (recovery) {
+            val current = currentCoroutineContext()[Job]
+            stateTask?.takeUnless { it === current }?.cancel()
+            fileTransferTask?.takeUnless { it === current }?.cancel()
+            readerDownloads.filter { it !== current }.forEach { it.cancel(AuthorizationRecoveryCancellation(error)) }
+            withContext(NonCancellable) { saveCache() }
+        }
+    }
+
+    private suspend fun preserveAuthorizationVerification() {
+        if (!cache.verifyConnection && authorizationRecoveryRequired()) {
+            cache = cache.copy(verifyConnection = true)
+            saveCache()
+        }
+    }
+
+    private fun settleRetryIfIdle() {
+        if (!stopped && !authorizing && stateTask == null && fileTransferTask == null && readerDownloads.none { it.isActive } &&
+            runError == null && bookErrors.values.none { it.cause.isSyncRetryableFailure() }) networkRetry.reset()
     }
 
     private fun queue(): List<SyncQueueItem> {
@@ -694,11 +828,12 @@ class GoogleDriveSyncManager internal constructor(
         val task = scope.async(start = CoroutineStart.LAZY) {
             val key = book.folder!!.syncKey()
             try {
-                sync(book)
+                if (!requestSync(book, automatic = false)) throw CancellationException("Book state check was superseded")
                 if (unsupportedFormat) throw SyncFormatError()
                 runError?.let { throw it }
                 bookErrors[key to SyncPhase.State]?.cause?.let { throw it }
                 currentCoroutineContext().ensureActive()
+                if (cache.verifyConnection) throw CancellationException("Drive connection verification is pending")
                 if (store.state.books[key]?.deleted == true) throw GoogleDriveSyncException(UiText.Resource(R.string.sync_book_deleted))
                 if (enabled() && store.state.books[key]?.files?.get(SyncFileType.epub)?.value != null) {
                     scheduler.withBook(key, priority = true) {
@@ -714,15 +849,29 @@ class GoogleDriveSyncManager internal constructor(
                 val metadata = books.loadMetadata(store.bookDirectory(book.folder)) ?: book
                 if (metadata.epub == null) throw GoogleDriveSyncException(UiText.Resource(R.string.sync_book_not_uploaded))
                 metadata
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                if (error.isSyncAuthorizationRecovery()) {
+                    failRun(error)
+                }
+                throw error
             } finally {
                 withContext(NonCancellable) { startFileSync() }
             }
         }
         readerDownloads += task
-        task.invokeOnCompletion { scope.launch(mainDispatcher) { readerDownloads -= task; publish() } }
+        task.invokeOnCompletion { scope.launch(mainDispatcher) { readerDownloads -= task; settleRetryIfIdle(); publish() } }
         task.start()
         // A caller leaving the reader does not stop application-owned work.
-        task.await()
+        try {
+            task.await()
+        } catch (error: CancellationException) {
+            currentCoroutineContext().ensureActive()
+            // Stopping app-owned I/O must still report its operational failure to an active waiter.
+            if (error is AuthorizationRecoveryCancellation) throw error.failure
+            throw error
+        }
     }
 
     private suspend fun changes(): RemoteChanges {
@@ -1131,7 +1280,8 @@ class GoogleDriveSyncManager internal constructor(
 }
 
 private val Throwable.stopsRun: Boolean
-    get() = this !is Exception || this is CancellationException || this is SyncFormatError || this is DriveAuthException || (this is GoogleDriveUnavailableException && this !is GoogleDriveMetadataNetworkException)
+    get() = this !is Exception || this is CancellationException || this is SyncFormatError || this is DriveAuthException ||
+        (this is GoogleDriveUnavailableException && this !is GoogleDriveMetadataNetworkException && cause !is DrivePayloadNetworkIOException)
 
 private val SyncRecord.missingEpub: Boolean
     get() = !deleted && files[SyncFileType.epub]?.let { published -> published.value != null && (sources[SyncFileType.epub]?.let { it < published.modified } ?: true) } == true

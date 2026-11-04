@@ -49,6 +49,8 @@ Rendering and latency claims require device evidence.
   scope before `resetMain()`, or late callbacks can fail unrelated tests.
 - MockWebServer WebSocket fixtures must answer `onClosing` with
   `webSocket.close(code, reason)`; otherwise shutdown can hang or fail teardown.
+- For MockWebServer disconnect tests, bind the server and client DNS to IPv4
+  loopback so `localhost` IPv6 fallback cannot mask the intended failure.
 - Duplicate English strings with intentionally different contexts need matching
   `comment` attributes on every duplicate in both language resource files.
 - Settings state tests use delayed first emissions, read failure/retry and stale

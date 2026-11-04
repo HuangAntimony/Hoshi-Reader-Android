@@ -484,6 +484,9 @@
     <string name="sync_google_device_code">Google device code</string>
     <string name="sync_device_code_copied">Device code copied</string>
     <string name="sync_connect_google_drive">Connect Google Drive</string>
+    <string name="sync_restore_google_drive_authorization">Restore Google Drive authorization</string>
+    <string name="sync_status_authorization_recovery">Waiting for authorization recovery</string>
+    <string name="sync_authorization_recovery_pending">Google Drive authorization needs recovery. Retrying automatically; you can also restore authorization in Sync settings.</string>
     <string name="sync_device_code_setup">ッツ Sync setup</string>
     <string name="sync_ttu_google_cloud_setup">ッツ Sync guide</string>
     <string name="sync_device_code_intro">Google Drive sync uses Device Code flow so this Android app can use the same user-owned Google Cloud project described in the ッツ Sync guide.</string>

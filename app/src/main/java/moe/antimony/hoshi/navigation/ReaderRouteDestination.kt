@@ -108,7 +108,7 @@ internal fun ReaderRouteDestination(
                 sasayakiSettings = sasayakiSettings ?: appContainer.sasayakiSettingsRepository.settings.first(),
             )
             if (initialAutoSyncState.syncSettings?.let { it.enabled && it.provider == SyncProvider.Gdrive } == true) {
-                if (!skipSyncOnOpen) appContainer.googleDriveSyncManager.sync(entry.metadata)
+                if (!skipSyncOnOpen) appContainer.googleDriveSyncManager.syncAutomatically(entry.metadata)
                 if (appContainer.bookRepository.loadMetadata(entry.root)?.epub == null) {
                     withContext(Dispatchers.Main.immediate) { onClose() }
                     error("Book was deleted.")
@@ -195,14 +195,14 @@ internal fun ReaderRouteDestination(
         if (syncSettings?.provider == SyncProvider.Gdrive) {
             appContainer.appScope.launch {
                 autoSyncExportController.flushSaves()
-                appContainer.googleDriveSyncManager.sync()
+                appContainer.googleDriveSyncManager.syncAutomatically()
             }
         } else autoSyncExportController.flushExport(autoSyncState.isReaderAutoSyncEnabled)
     }
 
     fun importOnForeground(entry: BookEntry) {
         if (syncSettings?.provider == SyncProvider.Gdrive) {
-            bookmarkScope.launch { appContainer.googleDriveSyncManager.sync(entry.metadata) }
+            bookmarkScope.launch { appContainer.googleDriveSyncManager.syncAutomatically(entry.metadata) }
             return
         }
         if (!autoSyncState.isReaderAutoSyncEnabled) return

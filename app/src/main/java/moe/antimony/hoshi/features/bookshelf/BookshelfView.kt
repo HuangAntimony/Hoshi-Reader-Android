@@ -797,7 +797,7 @@ internal fun shouldEnableBookshelfPullRefresh(
     isSelecting: Boolean,
     fileTaskBlocked: Boolean,
 ): Boolean =
-    syncSettings.enabled && authStatus == DriveAuthStatus.Connected &&
+    syncSettings.enabled && authStatus?.isLinked == true &&
         hasLoadedBooks &&
         !isSelecting &&
         !fileTaskBlocked

@@ -152,6 +152,10 @@ class MainShellUiTest {
 
     @Test
     fun bookshelfPullRefreshIsEnabledOnlyForLoadedSyncShelfLikeIos() {
+        assertTrue(shouldEnableBookshelfPullRefresh(
+            syncSettings = SyncSettings(enabled = true), authStatus = DriveAuthStatus.RecoveryRequired,
+            hasLoadedBooks = true, isSelecting = false, fileTaskBlocked = false,
+        ))
         assertTrue(
             shouldEnableBookshelfPullRefresh(
                 syncSettings = SyncSettings(enabled = true),

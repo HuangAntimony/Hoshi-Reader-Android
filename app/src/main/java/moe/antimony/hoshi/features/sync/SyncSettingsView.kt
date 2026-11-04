@@ -194,10 +194,7 @@ fun SyncSettingsView(
                             IntentSender.SendIntentException::class.java)
                     }?.let { throw it }
                     googleAuth.authorizationResult(result.data)
-                    hoshiSync.stop()
-                    googleAuth.accept()
-                    hoshiSync.resetConnection()
-                    hoshiSync.start()
+                    hoshiSync.reauthorize { googleAuth.accept() }
                     authStatus = DriveAuthStatus.Connected
                 }
             } finally {
@@ -214,14 +211,8 @@ fun SyncSettingsView(
                         googleAuth.browser.cancelAuthorization()
                         return@runDriveAuthorization
                     }
-                    hoshiSync.stop()
-                    try {
-                        googleAuth.acceptBrowserAuthorization(result.data)
-                        hoshiSync.resetConnection()
-                        authStatus = DriveAuthStatus.Connected
-                    } finally {
-                        hoshiSync.start()
-                    }
+                    hoshiSync.reauthorize { googleAuth.acceptBrowserAuthorization(result.data) }
+                    authStatus = DriveAuthStatus.Connected
                 }
             } finally {
                 isAuthorizing = false
@@ -326,15 +317,12 @@ fun SyncSettingsView(
                             browserAuthorizationLauncher.launch(googleAuth.browser.authorizationIntent())
                             awaitingResult = true
                         } else {
-                            val result = googleAuth.authorize(selectAccount = true)
+                            val result = googleAuth.authorize(selectAccount = currentAuthStatus != DriveAuthStatus.RecoveryRequired)
                             if (result.hasResolution()) {
                                 authorizationLauncher.launch(IntentSenderRequest.Builder(result.pendingIntent!!).build())
                                 awaitingResult = true
                             } else {
-                                hoshiSync.stop()
-                                googleAuth.accept()
-                                hoshiSync.resetConnection()
-                                hoshiSync.start()
+                                hoshiSync.reauthorize { googleAuth.accept() }
                                 authStatus = DriveAuthStatus.Connected
                             }
                         }
@@ -659,7 +647,7 @@ fun SyncSettingsView(
                         headlineContent = { Text(stringResource(R.string.sync_google_drive)) },
                         supportingContent = {
                             Text(
-                                if (currentSettings.provider == SyncProvider.Gdrive && currentAuthStatus == DriveAuthStatus.Connected && hoshiState.attachPending) {
+                                if (currentSettings.provider == SyncProvider.Gdrive && currentAuthStatus.isLinked && hoshiState.attachPending) {
                                     stringResource(R.string.sync_status_choice_needed)
                                 } else {
                                     currentAuthStatus.labelText()
@@ -759,7 +747,7 @@ fun SyncSettingsView(
                 }
             }
             item {
-                if (currentSettings?.enabled == true && currentSettings.provider == SyncProvider.Gdrive && currentAuthStatus == DriveAuthStatus.Connected) {
+                if (currentSettings?.enabled == true && currentSettings.provider == SyncProvider.Gdrive && currentAuthStatus?.isLinked == true) {
                     SettingsCard {
                         ListItem(
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
@@ -851,7 +839,7 @@ fun SyncSettingsView(
                             enabled = connectionActions.connectEnabled,
                             modifier = Modifier.fillMaxWidth(),
                         ) {
-                            Text(stringResource(R.string.sync_connect_google_drive))
+                            Text(stringResource(if (currentAuthStatus == DriveAuthStatus.RecoveryRequired) R.string.sync_restore_google_drive_authorization else R.string.sync_connect_google_drive))
                         }
                     }
                     if (connectionActions.showSignOut) {
@@ -1024,6 +1012,7 @@ private fun CopyValueButton(label: String, value: String, onCopied: () -> Unit) 
 private fun DriveAuthStatus.labelText(): String =
     when (this) {
         DriveAuthStatus.Connected -> stringResource(R.string.sync_status_connected)
+        DriveAuthStatus.RecoveryRequired -> stringResource(R.string.sync_status_authorization_recovery)
         DriveAuthStatus.NotConnected -> stringResource(R.string.sync_status_not_connected)
         DriveAuthStatus.MissingConfiguration -> stringResource(R.string.sync_status_missing_configuration)
         is DriveAuthStatus.Failed -> message

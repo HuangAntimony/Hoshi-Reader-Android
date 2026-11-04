@@ -28,6 +28,60 @@ class DriveFileTransferTest {
         endpoint = server.url("/upload").toString(), checkInternet = {}, retryDelay = {},
     )
 
+    private fun ipv4Transport(server: MockWebServer) = GoogleDriveFileTransfer(
+        auth, DriveUploadSessions(temporary.newFolder()), Dispatchers.IO,
+        OkHttpClient.Builder().readTimeout(1, TimeUnit.SECONDS)
+            .dns(object : okhttp3.Dns {
+                override fun lookup(hostname: String) = listOf(java.net.InetAddress.getByName("127.0.0.1"))
+            }).build(),
+        endpoint = server.url("/upload").toString(), checkInternet = {}, retryDelay = {},
+    )
+
+    @Test fun exhaustedConnectionResetsRemainNetworkFailuresAfterRedaction() = runBlocking {
+        for (upload in listOf(false, true)) MockWebServer().use { server ->
+            server.start(java.net.InetAddress.getByName("127.0.0.1"), 0)
+            repeat(5) { server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST)) }
+            val engine = ipv4Transport(server)
+            val error = runCatching {
+                if (upload) engine.upload(temporary.newFile().apply { writeText("payload") }, request) {}
+                else engine.download(server.url("/private-file").toString(), temporary.newFile(), 7) {}
+            }.exceptionOrNull()!!
+            assertEquals("upload=$upload error=${error.stackTraceToString()}", 5, server.requestCount)
+            assertTrue(error is GoogleDriveUnavailableException)
+            assertTrue("Exhausted $upload payload reset must retain network classification: $error", error.isSyncNetworkFailure())
+            assertFalse(error.stackTraceToString().contains(server.url("/").toString()))
+            assertFalse(error.stackTraceToString().contains("test-token"))
+        }
+    }
+
+    @Test fun truncatedErrorResponseRetainsNetworkClassification() = runBlocking {
+        MockWebServer().use { server ->
+            server.start(java.net.InetAddress.getByName("127.0.0.1"), 0)
+            repeat(5) {
+                server.enqueue(MockResponse().setResponseCode(503).setBody("unavailable response body")
+                    .setSocketPolicy(SocketPolicy.DISCONNECT_DURING_RESPONSE_BODY))
+            }
+            val error = runCatching {
+                ipv4Transport(server).download(server.url("/file").toString(), temporary.newFile(), 7) {}
+            }.exceptionOrNull()!!
+            assertEquals(5, server.requestCount)
+            assertTrue(error is GoogleDriveUnavailableException)
+            assertTrue("Truncated error bodies must back off too: $error", error.isSyncNetworkFailure())
+        }
+    }
+
+    @Test fun localDownloadDestinationFailureIsNotAnOutage() = runBlocking {
+        MockWebServer().use { server ->
+            server.start()
+            repeat(5) { server.enqueue(MockResponse().setBody("payload")) }
+            val error = runCatching {
+                transport(server, temporary.newFolder()).download(server.url("/file").toString(), temporary.newFolder(), 7) {}
+            }.exceptionOrNull()!!
+            assertTrue(error is GoogleDriveUnavailableException)
+            assertFalse("Local output failures must remain visible", error.isSyncNetworkFailure())
+        }
+    }
+
     @Test fun chunksUseConfirmedRangeAndOnlyReturnAfterFinalResponse() = runBlocking {
         MockWebServer().use { server ->
             server.start()

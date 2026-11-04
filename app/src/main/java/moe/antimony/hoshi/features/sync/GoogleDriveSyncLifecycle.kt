@@ -68,16 +68,27 @@ class GoogleDriveSyncLifecycle @Inject constructor(
         }
         context.getSystemService(ConnectivityManager::class.java).registerDefaultNetworkCallback(object : ConnectivityManager.NetworkCallback() {
             private var connected: Network? = null
+            private var validated = false
 
             override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) {
-                if (capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) && connected != network) {
+                val hasInternet = capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                val isValidated = capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+                val recovered = hasInternet && (connected != network || (!validated && isValidated))
+                if (hasInternet) {
                     connected = network
-                    scope.launch { manager.sync() }
+                    validated = isValidated
+                } else if (connected == network) {
+                    connected = null
+                    validated = false
                 }
+                if (recovered) scope.launch { manager.onNetworkAvailable() }
             }
 
             override fun onLost(network: Network) {
-                if (connected == network) connected = null
+                if (connected == network) {
+                    connected = null
+                    validated = false
+                }
             }
         })
     }
@@ -126,7 +137,7 @@ internal suspend fun backgroundSyncResult(sync: suspend () -> Unit): Result = tr
     if (error.isRetryableBackgroundSyncFailure()) Result.retry() else Result.failure()
 }
 
-internal fun Throwable.isRetryableBackgroundSyncFailure(): Boolean = when (this) {
+internal fun Throwable.isRetryableBackgroundSyncFailure(): Boolean = isSyncRetryableFailure() || when (this) {
     is GoogleDriveSyncException -> cause?.isRetryableBackgroundSyncFailure() == true
     is GoogleDriveUnavailableException -> cause is java.io.IOException || cause.isRetryableBackgroundSyncFailure()
     is GoogleDriveApiException -> isRateLimited || (statusCode ?: 0) >= 500 || isTransientDriveNetworkFailure()

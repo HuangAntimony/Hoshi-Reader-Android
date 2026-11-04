@@ -92,13 +92,13 @@ class GoogleDriveFileTransfer internal constructor(
                         override fun contentType() = "application/octet-stream".toMediaType()
                         override fun contentLength() = length
                         override fun writeTo(sink: BufferedSink) {
-                            RandomAccessFile(file, "r").use { source ->
+                            LocalUploadSource(file).use { source ->
                                 source.seek(start)
                                 var written = 0L
                                 val buffer = ByteArray(8192)
                                 while (written < length) {
                                     val count = source.read(buffer, 0, minOf(buffer.size.toLong(), length - written).toInt())
-                                    if (count < 0) throw IOException("Upload source ended unexpectedly")
+                                    if (count < 0) throw UploadSourceIOException("Upload source ended unexpectedly")
                                     sink.write(buffer, 0, count)
                                     sink.emitCompleteSegments()
                                     written += count
@@ -162,8 +162,8 @@ class GoogleDriveFileTransfer internal constructor(
         while (true) {
             try {
                 execute(Request.Builder().url(url), upload = false) { response, _ ->
-                    if (!response.isSuccessful) throw apiError(response.code, response.body?.string().orEmpty())
-                    val body = response.body ?: throw IOException("Drive download has no response body")
+                    if (!response.isSuccessful) throw apiError(response.code, payloadNetworkIo { response.body?.string().orEmpty() })
+                    val body = response.body ?: throw DrivePayloadNetworkIOException("Drive download has no response body")
                     val total = body.contentLength().takeIf { it >= 0 } ?: size
                     progress(DriveTransferUpdate(0, total))
                     var received = 0L
@@ -171,7 +171,7 @@ class GoogleDriveFileTransfer internal constructor(
                         destination.outputStream().use { output ->
                             val buffer = ByteArray(8192)
                             while (true) {
-                                val count = input.read(buffer)
+                                val count = payloadNetworkIo { input.read(buffer) }
                                 if (count == -1) break
                                 output.write(buffer, 0, count)
                                 received += count
@@ -179,7 +179,7 @@ class GoogleDriveFileTransfer internal constructor(
                             }
                         }
                     }
-                    if (total != null && received != total) throw IOException("Incomplete Drive download: $received of $total bytes")
+                    if (total != null && received != total) throw DrivePayloadNetworkIOException("Incomplete Drive download: $received of $total bytes")
                     progress(DriveTransferUpdate(received, total, received, SyncTransferPhase.AwaitingResponse))
                 }
                 return@withContext
@@ -203,7 +203,7 @@ class GoogleDriveFileTransfer internal constructor(
 
     private data class Reply(val code: Int, val headers: Headers, val body: String)
     private suspend fun bytes(builder: Request.Builder): Reply = execute(builder, upload = true) { response, token ->
-        val body = response.body?.string().orEmpty()
+        val body = payloadNetworkIo { response.body?.string().orEmpty() }
         Reply(response.code, response.headers, if (response.code >= 400) redactText(body, response.request.url.toString(), token) else body)
     }
 
@@ -220,7 +220,7 @@ class GoogleDriveFileTransfer internal constructor(
                         // Join the response consumer before callers clean up files or transfer state.
                         val consumer = launch(io) {
                             try {
-                                val result = call.execute().use {
+                                val result = payloadNetworkIo { call.execute() }.use {
                                     if (it.code == 401) throw RefreshToken()
                                     read(it, token)
                                 }
@@ -271,6 +271,8 @@ class GoogleDriveFileTransfer internal constructor(
         val message = redactText(error.message ?: error.javaClass.simpleName, url, token)
         val clean = when (error) {
             is GoogleDriveApiException -> GoogleDriveApiException(message, error.statusCode, error.reasons.map { redactText(it, url, token) }.toSet())
+            is DrivePayloadNetworkIOException -> DrivePayloadNetworkIOException(message)
+            is UploadSourceIOException -> UploadSourceIOException(message)
             is java.net.SocketTimeoutException -> java.net.SocketTimeoutException(message)
             is IOException -> IOException(message)
             else -> IOException(message)
@@ -279,6 +281,28 @@ class GoogleDriveFileTransfer internal constructor(
         (error.cause as? Exception)?.takeIf { it !== error }?.let { clean.initCause(redact(it, url, token)) }
         return clean
     }
+}
+
+private class UploadSourceIOException(message: String) : IOException(message)
+
+private inline fun <T> uploadSourceIo(action: () -> T): T = try {
+    action()
+} catch (error: IOException) {
+    throw UploadSourceIOException(error.message ?: error.javaClass.simpleName).apply { initCause(error) }
+}
+
+private class LocalUploadSource(file: File) : java.io.Closeable {
+    private val source = uploadSourceIo { RandomAccessFile(file, "r") }
+    fun seek(position: Long) = uploadSourceIo { source.seek(position) }
+    fun read(buffer: ByteArray, offset: Int, length: Int): Int = uploadSourceIo { source.read(buffer, offset, length) }
+    override fun close() = uploadSourceIo { source.close() }
+}
+
+private inline fun <T> payloadNetworkIo(action: () -> T): T = try {
+    action()
+} catch (error: IOException) {
+    if (error is UploadSourceIOException || error is javax.net.ssl.SSLException || error is DrivePayloadNetworkIOException) throw error
+    throw DrivePayloadNetworkIOException(error.message ?: error.javaClass.simpleName).apply { initCause(error) }
 }
 
 internal fun confirmedOffset(range: String?, size: Long): Long {

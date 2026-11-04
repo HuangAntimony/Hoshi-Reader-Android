@@ -12,6 +12,12 @@ internal fun syncConnectionActions(
     isAuthorizing: Boolean,
 ): SyncConnectionActions =
     when (authStatus) {
+        DriveAuthStatus.RecoveryRequired -> SyncConnectionActions(
+            showConnect = true,
+            connectEnabled = !isAuthorizing,
+            showSignOut = true,
+            signOutEnabled = !isAuthorizing,
+        )
         DriveAuthStatus.Connected -> SyncConnectionActions(
             showConnect = false,
             connectEnabled = false,

@@ -82,6 +82,920 @@ class GoogleDriveSyncManagerTest {
         { _, _, _ -> "" },
     ).orEmpty()
 
+    @Test fun recoveredTargetedStateFailureRetriesBeforeUploadingNewBooks() =
+        targetedStateFailureRecovery(IOException("transient targeted read failure"))
+
+    @Test fun rateLimitedTargetedStateIsRetriedWithoutLocalOrCloudChanges() =
+        targetedStateFailureRecovery(GoogleDriveApiException("Rate limited", 429))
+
+    @Test fun serverFailedTargetedStateIsRetriedWithoutLocalOrCloudChanges() =
+        targetedStateFailureRecovery(GoogleDriveApiException("Server unavailable", 500))
+
+    private fun targetedStateFailureRecovery(failure: Exception) = runTest {
+        val f = fixture()
+        f.remote.addState("a", "book-a.json", SyncFormat.encode(remoteBook))
+        f.manager.sync()
+        runCurrent()
+        val metadata = f.books.loadMetadata(f.store.bookDirectory("book-a"))!!
+        f.remote.reportChanges = false
+        f.remote.failRead = { if (it == "a") failure else null }
+        f.manager.syncAutomatically(metadata)
+        runCurrent()
+        assertFalse(f.store.state.books.getValue("book-a").pending)
+        val failedReads = f.remote.reads.getValue("a")
+        assertTrue(f.manager.state.value.queue.any { it.key == "book-a" && it.error != null })
+        f.remote.failRead = { null }
+        val root = f.books.createBookDirectory("healthy-b")
+        val local = BookMetadata("b", "B", folder = "healthy-b", epub = "b.epub", lastAccess = 0.0)
+        f.books.saveMetadata(root, local)
+        root.resolve("b.epub").writeText("healthy payload")
+        f.store.handleBookImport(local, root)
+        advanceTimeBy(30_000)
+        f.manager.syncAutomatically()
+        runCurrent()
+        assertTrue("The failed book must be retried even without local or cloud changes", f.remote.reads.getValue("a") > failedReads)
+        assertTrue(f.manager.state.value.queue.none { it.key == "book-a" && it.error != null })
+        assertEquals("b.epub", f.store.state.books.getValue("healthy-b").files[SyncFileType.epub]?.value)
+        val published = SyncFormat.decode<SyncBook>(f.remote.entries.values.single { it.file.name == "healthy-b.json" }.data)
+        assertEquals("b.epub", published.files[SyncFileType.epub]?.value)
+    }
+
+    @Test fun recoveredNetworkMustNotKeepGlobalErrorBecauseOneBookHasAStateError() = runTest {
+        var offline = false
+        val f = fixture(beforeRequest = {
+            if (offline) throw GoogleDriveApiException(GoogleDriveApiException.NoInternetConnectionMessage)
+        })
+        f.remote.addState("a", "book-a.json", SyncFormat.encode(remoteBook))
+        f.manager.sync()
+        runCurrent()
+        f.remote.reportChanges = false
+        f.remote.failRead = { if (it == "a") GoogleDriveApiException("Book access denied", 403) else null }
+        f.manager.syncAutomatically(f.books.loadMetadata(f.store.bookDirectory("book-a"))!!)
+        runCurrent()
+        assertTrue(f.manager.state.value.queue.any { it.key == "book-a" && it.error != null })
+        offline = true
+        f.manager.syncAutomatically()
+        runCurrent()
+        assertNotNull(f.manager.state.value.errorMessage)
+        offline = false
+        val root = f.books.createBookDirectory("healthy-b")
+        val book = BookMetadata("B", "Healthy", folder = "healthy-b", epub = "b.epub", lastAccess = 0.0)
+        f.books.saveMetadata(root, book)
+        root.resolve("b.epub").writeText("healthy payload")
+        f.store.handleBookImport(book, root)
+        f.manager.onNetworkAvailable()
+        runCurrent()
+        assertNull("A permanent per-book error must not retain the expired run-level network failure", f.manager.state.value.errorMessage)
+        assertTrue("The unresolved error must remain attached to its book", f.manager.state.value.queue.any { it.key == "book-a" && it.error != null })
+        assertEquals("b.epub", f.store.state.books.getValue("healthy-b").files[SyncFileType.epub]?.value)
+        val published = SyncFormat.decode<SyncBook>(f.remote.entries.values.single { it.file.name == "healthy-b.json" }.data)
+        assertEquals("The healthy upload must be published to the cloud", "b.epub", published.files[SyncFileType.epub]?.value)
+    }
+
+    @Test fun successfulTargetedCheckDoesNotExtendAnotherBooksRetryDeadline() = runTest {
+        val f = fixture()
+        for (key in listOf("a", "b")) f.remote.addState(key, "book-$key.json", SyncFormat.encode(remoteBook))
+        f.manager.sync()
+        runCurrent()
+        f.remote.reportChanges = false
+        f.remote.failRead = { if (it == "a") IOException("transient targeted read failure") else null }
+        f.manager.syncAutomatically(f.books.loadMetadata(f.store.bookDirectory("book-a"))!!)
+        val failedReads = f.remote.reads.getValue("a")
+        f.remote.failRead = { null }
+        advanceTimeBy(30_000)
+        f.manager.syncAutomatically(f.books.loadMetadata(f.store.bookDirectory("book-b"))!!)
+        assertTrue("An unrelated successful check must retain the unresolved book error", f.manager.state.value.queue.any { it.key == "book-a" && it.error != null })
+        f.manager.syncAutomatically()
+        assertTrue("An old error must not postpone the full retry after a successful targeted check", f.remote.reads.getValue("a") > failedReads)
+        assertTrue(f.manager.state.value.queue.none { it.error != null })
+    }
+
+    @Test fun automaticOfflineSyncBacksOffExponentiallyAndRecordsOneFailurePerOutage() = runTest {
+        var attempts = 0
+        val f = fixture(beforeRequest = {
+            attempts++
+            throw GoogleDriveApiException(GoogleDriveApiException.NoInternetConnectionMessage)
+        })
+        f.manager.syncAutomatically()
+        val firstMessage = f.manager.state.value.errorMessage
+        assertEquals(1, attempts)
+        assertEquals(1, ErrorDiagnosticEvents.buffer.drain().size)
+        for (wait in listOf(30_000L, 60_000L, 120_000L, 240_000L, 480_000L, 960_000L, 1_920_000L, 3_600_000L, 3_600_000L)) {
+            val previous = attempts
+            advanceTimeBy(wait - 1)
+            f.manager.syncAutomatically()
+            assertEquals("Automatic requests must wait for the retry deadline", previous, attempts)
+            advanceTimeBy(1)
+            f.manager.syncAutomatically()
+            assertEquals(previous + 1, attempts)
+            assertEquals(firstMessage, f.manager.state.value.errorMessage)
+            assertTrue(ErrorDiagnosticEvents.buffer.drain().isEmpty())
+        }
+        assertNull(f.manager.cache.cursor)
+    }
+
+    @Test fun authorizationResolutionBacksOffWithoutRepeatedErrorsAndVerifiesRootBeforeRecovery() = runTest {
+        var needsResolution = false
+        var attempts = 0
+        val f = fixture(beforeRequest = {
+            attempts++
+            if (needsResolution) nativeDriveToken(null, true, emptyList(), NativeDriveAuthorizationContext(true, 0, true, true, true))
+        })
+        f.remote.addState("a", "book-a.json", SyncFormat.encode(remoteBook))
+        f.manager.sync()
+        runCurrent()
+        val oldCache = f.manager.cache
+        val oldRecord = f.store.state.books.getValue("book-a")
+        ErrorDiagnosticEvents.buffer.drain()
+        needsResolution = true
+        f.manager.syncAutomatically()
+        val first = attempts
+        assertEquals(1, ErrorDiagnosticEvents.buffer.drain().size)
+        f.manager.syncAutomatically()
+        assertEquals("An authorization recovery request must wait for the retry deadline", first, attempts)
+        advanceTimeBy(30_000)
+        f.manager.syncAutomatically()
+        assertEquals(first + 1, attempts)
+        assertTrue(ErrorDiagnosticEvents.buffer.drain().isEmpty())
+        assertEquals(oldCache.root, f.manager.cache.root)
+        assertEquals(oldCache.cursor, f.manager.cache.cursor)
+        assertEquals(oldRecord, f.store.state.books.getValue("book-a"))
+        assertTrue(SyncFormat.decode<GoogleDriveSyncCache>(temporary.root.resolve("drive-sync.json").readText()).verifyConnection)
+        assertEquals(ListenableWorker.Result.retry(), backgroundSyncResult(f.manager::syncInBackground))
+        assertTrue(ErrorDiagnosticEvents.buffer.drain().isEmpty())
+        needsResolution = false
+        f.remote.requests.clear()
+        f.manager.onNetworkAvailable()
+        runCurrent()
+        assertTrue("The root must be verified before using the old cursor", f.remote.requests.indexOf("files") < f.remote.requests.indexOf("changes"))
+        assertFalse(f.manager.cache.verifyConnection)
+        assertFalse(f.manager.state.value.attachPending)
+        assertNull(f.manager.state.value.errorMessage)
+        assertEquals(oldRecord, f.store.state.books.getValue("book-a"))
+    }
+
+    @Test fun manualSyncAndNetworkRecoveryBypassBackoffAndSuccessResetsIt() = runTest {
+        var offline = true
+        var attempts = 0
+        val f = fixture(beforeRequest = {
+            attempts++
+            if (offline) throw GoogleDriveApiException(GoogleDriveApiException.NoInternetConnectionMessage)
+        })
+        f.manager.syncAutomatically()
+        f.manager.sync()
+        assertEquals(2, attempts)
+        assertEquals(2, ErrorDiagnosticEvents.buffer.drain().size)
+        offline = false
+        f.manager.onNetworkAvailable()
+        runCurrent()
+        assertNotNull(f.manager.state.value.lastSync)
+        assertNull(f.manager.state.value.errorMessage)
+        offline = true
+        val before = attempts
+        f.manager.syncAutomatically()
+        assertEquals(before + 1, attempts)
+        assertEquals(1, ErrorDiagnosticEvents.buffer.drain().size)
+        advanceTimeBy(30_000)
+        f.manager.syncAutomatically()
+        assertEquals(before + 2, attempts)
+        assertTrue(ErrorDiagnosticEvents.buffer.drain().isEmpty())
+    }
+
+    @Test fun networkRecoveryResumesAutomaticChecksWhileHealthyPayloadIsStillRunning() = runTest {
+        var offline = false
+        var checks = 0
+        val started = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val f = fixture(beforeRequest = {
+            checks++
+            if (offline) throw GoogleDriveMetadataNetworkException(IOException("metadata temporarily unavailable"))
+        }, transferFactory = { client -> object : TestDriveFileTransfer(client) {
+            override suspend fun upload(file: java.io.File, request: DriveUploadRequest, progress: (DriveTransferUpdate) -> Unit): GoogleDriveFile {
+                started.complete(Unit)
+                release.await()
+                return super.upload(file, request, progress)
+            }
+        } })
+        val root = f.books.createBookDirectory("book-a")
+        val book = BookMetadata("a", "A", folder = "book-a", epub = "a.epub", lastAccess = 0.0)
+        f.books.saveMetadata(root, book)
+        root.resolve("a.epub").writeText("healthy payload")
+        f.store.handleBookImport(book, root)
+        f.manager.syncAutomatically()
+        started.await()
+        try {
+            offline = true
+            f.manager.syncAutomatically()
+            assertFalse(release.isCompleted)
+            offline = false
+            f.manager.onNetworkAvailable()
+            val recoveredChecks = checks
+            f.manager.syncAutomatically()
+            assertTrue("Network recovery must release the old deadline while the healthy transfer continues", checks > recoveredChecks)
+        } finally {
+            release.complete(Unit)
+            runCurrent()
+        }
+    }
+
+    @Test fun networkFailureDoesNotHideFirstAuthorizationRecoveryDiagnostic() = runTest {
+        var recovery = false
+        val f = fixture(beforeRequest = {
+            if (recovery) nativeDriveToken(null, true, emptyList(), NativeDriveAuthorizationContext(true, 0, true, true, true))
+            else throw GoogleDriveApiException(GoogleDriveApiException.NoInternetConnectionMessage)
+        })
+        f.manager.syncAutomatically()
+        assertEquals(1, ErrorDiagnosticEvents.buffer.drain().size)
+        recovery = true
+        advanceTimeBy(30_000)
+        f.manager.syncAutomatically()
+        val events = ErrorDiagnosticEvents.buffer.drain()
+        assertEquals(1, events.size)
+        assertTrue(events.single().error!!.isSyncAuthorizationRecovery())
+        advanceTimeBy(60_000)
+        f.manager.syncAutomatically()
+        assertTrue(ErrorDiagnosticEvents.buffer.drain().isEmpty())
+    }
+
+    @Test fun persistedAuthRecoveryRequiresRootValidationEvenIfManagerNeverRecordedFailure() = runTest {
+        var pendingRecovery = false
+        val f = fixture(beforeRequest = {
+            if (pendingRecovery) assertTrue(SyncFormat.decode<GoogleDriveSyncCache>(temporary.root.resolve("drive-sync.json").readText()).verifyConnection)
+        })
+        f.manager.sync()
+        f.manager.stop()
+        assertFalse(f.manager.cache.verifyConnection)
+        pendingRecovery = true
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        val restarted = GoogleDriveSyncManager(f.store, GoogleDriveSyncHandler(f.client), f.client, f.settings, f.books,
+            temporary.root, temporary.root.resolve("cache"), backgroundScope, dispatcher, dispatcher,
+            { true }, {}, {}, TestDriveFileTransfer(f.client), { testScheduler.currentTime },
+            authorizationRecoveryRequired = { pendingRecovery }, completeAuthorizationRecovery = {
+                assertFalse(SyncFormat.decode<GoogleDriveSyncCache>(temporary.root.resolve("drive-sync.json").readText()).verifyConnection)
+                pendingRecovery = false
+            })
+        f.remote.requests.clear()
+        restarted.start()
+        runCurrent()
+        assertFalse(pendingRecovery)
+        assertTrue(f.remote.requests.indexOf("files") < f.remote.requests.indexOf("changes"))
+        assertFalse(restarted.state.value.attachPending)
+    }
+
+    @Test fun priorityPayloadAuthorizationRecoveryPreservesVerificationAndBackoff() = runTest {
+        var attempts = 0
+        val f = fixture(beforeRequest = { attempts++ }, transferFactory = { client -> object : TestDriveFileTransfer(client) {
+            override suspend fun download(url: String, destination: java.io.File, size: Long?, progress: (DriveTransferUpdate) -> Unit) {
+                nativeDriveToken(null, true, emptyList(), NativeDriveAuthorizationContext(true, 0, true, true, true))
+            }
+        } })
+        val root = f.books.createBookDirectory("book-a")
+        f.books.saveMetadata(root, BookMetadata("ID", "Local", folder = "book-a", epub = "book-a.epub", lastAccess = 0.0))
+        root.resolve("book-a.epub").writeText("epub-content")
+        f.store.handleBookImport(f.books.loadMetadata(root)!!, root)
+        f.manager.sync()
+        runCurrent()
+        f.store.deleteLocalBook("book-a")
+        f.manager.sync()
+        val error = runCatching { f.manager.downloadBook(f.books.loadMetadata(root)!!) {} }.exceptionOrNull()!!
+        assertTrue(error.isSyncAuthorizationRecovery())
+        assertTrue(SyncFormat.decode<GoogleDriveSyncCache>(temporary.root.resolve("drive-sync.json").readText()).verifyConnection)
+        val previous = attempts
+        f.manager.syncAutomatically()
+        assertEquals(previous, attempts)
+        assertFalse(root.resolve("book-a.epub").exists())
+    }
+
+    @Test fun priorityStateAuthorizationRecoveryPreservesCauseAndRegistersOnlyOneBackoff() = runTest {
+        var attempts = 0
+        val f = fixture(beforeRequest = {
+            attempts++
+            nativeDriveToken(null, true, emptyList(), NativeDriveAuthorizationContext(true, 0, true, true, true))
+        })
+        val error = runCatching { f.manager.downloadBook(BookMetadata("ID", folder = "book-a", lastAccess = 0.0)) {} }.exceptionOrNull()!!
+        assertTrue("An active reader waiter must receive the recovery failure", error.isSyncAuthorizationRecovery())
+        assertFalse(error is kotlinx.coroutines.CancellationException)
+        assertTrue(error.syncMessage().details().contains("requiresResolution=true"))
+        assertNotNull(f.manager.state.value.errorMessage)
+        assertEquals(1, attempts)
+        advanceTimeBy(29_999)
+        f.manager.syncAutomatically()
+        assertEquals(1, attempts)
+        advanceTimeBy(1)
+        f.manager.syncAutomatically()
+        assertEquals("The state failure must not register a second backoff in the reader waiter", 2, attempts)
+    }
+
+    @Test fun authorizationRecoveryStopsInFlightPriorityPayloadBeforeItCanBeApplied() = runTest {
+        var needsResolution = false
+        val started = CompletableDeferred<Unit>()
+        var cancelled = false
+        val f = fixture(beforeRequest = {
+            if (needsResolution) nativeDriveToken(null, true, emptyList(), NativeDriveAuthorizationContext(true, 0, true, true, true))
+        }, transferFactory = { client -> object : TestDriveFileTransfer(client) {
+            override suspend fun download(url: String, destination: java.io.File, size: Long?, progress: (DriveTransferUpdate) -> Unit) {
+                started.complete(Unit)
+                try { kotlinx.coroutines.awaitCancellation() } finally { cancelled = true }
+            }
+        } })
+        val root = f.books.createBookDirectory("book-a")
+        f.books.saveMetadata(root, BookMetadata("ID", "Local", folder = "book-a", epub = "book-a.epub", lastAccess = 0.0))
+        root.resolve("book-a.epub").writeText("epub-content")
+        f.store.handleBookImport(f.books.loadMetadata(root)!!, root)
+        f.manager.sync()
+        runCurrent()
+        f.store.deleteLocalBook("book-a")
+        f.manager.sync()
+        val reader = async { runCatching { f.manager.downloadBook(f.books.loadMetadata(root)!!) {} } }
+        started.await()
+        needsResolution = true
+        f.manager.syncAutomatically()
+        runCurrent()
+        assertTrue(cancelled)
+        assertTrue("Cancelled payload I/O must still report its recovery failure to the active waiter", reader.await().exceptionOrNull()!!.isSyncAuthorizationRecovery())
+        assertTrue(f.manager.cache.verifyConnection)
+        assertFalse(root.resolve("book-a.epub").exists())
+    }
+
+    private class RecoveryIoGate(private val delegate: CoroutineDispatcher) : CoroutineDispatcher() {
+        var shouldHold: () -> Boolean = { false }
+        var held: Pair<CoroutineContext, Runnable>? = null
+        private var captured = false
+        override fun dispatch(context: CoroutineContext, block: Runnable) {
+            if (!captured && shouldHold()) {
+                captured = true
+                held = context to block
+            } else delegate.dispatch(context, block)
+        }
+        fun release() {
+            val (context, block) = checkNotNull(held)
+            held = null
+            delegate.dispatch(context, block)
+        }
+    }
+
+    @Test fun staleReaderRecoveryMustNotOverwriteANewerSuccessfulSync() = runTest {
+        val normal = StandardTestDispatcher(testScheduler)
+        val io = RecoveryIoGate(normal)
+        var checks = 0
+        val f = fixture(normal, managerIo = io, beforeRequest = { checks++ }, transferFactory = { client ->
+            object : TestDriveFileTransfer(client) {
+                override suspend fun download(url: String, destination: java.io.File, size: Long?, progress: (DriveTransferUpdate) -> Unit) {
+                    nativeDriveToken(null, true, emptyList(), NativeDriveAuthorizationContext(true, 0, true, true, true))
+                }
+            }
+        })
+        val root = f.books.createBookDirectory("book-a")
+        val book = BookMetadata("ID", "Local", folder = "book-a", epub = "book-a.epub", lastAccess = 0.0)
+        f.books.saveMetadata(root, book)
+        root.resolve("book-a.epub").writeText("epub-content")
+        f.store.handleBookImport(book, root)
+        f.manager.sync()
+        runCurrent()
+        f.store.deleteLocalBook("book-a")
+        f.manager.sync()
+        runCurrent()
+        io.shouldHold = { f.manager.cache.verifyConnection }
+        val reader = async { runCatching { f.manager.downloadBook(f.books.loadMetadata(root)!!) {} } }
+        runCurrent()
+        assertNotNull("The old reader must pause during recovery persistence", io.held)
+        assertTrue(f.manager.cache.verifyConnection)
+        try {
+            f.manager.onNetworkAvailable()
+            runCurrent()
+            assertFalse("The newer state check has verified the same root", f.manager.cache.verifyConnection)
+            assertNull("The newer successful check cleared the visible error", f.manager.state.value.errorMessage)
+        } finally {
+            io.release()
+        }
+        runCurrent()
+        assertTrue(reader.await().exceptionOrNull()!!.isSyncAuthorizationRecovery())
+        assertNull("The old failure must not overwrite the newer successful recovery", f.manager.state.value.errorMessage)
+        val before = checks
+        f.manager.syncAutomatically()
+        runCurrent()
+        assertTrue("The old failure must not re-create backoff after recovery", checks > before)
+    }
+
+    @Test fun restartingForegroundPollingDoesNotResetOfflineBackoff() = runTest {
+        var attempts = 0
+        val f = fixture(beforeRequest = {
+            attempts++
+            throw GoogleDriveApiException(GoogleDriveApiException.NoInternetConnectionMessage)
+        })
+        f.manager.start()
+        runCurrent()
+        f.manager.pausePolling()
+        f.manager.start()
+        runCurrent()
+        advanceTimeBy(29_999)
+        runCurrent()
+        assertEquals(1, attempts)
+        advanceTimeBy(1)
+        f.manager.syncAutomatically()
+        assertEquals(2, attempts)
+        assertEquals(1, ErrorDiagnosticEvents.buffer.drain().size)
+    }
+
+    @Test fun reauthorizationOfSameLibraryPreservesAssociationAndCloudPlaceholders() = runTest {
+        val f = fixture()
+        f.remote.addState("a", "book-a.json", SyncFormat.encode(remoteBook))
+        f.manager.sync()
+        runCurrent()
+        val beforeCache = f.manager.cache
+        val beforeRecord = f.store.state.books.getValue("book-a")
+        val placeholder = f.store.bookDirectory("book-a")
+        assertTrue(placeholder.isDirectory)
+        f.manager.stop()
+        f.manager.authorizationChanged()
+        assertEquals(beforeCache.root, f.manager.cache.root)
+        assertEquals(beforeCache.cursor, f.manager.cache.cursor)
+        assertEquals(beforeRecord, f.store.state.books.getValue("book-a"))
+        assertTrue(placeholder.isDirectory)
+        assertTrue(f.manager.cache.verifyConnection)
+        f.manager.start()
+        runCurrent()
+        assertFalse(f.manager.state.value.attachPending)
+        assertFalse(f.manager.cache.verifyConnection)
+        assertEquals(beforeCache.bookVersions, f.manager.cache.bookVersions)
+        assertEquals(beforeRecord.generation, f.store.state.books.getValue("book-a").generation)
+        assertTrue(placeholder.isDirectory)
+    }
+
+    @Test fun successfulManualSyncRestoresNormalPollingDuringLongBackoff() = runTest {
+        var offline = true
+        val f = fixture(beforeRequest = {
+            if (offline) throw GoogleDriveApiException(GoogleDriveApiException.NoInternetConnectionMessage)
+        })
+        f.manager.start()
+        runCurrent()
+        advanceTimeBy(90_000)
+        runCurrent()
+        offline = false
+        f.manager.sync()
+        val before = f.remote.requests.size
+        advanceTimeBy(if (BuildConfig.DEBUG) 5_000 else 120_000)
+        runCurrent()
+        assertTrue("Success must restore normal polling instead of sleeping through the old backoff", f.remote.requests.size > before)
+    }
+
+    @Test fun clearingCacheWhileReauthorizationIsOfflineCannotSkipRootValidation() = runTest {
+        var offline = false
+        val f = fixture(beforeRequest = {
+            if (offline) throw GoogleDriveApiException(GoogleDriveApiException.NoInternetConnectionMessage)
+        })
+        f.remote.addState("a", "book-a.json", SyncFormat.encode(remoteBook))
+        f.manager.sync()
+        f.manager.stop()
+        f.manager.authorizationChanged()
+        offline = true
+        f.manager.clearCache()
+        runCurrent()
+        assertEquals("r", f.manager.cache.root)
+        assertTrue(f.manager.cache.verifyConnection)
+    }
+
+    @Test fun offlineReauthorizationSurvivesRestartAndValidatesBeforeUsingOldCursor() = runTest {
+        var offline = false
+        val f = fixture(beforeRequest = {
+            if (offline) throw GoogleDriveApiException(GoogleDriveApiException.NoInternetConnectionMessage)
+        })
+        f.remote.addState("a", "book-a.json", SyncFormat.encode(remoteBook))
+        f.manager.sync()
+        runCurrent()
+        val oldCache = f.manager.cache
+        f.manager.stop()
+        f.manager.authorizationChanged()
+        val saved = SyncFormat.decode<GoogleDriveSyncCache>(temporary.root.resolve("drive-sync.json").readText())
+        assertTrue(saved.verifyConnection)
+        offline = true
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        val restarted = GoogleDriveSyncManager(f.store, GoogleDriveSyncHandler(f.client), f.client, f.settings, f.books,
+            temporary.root, temporary.root.resolve("cache"), backgroundScope, dispatcher, dispatcher,
+            { true }, {}, {}, TestDriveFileTransfer(f.client), { testScheduler.currentTime })
+        restarted.start()
+        runCurrent()
+        assertEquals(oldCache.root, restarted.cache.root)
+        assertEquals(oldCache.cursor, restarted.cache.cursor)
+        assertTrue(restarted.cache.verifyConnection)
+        f.remote.requests.clear()
+        offline = false
+        restarted.onNetworkAvailable()
+        runCurrent()
+        assertFalse(restarted.cache.verifyConnection)
+        assertTrue("Must validate the root before consuming the cached change cursor", f.remote.requests.indexOf("files") < f.remote.requests.indexOf("changes"))
+        assertFalse(restarted.state.value.attachPending)
+    }
+
+    @Test fun reauthorizationToDifferentLibraryStillRequiresAttachWithoutPublishingLocalState() = runTest {
+        val f = fixture()
+        val folder = f.books.createBookDirectory("local-book")
+        val local = BookMetadata("local", "Local", folder = "local-book", epub = "local.epub", lastAccess = 0.0)
+        f.books.saveMetadata(folder, local)
+        folder.resolve("local.epub").writeText("epub")
+        f.store.handleBookImport(local, folder)
+        f.manager.sync()
+        runCurrent()
+        assertEquals("r", f.manager.cache.root)
+        assertTrue(f.store.state.books.getValue("local-book").attached)
+        f.manager.stop()
+        f.manager.authorizationChanged()
+        f.remote.entries.clear()
+        f.remote.folder("new-root", "Hoshi Reader", "root")
+        f.remote.folder("new-state", "state", "new-root")
+        f.remote.folder("new-books", "books", "new-root")
+        f.remote.entries["remote"] = DriveService.Entry(
+            GoogleDriveFile("remote", "other-book.json", "application/json", "1", parents = listOf("new-state"), createdTime = ""),
+            SyncFormat.encode(remoteBook),
+        )
+        f.remote.writes.clear()
+        f.manager.start()
+        runCurrent()
+        assertTrue(f.manager.state.value.attachPending)
+        assertTrue(folder.resolve("local.epub").isFile)
+        assertTrue(f.remote.writes.isEmpty())
+    }
+
+    @Test fun canceledReauthorizationResumesSyncAndPreservesCancellation() = runTest {
+        var checks = 0
+        val f = fixture(beforeRequest = { checks++ })
+        f.manager.sync()
+        runCurrent()
+        val accepting = CompletableDeferred<Unit>()
+        val auth = launch {
+            f.manager.reauthorize {
+                accepting.complete(Unit)
+                kotlinx.coroutines.awaitCancellation()
+            }
+        }
+        accepting.await()
+        auth.cancel()
+        auth.join()
+        assertTrue(auth.isCancelled)
+        val before = checks
+        f.manager.onNetworkAvailable()
+        runCurrent()
+        assertTrue("Canceling authorization must not leave synchronization stopped", checks > before)
+        assertFalse(f.manager.cache.verifyConnection)
+    }
+
+    @Test fun reauthorizationPersistsVerificationBeforeCredentialMutationAndBlocksLifecycleStart() = runTest {
+        val f = fixture()
+        f.manager.sync()
+        val before = f.remote.requests.size
+        val accepting = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val reconnect = async {
+            f.manager.reauthorize {
+                val saved = SyncFormat.decode<GoogleDriveSyncCache>(temporary.root.resolve("drive-sync.json").readText())
+                assertTrue(saved.verifyConnection)
+                accepting.complete(Unit)
+                release.await()
+            }
+        }
+        accepting.await()
+        f.manager.start()
+        f.manager.syncAutomatically()
+        assertEquals(before, f.remote.requests.size)
+        release.complete(Unit)
+        reconnect.await()
+        runCurrent()
+        assertFalse(f.manager.cache.verifyConnection)
+    }
+
+    @Test fun workManagerRetriesShareOutageBackoffAndDoNotDuplicateHistory() = runTest {
+        var attempts = 0
+        val f = fixture(beforeRequest = {
+            attempts++
+            throw GoogleDriveApiException(GoogleDriveApiException.NoInternetConnectionMessage)
+        })
+        assertEquals(ListenableWorker.Result.retry(), backgroundSyncResult(f.manager::syncInBackground))
+        assertEquals(1, ErrorDiagnosticEvents.buffer.drain().size)
+        assertEquals(ListenableWorker.Result.retry(), backgroundSyncResult(f.manager::syncInBackground))
+        assertEquals(1, attempts)
+        assertTrue(ErrorDiagnosticEvents.buffer.drain().isEmpty())
+        advanceTimeBy(30_000)
+        assertEquals(ListenableWorker.Result.retry(), backgroundSyncResult(f.manager::syncInBackground))
+        assertEquals(2, attempts)
+        assertTrue(ErrorDiagnosticEvents.buffer.drain().isEmpty())
+    }
+
+    @Test fun perBookMetadataNetworkFailuresBackOffWithoutAdvancingCursorOrFloodingHistory() = runTest {
+        val f = fixture()
+        f.remote.addState("a", "book-a.json", SyncFormat.encode(remoteBook))
+        var reads = 0
+        f.remote.failRead = {
+            reads++
+            GoogleDriveMetadataNetworkException(IOException("fixture metadata network failure"))
+        }
+        f.manager.syncAutomatically()
+        assertEquals(5, reads)
+        assertNull(f.manager.cache.cursor)
+        assertEquals(1, ErrorDiagnosticEvents.buffer.drain().size)
+        f.manager.syncAutomatically()
+        assertEquals(5, reads)
+        advanceTimeBy(30_000)
+        f.manager.syncAutomatically()
+        assertEquals(10, reads)
+        assertTrue(ErrorDiagnosticEvents.buffer.drain().isEmpty())
+        f.remote.failRead = { null }
+        f.manager.onNetworkAvailable()
+        assertEquals("next", f.manager.cache.cursor)
+        assertTrue(f.manager.state.value.queue.isEmpty())
+    }
+
+    @Test fun automaticPayloadNetworkFailuresBackOffEvenWhenMetadataChecksSucceed() = automaticPayloadBackoff {
+        java.net.SocketException("fixture payload connection reset")
+    }
+
+    @Test fun transportClassifiedPayloadFailureBacksOffAndRecovers() = automaticPayloadBackoff {
+        GoogleDriveUnavailableException(DrivePayloadNetworkIOException("redacted payload connection reset"))
+    }
+
+    private fun automaticPayloadBackoff(error: () -> Exception) = runTest {
+        var attempts = 0
+        var failUpload = true
+        val f = fixture(transferFactory = { client -> object : TestDriveFileTransfer(client) {
+            override suspend fun upload(file: java.io.File, request: DriveUploadRequest, progress: (DriveTransferUpdate) -> Unit): GoogleDriveFile {
+                attempts++
+                if (failUpload) throw error()
+                return super.upload(file, request, progress)
+            }
+        } })
+        val folder = f.books.createBookDirectory("book-a")
+        val book = BookMetadata("local", "Local", folder = "book-a", epub = "book.epub", lastAccess = 0.0)
+        f.books.saveMetadata(folder, book)
+        folder.resolve("book.epub").writeText("epub")
+        f.store.handleBookImport(book, folder)
+        f.manager.syncAutomatically()
+        runCurrent()
+        assertEquals(1, attempts)
+        assertEquals(1, ErrorDiagnosticEvents.buffer.drain().size)
+        f.manager.syncAutomatically()
+        runCurrent()
+        assertEquals(1, attempts)
+        advanceTimeBy(30_000)
+        f.manager.syncAutomatically()
+        runCurrent()
+        assertEquals(2, attempts)
+        assertTrue(ErrorDiagnosticEvents.buffer.drain().isEmpty())
+        failUpload = false
+        f.manager.onNetworkAvailable()
+        runCurrent()
+        assertEquals(3, attempts)
+        assertTrue(f.manager.state.value.queue.isEmpty())
+        assertNotNull(f.store.state.books.getValue("book-a").files[SyncFileType.epub]?.value)
+    }
+
+    @Test fun mixedPayloadSuccessPublishesImmediatelyAndFailuresShareOneBackoff() = runTest {
+        var failedAttempts = 0
+        val healthyStarted = CompletableDeferred<Unit>()
+        val releaseHealthy = CompletableDeferred<Unit>()
+        var healthyCancelled = false
+        val f = fixture(StandardTestDispatcher(testScheduler), transferFactory = { client -> object : TestDriveFileTransfer(client) {
+            override suspend fun upload(file: java.io.File, request: DriveUploadRequest, progress: (DriveTransferUpdate) -> Unit): GoogleDriveFile {
+                if (request.book != "book-a") {
+                    failedAttempts++
+                    throw GoogleDriveUnavailableException(DrivePayloadNetworkIOException("mixed payload reset"))
+                }
+                healthyStarted.complete(Unit)
+                try { releaseHealthy.await() } catch (error: kotlinx.coroutines.CancellationException) {
+                    healthyCancelled = true
+                    throw error
+                }
+                return super.upload(file, request, progress)
+            }
+        } })
+        for (name in listOf("book-a", "book-b", "book-c")) {
+            val root = f.books.createBookDirectory(name)
+            val book = BookMetadata(name, name, folder = name, epub = "$name.epub", lastAccess = 0.0)
+            f.books.saveMetadata(root, book)
+            root.resolve("$name.epub").writeText("epub")
+            f.store.handleBookImport(book, root)
+        }
+        val worker = async { backgroundSyncResult(f.manager::syncInBackground) }
+        try {
+            runCurrent()
+            assertTrue(healthyStarted.isCompleted)
+            assertFalse("A book's exhausted network retries must not cancel healthy uploads", healthyCancelled)
+            assertFalse(worker.isCompleted)
+        } finally {
+            releaseHealthy.complete(Unit)
+        }
+        assertEquals(ListenableWorker.Result.retry(), worker.await())
+        assertEquals(2, failedAttempts)
+        assertEquals("book-a.epub", f.publishedEpub())
+        assertFalse(f.store.state.books.getValue("book-a").pending)
+        assertEquals(1, ErrorDiagnosticEvents.buffer.drain().size)
+        advanceTimeBy(29_999)
+        f.manager.syncAutomatically()
+        runCurrent()
+        assertEquals(2, failedAttempts)
+        advanceTimeBy(1)
+        f.manager.syncAutomatically()
+        runCurrent()
+        assertEquals(4, failedAttempts)
+        assertEquals("book-a.epub", f.publishedEpub())
+        assertTrue(ErrorDiagnosticEvents.buffer.drain().isEmpty())
+    }
+
+    @Test fun networkRecoveryJoiningPublicationReleasesBackoff() = forcedRequestJoiningPublication(recoveredNetwork = true)
+
+    @Test fun manualSyncJoiningPublicationReleasesBackoff() = forcedRequestJoiningPublication(recoveredNetwork = false)
+
+    private fun forcedRequestJoiningPublication(recoveredNetwork: Boolean) = runTest {
+        var offline = true
+        var failedBookAttempts = 0
+        val publicationReached = CompletableDeferred<Unit>()
+        val releasePublication = CompletableDeferred<Unit>()
+        lateinit var f: Fixture
+        f = fixture(StandardTestDispatcher(testScheduler), transferFactory = { client -> object : TestDriveFileTransfer(client) {
+            override suspend fun upload(file: java.io.File, request: DriveUploadRequest, progress: (DriveTransferUpdate) -> Unit): GoogleDriveFile {
+                if (request.book == "book-b") {
+                    failedBookAttempts++
+                    if (offline) throw java.net.SocketException("temporarily unavailable")
+                }
+                return super.upload(file, request, progress)
+            }
+        } })
+        for (name in listOf("book-a", "book-b")) {
+            val root = f.books.createBookDirectory(name)
+            val book = BookMetadata(name, name, folder = name, epub = "$name.epub", lastAccess = 0.0)
+            f.books.saveMetadata(root, book)
+            root.resolve("$name.epub").writeText("epub")
+            f.store.handleBookImport(book, root)
+        }
+        f.manager.flushReader = { key ->
+            if (key == "book-a" && f.store.state.books[key]?.files?.get(SyncFileType.epub)?.value != null) {
+                publicationReached.complete(Unit)
+                releasePublication.await()
+            }
+        }
+        f.manager.syncAutomatically()
+        runCurrent()
+        assertTrue(publicationReached.isCompleted)
+        assertEquals(1, failedBookAttempts)
+        offline = false
+        val forced = async {
+            if (recoveredNetwork) f.manager.onNetworkAvailable() else f.manager.sync()
+        }
+        try {
+            runCurrent()
+            assertFalse("The forced request must join the active publication", forced.isCompleted)
+        } finally {
+            releasePublication.complete(Unit)
+        }
+        forced.await()
+        runCurrent()
+        val before = failedBookAttempts
+        f.manager.syncAutomatically()
+        runCurrent()
+        assertTrue("The joined request must release the old outage deadline", failedBookAttempts > before)
+    }
+
+    @Test fun completedFileBatchDoesNotCountItsAlreadyReportedFailureAgain() = runTest {
+        var offline = true
+        var epubAttempts = 0
+        val coverReached = CompletableDeferred<Unit>()
+        val releaseCover = CompletableDeferred<Unit>()
+        val f = fixture(StandardTestDispatcher(testScheduler), transferFactory = { client -> object : TestDriveFileTransfer(client) {
+            override suspend fun upload(file: java.io.File, request: DriveUploadRequest, progress: (DriveTransferUpdate) -> Unit): GoogleDriveFile {
+                if (request.type == SyncFileType.epub) {
+                    epubAttempts++
+                    if (offline) throw GoogleDriveMetadataNetworkException(IOException("metadata unavailable"))
+                } else if (request.type == SyncFileType.cover) {
+                    coverReached.complete(Unit)
+                    releaseCover.await()
+                }
+                return super.upload(file, request, progress)
+            }
+        } })
+        val root = f.books.createBookDirectory("book-a")
+        val book = BookMetadata("a", "A", folder = "book-a", epub = "a.epub", cover = "cover.jpg", lastAccess = 0.0)
+        f.books.saveMetadata(root, book)
+        root.resolve("a.epub").writeText("epub")
+        root.resolve("cover.jpg").writeText("cover")
+        f.store.handleBookImport(book, root)
+        f.manager.syncAutomatically()
+        runCurrent()
+        try {
+            assertTrue(coverReached.isCompleted)
+            assertEquals(1, epubAttempts)
+            offline = false
+            advanceTimeBy(30_000)
+            f.manager.syncAutomatically()
+        } finally {
+            releaseCover.complete(Unit)
+        }
+        runCurrent()
+        f.manager.syncAutomatically()
+        runCurrent()
+        assertEquals("The old batch error must not create another deadline", 2, epubAttempts)
+    }
+
+    @Test fun automaticPublicationFailuresShareOutageHistoryAndBackoff() = runTest {
+        var fail = true
+        var attempts = 0
+        val f = uploadFixture {
+            attempts++
+            if (fail) throw GoogleDriveApiException(GoogleDriveApiException.NoInternetConnectionMessage)
+        }
+        assertEquals(ListenableWorker.Result.retry(), backgroundSyncResult(f.manager::syncInBackground))
+        assertEquals(1, ErrorDiagnosticEvents.buffer.drain().size)
+        val firstAttempts = attempts
+        assertEquals(ListenableWorker.Result.retry(), backgroundSyncResult(f.manager::syncInBackground))
+        assertEquals(firstAttempts, attempts)
+        advanceTimeBy(30_000)
+        assertEquals(ListenableWorker.Result.retry(), backgroundSyncResult(f.manager::syncInBackground))
+        assertTrue(attempts > firstAttempts)
+        assertTrue("Publication must not record the same automatic outage again", ErrorDiagnosticEvents.buffer.drain().isEmpty())
+        fail = false
+        f.manager.onNetworkAvailable()
+        runCurrent()
+        assertEquals("book-a.epub", f.publishedEpub())
+    }
+
+    @Test fun queuedDuplicateCannotRetryAfterWaitingForAFailedBook() = runTest {
+        val started = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        var attempts = 0
+        val f = fixture(transferFactory = { client -> object : TestDriveFileTransfer(client) {
+            override suspend fun upload(file: java.io.File, request: DriveUploadRequest, progress: (DriveTransferUpdate) -> Unit): GoogleDriveFile {
+                attempts++
+                if (attempts == 1) {
+                    started.complete(Unit)
+                    release.await()
+                    throw java.net.SocketException("overlapping payload reset")
+                }
+                return super.upload(file, request, progress)
+            }
+        } })
+        f.settings.update { it.copy(transferConcurrency = 1) }
+        val folder = f.books.createBookDirectory("book-a")
+        val book = BookMetadata("local", "Local", folder = "book-a", epub = "book-a.epub", lastAccess = 0.0)
+        f.books.saveMetadata(folder, book)
+        folder.resolve("book-a.epub").writeText("epub")
+        f.store.handleBookImport(book, folder)
+        val worker = async { backgroundSyncResult(f.manager::syncInBackground) }
+        runCurrent()
+        assertTrue(started.isCompleted)
+        f.manager.syncAutomatically()
+        runCurrent()
+        release.complete(Unit)
+        assertEquals(ListenableWorker.Result.retry(), worker.await())
+        assertEquals("A duplicate waiting on the book permit must not retry the failed upload", 1, attempts)
+        assertNull(f.publishedEpub())
+        assertNull(f.store.state.books.getValue("book-a").files[SyncFileType.epub])
+        assertNotNull(f.store.state.books.getValue("book-a").sources[SyncFileType.epub])
+        advanceTimeBy(30_000)
+        assertEquals(ListenableWorker.Result.success(), backgroundSyncResult(f.manager::syncInBackground))
+        assertEquals(2, attempts)
+        assertEquals("book-a.epub", f.publishedEpub())
+    }
+
+    @Test fun supersededPriorityDownloadCannotUseOldAssociationDuringVerification() = runTest {
+        var blocked = false
+        var blockedRequests = 0
+        var payloads = 0
+        val f = fixture(beforeRequest = {
+            if (blocked) {
+                blockedRequests++
+                kotlinx.coroutines.awaitCancellation()
+            }
+        }, transferFactory = { client -> object : TestDriveFileTransfer(client) {
+            override suspend fun download(url: String, destination: java.io.File, size: Long?, progress: (DriveTransferUpdate) -> Unit) {
+                payloads++
+                super.download(url, destination, size, progress)
+            }
+        } })
+        for (name in listOf("book-a", "book-b")) {
+            f.remote.addState(name, "$name.json", SyncFormat.encode(remoteBook.copy(files = mapOf(
+                SyncFileType.epub to Timestamped(1000, "$name.epub"),
+            ))))
+        }
+        f.manager.sync()
+        runCurrent()
+        val a = f.books.loadMetadata(f.store.bookDirectory("book-a"))!!
+        val b = f.books.loadMetadata(f.store.bookDirectory("book-b"))!!
+        f.manager.stop()
+        f.manager.authorizationChanged()
+        blocked = true
+        f.manager.start()
+        runCurrent()
+        val first = async { runCatching { f.manager.downloadBook(a) {} } }
+        runCurrent()
+        val second = async { runCatching { f.manager.downloadBook(b) {} } }
+        runCurrent()
+        assertTrue(f.manager.cache.verifyConnection)
+        assertEquals("Only the three root checks may request authorization", 3, blockedRequests)
+        assertTrue("Superseded book must stop before using the old reference", first.isCompleted)
+        assertTrue(first.await().exceptionOrNull() is kotlinx.coroutines.CancellationException)
+        assertEquals(0, payloads)
+        f.manager.stop()
+        runCurrent()
+        second.await()
+    }
+
     @Test fun foregroundRunFailurePublishesAndRecordsOriginalCause() = runTest {
         val f = fixture()
         f.remote.addState("a", "book-a.json", SyncFormat.encode(remoteBook))
@@ -179,6 +1093,7 @@ class GoogleDriveSyncManagerTest {
         dispatcher: TestDispatcher = UnconfinedTestDispatcher(testScheduler),
         transferFactory: (GoogleDriveClient) -> DriveFileTransfer = { TestDriveFileTransfer(it) },
         booksDispatcher: CoroutineDispatcher = dispatcher,
+        managerIo: CoroutineDispatcher = dispatcher,
         beforeRequest: suspend () -> Unit = {},
     ): Fixture {
         val remote = DriveService()
@@ -195,7 +1110,7 @@ class GoogleDriveSyncManagerTest {
         val client = GoogleDriveClient(token, { settings.settings.first().provider }, {}, dispatcher, remote::connection)
         val handler = GoogleDriveSyncHandler(client)
         val manager = GoogleDriveSyncManager(store, handler, client, settings, books, temporary.root,
-            temporary.root.resolve("cache").apply { mkdirs() }, CoroutineScope(backgroundScope.coroutineContext + SupervisorJob(backgroundScope.coroutineContext[Job])), dispatcher, dispatcher, { true }, {}, {}, transferFactory(client))
+            temporary.root.resolve("cache").apply { mkdirs() }, CoroutineScope(backgroundScope.coroutineContext + SupervisorJob(backgroundScope.coroutineContext[Job])), dispatcher, managerIo, { true }, {}, {}, transferFactory(client), { testScheduler.currentTime })
         return Fixture(remote, books, store, manager, settings, client)
     }
 
@@ -996,10 +1911,12 @@ class GoogleDriveSyncManagerTest {
         f.remote.addState("a", "book-a.json", SyncFormat.encode(remoteBook))
         f.remote.failRead = { IOException("offline") }
         val error = runCatching { f.manager.syncInBackground() }.exceptionOrNull()
-        assertTrue(error is GoogleDriveUnavailableException)
+        assertTrue(error is GoogleDriveSyncException)
+        assertTrue(error?.cause is GoogleDriveUnavailableException)
         assertNull(f.manager.cache.cursor)
         assertEquals(ListenableWorker.Result.retry(), backgroundSyncResult(f.manager::syncInBackground))
         f.remote.failRead = { null }
+        advanceTimeBy(30_000)
         assertEquals(ListenableWorker.Result.success(), backgroundSyncResult(f.manager::syncInBackground))
         assertEquals("Remote", f.store.loadBook("book-a")!!.metadata.value.title)
         assertEquals("next", f.manager.cache.cursor)
