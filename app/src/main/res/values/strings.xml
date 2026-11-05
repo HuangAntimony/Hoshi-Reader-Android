@@ -1128,7 +1128,7 @@
     <string name="diagnostics_android_sdk">Android SDK</string>
     <string name="diagnostics_unavailable">Unavailable</string>
     <string name="diagnostics_crash_records">Crash Records</string>
-    <string name="diagnostics_no_crashes">No captured crashes.</string>
+    <string name="diagnostics_no_crashes">No crash records.</string>
     <string name="diagnostics_captured_crash">Captured crash</string>
     <string name="diagnostics_process_exits">Process Exit Records</string>
     <string name="diagnostics_no_process_exits">No process exit records available.</string>

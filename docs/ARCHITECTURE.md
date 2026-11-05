@@ -141,6 +141,13 @@ Typed categories select recovery alongside the original failure.
   formats the supplied failure.
   Diagnostics reports combine handled errors with crash/process-exit history;
   sharing uses FileProvider-backed files.
+- `ProcessExitDiagnosticsReport` supplies mutually exclusive crash and other-exit
+  categories to the screen and exports. Local captures and Android Java/native
+  crash entries belong to crash history, preserving each original source record;
+  all other exit reasons stay in process-exit history. `NativeCrashTrace` decodes
+  API 31+ tombstone protobuf into the original signal, abort message, causes and
+  crashing-thread frames. Trace reads
+  are bounded; missing or malformed traces never remove the crash event.
 
 Validation guidance and failure injection methods are in
 [VALIDATION.md](VALIDATION.md#test-and-fixture-pitfalls).

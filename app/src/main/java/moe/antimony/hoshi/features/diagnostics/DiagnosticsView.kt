@@ -77,9 +77,21 @@ import moe.antimony.hoshi.features.settings.GroupCard
 import moe.antimony.hoshi.features.settings.GroupDivider
 import moe.antimony.hoshi.features.settings.SectionTitle
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DiagnosticsView(
+    onClose: () -> Unit,
+    onOpenRecords: (DiagnosticsRecordKind) -> Unit,
+    records: DiagnosticsRecordKind? = null,
+    modifier: Modifier = Modifier,
+) {
+    val viewModel: DiagnosticsViewModel = hiltViewModel()
+    DiagnosticsScreen(viewModel, onClose, onOpenRecords, records, modifier)
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun DiagnosticsScreen(
+    viewModel: DiagnosticsViewModel,
     onClose: () -> Unit,
     onOpenRecords: (DiagnosticsRecordKind) -> Unit,
     records: DiagnosticsRecordKind? = null,
@@ -89,7 +101,6 @@ fun DiagnosticsView(
     val resources = LocalResources.current
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
-    val viewModel: DiagnosticsViewModel = hiltViewModel()
     val state by viewModel.state.collectAsStateWithLifecycle()
     val report = state.report
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.reload() }
@@ -297,22 +308,34 @@ fun DiagnosticsView(
                         }
                     }
                     DiagnosticsRecordKind.Crashes -> {
-                        if (report.capturedCrashes.isEmpty()) {
+                        val crashes = report.crashes
+                        if (crashes.isEmpty()) {
                             item { DiagnosticsEmptyText(stringResource(R.string.diagnostics_no_crashes)) }
                         } else {
-                            items(report.capturedCrashes) { crash ->
-                                DiagnosticsRecordRow(stringResource(R.string.diagnostics_captured_crash), crash.timestampMillis,
-                                    crash.text.lineSequence().firstOrNull().orEmpty()) {
-                                    selectedDetails = crash.text
+                            items(crashes) { crash ->
+                                val title = if (crash is CrashDiagnosticRecord.Captured) {
+                                    R.string.diagnostics_captured_crash
+                                } else {
+                                    crash.reason.messageRes()
+                                }
+                                DiagnosticsRecordRow(stringResource(title), crash.timestampMillis,
+                                    crash.summary) {
+                                    selectedDetails = when (crash) {
+                                        is CrashDiagnosticRecord.Captured -> crash.record.text
+                                        is CrashDiagnosticRecord.SystemExit -> report.copy(
+                                            capturedCrashes = emptyList(), nonfatalErrors = emptyList(), records = listOf(crash.record),
+                                        ).toShareText()
+                                    }
                                 }
                             }
                         }
                     }
                     DiagnosticsRecordKind.ProcessExits -> {
-                        if (report.records.isEmpty()) {
+                        val exits = report.processExits
+                        if (exits.isEmpty()) {
                             item { DiagnosticsEmptyText(stringResource(R.string.diagnostics_no_process_exits)) }
                         }
-                        items(report.records) { exit ->
+                        items(exits) { exit ->
                             DiagnosticsRecordRow(stringResource(exit.reason.messageRes()), exit.timestampMillis,
                                 exit.description.orEmpty()) {
                                 selectedDetails = report.copy(capturedCrashes = emptyList(), nonfatalErrors = emptyList(),

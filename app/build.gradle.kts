@@ -201,6 +201,7 @@ dependencies {
     implementation(libs.re2j)
     implementation(libs.okhttp)
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.kotlinx.serialization.protobuf)
     implementation("net.java.dev.jna:jna:${libs.versions.jna.get()}@aar")
     ksp(libs.androidx.hilt.compiler)
     ksp(libs.google.dagger.hilt.android.compiler)

@@ -112,6 +112,14 @@ sign in or synchronize.
 settings in a debug-only Activity and restore the original app language and
 notification-channel metadata.
 
+### Diagnostic history fixtures
+
+`DiagnosticsDeviceTest` uses synthetic history and independently encoded native
+tombstone bytes to check crash/process-exit categories, native stack details and
+export contents. It preserves separate local/system crash records without
+writing installed history or deliberately crashing a process; its screenshot is
+saved to target cache `diagnostics-fixture.png`.
+
 ## Drive metadata timeout isolation
 
 Run `python3 tools/drive-metadata-isolation-fixture.py` on the host and
