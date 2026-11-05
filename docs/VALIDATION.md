@@ -106,6 +106,12 @@ tagged note, checks fetching/mining/duplicates/browsing, saves `cache/kuma3-smok
 under the target app, and deletes only its tagged note in `finally`; it does not
 sign in or synchronize.
 
+### App language fixtures
+
+`AppLanguageDeviceTest` and `AppLanguageNotificationDeviceTest` render language
+settings in a debug-only Activity and restore the original app language and
+notification-channel metadata.
+
 ## Drive metadata timeout isolation
 
 Run `python3 tools/drive-metadata-isolation-fixture.py` on the host and
@@ -122,6 +128,11 @@ then finish and publish references after recovery. Expect roughly two minutes.
 Stop the fixture and remove only this reverse mapping after testing.
 
 ## WebView and UI automation pitfalls
+
+- `uiautomator dump` can report `null root node` while a recreated Compose screen
+  is visible, and leave a previous XML dump untouched. Use a fresh destination,
+  check dump output as well as exit status, and confirm state with Compose tests
+  or a current screenshot; an old popup tree is not evidence of failed navigation.
 
 - `BookshelfImportProgressTest` renders the real shelf with a scratch `SyncStorage`
   and generated books, without accessing the installed library or Drive account.

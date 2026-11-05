@@ -2,6 +2,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application>
         <activity
+            android:name=".features.settings.AppLanguageFixtureActivity"
+            android:exported="false"
+            android:theme="@style/Theme.HoshiReader" />
+        <activity
             android:name=".features.sync.OAuthCallerFixtureActivity"
             android:exported="false"
             android:theme="@android:style/Theme.Material.Light.NoActionBar" />

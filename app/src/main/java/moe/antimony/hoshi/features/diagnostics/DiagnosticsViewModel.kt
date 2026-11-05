@@ -20,6 +20,7 @@ import moe.antimony.hoshi.R
 import moe.antimony.hoshi.di.CacheDir
 import moe.antimony.hoshi.di.IoDispatcher
 import moe.antimony.hoshi.ui.UiText
+import moe.antimony.hoshi.ui.resolve
 import moe.antimony.hoshi.ui.withErrorDetails
 
 internal class DiagnosticsRepository @Inject constructor(
@@ -29,7 +30,7 @@ internal class DiagnosticsRepository @Inject constructor(
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) {
     suspend fun load(): ProcessExitDiagnosticsReport = withContext(ioDispatcher) {
-        loadDiagnosticsReport(nonfatalLogger, context.getString(R.string.diagnostics_load_failed)) {
+        loadDiagnosticsReport(nonfatalLogger, UiText.Resource(R.string.diagnostics_load_failed).resolve(context)) {
             loadProcessExitDiagnosticsReport(context)
         }
     }

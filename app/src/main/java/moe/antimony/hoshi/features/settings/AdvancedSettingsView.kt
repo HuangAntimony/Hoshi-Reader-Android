@@ -30,9 +30,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.features.anki.AnkiConnectView
 import moe.antimony.hoshi.features.audio.AudioSettingsView
@@ -123,15 +124,19 @@ fun AdvancedSettingsView(
                     }
                 }
             }
-            if (isAppLanguagePickerSupported()) {
-                item {
-                    val context = LocalContext.current
-                    GroupCard {
-                        AppLanguageListItem(
-                            selected = context.currentAppLanguageMode(),
-                            onSelected = { mode -> context.setAppLanguageMode(mode) },
-                        )
-                    }
+            item {
+                var languageMode by remember { mutableStateOf(currentAppLanguageMode()) }
+                LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+                    languageMode = currentAppLanguageMode()
+                }
+                GroupCard {
+                    AppLanguageListItem(
+                        selected = languageMode,
+                        onSelected = { mode ->
+                            setAppLanguageMode(mode)
+                            languageMode = currentAppLanguageMode()
+                        },
+                    )
                 }
             }
         }

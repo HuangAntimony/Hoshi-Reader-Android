@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Handler
 import android.os.Looper
+import moe.antimony.hoshi.ui.appLanguageContext
 import androidx.annotation.OptIn
 import androidx.media3.common.C
 import androidx.media3.common.ForwardingPlayer
@@ -101,7 +102,7 @@ internal class SasayakiPlaybackServiceRuntime @Inject constructor(
             .setId(SasayakiPlaybackService.SessionId)
             .setMediaButtonPreferences(mediaButtons)
             .setSessionActivity(sasayakiPlaybackReturnPendingIntent(appContext, activeBookId))
-            .setCallback(SasayakiPlaybackServiceSessionCallback(runtime = this, mediaButtons = mediaButtons))
+            .setCallback(SasayakiPlaybackServiceSessionCallback(appContext))
             .build()
 
         player = createdPlayer
@@ -291,8 +292,7 @@ internal class SasayakiPlaybackServiceRuntime @Inject constructor(
 
 @OptIn(UnstableApi::class)
 private class SasayakiPlaybackServiceSessionCallback(
-    private val runtime: SasayakiPlaybackServiceRuntime,
-    private val mediaButtons: List<CommandButton>,
+    private val context: Context,
 ) : MediaSession.Callback {
     override fun onConnect(
         session: MediaSession,
@@ -311,7 +311,7 @@ private class SasayakiPlaybackServiceSessionCallback(
             .build()
         return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
             .setAvailablePlayerCommands(playerCommands)
-            .setMediaButtonPreferences(mediaButtons)
+            .setMediaButtonPreferences(sasayakiServiceMediaButtons(context))
             .build()
     }
 }
@@ -383,14 +383,16 @@ internal fun sasayakiServiceMediaButtonSpecs(): List<SasayakiServiceMediaButtonS
     )
 
 @OptIn(UnstableApi::class)
-internal fun sasayakiServiceMediaButtons(context: Context): List<CommandButton> =
-    sasayakiServiceMediaButtonSpecs().map { spec ->
+internal fun sasayakiServiceMediaButtons(context: Context): List<CommandButton> {
+    val languageContext = context.appLanguageContext()
+    return sasayakiServiceMediaButtonSpecs().map { spec ->
         CommandButton.Builder(spec.icon)
-            .setDisplayName(context.getString(spec.displayNameResId))
+            .setDisplayName(languageContext.getString(spec.displayNameResId))
             .setPlayerCommand(spec.playerCommand)
             .setSlots(spec.slot)
             .build()
     }
+}
 
 internal fun sasayakiPlaybackReturnActivityFlags(): Int =
     Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT

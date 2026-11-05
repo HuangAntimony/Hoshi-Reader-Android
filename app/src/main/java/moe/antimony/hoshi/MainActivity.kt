@@ -48,11 +48,13 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        pendingImportUri = intent.importUri()
-        pendingSasayakiReaderBookId = intent.sasayakiReaderBookIdOrActivePlayback()
         if (savedInstanceState == null) {
+            pendingImportUri = intent.importUri()
+            pendingSasayakiReaderBookId = intent.sasayakiReaderBookIdOrActivePlayback()
             pendingDictionaryLookupRequest = intent.pendingDictionaryLookupRequest()
         } else {
+            pendingImportUri = savedInstanceState.getString("pendingImportUri")?.let(Uri::parse)
+            pendingSasayakiReaderBookId = savedInstanceState.getString("pendingSasayakiReaderBookId")
             dictionaryLookupRequestId = savedInstanceState.getLong("dictionaryLookupRequestId")
             pendingDictionaryLookupRequest = savedInstanceState.getString("pendingDictionaryLookupQuery")?.let {
                 PendingDictionaryLookupRequest(query = it, requestId = dictionaryLookupRequestId)
@@ -110,6 +112,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
+        outState.putString("pendingImportUri", pendingImportUri?.toString())
+        outState.putString("pendingSasayakiReaderBookId", pendingSasayakiReaderBookId)
         outState.putLong("dictionaryLookupRequestId", dictionaryLookupRequestId)
         outState.putString("pendingDictionaryLookupQuery", pendingDictionaryLookupRequest?.query)
     }

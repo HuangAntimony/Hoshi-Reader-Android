@@ -24,6 +24,7 @@ import java.io.FileNotFoundException
 import java.io.IOException
 import moe.antimony.hoshi.ui.ErrorDiagnosticEvents
 import moe.antimony.hoshi.ui.UiText
+import moe.antimony.hoshi.ui.appLanguageContext
 import moe.antimony.hoshi.ui.diagnosticMessage
 import java.security.MessageDigest
 
@@ -101,11 +102,12 @@ internal class AndroidUpdateDownloadManager internal constructor(
         if (target.exists()) {
             target.delete()
         }
+        val languageContext = appContext.appLanguageContext()
         val request = DownloadManager.Request(Uri.parse(downloadUrl))
             .setTitle(update.previewCommitSha?.let {
-                appContext.getString(R.string.preview_download_title, it.take(7))
+                languageContext.getString(R.string.preview_download_title, it.take(7))
             } ?: "Hoshi Reader ${update.versionName}")
-            .setDescription(appContext.getString(R.string.update_downloading_notification))
+            .setDescription(languageContext.getString(R.string.update_downloading_notification))
             .setMimeType(ApkMimeType)
             .setAllowedOverMetered(true)
             .setAllowedOverRoaming(false)

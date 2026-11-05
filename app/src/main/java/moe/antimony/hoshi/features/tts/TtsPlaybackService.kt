@@ -1,17 +1,21 @@
 package moe.antimony.hoshi.features.tts
 
+import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
+import android.os.LocaleList
 import androidx.annotation.OptIn
 import androidx.media3.common.*
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import kotlinx.coroutines.*
 import moe.antimony.hoshi.MainActivity
+import moe.antimony.hoshi.ui.appLanguageContext
 
 @OptIn(UnstableApi::class)
 @AndroidEntryPoint
@@ -20,6 +24,7 @@ class TtsPlaybackService : MediaSessionService() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var session: MediaSession? = null
     private var player: ExoPlayer? = null
+    private var notificationLocales: LocaleList? = null
     override fun onCreate() {
         super.onCreate()
         val audio = ExoPlayer.Builder(this).setWakeMode(C.WAKE_MODE_LOCAL).build().apply {
@@ -39,6 +44,19 @@ class TtsPlaybackService : MediaSessionService() {
     }
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session
     override fun onUpdateNotification(session: MediaSession, startInForegroundRequired: Boolean) {
+        val languageContext = appLanguageContext()
+        val locales = languageContext.resources.configuration.locales
+        if (notificationLocales != locales) {
+            notificationLocales = locales
+            val provider = DefaultMediaNotificationProvider.Builder(languageContext).build()
+            val channelInfo = provider.notificationChannelInfo
+            val manager = getSystemService(NotificationManager::class.java)
+            manager.getNotificationChannel(channelInfo.id)?.let { channel ->
+                channel.name = channelInfo.name
+                manager.createNotificationChannel(channel)
+            }
+            setMediaNotificationProvider(provider)
+        }
         super.onUpdateNotification(session, startInForegroundRequired || controller.state.value.playing)
     }
     override fun onTaskRemoved(rootIntent: Intent?) {

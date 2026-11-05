@@ -5,7 +5,7 @@ import android.content.res.Resources
 import androidx.annotation.PluralsRes
 import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 
 sealed interface UiText {
     data class Resource(@param:StringRes val id: Int, val args: List<Any> = emptyList()) : UiText {
@@ -28,7 +28,7 @@ fun UiText.resolve(resources: Resources): String =
     )
 
 fun UiText.resolve(context: Context): String =
-    resolve(context.resources)
+    resolve(context.appLanguageContext().resources)
 
 fun UiText.resolve(
     getString: (id: Int, args: Array<out Any>) -> String,
@@ -43,4 +43,4 @@ fun UiText.resolve(
 
 @Composable
 fun UiText.asString(): String =
-    resolve(LocalContext.current)
+    resolve(LocalResources.current)

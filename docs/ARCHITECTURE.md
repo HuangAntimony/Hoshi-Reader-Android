@@ -97,6 +97,16 @@ Names without an extension are searchable types, not necessarily filenames.
   Compose uses `stringResource`/`pluralStringResource`;
   non-UI messages use `UiText` or an equivalent resource reference, without
   retaining a `Context`. Original external diagnostics retain their actual text.
+- `AppLanguage` uses `AppCompatDelegate` for the global app language on API 26+;
+  AndroidX auto-storage owns pre-33 persistence and framework migration. Keep
+  language preferences out of DataStore and Profiles. Locale changes use normal
+  Activity recreation; consumed launch requests must not replay after restore.
+  `ui/AppLanguageResources.kt` supplies locale-aware resources outside AppCompat
+  Activities; `UiText.resolve(context)` uses it too. Resolve background text at
+  generation time instead of caching a localized Context. Media notifications
+  adopt the language on normal generation/update without restarting playback;
+  cached session buttons refresh when regenerated. Existing download requests
+  and historical diagnostics retain their original text.
 - New/replacement icons use Material Icons, Material vector assets or established
   brand assets.
 - Accessibility-only work (TalkBack, screen-reader semantics, announcements and

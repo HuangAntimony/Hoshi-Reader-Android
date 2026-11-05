@@ -7,6 +7,7 @@ Release notes before v1.3.0 are in [CHANGELOG_ARCHIVE.md](CHANGELOG_ARCHIVE.md).
 
 ### Added
 
+- Switch the app between English, Simplified Chinese and the system language on Android 8–12 as well as newer versions, with the chosen language also used for newly generated notifications and background messages.
 - Use the bookshelf’s Mark menu to reset books to unread, including their reading position and statistics, or mark cloud books as read when cached book information is available.
 - Choose AnkiDroid or kuma3 Anki as the card-making client, including deck and note-type fetching, media export, duplicate checks, note browsing and synchronization.
 
