@@ -25,6 +25,7 @@ import moe.antimony.hoshi.features.bookshelf.BookCoverThumbnailStore
 import moe.antimony.hoshi.features.sync.GoogleDriveSyncLifecycle
 import moe.antimony.hoshi.features.diagnostics.installCrashDiagnostics
 import moe.antimony.hoshi.features.diagnostics.NonfatalDiagnosticsLogger
+import moe.antimony.hoshi.features.diagnostics.WebViewDebuggingSettings
 import moe.antimony.hoshi.features.dictionary.DictionaryAutoUpdateScheduler
 import moe.antimony.hoshi.features.update.UpdateApkCleanup
 import moe.antimony.hoshi.features.update.UpdateScheduler
@@ -36,6 +37,7 @@ class HoshiApplication : Application(), Configuration.Provider, SingletonImageLo
     @Inject @ApplicationScope internal lateinit var applicationScope: CoroutineScope
     @Inject internal lateinit var legacySasayakiResourceCleanup: LegacySasayakiResourceCleanup
     @Inject internal lateinit var nonfatalDiagnosticsLogger: NonfatalDiagnosticsLogger
+    @Inject internal lateinit var webViewDebuggingSettings: WebViewDebuggingSettings
     @Inject internal lateinit var updateApkCleanup: UpdateApkCleanup
     @Inject internal lateinit var dictionaryAutoUpdateScheduler: Lazy<DictionaryAutoUpdateScheduler>
     @Inject internal lateinit var updateDownloadStore: UpdateDownloadStore
@@ -54,6 +56,7 @@ class HoshiApplication : Application(), Configuration.Provider, SingletonImageLo
         super.onCreate()
         installCrashDiagnostics(this)
         nonfatalDiagnosticsLogger.start()
+        applicationScope.launch { webViewDebuggingSettings.initialize() }
         applicationScope.launch { legacySasayakiResourceCleanup.clean() }
         prepareUpdateStartupState()
         updateScheduler.get().sync()

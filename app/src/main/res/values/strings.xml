@@ -1143,6 +1143,9 @@
     <string name="diagnostics_exit_other">Other exit</string>
     <string name="diagnostics_exit_unknown">Unknown exit</string>
     <string name="diagnostics_webview" translatable="false">WebView</string>
+    <string name="diagnostics_webview_debugging">WebView debugging</string>
+    <string name="diagnostics_webview_debugging_help">Allow an authorized ADB connection to inspect WebView pages. Takes effect immediately.</string>
+    <string name="diagnostics_webview_debugging_failed">Unable to change WebView debugging.</string>
     <string name="sasayaki_nakuru_unavailable">Nakuru is not available on this device.</string>
     <string name="sasayaki_legacy_resources_cleanup">Remove retired transcription resource: %1$s</string>
     <string name="sync_error_details">View sync error</string>

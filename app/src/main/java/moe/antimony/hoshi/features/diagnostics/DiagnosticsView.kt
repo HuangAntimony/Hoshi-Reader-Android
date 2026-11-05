@@ -85,7 +85,7 @@ fun DiagnosticsView(
     modifier: Modifier = Modifier,
 ) {
     val viewModel: DiagnosticsViewModel = hiltViewModel()
-    DiagnosticsScreen(viewModel, onClose, onOpenRecords, records, modifier)
+    DiagnosticsScreen(viewModel, onClose, onOpenRecords, records, modifier, webViewDebugging = { WebViewDebuggingSetting() })
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -96,6 +96,7 @@ internal fun DiagnosticsScreen(
     onOpenRecords: (DiagnosticsRecordKind) -> Unit,
     records: DiagnosticsRecordKind? = null,
     modifier: Modifier = Modifier,
+    webViewDebugging: @Composable () -> Unit = {},
 ) {
     val context = LocalContext.current
     val resources = LocalResources.current
@@ -280,6 +281,8 @@ internal fun DiagnosticsScreen(
                                 GroupDivider()
                                 DiagnosticsInfoRow(stringResource(R.string.diagnostics_version_name),
                                     report.webViewVersionName ?: stringResource(R.string.diagnostics_unavailable))
+                                GroupDivider()
+                                webViewDebugging()
                             }
                             Spacer(Modifier.height(24.dp))
                             GroupCard {

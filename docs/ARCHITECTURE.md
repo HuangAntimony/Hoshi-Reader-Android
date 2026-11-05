@@ -40,6 +40,7 @@ Names without an extension are searchable types, not necessarily filenames.
 | Transcription, subtitle matching | `features/sasayaki/SasayakiTranscriptionCoordinator.kt`, `features/sasayaki/SasayakiTranscriptionRepository.kt`, `features/sasayaki/transcription/` | Checkpointed recognition, alignment and verified native resources |
 | TTS source text, speech, playback | `features/tts/TtsBookRepository.kt`, `features/tts/TtsAudioRepository.kt`, `TtsEngineRouter`, `TtsPlaybackController`, `TtsPlaybackService` | Source extraction, synthesis/cache, provider adapters and sentence transport |
 | [Errors and diagnostics](#errors-and-diagnostics) | `ui/ErrorDetails.kt`, `ui/ErrorDiagnosticEvents.kt`, `features/diagnostics/NonfatalDiagnostics.kt` | Visible error adaptation, original failure events and application-owned persistence |
+| WebView debugging, release inspection | `features/diagnostics/WebViewDebuggingSettings.kt`, `features/diagnostics/WebViewDebuggingSetting.kt` | App-local persisted debugging policy and the Diagnostics toggle |
 | [Network and credentials](#network-and-credential-boundaries) | `network/PrivateHttpHost.kt`, `features/tts/OnlineTtsTransport.kt`, `TtsCredentialCipher` | Endpoint policy, cancellable transport, secret storage and diagnostic redaction |
 | App updates, About | `features/update/`, `.github/workflows/` and `tools/` (repo root) | Stable releases, manual previews, APK downloads and build provenance |
 
@@ -148,6 +149,14 @@ Typed categories select recovery alongside the original failure.
   API 31+ tombstone protobuf into the original signal, abort message, causes and
   crashing-thread frames. Trace reads
   are bounded; missing or malformed traces never remove the crash event.
+
+- `WebViewDebuggingSettings` owns the app-local Diagnostics toggle and applies
+  `WebView.setWebContentsDebuggingEnabled` on the main thread, including to existing
+  WebViews without reloading documents. Release defaults off; debug builds retain
+  automatic debugging until explicitly disabled. Application startup restores the
+  saved choice without initializing WebView for a disabled release setting.
+  The switch only shows confirmed state; failed writes restore the previous
+  runtime choice and report the error. This setting is independent of profiles.
 
 Validation guidance and failure injection methods are in
 [VALIDATION.md](VALIDATION.md#test-and-fixture-pitfalls).

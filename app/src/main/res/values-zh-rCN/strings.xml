@@ -1140,6 +1140,9 @@
     <string name="diagnostics_exit_other">其他退出</string>
     <string name="diagnostics_exit_unknown">未知退出</string>
     <string name="diagnostics_webview" translatable="false">WebView</string>
+    <string name="diagnostics_webview_debugging">WebView 调试</string>
+    <string name="diagnostics_webview_debugging_help">允许通过已授权的 ADB 连接检查 WebView 页面，切换后立即生效。</string>
+    <string name="diagnostics_webview_debugging_failed">无法更改 WebView 调试设置。</string>
     <string name="sasayaki_nakuru_unavailable">此设备不支持 Nakuru。</string>
     <string name="sasayaki_legacy_resources_cleanup">清理已停用的转录资源：%1$s</string>
     <string name="sync_error_details">查看同步错误</string>

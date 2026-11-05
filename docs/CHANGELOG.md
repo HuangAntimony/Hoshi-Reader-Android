@@ -21,7 +21,7 @@ Release notes before v1.3.0 are in [CHANGELOG_ARCHIVE.md](CHANGELOG_ARCHIVE.md).
 - Customize TTS pronunciation with book-specific or global replacements, optional regular expressions and ruby readings, without changing book text.
 - Export audiobook or TTS sentence audio to AnkiDroid and AnkiConnect with the optional `{sentence-audio}` field.
 - Optionally disable a term's Anki button after successful mining until the popup is reopened.
-- View, copy or export recent runtime errors alongside Java and native crash records, decoded native stacks, separate process-exit history and build information in Diagnostics, including Google Drive authorization status and network context when reconnection is required.
+- View, copy or export recent runtime errors alongside Java and native crash records, decoded native stacks, separate process-exit history and build information in Diagnostics, including Google Drive authorization status and network context when reconnection is required, and optionally enable WebView debugging in release builds without restarting the app.
 - Install the latest development preview from About.
 - Add LINE Seed JP to the recommended reader fonts.
 

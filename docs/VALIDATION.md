@@ -142,6 +142,11 @@ Stop the fixture and remove only this reverse mapping after testing.
   check dump output as well as exit status, and confirm state with Compose tests
   or a current screenshot; an old popup tree is not evidence of failed navigation.
 
+- CDP discovery can label the Dictionary's `loadDataWithBaseURL` host as
+  `about:blank` even while its iframe is rendered. Inspect the intended app
+  process's targets and confirm `location.href` or `document.baseURI` in the page;
+  filtering only `/json` URLs for `appassets.androidplatform.net` can miss it.
+
 - `BookshelfImportProgressTest` renders the real shelf with a scratch `SyncStorage`
   and generated books, without accessing the installed library or Drive account.
   It checks standard/E-ink import progress across the real reload timer and saves
@@ -261,7 +266,11 @@ the second covers web setup/layout/restore. A ready flag does not prove paint.
 Compare relevant controls, such as first/repeated entry, short/long chapters,
 Sasayaki on/off and paragraph mode on/off.
 
-For a debuggable process, locate its WebView through CDP:
+For a debug build, or a release with Diagnostics → WebView debugging enabled,
+locate its WebView through CDP. The release toggle is off by default and remembers
+the chosen value. Enable it before investigating an intermittent Reader problem
+so opening Diagnostics does not replace the failing reading session. Toggling
+debugging itself does not reload WebViews. Use the intended package in the command:
 
 ```bash
 hoshi_serial='REPLACE_WITH_DEVICE_SERIAL'
