@@ -45,6 +45,7 @@ Release notes before v1.3.0 are in [CHANGELOG_ARCHIVE.md](CHANGELOG_ARCHIVE.md).
 
 ### Fixed
 
+- Keep reduced-motion scrolling and swipe dismissal working in lookup popups when WebView retains a touch on the reader page.
 - Refresh a book's recent-reading order and progress promptly when returning to the bookshelf, including quick switches between books, and reduce loading delays for large libraries.
 - Prevent intermittent bookshelf sorting errors after successful EPUB imports, and distinguish refresh failures from import failures.
 - Prevent book styles from shrinking the reading area in paginated and continuous modes.

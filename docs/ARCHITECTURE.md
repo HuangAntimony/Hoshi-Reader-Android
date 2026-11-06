@@ -427,7 +427,11 @@ dynamic configuration and bridge calls.
 - Reader, Dictionary and Process Text use the same iframe popup host and native
   service bridge. `popup.js`'s `hoshiPopupGeometry` owns CSS-zoom coordinates.
   It converts between unscaled layout coordinates and visual scroll/viewport
-  coordinates. Theme-only changes preserve popup DOM/history.
+  coordinates. `popup-gestures.js` recognizes gestures through per-pointer events,
+  including non-primary popup pointers when another document retains a touch.
+  Reduced-motion scrolling sets `touch-action: none` on the popup root and its
+  embedding iframe; ordinary scrolling keeps `pan-y`. Theme-only changes preserve
+  popup DOM/history.
 - `DictionarySearchSession` retains search/popup navigation history across tabs.
   Successful book opening resets it before book-profile activation; failed opening
   leaves it. Clearing the Dictionary input preserves displayed lookup content and

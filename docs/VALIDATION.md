@@ -173,6 +173,17 @@ Stop the fixture and remove only this reverse mapping after testing.
   process's targets and confirm `location.href` or `document.baseURI` in the page;
   filtering only `/json` URLs for `appassets.androidplatform.net` can miss it.
 
+- An active CDP-injected touch sequence can suppress native touchscreen input.
+  Use one input stream for controlled multi-pointer tests and always finish it
+  with `touchEnd` or `touchCancel` before native input or disconnecting the CDP
+  session. Disconnecting mid-gesture can leave native input blocked after the
+  renderer touch is cleared. Prefer `LookupPopupGestureWebViewTest`'s isolated
+  native-event fixture for popup gesture regressions. To test cross-document
+  touch routing, start a parent touch, add and move an iframe touch with
+  `touchMove`, then end the sequence. The iframe pointer can be non-primary while
+  its Touch Events stay in the parent document. Run real-device gestures as a
+  separate check; do not infer native behavior from suppressed input.
+
 - `BookshelfImportProgressTest` renders the real shelf with a scratch `SyncStorage`
   and generated books, without accessing the installed library or Drive account.
   It checks standard/E-ink import progress across the real reload timer and saves

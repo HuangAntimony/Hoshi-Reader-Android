@@ -1,52 +1,59 @@
 (function() {
+    if (!window.reducedMotionScrolling && !window.swipeThreshold) return;
+
+    // Touch Events stay in the document where the first active touch began.
+    // A retained reader touch can therefore send popup touches to the parent
+    // iframe element. Pointer Events still target this popup independently.
+    // Set the iframe's action too, since Chromium can calculate it there.
+    const touchAction = window.reducedMotionScrolling ? 'none' : 'pan-y';
+    document.documentElement.style.touchAction = touchAction;
+    if (window.frameElement) window.frameElement.style.touchAction = touchAction;
+
     if (window.reducedMotionScrolling) {
-        var reducedMotionStartY = 0;
-        var scrollByPopupHeight = function(direction) {
-            window.hoshiPopupGeometry?.scrollByViewport(direction, window.reducedMotionScrollScale);
-        };
-        document.addEventListener('touchstart', function(e) {
-            if (e.touches.length === 1) {
-                reducedMotionStartY = e.touches[0].clientY;
-            }
-        }, { passive: true });
-        document.addEventListener('touchmove', function(e) {
-            if (e.touches.length === 1 && e.cancelable) {
-                e.preventDefault();
-            }
-        }, { passive: false });
-        document.addEventListener('touchend', function(e) {
-            if (!e.changedTouches.length) return;
-            var delta = reducedMotionStartY - e.changedTouches[0].clientY;
-            var threshold = window.reducedMotionSwipeThreshold;
-            if (delta > threshold) {
-                scrollByPopupHeight(1);
-            } else if (delta < -threshold) {
-                scrollByPopupHeight(-1);
-            }
-        }, { passive: true });
         document.addEventListener('wheel', function(e) {
             if (e.deltaY === 0) return;
-            scrollByPopupHeight(e.deltaY > 0 ? 1 : -1);
+            window.hoshiPopupGeometry?.scrollByViewport(
+                e.deltaY > 0 ? 1 : -1, window.reducedMotionScrollScale);
             e.preventDefault();
         }, { passive: false });
     }
-    if (!window.swipeThreshold) {
-        return;
-    }
-    var startX, startY;
-    document.addEventListener('touchstart', function(e) {
-        startX = e.touches[0].clientX;
-        startY = e.touches[0].clientY;
-    });
-    document.addEventListener('touchend', function(e) {
-        var dx = e.changedTouches[0].clientX - startX;
-        var dy = e.changedTouches[0].clientY - startY;
-        var absDx = Math.abs(dx);
-        var absDy = Math.abs(dy);
-        var isHorizontalDismiss = absDx > window.swipeThreshold && absDx > absDy * 1.75;
-        var hasSelection = window.getSelection().toString();
-        if (isHorizontalDismiss && !hasSelection) {
+
+    const pointers = new Set();
+    let start = null;
+    document.addEventListener('pointerdown', function(e) {
+        if (e.pointerType !== 'touch' && e.pointerType !== 'pen') return;
+        pointers.add(e.pointerId);
+        if (pointers.size !== 1) start = null;
+    }, { capture: true, passive: true });
+    document.addEventListener('pointerdown', function(e) {
+        // Do not require isPrimary: a retained touch in the reader can own that
+        // flag while this is the only pointer interacting with the popup.
+        // Menus can stop bubbling to opt out of starting a gesture, while their
+        // pointers still count above when another finger is already down.
+        if (pointers.size === 1 && pointers.has(e.pointerId)) {
+            start = { id: e.pointerId, x: e.clientX, y: e.clientY };
+        }
+    }, { passive: true });
+    document.addEventListener('pointercancel', function(e) {
+        if (pointers.delete(e.pointerId)) start = null;
+    }, { capture: true, passive: true });
+    document.addEventListener('pointerup', function(e) {
+        pointers.delete(e.pointerId);
+        if (!start || start.id !== e.pointerId) return;
+        const origin = start;
+        start = null;
+        if (pointers.size) return;
+
+        const dx = e.clientX - origin.x;
+        const dy = e.clientY - origin.y;
+        if (window.reducedMotionScrolling && Math.abs(dy) > window.reducedMotionSwipeThreshold) {
+            window.hoshiPopupGeometry?.scrollByViewport(
+                dy < 0 ? 1 : -1, window.reducedMotionScrollScale);
+        }
+        const isHorizontalDismiss = window.swipeThreshold &&
+            Math.abs(dx) > window.swipeThreshold && Math.abs(dx) > Math.abs(dy) * 1.75;
+        if (isHorizontalDismiss && !window.getSelection().toString()) {
             webkit.messageHandlers.swipeDismiss.postMessage(null);
         }
-    });
+    }, { capture: true, passive: true });
 })();
