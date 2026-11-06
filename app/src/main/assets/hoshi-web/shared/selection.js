@@ -196,6 +196,27 @@ window.hoshiSelection = {
 
     configure(options = {}) {
         this.options = { ...this.options, ...options };
+        const policies = window.hoshiSelectionLanguagePolicies;
+        const policy = policies?.[this.options.language] || policies?.default;
+        this.languagePolicy = policy;
+        const bindCharacterBoundary = fn => fn
+            ? char => fn.call(policy, char, this)
+            : () => true;
+        const bindTextBoundary = (fn, characterBoundary) => {
+            if (fn) return (text, offset, char) => fn.call(policy, text, offset, this, char);
+            if (characterBoundary) return (text, offset, char = this.codePointAt(text, offset)) =>
+                characterBoundary.call(policy, char, this);
+            return () => true;
+        };
+        const scan = policy?.isScanBoundary;
+        const hit = policy?.isHitBoundary || scan;
+        const wordStart = policy?.isWordStartBoundary || hit;
+        this.isScanBoundary = bindCharacterBoundary(scan);
+        this.isHitBoundary = bindCharacterBoundary(hit);
+        this.isWordStartBoundary = bindCharacterBoundary(wordStart);
+        this.isScanBoundaryAt = bindTextBoundary(policy?.isScanBoundaryAt, scan);
+        this.isHitBoundaryAt = bindTextBoundary(policy?.isHitBoundaryAt, hit);
+        this.isWordStartBoundaryAt = bindTextBoundary(policy?.isWordStartBoundaryAt, wordStart);
     },
 
     postTextSelected(selection) {
@@ -235,62 +256,8 @@ window.hoshiSelection = {
         return right > left && bottom > top ? { x: left, y: top, width: right - left, height: bottom - top } : null;
     },
 
-    languagePolicy() {
-        const configured = String(
-            this.options.language ||
-            document.documentElement?.dataset?.hoshiContentLanguage ||
-            'ja'
-        );
-        const normalized = configured.toLowerCase().split('-')[0];
-        const policies = window.hoshiSelectionLanguagePolicies || {};
-        return policies[normalized] || policies[configured] || policies.default;
-    },
-
-    isScanBoundary(char) {
-        const policy = this.languagePolicy();
-        if (!policy) return true;
-        return policy.isScanBoundary.call(policy, char, this);
-    },
-
-    isScanBoundaryAt(text, offset) {
-        const policy = this.languagePolicy();
-        if (!policy) return true;
-        if (policy.isScanBoundaryAt) return policy.isScanBoundaryAt.call(policy, text, offset, this);
-        return policy.isScanBoundary.call(policy, this.codePointAt(text, offset), this);
-    },
-
-    isHitBoundary(char) {
-        const policy = this.languagePolicy();
-        if (!policy) return true;
-        const isBoundary = policy.isHitBoundary || policy.isScanBoundary;
-        return isBoundary.call(policy, char, this);
-    },
-
-    isHitBoundaryAt(text, offset) {
-        const policy = this.languagePolicy();
-        if (!policy) return true;
-        if (policy.isHitBoundaryAt) return policy.isHitBoundaryAt.call(policy, text, offset, this);
-        const isBoundary = policy.isHitBoundary || policy.isScanBoundary;
-        return isBoundary.call(policy, this.codePointAt(text, offset), this);
-    },
-
-    isWordStartBoundary(char) {
-        const policy = this.languagePolicy();
-        if (!policy) return true;
-        const isBoundary = policy.isWordStartBoundary || policy.isHitBoundary || policy.isScanBoundary;
-        return isBoundary.call(policy, char, this);
-    },
-
-    isWordStartBoundaryAt(text, offset) {
-        const policy = this.languagePolicy();
-        if (!policy) return true;
-        if (policy.isWordStartBoundaryAt) return policy.isWordStartBoundaryAt.call(policy, text, offset, this);
-        const isBoundary = policy.isWordStartBoundary || policy.isHitBoundary || policy.isScanBoundary;
-        return isBoundary.call(policy, this.codePointAt(text, offset), this);
-    },
-
     selectionStartForHit(hit) {
-        const policy = this.languagePolicy();
+        const policy = this.languagePolicy;
         if (!policy) return hit;
         const normalizedHit = {
             ...hit,
@@ -329,7 +296,7 @@ window.hoshiSelection = {
         if (start >= text.length) return text.length;
         const codePoint = text.codePointAt(start);
         if (codePoint === undefined) return text.length;
-        return start + String.fromCodePoint(codePoint).length;
+        return start + (codePoint > 0xffff ? 2 : 1);
     },
 
     previousCodePointStartOffset(text, offset) {
@@ -644,11 +611,11 @@ window.hoshiSelection = {
 
             while (offset < content.length && text.length < maxLength) {
                 const char = this.codePointAt(content, offset);
-                if (this.isScanBoundaryAt(content, offset)) {
+                if (this.isScanBoundaryAt(content, offset, char)) {
                     break;
                 }
                 text += char;
-                offset = this.nextCodePointOffset(content, offset);
+                offset += char.length;
             }
 
             if (offset > start) {
@@ -1042,6 +1009,8 @@ window.hoshiSelection = {
         this.selection = null;
     }
 };
+
+window.hoshiSelection.configure();
 
 let lastHasSelection = false;
 document.addEventListener('contextmenu', event => window.hoshiSelection.recoverNativeSelectionMenu(event));

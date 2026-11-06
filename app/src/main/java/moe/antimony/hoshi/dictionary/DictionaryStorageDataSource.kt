@@ -170,10 +170,14 @@ internal class DictionaryStorageDataSource(
             dictionary.index.title == index.title
         }
 
-    fun enabledDictionaryPaths(type: DictionaryType): List<File> =
-        loadDictionaries(type)
-            .filter { it.isEnabled }
-            .map { it.path }
+    fun enabledDictionaryPaths(profileId: String): Map<DictionaryType, List<File>> {
+        val config = loadConfig(configFile(profileId))
+        return DictionaryType.entries.associateWith { type ->
+            DictionaryManager.collectDictionaries(storedDictionaries(type), config.entriesForType(type))
+                .filter { it.isEnabled }
+                .map { it.path }
+        }
+    }
 
     fun typeDirectory(type: DictionaryType): File =
         File(dictionariesDir, type.directoryName)

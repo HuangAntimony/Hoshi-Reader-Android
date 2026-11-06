@@ -54,8 +54,8 @@ class ReaderParagraphWebViewTest {
             }
             webView.loadDataWithBaseURL(null, """
                 <!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
-                <script>${assets.languageJapaneseJs}
-                ${assets.selectionJapaneseJs}
+                <script>${assets.languageAssets.languageJapaneseJs}
+                ${assets.languageAssets.selectionJapaneseJs}
                 ${assets.selectionJs}
                 window.HoshiReaderRestore={postMessage:()=>window.testRestored=true};</script>
                 $styles<style>$viewport rt { color:rgb(220,0,0) !important; }</style>$script

@@ -7,6 +7,21 @@ import org.junit.Test
 
 class ContentLanguageProfileTest {
     @Test
+    fun chineseAndKoreanResolveTheirOwnTypographyAndInputLocale() {
+        listOf(Triple("zh", "zh-CN", "SC"), Triple("ko", "ko-KR", "KR")).forEach { (id, locale, region) ->
+            val profile = ContentLanguageProfile.fromDictionaryLanguageId(id)
+            org.junit.Assert.assertNotNull("Supported profile $id", profile)
+            profile!!
+            assertEquals(id, profile.htmlLang)
+            assertEquals(locale, profile.composeLocaleTag)
+            assertEquals(locale, profile.inputLocaleTag)
+            assertTrue(profile.webViewFontFamilyCss.contains("Noto Sans CJK $region"))
+            assertTrue(profile.readerSerifFontFamilyCss.contains("Noto Serif CJK $region"))
+            assertTrue(profile.readerSansSerifFontFamilyCss.contains("Noto Sans CJK $region"))
+        }
+    }
+
+    @Test
     fun defaultProfileIsJapaneseAndUsesAndroidFonts() {
         val japanese = ContentLanguageProfile.Default
 

@@ -13,6 +13,9 @@ function selectionSource() {
         japaneseLanguageUrl,
         japaneseSelectionUrl,
         englishSelectionUrl,
+        new URL('../../main/assets/hoshi-web/shared/language-cjk.js', import.meta.url),
+        new URL('../../main/assets/hoshi-web/shared/selection-zh.js', import.meta.url),
+        new URL('../../main/assets/hoshi-web/shared/selection-ko.js', import.meta.url),
         new URL('../../main/assets/hoshi-web/reader/reader-dom-text.js', import.meta.url),
         sharedSelectionUrl,
     ].map((url) => fs.readFileSync(url, 'utf8')).join('\n');
@@ -194,14 +197,14 @@ function loadAdjacentExpressionTags() {
     return selection;
 }
 
-function scanTextFromOffset(text, offset, configureOptions = {}) {
+function scanTextFromOffset(text, offset, configureOptions = {}, scanOtherLanguages = false) {
     const { document, selection, textNode, window } = loadSelection(text);
     document.pointElement = hitElement([]);
     selection.configure(configureOptions);
     selection.postTextSelected = () => {};
     selection.clearSelection = () => {};
     selection.getCharacterAtPoint = () => ({ node: textNode, offset });
-    window.scanNonJapaneseText = false;
+    window.scanNonJapaneseText = scanOtherLanguages;
     return selection.selectText(1, 1, 80);
 }
 
@@ -376,10 +379,71 @@ test('shared selection can preserve reader link and image tap tokens', () => {
 test('shared selection treats missing language policy as a no-scan boundary', () => {
     const selection = loadSharedSelectionWithoutPolicy();
 
-    assert.equal(selection.languagePolicy(), undefined);
     assert.doesNotThrow(() => selection.isScanBoundary('猫'));
     assert.equal(selection.isScanBoundary('猫'), true);
     assert.equal(selection.selectionStartForHit({ node: {}, offset: 3 }).offset, 3);
+});
+
+test('configuration selects the language policy before scanning without rereading configuration', () => {
+    const { selection, window, textNode } = loadSelection('猫');
+    selection.configure({ language: 'ja' });
+    Object.defineProperty(selection.options, 'language', {
+        get() { assert.fail('character scanning must not read the configured language'); },
+    });
+    Object.defineProperty(window, 'hoshiSelectionLanguagePolicies', {
+        get() { assert.fail('character scanning must not look up the language policy'); },
+    });
+    Object.defineProperty(window, 'hoshiLanguageUtilities', {
+        get() { assert.fail('character scanning must not look up fixed language utilities'); },
+    });
+    Object.defineProperty(selection.languagePolicy, 'isScanBoundaryAt', {
+        get() { assert.fail('character scanning must not choose a boundary implementation'); },
+    });
+    for (const char of '猫が本を読んでいる') {
+        assert.equal(selection.isScanBoundary(char), false);
+        assert.equal(selection.isScanBoundaryAt(char, 0), false);
+        assert.equal(selection.isHitBoundary(char), false);
+        assert.equal(selection.isHitBoundaryAt(char, 0), false);
+        assert.equal(selection.isWordStartBoundary(char), false);
+        assert.equal(selection.isWordStartBoundaryAt(char, 0), false);
+    }
+    assert.equal(selection.selectionStartForHit({ node: textNode, offset: 0 }).offset, 0);
+});
+
+test('Japanese scanning extracts each codepoint once and reuses its UTF-16 width', () => {
+    const { document, selection, textNode, window } = loadSelection('猫𠮟る');
+    document.pointElement = hitElement([]);
+    selection.configure({ language: 'ja' });
+    selection.clearSelection = () => {};
+    selection.getCharacterAtPoint = () => ({ node: textNode, offset: 0 });
+    selection.getSelectionRect = () => null;
+    selection.getSentenceContext = () => ({ sentence: '猫𠮟る', sentenceOffset: 0 });
+    selection.postTextSelected = () => {};
+    window.scanNonJapaneseText = false;
+    let extractions = 0;
+    const extract = selection.codePointAt;
+    selection.codePointAt = function(...args) { extractions++; return extract.apply(this, args); };
+    selection.nextCodePointOffset = () => assert.fail('scanning already knows the codepoint width');
+
+    assert.equal(selection.selectText(1, 1, 16), '猫𠮟る');
+    assert.equal(extractions, 3);
+    assert.equal(selection.selection.ranges[0].end, 4);
+});
+
+test('configuration changes switch language policies and can pick up newly loaded rules', () => {
+    const { selection, window } = loadSelection('猫');
+    window.scanNonJapaneseText = false;
+    for (const language of ['ja', 'en', 'zh', 'ko', 'ja']) {
+        selection.configure({ language });
+        assert.equal(selection.isScanBoundary('あ'), language === 'zh' || language === 'ko');
+        assert.equal(selection.isScanBoundary('한'), language === 'ja' || language === 'zh');
+    }
+    selection.configure({ language: 'en' });
+    assert.equal(selection.isScanBoundary('-'), true);
+    const replacement = { isScanBoundary: () => false };
+    window.hoshiSelectionLanguagePolicies = { en: replacement };
+    selection.configure({ language: 'en' });
+    assert.equal(selection.isScanBoundary('-'), false);
 });
 
 test('english reader selection ignores the Japanese non-Japanese scan toggle', () => {
@@ -1106,3 +1170,29 @@ test('continuous native menu clips to the body viewport while retaining full Web
     assert.deepEqual(JSON.parse(JSON.stringify(selection.nativeSelectionMenuRect())),
         { left: 40, right: 360, top: 80, bottom: 720, viewportWidth: 400 });
 });
+
+for (const [language, text, offset, expected] of [
+    ['zh', '学习汉语。下一句', 2, '汉语'],
+    ['ko', '읽었어요 다음', 2, '어요'],
+    ['ko', '읽었어요。다음', 0, '읽었어요'],
+    ['zh', 'ㄅㄆㄇ', 0, 'ㄅㄆㄇ'],
+    ['ko', 'ᄀㄱꥠힰﾡ', 0, 'ᄀㄱꥠힰﾡ'],
+    ['zh', '𠀀中文', 1, '𠀀中文'],
+    ['ko', '漢字한글', 0, '漢字한글'],
+]) {
+    test(`${language} scans from the clicked codepoint: ${text}`, () => {
+        assert.equal(scanTextFromOffset(text, offset, { language }), expected);
+    });
+}
+
+for (const language of ['zh', 'ko']) {
+    test(`${language} excludes Latin text when other-language scanning is disabled`, () => {
+        assert.equal(scanTextFromOffset('reading', 0, { language }), null);
+    });
+}
+
+for (const language of ['zh', 'ko']) {
+    test(`${language} allows mixed Latin text when other-language scanning is enabled`, () => {
+        assert.equal(scanTextFromOffset('reading 字', 0, { language }, true), 'reading');
+    });
+}

@@ -7,6 +7,8 @@ Release notes before v1.3.0 are in [CHANGELOG_ARCHIVE.md](CHANGELOG_ARCHIVE.md).
 
 ### Added
 
+- Create Chinese and Korean profiles with language-specific fonts, automatic book-profile selection, and lookup in the reader and dictionary popups, including Korean deinflection and Chinese pinyin grouping.
+
 - Switch the app between English, Simplified Chinese and the system language on Android 8–12 as well as newer versions, with the chosen language also used for newly generated notifications and background messages.
 - Use the bookshelf’s Mark menu to reset books to unread, including their reading position and statistics, or mark cloud books as read when cached book information is available.
 - Choose AnkiDroid or kuma3 Anki as the card-making client, including deck and note-type fetching, media export, duplicate checks, note browsing and synchronization.
@@ -26,6 +28,8 @@ Release notes before v1.3.0 are in [CHANGELOG_ARCHIVE.md](CHANGELOG_ARCHIVE.md).
 - Add LINE Seed JP to the recommended reader fonts.
 
 ### Changed
+
+- Reduce repeated work when selecting text and searching dictionaries, while refreshing lookup sessions after profile switches and partially completed dictionary imports.
 
 - Remove automatic layout corrections for publisher paragraph containers, blank spacers and image margins.
 

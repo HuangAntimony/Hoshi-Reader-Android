@@ -204,7 +204,7 @@ class DictionarySearchUnmatchedSourceTest {
 private class UnmatchedSearchRepository : DictionarySearchRepository {
     override val dictionarySettings = MutableStateFlow(DictionarySettings())
     override val audioSettings = MutableStateFlow(AudioSettings(enableAutoplay = false))
-    override suspend fun rebuildLookupQuery() = Unit
+    override suspend fun ensureLookupQueryReady() = Unit
     override fun dictionaryStyles(): Map<String, String> = mapOf("Fixture" to ".glossary-content { color: black; }")
     override fun lookup(query: String, maxResults: Int, scanLength: Int, options: LookupOptions): List<LookupResult> =
         if (!query.startsWith("猫")) emptyList() else listOf(

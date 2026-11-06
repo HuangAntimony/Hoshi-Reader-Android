@@ -30,7 +30,7 @@ import moe.antimony.hoshi.ui.withErrorDetails
 internal interface DictionarySearchRepository {
     val dictionarySettings: Flow<DictionarySettings>
     val audioSettings: Flow<AudioSettings>
-    suspend fun rebuildLookupQuery()
+    suspend fun ensureLookupQueryReady()
     fun lookup(query: String, maxResults: Int, scanLength: Int, options: LookupOptions): List<LookupResult>
     fun dictionaryStyles(): Map<String, String>
     fun lookupKanji(kanji: String): KanjiResult = KanjiResult(kanji, emptyArray())
@@ -45,8 +45,8 @@ internal class AndroidDictionarySearchRepository @Inject constructor(
     override val dictionarySettings: Flow<DictionarySettings> = dictionarySettingsRepository.settings
     override val audioSettings: Flow<AudioSettings> = audioSettingsRepository.settings
 
-    override suspend fun rebuildLookupQuery() {
-        dictionaryRepository.rebuildLookupQuery()
+    override suspend fun ensureLookupQueryReady() {
+        dictionaryRepository.ensureLookupQueryReady()
     }
 
     override fun lookup(query: String, maxResults: Int, scanLength: Int, options: LookupOptions): List<LookupResult> =
@@ -124,7 +124,7 @@ internal class DictionarySearchViewModel : ViewModel {
     private fun collectInitialState() {
         scope.launch {
             withContext(ioDispatcher) {
-                runCatching { repository.rebuildLookupQuery() }
+                runCatching { repository.ensureLookupQueryReady() }
             }
         }
         scope.launch {
@@ -188,7 +188,7 @@ internal class DictionarySearchViewModel : ViewModel {
         }
         scope.launch {
             withContext(ioDispatcher) {
-                runCatching { repository.rebuildLookupQuery() }
+                runCatching { repository.ensureLookupQueryReady() }
             }
         }
     }
@@ -210,7 +210,7 @@ internal class DictionarySearchViewModel : ViewModel {
                             lookup = { error("lookup should not run for blank query") },
                         )
                     } else {
-                        repository.rebuildLookupQuery()
+                        repository.ensureLookupQueryReady()
                         val styles = repository.dictionaryStyles()
                         DictionarySearchContent.runLookup(
                             query = query,

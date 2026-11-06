@@ -18,6 +18,42 @@ import org.junit.Test
 
 class DictionaryLookupQueryServiceTest {
     @Test
+    fun stylesAreReadOncePerCommittedSessionAndSurviveFailedRebuilds() {
+        val bridge = RecordingDictionaryNativeBridge()
+        val service = DictionaryLookupQueryService(bridge)
+        service.rebuild(emptyList(), emptyList(), emptyList())
+        val first = service.getStyles()
+        assertEquals(first, service.getStyles())
+        assertEquals(listOf(1L), bridge.styleSessions)
+        bridge.failNextRebuild = true
+        org.junit.Assert.assertThrows(IllegalStateException::class.java) {
+            service.rebuild(emptyList(), emptyList(), emptyList())
+        }
+        assertEquals(first, service.getStyles())
+        assertEquals(listOf(1L), bridge.styleSessions)
+        service.rebuild(emptyList(), emptyList(), emptyList())
+        assertEquals(mapOf("Test" to "session-3"), service.getStyles())
+        assertEquals(listOf(1L, 3L), bridge.styleSessions)
+    }
+
+    @Test
+    fun switchingAllLanguagesReplacesSessionsAndRetainsTheLastOneOnFailure() {
+        val bridge = RecordingDictionaryNativeBridge()
+        val service = DictionaryLookupQueryService(bridge)
+        listOf("ja", "en", "zh", "ko").forEachIndexed { index, language ->
+            service.rebuild(listOf(File("/dicts/$language")), emptyList(), emptyList(), dictionaryLanguageId = language)
+            assertEquals("session-${index + 1}:/dicts/$language", service.lookup("text").single().term.glossaries.single().glossary)
+        }
+        bridge.failNextRebuild = true
+        org.junit.Assert.assertThrows(IllegalStateException::class.java) {
+            service.rebuild(emptyList(), emptyList(), emptyList(), dictionaryLanguageId = "zh")
+        }
+        assertEquals("session-4:/dicts/ko", service.lookup("text").single().term.glossaries.single().glossary)
+        assertEquals(listOf(1L, 2L, 3L, 5L), bridge.destroyedSessions)
+        assertEquals(listOf("ja", "en", "zh", "ko", "zh"), bridge.createdLanguageIds)
+    }
+
+    @Test
     fun lookupForwardsEveryFrequencyModeWithoutRebuildingTheSession() {
         val bridge = RecordingDictionaryNativeBridge()
         val service = DictionaryLookupQueryService(bridge)
@@ -271,7 +307,11 @@ class DictionaryLookupQueryServiceTest {
             )
         }
 
-        override fun getStyles(session: Long): List<DictionaryStyle> = emptyList()
+        val styleSessions = mutableListOf<Long>()
+        override fun getStyles(session: Long): List<DictionaryStyle> {
+            styleSessions += session
+            return listOf(DictionaryStyle("Test", "session-$session"))
+        }
 
         override fun getMediaFile(session: Long, dictionary: String, path: String): ByteArray? = null
     }

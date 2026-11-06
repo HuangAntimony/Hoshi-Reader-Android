@@ -74,6 +74,19 @@ Names without an extension are searchable types, not necessarily filenames.
   `StaticSettingsDetailScaffold` serves static menus/actions.
 - `ProfileRepository` owns profile identity. A book resolves forced profile,
   then EPUB-language primary profile, then global active profile.
+  `ContentLanguageProfile` supports `ja`, `en`, `zh` and `ko`; Chinese region/script
+  tags resolve to the single `zh` profile. Content language controls dictionary
+  sessions, input locale, typography and shared selection policies independently
+  of the app UI language. Chinese and Korean scan from the tapped codepoint,
+  while English rewinds to the word start. The legacy `scanNonJapaneseText` key
+  controls scanning outside the current Japanese/Chinese/Korean character ranges;
+  explicit dictionary searches remain unrestricted. Reader and popup asset loaders
+  must supply the same language policy, including externally loaded iframe scripts.
+  Load language policies before calling selection `configure`, which binds the
+  boundary functions using the profile's canonical language ID. Character scanning
+  extracts each codepoint once and reuses its UTF-16 width; it does not normalize
+  language tags or reselect boundary implementations. `SelectionLanguageAssets`
+  shares lazy language-script reads between reader documents and popup resource routes.
 - Reading appearance, dictionary and Anki settings are profile-owned JSON.
   Reader behavior, theme/E-ink, statistics goals and TTS preferences are global.
   `ReaderSettingsRepository` combines display and profile reading state;
@@ -419,6 +432,16 @@ dynamic configuration and bridge calls.
   leaves it. Clearing the Dictionary input preserves displayed lookup content and
   popup navigation; it does not reset the search session. Dictionary and external
   lookup retain tappable source text even when a successful query has no matches.
+- Ordinary Dictionary/Process Text queries ensure the existing native session is
+  ready; dictionary mutations rebuild it and profile identity changes invalidate it.
+  `DictionaryRepository` captures one profile and its dictionary configuration for
+  each rebuild, publishes that same identity with the ready session, and retries if
+  the active profile changes during initialization. Each committed recommended
+  import invalidates readiness and notifies the mutation coordinator, including when
+  a later download or configuration write fails. Rebuild failures leave readiness
+  invalid so the next query retries; unchanged queries reuse the existing session.
+  `DictionaryLookupQueryService` caches dictionary styles with the committed session
+  under the same query lock. Failed rebuilds preserve the previous session and styles.
 - `DictionaryLookupHistoryRepository` separately owns global original-submission
   history in `dictionary-lookup-history` DataStore. Only explicit Dictionary
   submissions and fresh external lookup requests write it; Reader lookup, popup

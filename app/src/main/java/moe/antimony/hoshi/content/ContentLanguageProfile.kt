@@ -17,6 +17,8 @@ class ContentLanguageProfile private constructor(
     companion object {
         const val JapaneseLanguageId = "ja"
         const val EnglishLanguageId = "en"
+        const val ChineseLanguageId = "zh"
+        const val KoreanLanguageId = "ko"
 
         val Japanese: ContentLanguageProfile = ContentLanguageProfile(
             id = JapaneseLanguageId,
@@ -42,8 +44,32 @@ class ContentLanguageProfile private constructor(
             readerSansSerifFontFamilyCss = "'Roboto', 'Noto Sans', Arial, sans-serif",
         )
 
+        val Chinese: ContentLanguageProfile = ContentLanguageProfile(
+            id = ChineseLanguageId,
+            displayNameRes = R.string.profile_language_chinese,
+            dictionaryLanguageId = ChineseLanguageId,
+            htmlLang = "zh",
+            composeLocaleTag = "zh-CN",
+            inputLocaleTag = "zh-CN",
+            webViewFontFamilyCss = "'Noto Sans CJK SC', sans-serif",
+            readerSerifFontFamilyCss = "'Noto Serif CJK SC', serif",
+            readerSansSerifFontFamilyCss = "'Noto Sans CJK SC', sans-serif",
+        )
+
+        val Korean: ContentLanguageProfile = ContentLanguageProfile(
+            id = KoreanLanguageId,
+            displayNameRes = R.string.profile_language_korean,
+            dictionaryLanguageId = KoreanLanguageId,
+            htmlLang = "ko",
+            composeLocaleTag = "ko-KR",
+            inputLocaleTag = "ko-KR",
+            webViewFontFamilyCss = "'Noto Sans CJK KR', sans-serif",
+            readerSerifFontFamilyCss = "'Noto Serif CJK KR', serif",
+            readerSansSerifFontFamilyCss = "'Noto Sans CJK KR', sans-serif",
+        )
+
         val Default: ContentLanguageProfile = Japanese
-        val Supported: List<ContentLanguageProfile> = listOf(Japanese, English)
+        val Supported: List<ContentLanguageProfile> = listOf(Japanese, English, Chinese, Korean)
 
         fun fromDictionaryLanguageId(languageId: String?): ContentLanguageProfile? =
             Supported.firstOrNull { it.dictionaryLanguageId == languageId }

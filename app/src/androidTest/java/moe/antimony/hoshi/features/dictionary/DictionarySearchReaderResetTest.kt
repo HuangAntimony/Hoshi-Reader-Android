@@ -216,7 +216,7 @@ private class MemorySearchRepository : DictionarySearchRepository {
             audioSources = listOf(AudioSource("Memory", "https://example.invalid/list?term={term}")),
         ),
     )
-    override suspend fun rebuildLookupQuery() = Unit
+    override suspend fun ensureLookupQueryReady() = Unit
     override fun dictionaryStyles(): Map<String, String> = emptyMap()
     override fun lookup(query: String, maxResults: Int, scanLength: Int, options: LookupOptions): List<LookupResult> =
         listOf(

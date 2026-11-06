@@ -59,8 +59,8 @@ class ReaderContinuousPopupViewportWebViewTest {
                         window.HoshiTextSelection={postMessage:value=>window.testLookupSelection=JSON.parse(value)};
                         window.HoshiReaderPopup={postMessage:value=>testPopupMessages.push(JSON.parse(value))};</script>
                         $styles$script
-                        <script>${assets.languageJapaneseJs}
-                        ${assets.selectionJapaneseJs}
+                        <script>${assets.languageAssets.languageJapaneseJs}
+                        ${assets.languageAssets.selectionJapaneseJs}
                         ${assets.selectionJs}
                         hoshiSelection.configure({bridge:'android-reader',scaleRects:false,rubyAwareRects:true});
                         $popupHost</script></head><body>

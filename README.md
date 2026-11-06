@@ -9,7 +9,7 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-Hoshi Reader Android is an EPUB reader for Japanese and English immersion, with Yomitan lookup, Anki card creation, audiobook read-along, text-to-speech, and e-ink display options.
+Hoshi Reader Android is an EPUB reader for Japanese, English, Chinese, and Korean immersion, with Yomitan lookup, Anki card creation, audiobook read-along, text-to-speech, and e-ink display options.
 
 This project brings [Hoshi Reader](https://github.com/Manhhao/Hoshi-Reader) to Android with native UI and Android-specific features.
 
@@ -55,7 +55,7 @@ This project brings [Hoshi Reader](https://github.com/Manhhao/Hoshi-Reader) to A
 
 - Import or download Yomitan term, frequency, pitch-accent, and Kanji dictionaries, with categories and automatic updates.
 - Look up words while reading, in standalone search, recursively inside definitions, or from other apps' text selections.
-- See Japanese deinflections and Kanji stroke order.
+- Look up Japanese and Korean inflections, group Chinese entries with equivalent pinyin, and view Kanji stroke order.
 - Sort results by frequency and customize popup styles and CSS.
 - Use online or local word audio and choose recordings for playback and card creation.
 

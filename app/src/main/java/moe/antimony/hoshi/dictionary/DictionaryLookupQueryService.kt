@@ -1,6 +1,5 @@
 package moe.antimony.hoshi.dictionary
 
-import de.manhhao.hoshi.DictionaryStyle
 import de.manhhao.hoshi.LookupOptions
 import de.manhhao.hoshi.LookupResult
 import de.manhhao.hoshi.KanjiResult
@@ -19,6 +18,7 @@ internal class DictionaryLookupQueryService @Inject constructor(
     private val rebuildLock = Any()
     private val queryLock = ReentrantReadWriteLock()
     private var currentSession: Long? = null
+    private var currentStyles: Lazy<Map<String, String>> = lazyOf(emptyMap())
 
     fun rebuild(
         termDictionaries: List<File>,
@@ -41,6 +41,7 @@ internal class DictionaryLookupQueryService @Inject constructor(
                 val previousSession = queryLock.write {
                     val previous = currentSession
                     currentSession = nextSession
+                    currentStyles = lazy { nativeBridge.getStyles(nextSession).associate { it.dictName to it.styles } }
                     committed = true
                     previous
                 }
@@ -66,10 +67,7 @@ internal class DictionaryLookupQueryService @Inject constructor(
                 ?: KanjiResult(kanji, emptyArray())
         }
 
-    fun getStyles(): List<DictionaryStyle> =
-        queryLock.read {
-            currentSession?.let(nativeBridge::getStyles) ?: emptyList()
-        }
+    fun getStyles(): Map<String, String> = queryLock.read { currentStyles.value }
 
     fun getMediaFile(dictionary: String, path: String): ByteArray? =
         queryLock.read {

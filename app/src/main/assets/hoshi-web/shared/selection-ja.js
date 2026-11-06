@@ -8,9 +8,9 @@
 //
 
 (function() {
+    const isCodePointJapanese = window.hoshiLanguageUtilities?.ja?.isCodePointJapanese;
     const JapaneseSelectionLanguage = {
         isScanBoundary(char, selection) {
-            const isCodePointJapanese = window.hoshiLanguageUtilities?.ja?.isCodePointJapanese;
             return /^[\s\u3000]$/.test(char) ||
                 selection.scanDelimiters.includes(char) ||
                 (window.scanNonJapaneseText === false && !isCodePointJapanese?.(char.codePointAt(0)));

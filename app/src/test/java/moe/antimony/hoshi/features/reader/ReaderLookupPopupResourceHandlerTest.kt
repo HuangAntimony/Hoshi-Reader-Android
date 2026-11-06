@@ -1,11 +1,26 @@
 package moe.antimony.hoshi.features.reader
 
 import moe.antimony.hoshi.features.dictionary.LookupPopupAssets
+import moe.antimony.hoshi.webview.SelectionLanguageAssets
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
 class ReaderLookupPopupResourceHandlerTest {
+    @Test
+    fun chineseAndKoreanScriptsAreServedToRecursivePopups() {
+        val assets = LookupPopupAssets(
+            popupJs = "", popupCss = "", languageAssets = SelectionLanguageAssets { name ->
+                mapOf("language-cjk.js" to "cjk", "selection-zh.js" to "zh", "selection-ko.js" to "ko")[name].orEmpty()
+            },
+        )
+        mapOf("language-cjk.js" to "cjk", "selection-zh.js" to "zh", "selection-ko.js" to "ko").forEach { (name, content) ->
+            val response = lookupPopupAssetResponse(name, assets)
+            assertEquals("application/javascript", response?.mimeType)
+            assertEquals(content, response?.content)
+        }
+    }
+
     @Test
     fun semanticThemeIsServedAsStylesheet() {
         val response = lookupPopupAssetResponse("popup-theme.css", LookupPopupAssets(
@@ -64,7 +79,7 @@ class ReaderLookupPopupResourceHandlerTest {
             assets = LookupPopupAssets(
                 popupJs = "",
                 popupCss = "",
-                languageJapaneseJs = "window.hoshiLanguageUtilities = {};",
+                languageAssets = SelectionLanguageAssets { "window.hoshiLanguageUtilities = {};" },
             ),
         )
 

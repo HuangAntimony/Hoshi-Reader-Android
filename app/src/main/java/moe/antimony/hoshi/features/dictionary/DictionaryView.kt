@@ -120,8 +120,14 @@ import moe.antimony.hoshi.ui.hoshiTextFieldCursorBrush
 import kotlin.math.roundToInt
 
 
-internal fun scanNonJapaneseTextSettingVisible(contentLanguageProfile: ContentLanguageProfile): Boolean =
-    contentLanguageProfile.dictionaryLanguageId == ContentLanguageProfile.JapaneseLanguageId
+@androidx.annotation.StringRes
+internal fun scanOtherLanguageTextLabel(contentLanguageProfile: ContentLanguageProfile): Int? =
+    when (contentLanguageProfile.dictionaryLanguageId) {
+        ContentLanguageProfile.JapaneseLanguageId -> R.string.dictionary_scan_non_japanese
+        ContentLanguageProfile.ChineseLanguageId -> R.string.dictionary_scan_non_chinese
+        ContentLanguageProfile.KoreanLanguageId -> R.string.dictionary_scan_non_korean
+        else -> null
+    }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -339,7 +345,7 @@ fun DictionaryView(
                 settings = uiState.settings,
                 termDictionaries = uiState.dictionaries[DictionaryType.Term].orEmpty(),
                 frequencyDictionaries = uiState.dictionaries[DictionaryType.Frequency].orEmpty(),
-                showScanNonJapaneseText = scanNonJapaneseTextSettingVisible(
+                scanOtherLanguageTextLabelRes = scanOtherLanguageTextLabel(
                     profileState.effectiveContentLanguageProfile,
                 ),
                 onSettingsChange = dictionaryViewModel::updateSettings,
@@ -1079,7 +1085,7 @@ private fun DictionarySettingsView(
     settings: DictionarySettings,
     termDictionaries: List<DictionaryInfo>,
     frequencyDictionaries: List<DictionaryInfo>,
-    showScanNonJapaneseText: Boolean,
+    @androidx.annotation.StringRes scanOtherLanguageTextLabelRes: Int?,
     onSettingsChange: ((DictionarySettings) -> DictionarySettings) -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
@@ -1122,9 +1128,9 @@ private fun DictionarySettingsView(
             item {
                 SectionLabel(stringResource(R.string.dictionary_settings_lookup))
                 SettingsGroup {
-                    if (showScanNonJapaneseText) {
+                    if (scanOtherLanguageTextLabelRes != null) {
                         ToggleRow(
-                            stringResource(R.string.dictionary_scan_non_japanese),
+                            stringResource(scanOtherLanguageTextLabelRes),
                             settings.scanNonJapaneseText,
                         ) {
                             onSettingsChange { current -> current.copy(scanNonJapaneseText = it) }

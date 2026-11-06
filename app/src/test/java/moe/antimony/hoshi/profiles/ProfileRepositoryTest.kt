@@ -36,6 +36,54 @@ class ProfileRepositoryTest {
     }
 
     @Test
+    fun chineseAndKoreanProfilesPersistAndActivateByBookLanguage() = runBlocking {
+        val files = tempFolder.newFolder("multilingual")
+        val repository = ProfileRepository(files)
+        val chinese = repository.createProfile("汉语", "zh")
+        val korean = repository.createProfile("한국어", "ko")
+        repository.activateGlobal(korean.id)
+        val reloaded = ProfileRepository(files)
+        assertEquals(korean.id, reloaded.state.value.globalActiveProfileId)
+        listOf("zh-CN", "zh-TW", "zh-Hant-TW", "ZH_CN").forEach { language ->
+            reloaded.activateForBook(bookMetadata(bookLanguage = language))
+            assertEquals(chinese.id, reloaded.state.value.effectiveProfileId)
+        }
+        reloaded.activateForBook(bookMetadata(bookLanguage = "ko-KR"))
+        assertEquals(korean.id, reloaded.state.value.effectiveProfileId)
+        reloaded.activateForBook(bookMetadata(profileId = chinese.id, bookLanguage = "ko"))
+        assertEquals(chinese.id, reloaded.state.value.effectiveProfileId)
+        reloaded.activateForBook(bookMetadata(bookLanguage = "fr"))
+        assertEquals(korean.id, reloaded.state.value.effectiveProfileId)
+    }
+
+    @Test
+    fun chineseAndKoreanDictionaryProfilesRoundTripThroughBackup() = runBlocking {
+        val repository = ProfileRepository(tempFolder.newFolder("source"))
+        val chinese = repository.createProfile("汉语", "zh")
+        val korean = repository.createProfile("한국어", "ko")
+        repository.dictionarySettingsFile(chinese.id).writeProfileText("""{"customCSS":".zh{}"}""")
+        repository.dictionarySettingsFile(korean.id).writeProfileText("""{"customCSS":".ko{}"}""")
+        repository.activateGlobal(korean.id)
+        val dictionaries = tempFolder.newFolder("dictionaries")
+        repository.writeDictionaryBackupProfilePayload(dictionaries.resolve(".hoshi-profiles"))
+        val restoredFiles = tempFolder.newFolder("restored")
+        val restored = ProfileRepository(restoredFiles)
+        // Dictionary restoration preserves the destination's unrelated profile-owned settings.
+        restored.ankiConfigFile(chinese.id).writeProfileText("""{"selectedDeckName":"keep"}""")
+        val prepared = tempFolder.newFolder("prepared")
+        restored.prepareDictionaryBackupProfilesRestore(dictionaries, prepared)
+        restoredFiles.resolve("Profiles").deleteRecursively()
+        prepared.copyRecursively(restoredFiles.resolve("Profiles"))
+        restored.reloadProfilesFromDisk()
+        assertEquals(korean.id, restored.state.value.globalActiveProfileId)
+        assertEquals(chinese.id, restored.state.value.primaryProfileIdsByLanguage["zh"])
+        assertEquals(korean.id, restored.state.value.primaryProfileIdsByLanguage["ko"])
+        assertEquals("""{"customCSS":".zh{}"}""", restored.dictionarySettingsFile(chinese.id).readText())
+        assertEquals("""{"customCSS":".ko{}"}""", restored.dictionarySettingsFile(korean.id).readText())
+        assertEquals("""{"selectedDeckName":"keep"}""", restored.ankiConfigFile(chinese.id).readText())
+    }
+
+    @Test
     fun firstLaunchCreatesJapaneseDefaultProfileAndMigratesDictionaryConfig() {
         val filesDir = tempFolder.newFolder("files")
         val legacyConfig = filesDir.resolve("Dictionaries/config.json")

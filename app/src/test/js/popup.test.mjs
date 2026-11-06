@@ -72,6 +72,10 @@ class FakeElement {
         return this.attributes.get(name) ?? null;
     }
 
+    hasAttribute(name) {
+        return this.attributes.has(name);
+    }
+
     appendChild(child) {
         child.parentElement = this;
         if (this.childProbeWidth !== undefined) {
@@ -2042,3 +2046,21 @@ test('audio menu fits a narrow zoomed viewport even when its preferred minimum w
     assert.ok(left >= 8 * zoom && right <= 320 - 8 * zoom, 'menu fits horizontally with scaled margins');
     assert.ok(top >= 64 + 4 * zoom && bottom <= 240 - 8 * zoom, 'menu fits below the trigger');
 });
+
+for (const language of ['zh', 'ko']) {
+    test(`${language} profile preserves glossary language detection across multiple lines`, () => {
+        const { context, document } = popupContext({ loadJapaneseLanguageAsset: true });
+        document.documentElement.lang = language;
+        const glossary = new FakeElement();
+        context.renderStructuredContent(glossary, 'English definition');
+        assert.equal(glossary.getAttribute('lang'), null);
+        const example = new FakeElement();
+        context.renderStructuredContent(example, 'English definition\n日本語です');
+        assert.equal(example.getAttribute('lang'), 'ja');
+        const explicitLanguage = new FakeElement();
+        context.renderStructuredContent(explicitLanguage, {
+            tag: 'span', lang: language, content: 'English definition\n日本語です',
+        });
+        assert.equal(explicitLanguage.children[0].getAttribute('lang'), language);
+    });
+}

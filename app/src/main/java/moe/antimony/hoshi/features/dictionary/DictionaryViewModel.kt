@@ -127,17 +127,15 @@ internal class AndroidDictionaryViewModelRepository @Inject constructor(
         onProgress: (DictionaryUpdateProgress) -> Unit,
     ) {
         mutationCoordinator.runExclusive(DictionaryMutationOperation.RecommendedImport) {
-            val importedCount = dictionaryRepository.importRecommendedDictionaries(
+            dictionaryRepository.importRecommendedDictionaries(
                 dictionaries = dictionaries,
+                onDictionariesChanged = { markDictionariesChanged() },
                 onProgress = { progress ->
                     report(progress)
                     onProgress(progress)
                 },
                 lowRamImport = settingsRepository.settings.first().lowRamDictionaryImport,
             )
-            if (importedCount > 0) {
-                markDictionariesChanged()
-            }
         }
     }
 

@@ -127,12 +127,12 @@ class DictionarySearchViewModelTest {
     }
 
     @Test
-    fun initializesLookupQueryLikePreviousComposableLaunchEffect() {
+    fun ensuresLookupQueryIsReadyOnInitialization() {
         val repository = FakeDictionarySearchRepository()
 
         viewModel(repository)
 
-        assertEquals(1, repository.rebuildCount)
+        assertEquals(1, repository.ensureReadyCount)
     }
 
     @Test
@@ -157,7 +157,7 @@ class DictionarySearchViewModelTest {
         assertFalse(state.isSearching)
         assertNull(state.errorMessage)
         assertEquals(listOf("猫:2:7"), repository.lookupCalls)
-        assertEquals(2, repository.rebuildCount)
+        assertEquals(2, repository.ensureReadyCount)
         assertEquals(1, state.results.size)
         assertEquals("猫", state.results.single().matched)
         assertEquals(mapOf("JMdict" to ".entry {}"), state.dictionaryStyles)
@@ -200,14 +200,14 @@ class DictionarySearchViewModelTest {
         viewModel.navigateBack()
         viewModel.setPopups(listOf(popup("child")))
         val previous = viewModel.uiState.value
-        val rebuildCount = repository.rebuildCount
+        val ensureReadyCount = repository.ensureReadyCount
 
         for (query in listOf("", "", "犬")) {
             viewModel.updateQuery(query)
 
             assertEquals(previous.copy(query = query), viewModel.uiState.value)
             assertEquals(listOf("猫:16:16"), repository.lookupCalls)
-            assertEquals(rebuildCount, repository.rebuildCount)
+            assertEquals(ensureReadyCount, repository.ensureReadyCount)
         }
     }
 
@@ -253,7 +253,7 @@ class DictionarySearchViewModelTest {
         )
         runCurrent()
         val pending = CompletableDeferred<Unit>()
-        repository.beforeRebuild = { pending.await() }
+        repository.beforeEnsureReady = { pending.await() }
         viewModel.applyExternalLookup("猫")
         runCurrent()
         assertTrue(viewModel.uiState.value.isSearching)
@@ -264,7 +264,7 @@ class DictionarySearchViewModelTest {
         runCurrent()
 
         assertEquals(cleared, viewModel.uiState.value)
-        repository.beforeRebuild = {}
+        repository.beforeEnsureReady = {}
         repository.lookupResults = listOf(lookupResult("犬"))
         viewModel.applyExternalLookup("犬")
         runCurrent()
@@ -282,7 +282,7 @@ class DictionarySearchViewModelTest {
         )
         runCurrent()
         val pending = CompletableDeferred<Unit>()
-        repository.beforeRebuild = { pending.await() }
+        repository.beforeEnsureReady = { pending.await() }
         viewModel.applyExternalLookup("猫")
         runCurrent()
 
@@ -374,7 +374,7 @@ class DictionarySearchViewModelTest {
         assertEquals(0, state.forwardCount)
         assertEquals(0, state.backSignal)
         assertEquals(0, state.forwardSignal)
-        assertEquals(3, repository.rebuildCount)
+        assertEquals(3, repository.ensureReadyCount)
         assertEquals(listOf("猫:16:16"), repository.lookupCalls)
     }
 
@@ -669,16 +669,16 @@ private class FakeDictionarySearchRepository(
     val audioSettingsFlow = MutableStateFlow(audioSettings)
     val lookupCalls = mutableListOf<String>()
     val lookupOptions = mutableListOf<de.manhhao.hoshi.LookupOptions>()
-    var rebuildCount = 0
-    var beforeRebuild: suspend () -> Unit = {}
+    var ensureReadyCount = 0
+    var beforeEnsureReady: suspend () -> Unit = {}
     var lookupResults = lookupResults
 
     override val dictionarySettings: StateFlow<DictionarySettings> = dictionarySettingsFlow
     override val audioSettings: StateFlow<AudioSettings> = audioSettingsFlow
 
-    override suspend fun rebuildLookupQuery() {
-        rebuildCount += 1
-        beforeRebuild()
+    override suspend fun ensureLookupQueryReady() {
+        ensureReadyCount += 1
+        beforeEnsureReady()
     }
 
     override fun lookup(query: String, maxResults: Int, scanLength: Int, options: de.manhhao.hoshi.LookupOptions): List<LookupResult> {

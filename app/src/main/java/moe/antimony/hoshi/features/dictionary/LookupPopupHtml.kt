@@ -1,6 +1,7 @@
 package moe.antimony.hoshi.features.dictionary
 
 import android.content.Context
+import moe.antimony.hoshi.webview.SelectionLanguageAssets
 import de.manhhao.hoshi.LookupResult
 import de.manhhao.hoshi.KanjiResult
 import de.manhhao.hoshi.TraceCandidate
@@ -22,9 +23,7 @@ internal data class LookupPopupAssets(
     val popupJs: String,
     val popupCss: String,
     val popupThemeCss: String = "",
-    val languageJapaneseJs: String = "",
-    val selectionJapaneseJs: String = "",
-    val selectionEnglishJs: String = "",
+    val languageAssets: SelectionLanguageAssets = SelectionLanguageAssets { "" },
     val selectionJs: String = "",
     val readerPopupHostJs: String = "",
     val popupGesturesJs: String = "",
@@ -42,9 +41,7 @@ internal data class LookupPopupAssets(
             popupJs = context.readAsset("hoshi-web/popup/popup.js"),
             popupCss = context.readAsset("hoshi-web/popup/popup.css"),
             popupThemeCss = context.readAsset("hoshi-web/popup/popup-theme.css"),
-            languageJapaneseJs = context.readAsset("hoshi-web/shared/language-ja.js"),
-            selectionJapaneseJs = context.readAsset("hoshi-web/shared/selection-ja.js"),
-            selectionEnglishJs = context.readAsset("hoshi-web/shared/selection-en.js"),
+            languageAssets = SelectionLanguageAssets.load(context),
             selectionJs = context.readAsset("hoshi-web/shared/selection.js"),
             readerPopupHostJs = context.readAsset("hoshi-web/popup/reader-popup-host.js"),
             popupGesturesJs = context.readAsset("hoshi-web/popup/popup-gestures.js"),
@@ -58,8 +55,10 @@ internal data class LookupPopupAssets(
 
     fun selectionSupportJs(contentLanguageProfile: ContentLanguageProfile): String =
         when (contentLanguageProfile.dictionaryLanguageId) {
-            ContentLanguageProfile.EnglishLanguageId -> "$languageJapaneseJs\n$selectionEnglishJs"
-            else -> "$languageJapaneseJs\n$selectionJapaneseJs"
+            ContentLanguageProfile.EnglishLanguageId -> "${languageAssets.languageJapaneseJs}\n${languageAssets.selectionEnglishJs}"
+            ContentLanguageProfile.ChineseLanguageId -> "${languageAssets.languageJapaneseJs}\n${languageAssets.languageCjkJs}\n${languageAssets.selectionChineseJs}"
+            ContentLanguageProfile.KoreanLanguageId -> "${languageAssets.languageJapaneseJs}\n${languageAssets.languageCjkJs}\n${languageAssets.selectionKoreanJs}"
+            else -> "${languageAssets.languageJapaneseJs}\n${languageAssets.selectionJapaneseJs}"
         }
 }
 
@@ -604,5 +603,7 @@ private val AnkiFormatIcon.popupName: String
 private fun selectionSupportAssetNames(contentLanguageProfile: ContentLanguageProfile): List<String> =
     when (contentLanguageProfile.dictionaryLanguageId) {
         ContentLanguageProfile.EnglishLanguageId -> listOf("language-ja.js", "selection-en.js")
+        ContentLanguageProfile.ChineseLanguageId -> listOf("language-ja.js", "language-cjk.js", "selection-zh.js")
+        ContentLanguageProfile.KoreanLanguageId -> listOf("language-ja.js", "language-cjk.js", "selection-ko.js")
         else -> listOf("language-ja.js", "selection-ja.js")
     }

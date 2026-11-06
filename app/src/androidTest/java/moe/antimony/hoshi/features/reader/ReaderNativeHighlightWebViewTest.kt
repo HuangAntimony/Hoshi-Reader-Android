@@ -50,8 +50,8 @@ class ReaderNativeHighlightWebViewTest {
                         <!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
                         <script>window.HoshiReaderRestore={postMessage:()=>window.testRestored=true};</script>
                         $styles<style>$viewport</style>$script
-                        <script>${assets.languageJapaneseJs}
-                        ${assets.selectionJapaneseJs}
+                        <script>${assets.languageAssets.languageJapaneseJs}
+                        ${assets.languageAssets.selectionJapaneseJs}
                         ${assets.selectionJs}</script></head><body><p>前。<ruby>瑞<rp>(</rp><rt><span>みず</span></rt><rp>)</rp>々<rt>みず</rt></ruby>しさ😀です。</p></body></html>
                     """.trimIndent(), "text/html", "utf-8", null)
                 }

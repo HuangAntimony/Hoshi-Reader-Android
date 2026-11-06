@@ -106,6 +106,32 @@ tagged note, checks fetching/mining/duplicates/browsing, saves `cache/kuma3-smok
 under the target app, and deletes only its tagged note in `finally`; it does not
 sign in or synchronize.
 
+### Dictionary language fixtures
+
+`DictionaryLanguagesNativeTest` imports generated dictionaries into JUnit temporary
+folders and destroys every native session. It covers Chinese radical/pinyin handling,
+Korean POS-filtered deinflection and Japanese/English regressions without installed
+user data. The test uses no Android APIs and can also run with JUnitCore against a
+host-built bridge JNI library; this verifies native behavior, not Android packaging
+or rendering. `ProfileLanguagesViewTest` uses a scratch profile repository, and
+`ContentLanguageSelectionWebViewTest` checks all four languages in generated reader
+documents and real popup iframes using the external asset route. Run these classes
+explicitly using the data-preserving installation procedure above.
+
+For a paired Japanese lookup performance check, run
+`JapaneseLookupPerformanceTest` and `ContentLanguageSelectionWebViewTest` with
+`-e lookupPerformance true`. Before the WebView comparison, copy the baseline
+revision's `language-ja.js`, `selection-ja.js` and `selection.js` into the debug app's
+`cache/lookup-performance-baseline/` using `adb shell run-as`; these are test-owned
+files, not installed dictionaries or settings. The WebView fixture alternates baseline
+and current scripts in actual iframes, including supplementary kanji and both scan
+toggle values. The native fixture imports a generated 10,005-entry dictionary and
+compares the former forced-rebuild query sequence with session reuse. It checks
+results and counts native session/style calls; all native handles are released.
+Both fixtures write `lookup-performance-{web,native}.json` to the debug app's cache.
+Compare paired samples rather than single runs. These measure DOM selection and
+repository lookup separately, not end-to-end popup painting latency.
+
 ### App language fixtures
 
 `AppLanguageDeviceTest` and `AppLanguageNotificationDeviceTest` render language

@@ -250,7 +250,7 @@ private fun ProcessTextLookupOverlay(
     LaunchedEffect(query, contentLanguageProfile) {
         runCatching {
             withContext(Dispatchers.IO) {
-                dependencies.dictionaryRepository.rebuildLookupQuery()
+                dependencies.dictionaryRepository.ensureLookupQueryReady()
                 val dictionarySettings = dependencies.dictionarySettingsRepository.settings.first().normalized()
                 val audioSettings = dependencies.audioSettingsRepository.settings.first()
                 val styles = dependencies.dictionaryRepository.dictionaryStyles()

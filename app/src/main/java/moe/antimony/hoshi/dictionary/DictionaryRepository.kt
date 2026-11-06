@@ -15,7 +15,7 @@ import java.io.InputStream
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
-import moe.antimony.hoshi.content.ContentLanguageProfile
+import moe.antimony.hoshi.profiles.HoshiProfile
 import moe.antimony.hoshi.profiles.ProfileRepository
 
 @Singleton
@@ -45,13 +45,7 @@ internal class DictionaryRepository @Inject constructor(
     private val lookupQueryLock = Any()
 
     @Volatile
-    private var lookupQueryReady = false
-
-    @Volatile
-    private var lookupQueryProfileId: String? = null
-
-    @Volatile
-    private var lookupQueryLanguageId: String? = null
+    private var lookupQueryProfile: HoshiProfile? = null
 
     fun loadDictionaries(type: DictionaryType): List<DictionaryInfo> =
         storage.loadDictionaries(type)
@@ -192,6 +186,7 @@ internal class DictionaryRepository @Inject constructor(
     fun importRecommendedDictionaries(
         dictionaries: List<RecommendedDictionary>,
         lowRamImport: Boolean = false,
+        onDictionariesChanged: () -> Unit = {},
         onProgress: (DictionaryUpdateProgress) -> Unit = {},
     ): Int {
         var importedCount = 0
@@ -219,7 +214,15 @@ internal class DictionaryRepository @Inject constructor(
             }
             importedCount += imported.size
             if (imported.isNotEmpty()) {
-                storage.saveConfigFromStorage()
+                try {
+                    synchronized(lookupQueryLock) {
+                        // The files are committed even if a later config write or download fails.
+                        lookupQueryProfile = null
+                        storage.saveConfigFromStorage()
+                    }
+                } finally {
+                    onDictionariesChanged()
+                }
             }
         }
         if (importedCount > 0) {
@@ -230,21 +233,24 @@ internal class DictionaryRepository @Inject constructor(
 
     fun rebuildLookupQuery() {
         synchronized(lookupQueryLock) {
-            rebuildLookupQueryLocked()
+            rebuildLookupQueryLocked(profileRepository.state.value.effectiveProfile)
         }
     }
 
     fun ensureLookupQueryReady() {
-        val profileId = profileRepository.currentEffectiveProfileId
-        val languageId = profileRepository.currentEffectiveContentLanguageProfile.dictionaryLanguageId
-        if (lookupQueryReady && lookupQueryProfileId == profileId && lookupQueryLanguageId == languageId) return
+        if (lookupQueryMatches(profileRepository.state.value.effectiveProfile)) return
         synchronized(lookupQueryLock) {
-            val lockedProfileId = profileRepository.currentEffectiveProfileId
-            val lockedLanguageId = profileRepository.currentEffectiveContentLanguageProfile.dictionaryLanguageId
-            if (!lookupQueryReady || lookupQueryProfileId != lockedProfileId || lookupQueryLanguageId != lockedLanguageId) {
-                rebuildLookupQueryLocked()
+            while (true) {
+                val profile = profileRepository.state.value.effectiveProfile
+                if (lookupQueryMatches(profile)) return
+                rebuildLookupQueryLocked(profile)
             }
         }
+    }
+
+    private fun lookupQueryMatches(profile: HoshiProfile): Boolean {
+        val loaded = lookupQueryProfile
+        return loaded?.id == profile.id && loaded.dictionaryLanguageId == profile.dictionaryLanguageId
     }
 
     fun lookup(text: String, maxResults: Int = 16, scanLength: Int = 16, options: LookupOptions = LookupOptions()): List<LookupResult> {
@@ -259,7 +265,7 @@ internal class DictionaryRepository @Inject constructor(
 
     fun dictionaryStyles(): Map<String, String> {
         ensureLookupQueryReady()
-        return lookupQueryService.getStyles().associate { it.dictName to it.styles }
+        return lookupQueryService.getStyles()
     }
 
     fun dictionaryMedia(dictionary: String, path: String): ByteArray? {
@@ -267,20 +273,17 @@ internal class DictionaryRepository @Inject constructor(
         return lookupQueryService.getMediaFile(dictionary, path)
     }
 
-    private fun rebuildLookupQueryLocked() {
-        val contentLanguageProfile = profileRepository.currentEffectiveContentLanguageProfile
+    private fun rebuildLookupQueryLocked(profile: HoshiProfile) {
+        lookupQueryProfile = null
+        val paths = storage.enabledDictionaryPaths(profile.id)
         lookupQueryService.rebuild(
-            termDictionaries = storage.enabledDictionaryPaths(DictionaryType.Term),
-            frequencyDictionaries = storage.enabledDictionaryPaths(DictionaryType.Frequency),
-            pitchDictionaries = storage.enabledDictionaryPaths(DictionaryType.Pitch),
-            kanjiDictionaries = storage.enabledDictionaryPaths(DictionaryType.Kanji),
-            dictionaryLanguageId = contentLanguageProfile.dictionaryLanguageId
-                .takeIf { ContentLanguageProfile.fromDictionaryLanguageId(it) != null }
-                ?: ContentLanguageProfile.Default.dictionaryLanguageId,
+            termDictionaries = paths.getValue(DictionaryType.Term),
+            frequencyDictionaries = paths.getValue(DictionaryType.Frequency),
+            pitchDictionaries = paths.getValue(DictionaryType.Pitch),
+            kanjiDictionaries = paths.getValue(DictionaryType.Kanji),
+            dictionaryLanguageId = profile.dictionaryLanguageId,
         )
-        lookupQueryReady = true
-        lookupQueryProfileId = profileRepository.currentEffectiveProfileId
-        lookupQueryLanguageId = contentLanguageProfile.dictionaryLanguageId
+        lookupQueryProfile = profile
     }
 
     private fun typeDirectories(): Map<DictionaryType, File> =

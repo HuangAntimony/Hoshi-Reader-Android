@@ -1265,4 +1265,8 @@
     <string name="reader_paragraph_text_speed_value">%1$d/s</string>
     <string name="reader_paragraph_click_advance">Tap Blank Area to Advance</string>
     <string name="sasayaki_page_advance">Advance on Page Turn</string>
+    <string name="profile_language_chinese">Chinese</string>
+    <string name="profile_language_korean">Korean</string>
+    <string name="dictionary_scan_non_chinese">Scan Non-Chinese Text</string>
+    <string name="dictionary_scan_non_korean">Scan Non-Korean Text</string>
 </resources>

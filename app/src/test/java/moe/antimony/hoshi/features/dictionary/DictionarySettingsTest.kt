@@ -75,8 +75,10 @@ class DictionarySettingsTest {
     }
 
     @Test
-    fun scanNonJapaneseTextSettingIsOnlyVisibleForJapaneseProfiles() {
-        assertTrue(scanNonJapaneseTextSettingVisible(ContentLanguageProfile.Japanese))
-        assertFalse(scanNonJapaneseTextSettingVisible(ContentLanguageProfile.English))
+    fun otherLanguageScanningSettingIsVisibleForCjkProfiles() {
+        assertEquals(moe.antimony.hoshi.R.string.dictionary_scan_non_japanese, scanOtherLanguageTextLabel(ContentLanguageProfile.Japanese))
+        assertEquals(null, scanOtherLanguageTextLabel(ContentLanguageProfile.English))
+        assertEquals(moe.antimony.hoshi.R.string.dictionary_scan_non_chinese, scanOtherLanguageTextLabel(ContentLanguageProfile.Chinese))
+        assertEquals(moe.antimony.hoshi.R.string.dictionary_scan_non_korean, scanOtherLanguageTextLabel(ContentLanguageProfile.Korean))
     }
 }
