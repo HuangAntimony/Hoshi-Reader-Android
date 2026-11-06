@@ -16,13 +16,16 @@ class TtsDialogueTest {
         assertEquals(12, sentence.length)
     }
 
-    @Test fun quotesContinueAcrossSentencesParagraphsAndImagesButNotChapters() {
-        val sentences = TtsText.chapter(0, "<p>「おはよう。</p><img src='image'/><p>今日は晴れだ。」彼は笑った。</p>")
-        assertEquals(listOf(TtsTextRole.Dialogue to "「おはよう。"), parts(sentences[0]))
-        assertEquals(listOf(TtsTextRole.Dialogue to "今日は晴れだ。」"), parts(sentences[1]))
-        assertTrue(sentences[1].imageBefore)
-        assertEquals(listOf(TtsTextRole.Narration to "彼は笑った。"), parts(sentences[2]))
-        assertEquals(listOf(TtsTextRole.Narration to "続きだ。」"), parts(TtsText.chapter(1, "<p>続きだ。」</p>").single()))
+    @Test fun everyQuoteTypePairsWithinAParagraphButNeverAcrossParagraphs() {
+        for ((open, close) in listOf('「' to '」', '『' to '』', '“' to '”', '‘' to '’', '"' to '"')) {
+            val sentences = TtsText.chapter(0, "<p>${open}おはよう。</p><img src='image'/><p>今日は晴れだ。${close}彼は笑った。</p>")
+            assertTrue(sentences.all { it.roles.all { range -> range.role == TtsTextRole.Narration } })
+            assertTrue(sentences[1].imageBefore)
+            val sameParagraph = TtsText.chapter(0, "<p>${open}おはよう。今日は晴れだ。${close}彼は笑った。</p>")
+            assertEquals(listOf(TtsTextRole.Dialogue, TtsTextRole.Dialogue, TtsTextRole.Narration),
+                sameParagraph.map { it.roles.single().role })
+            assertTrue(TtsDialogue.ranges("${open}第一段\n第二段${close}").all { it.role == TtsTextRole.Narration })
+        }
     }
 
     @Test fun nestedMatchedQuotesAndUnmatchedMarkersAreDeterministic() {
@@ -57,9 +60,9 @@ class TtsDialogueTest {
             TtsTextRole.Narration to "と言った。"), parts(selected))
     }
 
-    @Test fun imageGlyphAtTheEndOfAParagraphKeepsTheSpanningDialogueVoice() {
+    @Test fun imageGlyphAtTheEndOfAnUnclosedParagraphKeepsNarration() {
         val sentence = TtsText.chapter(0, "<p>「話<ruby><img src='g'/><rt>かな</rt></ruby></p><p>続き。」</p>").first()
-        assertEquals(listOf(TtsTextRole.Dialogue to "「話かな"), parts(sentence))
+        assertEquals(listOf(TtsTextRole.Narration to "「話かな"), parts(sentence))
     }
 
     @Test fun symbolicDialogueKeepsItsSourceRoleInLookupIncludingRepeatedOccurrences() {

@@ -21,6 +21,19 @@ import org.junit.rules.TemporaryFolder
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class AndroidTtsEngineTest {
+    @Test fun automaticAndExplicitCatalogCachesAreIsolatedByLanguage() = runTest {
+        val backend = DeviceEngine()
+        val engine = AndroidTtsEngine(backend)
+        for (id in listOf("", "device.one")) for (language in listOf("ja", "en", "zh", "ko")) {
+            val settings = TtsSettings(engine = id, languageId = language)
+            assertNull(engine.cachedCatalog(settings))
+            val catalog = engine.catalog(settings)
+            assertSame(catalog, engine.cachedCatalog(settings.withVoice("changed")))
+            assertSame(catalog, engine.catalog(settings))
+        }
+        assertEquals(8, backend.discoveries)
+    }
+
     @Test fun terminalAutomaticEngineSelectionKeepsAllOriginalInitializationFailures() = runTest {
         val error = runCatching {
             resolveAutomaticTtsEngine(listOf("first.engine", "second.engine"), { id ->
@@ -28,8 +41,8 @@ class AndroidTtsEngineTest {
             }, { true })
         }.exceptionOrNull()!!.toTtsError(TtsFailure.EngineUnavailable)
 
-        assertEquals(TtsFailure.MissingJapanese, error.failure)
-        assertEquals(UiText.Joined(listOf(UiText.Resource(R.string.tts_missing_japanese),
+        assertEquals(TtsFailure.MissingLanguage, error.failure)
+        assertEquals(UiText.Joined(listOf(UiText.Resource(R.string.tts_missing_language),
             UiText.Literal("first.engine: TextToSpeech.onInit: -1\nsecond.engine: TextToSpeech.onInit: -7"))), error.message)
     }
 

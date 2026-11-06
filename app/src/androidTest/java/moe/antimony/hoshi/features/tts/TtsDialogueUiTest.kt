@@ -19,6 +19,26 @@ class TtsDialogueUiTest {
     @get:Rule val compose = createComposeRule()
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
+    @Test fun profileLanguageChangesTheLabelAndRestoresItsOwnVoice() {
+        val settings = mutableStateOf(TtsSettings(engine = TtsOnlineSource.Edge.id).withVoice("nanami")
+            .copy(languageId = "en").withVoice("british"))
+        compose.setContent {
+            HoshiReaderTheme(darkTheme = false, dynamicColor = false) {
+                TtsVoiceSettings(settings.value, TtsCatalog(settings.value.engine, listOf(
+                    TtsVoiceInfo(if (settings.value.languageId == "en") "british" else "nanami", true))), emptyList(), false,
+                    TtsPreviewState.Idle, null, { update -> settings.value = update(settings.value) }, {}, {}, {}, {}, {})
+            }
+        }
+        compose.onNodeWithText(context.getString(R.string.tts_profile_language, context.getString(R.string.profile_language_english))).assertIsDisplayed()
+        compose.onNodeWithText("british").assertIsDisplayed()
+        compose.runOnIdle { settings.value = settings.value.copy(languageId = "ja") }
+        compose.onNodeWithText(context.getString(R.string.tts_profile_language, context.getString(R.string.profile_language_japanese))).assertIsDisplayed()
+        compose.onNodeWithText("nanami").assertIsDisplayed()
+        compose.onNodeWithText("british").assertDoesNotExist()
+    }
+
+    private fun voiceLabel(resource: Int) = context.getString(R.string.tts_voice_status, context.getString(resource), context.getString(R.string.tts_online))
+
     private fun verify(eink: Boolean) {
         val settings = mutableStateOf(TtsSettings(engine = TtsOnlineSource.Azure.id))
         var refreshes = 0
@@ -29,13 +49,13 @@ class TtsDialogueUiTest {
                     TtsPreviewState.Idle, null, { update -> settings.value = update(settings.value) }, {}, {}, { refreshes++ }, {}, {}, Modifier)
             }
         }
-        compose.onNodeWithText(context.getString(R.string.tts_dialogue_voice)).assertDoesNotExist()
-        compose.onNode(hasText(context.getString(R.string.tts_voice), substring = true) and hasClickAction()).performScrollTo().performClick()
+        compose.onNodeWithText(voiceLabel(R.string.tts_dialogue_voice)).assertDoesNotExist()
+        compose.onNode(hasText(context.getString(R.string.tts_voice_status, context.getString(R.string.tts_voice), context.getString(R.string.tts_online))) and hasClickAction()).performScrollTo().performClick()
         compose.onNodeWithText("n").performClick()
         compose.onAllNodes(isToggleable()).onFirst().assertIsOff().performClick()
         compose.runOnIdle { assertEquals("n", settings.value.routing().dialogue) }
-        compose.onNodeWithText(context.getString(R.string.tts_narration_voice)).assertExists()
-        compose.onNodeWithText(context.getString(R.string.tts_dialogue_voice)).performScrollTo().performClick()
+        compose.onNodeWithText(voiceLabel(R.string.tts_narration_voice)).assertExists()
+        compose.onNodeWithText(voiceLabel(R.string.tts_dialogue_voice)).performScrollTo().performClick()
         compose.onNodeWithText(context.getString(R.string.tts_refresh_voices)).assertIsDisplayed().performClick()
         compose.runOnIdle { assertEquals(1, refreshes) }
         compose.onNodeWithText("d").performClick()
@@ -47,7 +67,7 @@ class TtsDialogueUiTest {
         compose.onNodeWithText(context.getString(R.string.tts_preview_voice)).assertIsDisplayed()
         compose.onNodeWithText(context.getString(R.string.tts_dialogue_routing)).performScrollTo()
         compose.onAllNodes(isToggleable()).onFirst().performClick()
-        compose.onNodeWithText(context.getString(R.string.tts_dialogue_voice)).assertDoesNotExist()
+        compose.onNodeWithText(voiceLabel(R.string.tts_dialogue_voice)).assertDoesNotExist()
         compose.runOnIdle { assertEquals("d", settings.value.routing().dialogue) }
         compose.onAllNodes(isToggleable()).onFirst().performClick()
         compose.runOnIdle { assertEquals("d", settings.value.routing().dialogue) }

@@ -5,16 +5,26 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class TtsVoiceRouting(val enabled: Boolean = false, val narration: String = "", val dialogue: String = "", val initialized: Boolean = enabled)
 
-internal fun TtsSettings.routing() = routingBySource[engine] ?: TtsVoiceRouting()
+internal fun TtsSettings.migrateRouting(): TtsSettings = if (routingBySource.isEmpty()) this else copy(
+    routingBySource = emptyMap(),
+    routingByLanguageAndSource = routingByLanguageAndSource + ("ja" to (routingBySource + routingByLanguageAndSource["ja"].orEmpty())),
+)
+internal fun TtsSettings.withoutSourceRouting(id: String): TtsSettings = migrateRouting().let { settings ->
+    settings.copy(routingByLanguageAndSource = settings.routingByLanguageAndSource.mapValues { (_, routes) -> routes - id })
+}
+internal fun TtsSettings.routing(source: String = engine) = routingByLanguageAndSource[languageId]?.get(source)
+    ?: routingBySource[source]?.takeIf { languageId == "ja" } ?: TtsVoiceRouting()
 internal fun TtsSettings.withRouting(value: TtsVoiceRouting): TtsSettings {
     val routing = if (value.enabled && !value.initialized) value.copy(dialogue = value.narration, initialized = true) else value
-    return copy(routingBySource = routingBySource + (engine to routing))
+    val settings = migrateRouting()
+    return settings.copy(routingByLanguageAndSource = settings.routingByLanguageAndSource +
+        (languageId to (settings.routingByLanguageAndSource[languageId].orEmpty() + (engine to routing))))
 }
 
 internal data class TtsSynthesisPart(val text: String, val settings: TtsSettings)
 
 /** Effective voice overrides are request-local and leave persisted source selections untouched. */
-internal fun TtsSettings.forVoice(id: String): TtsSettings = copy(routingBySource = mapOf(engine to TtsVoiceRouting(narration = id)))
+internal fun TtsSettings.forVoice(id: String): TtsSettings = withRouting(TtsVoiceRouting(narration = id))
 
 internal fun TtsSettings.sharedVoice(voices: List<TtsVoiceInfo>): TtsVoiceInfo? {
     fun find(id: String) = if (id.isBlank()) voices.firstOrNull() else voices.firstOrNull { it.id == id }
@@ -60,7 +70,7 @@ internal fun ttsSynthesisPlan(
     fun effective(id: String): String {
         // An OpenAI server's omitted voice means its own default, not necessarily the first listed voice.
         if (settings.customSource()?.protocol == TtsCustomProtocol.OpenAi) return id
-        if (id.isNotBlank() && catalog?.voices?.none { it.id == id } == true) throw TtsException(TtsFailure.MissingJapanese)
+        if (id.isNotBlank() && catalog?.voices?.none { it.id == id } == true) throw TtsException(TtsFailure.MissingLanguage)
         return id.ifBlank { catalog?.voices?.firstOrNull()?.id.orEmpty() }
     }
     val narration = effective(settings.voice)

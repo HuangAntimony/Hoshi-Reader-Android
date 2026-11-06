@@ -957,7 +957,7 @@
     <string name="tts_refresh_voices">Refresh voices</string>
     <string name="tts_source">Source</string>
     <string name="tts_voice" comment="Label for the selected synthesis voice.">Voice</string>
-    <string name="tts_system_default" comment="Automatically choose an installed Japanese TTS engine or voice.">Automatic</string>
+    <string name="tts_system_default" comment="Automatically choose a TTS engine or voice for the profile language.">Automatic</string>
     <string name="tts_offline">Offline</string>
     <string name="tts_preview">Preview</string>
     <string name="tts_preview_voice">Preview voice</string>
@@ -984,12 +984,21 @@
     <string name="tts_replacement">Replace with</string>
     <string name="tts_invalid_surface">Enter the original text.</string>
     <string name="tts_duplicate">This text already has a replacement in this scope. Edit the existing entry.</string>
-    <string name="tts_no_engine">No TTS engine is installed. Install an engine and Japanese voice data in system settings.</string>
-    <string name="tts_missing_japanese">Japanese voice data is unavailable. Choose another voice or install Japanese data in system settings.</string>
+    <string name="tts_no_engine">No TTS engine is installed. Install an engine and voice data for the profile language in system settings.</string>
+    <string name="tts_missing_language">No voice is available for the profile language. Choose another voice or install the language in system settings.</string>
     <string name="tts_engine_unavailable">The selected engine is unavailable. Choose another installed engine.</string>
     <string name="tts_timeout">The speech engine did not respond in time. Check its connection and retry.</string>
     <string name="tts_empty_text">No readable sentences were found.</string>
     <string name="tts_failed">Unable to prepare or play the sentence audio. Please retry.</string>
+    <string name="tts_sample_en" comment="English content-language voice sample; keep in English.">Hello. Let us begin reading in English.</string>
+    <string name="tts_sample_zh" comment="Chinese content-language voice sample; keep in Chinese.">你好，现在开始中文朗读。</string>
+    <string name="tts_sample_ko" comment="Korean content-language voice sample; keep in Korean.">안녕하세요. 한국어 읽기를 시작합니다.</string>
+    <string name="tts_dialogue_sample_en" comment="English dialogue sample; keep in English.">She opened the window. “What a beautiful day,” she said with a smile.</string>
+    <string name="tts_dialogue_sample_zh" comment="Chinese dialogue sample; keep in Chinese.">她打开窗户，微笑着说：“今天天气真好。”</string>
+    <string name="tts_dialogue_sample_ko" comment="Korean dialogue sample; keep in Korean.">그녀는 창문을 열었다. “오늘은 날씨가 좋네요.” 그녀가 미소를 지으며 말했다.</string>
+    <string name="tts_profile_language">Voice language: %1$s</string>
+    <string name="tts_split_clauses">Split into short clauses</string>
+    <string name="tts_split_clauses_hint">Pause, skip and replay at commas, semicolons and clause dashes.</string>
     <string name="tts_sample">こんにちは。日本語の読み上げを始めます。</string>
     <string name="tts_dialogue_routing">Separate narration and dialogue</string>
     <string name="tts_narration_voice">Narration voice</string>

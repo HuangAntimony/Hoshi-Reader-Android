@@ -14,7 +14,7 @@ import moe.antimony.hoshi.epub.shouldHoldImage
 
 internal data class TtsBookPosition(
     val sentences: List<TtsSentence>, val index: Int,
-    val previousChapter: Int?, val nextChapter: Int?,
+    val previousChapter: Int?, val nextChapter: Int?, val splitAtClausePunctuation: Boolean = false,
 ) {
     val sentence: TtsSentence get() = sentences[index]
 }
@@ -22,22 +22,22 @@ internal data class TtsBookPosition(
 /** Full chapters preserve quote/ruby context. Book instances are immutable reading snapshots. */
 @Singleton
 class TtsBookRepository @Inject constructor(@param:IoDispatcher private val dispatcher: CoroutineDispatcher) {
-    private class Key(val book: EpubBook, val chapter: Int) {
-        override fun equals(other: Any?) = other is Key && book === other.book && chapter == other.chapter
-        override fun hashCode() = 31 * System.identityHashCode(book) + chapter
+    private class Key(val book: EpubBook, val chapter: Int, val splitAtClausePunctuation: Boolean) {
+        override fun equals(other: Any?) = other is Key && book === other.book && chapter == other.chapter && splitAtClausePunctuation == other.splitAtClausePunctuation
+        override fun hashCode() = 31 * (31 * System.identityHashCode(book) + chapter) + splitAtClausePunctuation.hashCode()
     }
     private val mutex = Mutex()
     private val chapters = LinkedHashMap<Key, TtsChapterText>(4, .75f, true)
 
-    suspend fun chapter(book: EpubBook, index: Int): List<TtsSentence> = parsedChapter(book, index).sentences
+    suspend fun chapter(book: EpubBook, index: Int, splitAtClausePunctuation: Boolean = false): List<TtsSentence> = parsedChapter(book, index, splitAtClausePunctuation).sentences
 
-    private suspend fun parsedChapter(book: EpubBook, index: Int): TtsChapterText = withContext(dispatcher) {
+    private suspend fun parsedChapter(book: EpubBook, index: Int, splitAtClausePunctuation: Boolean): TtsChapterText = withContext(dispatcher) {
         mutex.withLock {
-            val key = Key(book, index)
+            val key = Key(book, index, splitAtClausePunctuation)
             chapters[key]?.let { return@withLock it }
             val source = book.chapters[index]
             val html = source.html.ifBlank { book.readResource(source.href)?.toString(Charsets.UTF_8).orEmpty() }
-            val sentences = TtsText.extractChapter(index, html, source.mediaType) { book.shouldHoldImage(source.href, it) }
+            val sentences = TtsText.extractChapter(index, html, source.mediaType, splitAtClausePunctuation) { book.shouldHoldImage(source.href, it) }
             currentCoroutineContext().ensureActive()
             chapters[key] = sentences
             if (chapters.size > 4) chapters.remove(chapters.keys.first())
@@ -49,9 +49,9 @@ class TtsBookRepository @Inject constructor(@param:IoDispatcher private val disp
     internal suspend fun hasImagesBetween(book: EpubBook, from: TtsBookPosition, to: TtsBookPosition): Boolean {
         if (to.sentence.imageBefore) return true
         if (from.sentence.chapter == to.sentence.chapter) return false
-        if (parsedChapter(book, from.sentence.chapter).trailingImage) return true
+        if (parsedChapter(book, from.sentence.chapter, from.splitAtClausePunctuation).trailingImage) return true
         for (index in (from.sentence.chapter + 1) until to.sentence.chapter) {
-            val chapter = parsedChapter(book, index)
+            val chapter = parsedChapter(book, index, from.splitAtClausePunctuation)
             if (chapter.trailingImage || chapter.sentences.any { it.imageBefore }) return true
         }
         return false
@@ -62,28 +62,28 @@ class TtsBookRepository @Inject constructor(@param:IoDispatcher private val disp
         chapter.linear && !chapter.isGuideToc && chapter.properties?.split(" ")?.contains("nav") != true
     }
 
-    private suspend fun neighbor(book: EpubBook, index: Int, direction: Int): Int? {
+    private suspend fun neighbor(book: EpubBook, index: Int, direction: Int, splitAtClausePunctuation: Boolean): Int? {
         val candidates = readable(book).filter { if (direction > 0) it > index else it < index }
         for (candidate in if (direction > 0) candidates else candidates.asReversed()) {
             currentCoroutineContext().ensureActive()
-            if (chapter(book, candidate).isNotEmpty()) return candidate
+            if (chapter(book, candidate, splitAtClausePunctuation).isNotEmpty()) return candidate
         }
         return null
     }
 
-    private suspend fun position(book: EpubBook, sentences: List<TtsSentence>, index: Int) = TtsBookPosition(
-        sentences, index, neighbor(book, sentences[index].chapter, -1), neighbor(book, sentences[index].chapter, 1))
+    private suspend fun position(book: EpubBook, sentences: List<TtsSentence>, index: Int, splitAtClausePunctuation: Boolean) = TtsBookPosition(
+        sentences, index, neighbor(book, sentences[index].chapter, -1, splitAtClausePunctuation), neighbor(book, sentences[index].chapter, 1, splitAtClausePunctuation), splitAtClausePunctuation)
 
-    internal suspend fun at(book: EpubBook, chapter: Int, offset: Int): TtsBookPosition? {
+    internal suspend fun at(book: EpubBook, chapter: Int, offset: Int, splitAtClausePunctuation: Boolean = false): TtsBookPosition? {
         for (candidate in readable(book).filter { it >= chapter }) {
-            val sentences = chapter(book, candidate)
+            val sentences = chapter(book, candidate, splitAtClausePunctuation)
             val index = if (candidate == chapter) sentences.indexOfFirst { it.start + it.length > offset } else 0
-            if (index in sentences.indices) return position(book, sentences, index)
+            if (index in sentences.indices) return position(book, sentences, index, splitAtClausePunctuation)
         }
         // Starting beyond the book's text retains the previous last-sentence behavior.
         for (candidate in readable(book).asReversed()) {
-            val sentences = chapter(book, candidate)
-            if (sentences.isNotEmpty()) return position(book, sentences, sentences.lastIndex)
+            val sentences = chapter(book, candidate, splitAtClausePunctuation)
+            if (sentences.isNotEmpty()) return position(book, sentences, sentences.lastIndex, splitAtClausePunctuation)
         }
         return null
     }
@@ -92,10 +92,10 @@ class TtsBookRepository @Inject constructor(@param:IoDispatcher private val disp
         val index = current.index + direction
         if (index in current.sentences.indices) return current.copy(index = index)
         val next = (if (direction > 0) current.nextChapter else current.previousChapter) ?: return null
-        val sentences = chapter(book, next)
-        return position(book, sentences, if (direction > 0) 0 else sentences.lastIndex)
+        val sentences = chapter(book, next, current.splitAtClausePunctuation)
+        return position(book, sentences, if (direction > 0) 0 else sentences.lastIndex, current.splitAtClausePunctuation)
     }
 
-    suspend fun selection(book: EpubBook, index: Int, text: String, normalizedOffset: Int?, sentenceOffset: Int?): TtsSentence =
-        withContext(dispatcher) { TtsText.selection(chapter(book, index), text, normalizedOffset, sentenceOffset) }
+    suspend fun selection(book: EpubBook, index: Int, text: String, normalizedOffset: Int?, sentenceOffset: Int?, splitAtClausePunctuation: Boolean = false): TtsSentence =
+        withContext(dispatcher) { TtsText.selection(chapter(book, index, splitAtClausePunctuation), text, normalizedOffset, sentenceOffset) }
 }

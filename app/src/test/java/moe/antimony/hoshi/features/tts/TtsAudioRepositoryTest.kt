@@ -24,6 +24,24 @@ class TtsAudioRepositoryTest {
     private val next = TtsSentence(0, 0, 3, "次です。")
     private val later = TtsSentence(0, 4, 4, "三つです。")
 
+    @Test fun sameTextAndMultilingualVoiceCannotReuseAudioFromAnotherLanguage() = runBlocking {
+        val requests = mutableListOf<String>()
+        val client = client { requests += it }
+        val repository = repository(client)
+        try {
+            val japanese = repository.audio(next, "book", preferences)
+            val englishConfig = preferences.copy(settings = preferences.settings.copy(languageId = "en"))
+            val english = repository.audio(next, "book", englishConfig)
+            assertNotEquals(japanese, english)
+            assertEquals(english, repository.audio(next, "book", englishConfig))
+            assertEquals(japanese, repository.audio(next, "book", preferences))
+            assertEquals(2, requests.size)
+            assertEquals(listOf("ja-JP", "en-US"), requests.map {
+                Json.parseToJsonElement(it).jsonObject.getValue("voice").jsonObject.getValue("languageCode").jsonPrimitive.content
+            })
+        } finally { repository.clearPlaybackCache(); close(client) }
+    }
+
     @Test fun replayedMultipartAudioSurvivesMaximumPrefetchAndAvoidsNewSynthesis() = runBlocking {
         val syntheses = AtomicInteger()
         val client = client { syntheses.incrementAndGet() }
@@ -81,7 +99,7 @@ class TtsAudioRepositoryTest {
             assertTrue(requests.single().contains(sentence.text))
             val invalid = same.copy(settings = same.settings.withRouting(TtsVoiceRouting(true, "ja-JP-Neural2-B", "missing")))
             try { repository.audio(sentence, "book", invalid); fail("Invalid voice must not fall back") }
-            catch (error: TtsException) { assertEquals(TtsFailure.MissingJapanese, error.failure) }
+            catch (error: TtsException) { assertEquals(TtsFailure.MissingLanguage, error.failure) }
             assertEquals(1, requests.size)
         } finally { repository.clearPlaybackCache(); close(client) }
     }
@@ -352,7 +370,7 @@ class TtsAudioRepositoryTest {
         return OkHttpClient.Builder().addInterceptor { chain ->
             val request = chain.request()
             val body = if (request.url.encodedPath.endsWith("voices")) {
-                """{"voices":[{"name":"ja-JP-Neural2-B","languageCodes":["ja-JP"]},{"name":"ja-JP-Neural2-C","languageCodes":["ja-JP"]}]}"""
+                """{"voices":[{"name":"ja-JP-Neural2-B","languageCodes":["ja-JP","en-US"]},{"name":"ja-JP-Neural2-C","languageCodes":["ja-JP"]}]}"""
             } else {
                 val buffer = okio.Buffer()
                 request.body!!.writeTo(buffer)

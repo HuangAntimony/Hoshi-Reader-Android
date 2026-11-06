@@ -954,7 +954,7 @@
     <string name="tts_refresh_voices">刷新音色列表</string>
     <string name="tts_source">来源</string>
     <string name="tts_voice" comment="Label for the selected synthesis voice.">音色</string>
-    <string name="tts_system_default" comment="Automatically choose an installed Japanese TTS engine or voice.">自动选择</string>
+    <string name="tts_system_default" comment="Automatically choose a TTS engine or voice for the profile language.">自动选择</string>
     <string name="tts_offline">离线</string>
     <string name="tts_preview">试听</string>
     <string name="tts_preview_voice">试听音色</string>
@@ -981,12 +981,21 @@
     <string name="tts_replacement">替换为</string>
     <string name="tts_invalid_surface">请输入原文本。</string>
     <string name="tts_duplicate">此作用范围内已存在相同原文本，请编辑已有规则。</string>
-    <string name="tts_no_engine">设备未安装 TTS 引擎，请在系统设置中安装引擎及日语语音数据。</string>
-    <string name="tts_missing_japanese">日语音色不可用，请选择其他音色或在系统设置中安装日语语音数据。</string>
+    <string name="tts_no_engine">设备未安装 TTS 引擎，请在系统设置中安装引擎及当前配置语言的语音数据。</string>
+    <string name="tts_missing_language">当前配置语言的音色不可用，请选择其他音色或在系统设置中安装对应语言的语音数据。</string>
     <string name="tts_engine_unavailable">所选引擎不可用，请选择其他已安装的引擎。</string>
     <string name="tts_timeout">语音引擎响应超时，请检查连接后重试。</string>
     <string name="tts_empty_text">未找到可朗读的句子。</string>
     <string name="tts_failed">无法生成或播放句子音频，请重试。</string>
+    <string name="tts_sample_en" comment="English content-language voice sample; keep in English.">Hello. Let us begin reading in English.</string>
+    <string name="tts_sample_zh" comment="Chinese content-language voice sample; keep in Chinese.">你好，现在开始中文朗读。</string>
+    <string name="tts_sample_ko" comment="Korean content-language voice sample; keep in Korean.">안녕하세요. 한국어 읽기를 시작합니다.</string>
+    <string name="tts_dialogue_sample_en" comment="English dialogue sample; keep in English.">She opened the window. “What a beautiful day,” she said with a smile.</string>
+    <string name="tts_dialogue_sample_zh" comment="Chinese dialogue sample; keep in Chinese.">她打开窗户，微笑着说：“今天天气真好。”</string>
+    <string name="tts_dialogue_sample_ko" comment="Korean dialogue sample; keep in Korean.">그녀는 창문을 열었다. “오늘은 날씨가 좋네요.” 그녀가 미소를 지으며 말했다.</string>
+    <string name="tts_profile_language">音色语言：%1$s</string>
+    <string name="tts_split_clauses">短句细分</string>
+    <string name="tts_split_clauses_hint">在逗号、分号及分句横线处细分，便于停顿、跳转和重播。</string>
     <string name="tts_sample">こんにちは。日本語の読み上げを始めます。</string>
     <string name="tts_dialogue_routing">区分旁白与对白</string>
     <string name="tts_narration_voice">旁白音色</string>

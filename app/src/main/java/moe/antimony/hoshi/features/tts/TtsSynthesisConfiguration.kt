@@ -2,6 +2,7 @@ package moe.antimony.hoshi.features.tts
 
 /** Only inputs to speech generation; player timing and catalog/display metadata stay outside. */
 internal data class TtsSynthesisConfiguration(
+    val languageId: String,
     val engine: String,
     val voice: String,
     val rate: Float,
@@ -25,7 +26,7 @@ internal data class TtsCustomSynthesisConfiguration(
 internal fun TtsSettings.synthesisSettings(): TtsSynthesisConfiguration {
     val custom = customSource()
     val onlineSource = TtsOnlineSource.from(engine)
-    return TtsSynthesisConfiguration(engine, voice, rate,
+    return TtsSynthesisConfiguration(languageId, engine, voice, rate,
         if (isCustomSource()) 0f else pitch,
         online[engine].takeIf { onlineSource != null }, options().takeIf { onlineSource != null },
         custom?.let { TtsCustomSynthesisConfiguration(it.protocol, it.baseUrl, it.encryptedKey, it.model, it.format, it.preset) },

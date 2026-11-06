@@ -18,6 +18,92 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TtsPlaybackControllerTest {
+    @Test fun clauseToggleRetainsPendingNextAndPreviousChapterDestinations() = runTest {
+        for (direction in listOf(1, -1)) {
+            val delegate = StandardTestDispatcher(testScheduler)
+            var blockNext = false
+            var blocked: (() -> Unit)? = null
+            val dispatcher = object : CoroutineDispatcher() {
+                override fun dispatch(context: kotlin.coroutines.CoroutineContext, block: Runnable) {
+                    if (blockNext) { blockNext = false; blocked = { delegate.dispatch(context, block) } }
+                    else delegate.dispatch(context, block)
+                }
+            }
+            val chapters = book.copy(chapters = listOf(
+                book.chapters.single().copy(html = "<p>前文、後文。</p>"),
+                EpubChapter("two", "two.xhtml", "application/xhtml+xml", "<p>次句、末尾。</p>")))
+            fixture(fixtureBook = chapters, bookDispatcher = dispatcher) { controller, _, _, repository ->
+                if (direction < 0) { controller.prepareAt(1, 0); runCurrent() }
+                blockNext = true
+                if (direction > 0) controller.next() else controller.previous()
+                runCurrent()
+                assertNotNull(blocked)
+                repository.settings { it.copy(splitAtClausePunctuation = true) }; runCurrent()
+                blocked!!(); runCurrent()
+                assertFalse(controller.state.value.playing)
+                assertEquals(if (direction > 0) "次句、" else "後文。", controller.state.value.sentence?.text)
+                assertEquals(if (direction > 0) 1 else 0, controller.state.value.sentence?.chapter)
+            }
+        }
+    }
+
+    @Test fun clauseToggleReconcilesQueuedPositionPausesAndRetainsNavigationAndPauses() = runTest {
+        val source = book.copy(chapters = listOf(book.chapters.single().copy(html = "<p>前文、後文。次句、末尾。</p>")))
+        fixture(fixtureBook = source) { controller, output, _, repository ->
+            controller.play(); runCurrent()
+            val tokens = output.queued.keys.toList()
+            output.enterNext(notify = false)
+            repository.settings { it.copy(splitAtClausePunctuation = true, sentencePauseMs = 300) }; runCurrent()
+            tokens.forEach(output.onTransition)
+            assertFalse(controller.state.value.playing)
+            assertEquals("次句、", controller.state.value.sentence?.text)
+            assertEquals(4, controller.state.value.sentence?.start)
+            assertTrue(output.queued.isEmpty())
+            controller.play(); runCurrent()
+            output.onEnded(); runCurrent()
+            advanceTimeBy(299); runCurrent()
+            assertEquals("次句、", controller.state.value.sentence?.text)
+            advanceTimeBy(1); runCurrent()
+            assertEquals("末尾。", controller.state.value.sentence?.text)
+            controller.pause()
+            repository.settings { it.copy(splitAtClausePunctuation = false) }; runCurrent()
+            assertFalse(controller.state.value.playing)
+            assertEquals("次句、末尾。", controller.state.value.sentence?.text)
+            controller.previous(); runCurrent()
+            assertEquals("前文、後文。", controller.state.value.sentence?.text)
+        }
+    }
+
+    @Test fun clauseToggleReplacesPendingPositionAndRejectsLateSynthesis() = runTest {
+        val delegate = StandardTestDispatcher(testScheduler)
+        var blockNext = false
+        var blocked: (() -> Unit)? = null
+        val dispatcher = object : CoroutineDispatcher() {
+            override fun dispatch(context: kotlin.coroutines.CoroutineContext, block: Runnable) {
+                if (blockNext) { blockNext = false; blocked = { delegate.dispatch(context, block) } }
+                else delegate.dispatch(context, block)
+            }
+        }
+        val source = book.copy(chapters = listOf(book.chapters.single().copy(html = "<p>前文、後文。次句、末尾。</p>")))
+        fixture(fixtureBook = source, bookDispatcher = dispatcher) { controller, output, audio, repository ->
+            blockNext = true
+            controller.startAt(0, 6); runCurrent()
+            assertNotNull(blocked)
+            repository.settings { it.copy(splitAtClausePunctuation = true) }; runCurrent()
+            blocked!!(); runCurrent()
+            assertEquals("末尾。", controller.state.value.sentence?.text)
+            assertFalse(controller.state.value.playing)
+            val release = CompletableDeferred<Unit>()
+            audio.synthesize = { withContext(NonCancellable) { release.await() } }
+            controller.play(); runCurrent()
+            repository.settings { it.copy(splitAtClausePunctuation = false) }; runCurrent()
+            release.complete(Unit); runCurrent()
+            assertEquals("次句、末尾。", controller.state.value.sentence?.text)
+            assertFalse(controller.state.value.playing)
+            assertEquals(0, output.playCount)
+        }
+    }
+
     @Test fun restartWhilePausedStartsCurrentSentenceAndContinuesNormally() = runTest {
         fixture { controller, output, _, _ ->
             controller.startAt(0, 0, singleSentence = true); runCurrent()
@@ -1278,9 +1364,9 @@ class TtsPlaybackControllerTest {
     }
     @Test fun engineFailureIsVisibleAndRetryCanPlay() = runTest {
         fixture { controller, output, audio, _ ->
-            audio.synthesize = { throw TtsException(TtsFailure.MissingJapanese) }
+            audio.synthesize = { throw TtsException(TtsFailure.MissingLanguage) }
             controller.play(); runCurrent()
-            assertEquals(TtsFailure.MissingJapanese, controller.state.value.error?.failure)
+            assertEquals(TtsFailure.MissingLanguage, controller.state.value.error?.failure)
             assertFalse(controller.state.value.playing)
             audio.synthesize = {}
             controller.play(); runCurrent()

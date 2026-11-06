@@ -22,11 +22,11 @@ import moe.antimony.hoshi.ui.theme.hoshiSurfaces
 
 @Composable
 internal fun TtsSourceConfigurationSheet(
-    source: TtsOnlineSource, config: TtsOnlineConfig, viewModel: TtsViewModel, onDismiss: () -> Unit,
+    source: TtsOnlineSource, config: TtsOnlineConfig, viewModel: TtsViewModel, settings: TtsSettings, onDismiss: () -> Unit,
 ) {
-    val sample = stringResource(R.string.tts_sample)
+    val sample = stringResource(settings.sampleRes(dialogue = false))
     TtsProviderConfiguration(source, config,
-        onTest = { region, key -> viewModel.testConfiguration(source, region, key, sample) },
+        onTest = { region, key -> viewModel.testConfiguration(source, region, key, sample, settings.languageId) },
         onSave = { region, key -> viewModel.configure(source, region, key) }, onDismiss = onDismiss,
         onDelete = { viewModel.removeKey(source) })
 }

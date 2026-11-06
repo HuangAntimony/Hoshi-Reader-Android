@@ -16,6 +16,54 @@ import org.junit.rules.TemporaryFolder
 class OnlineTtsEngineTest {
     @get:Rule val folder = TemporaryFolder()
 
+    @Test fun legacyJapaneseOnlyDiskCatalogIsRefetchedBeforeFilteringNewLanguages() = runBlocking {
+        val store = TtsVoiceCatalogStore(folder.newFolder())
+        val config = TtsOnlineConfig()
+        val key = TtsVoiceCatalogKey.online(TtsOnlineSource.Edge, config)
+        val legacyHash = java.security.MessageDigest.getInstance("SHA-256").digest("\u0000".toByteArray())
+            .joinToString("") { "%02x".format(it) }
+        store.write(key.copy(configuration = legacyHash), listOf(TtsVoiceInfo("old-japanese", true)))
+        var requests = 0
+        val engine = engine(store) {
+            requests++
+            200 to """[{"Locale":"en-US","ShortName":"english"}]""".toByteArray()
+        }
+        val settings = TtsSettings(engine = TtsOnlineSource.Edge.id, languageId = "en")
+        assertNull(engine.cachedCatalog(settings))
+        assertEquals("english", engine.catalog(settings).voices.single().id)
+        assertEquals(1, requests)
+    }
+
+    @Test fun rawCatalogIsSharedAcrossLanguagesAndSynthesisUsesSelectedRegionalLocale() = runBlocking {
+        var catalogs = 0
+        val requests = mutableListOf<String>()
+        val engine = engine { request ->
+            if (request.url.encodedPath.endsWith("list")) {
+                catalogs++
+                200 to """[{"ShortName":"japanese","Locale":"ja-JP"},{"ShortName":"british","Locale":"en-GB"},
+                    {"ShortName":"cantonese","Locale":"yue-HK"},{"ShortName":"korean","Locale":"ko-KR"}]""".toByteArray()
+            } else {
+                val buffer = okio.Buffer(); request.body!!.writeTo(buffer); requests += buffer.readUtf8()
+                200 to wav
+            }
+        }
+        val settings = TtsSettings(engine = TtsOnlineSource.Azure.id, online = mapOf(TtsOnlineSource.Azure.id to TtsOnlineConfig("eastasia", "key")))
+            .withOptions(TtsSynthesisOptions(format = TtsAudioFormat.Wav, style = "unsupported", role = "Girl"))
+        for ((language, voice, locale) in listOf(Triple("ja", "japanese", "ja-JP"), Triple("en", "british", "en-GB"),
+            Triple("zh", "cantonese", "yue-HK"), Triple("ko", "korean", "ko-KR"))) {
+            val config = settings.copy(languageId = language)
+            assertEquals(voice, engine.catalog(config).voices.single().id)
+            engine.synthesize("sample", config, folder.root)
+            assertTrue(requests.last().contains("xml:lang=\"$locale\""))
+            assertFalse(requests.last().contains("express-as"))
+        }
+        assertEquals(1, catalogs)
+        assertEquals("unsupported", settings.options().style)
+        val invalid = settings.copy(languageId = "en").withVoice("japanese")
+        assertEquals(TtsFailure.MissingLanguage, (runCatching { engine.synthesize("text", invalid, folder.root) }.exceptionOrNull() as TtsException).failure)
+        assertEquals(4, requests.size)
+    }
+
     @Test fun edgeCatalogAndSynthesisSendV2TokensAndMatchingVersion() = runBlocking {
         val requests = mutableListOf<Request>()
         val engine = engine { request ->

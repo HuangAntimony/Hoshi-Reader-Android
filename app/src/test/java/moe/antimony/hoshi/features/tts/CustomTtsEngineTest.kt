@@ -14,6 +14,48 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
 class CustomTtsEngineTest {
+    @Test fun vitsFiltersEachLanguageFromOneRawCatalogAndNeverUsesSavedPlaceholders() = runBlocking {
+        MockWebServer().use { server ->
+            server.enqueue(MockResponse().setBody("""{"VITS":[
+                {"id":0,"lang":["jpn"]},{"id":1,"lang":["eng"]},{"id":2,"lang":["cmn"]},{"id":3,"lang":["kor"]}]}"""))
+            val source = profile(server, TtsCustomProtocol.Vits)
+            val adapter = engine()
+            for ((index, language) in listOf("ja", "en", "zh", "ko").withIndex()) {
+                val config = settings(source, "").copy(languageId = language)
+                assertEquals(listOf("VITS:$index"), adapter.catalog(config).voices.map { it.id })
+                server.enqueue(MockResponse().setBody(Buffer().write(wav)))
+                adapter.synthesize("sample", config, folder.root)
+            }
+            assertEquals(5, server.requestCount)
+            assertTrue(server.takeRequest().path!!.endsWith("voice/speakers"))
+            for (language in listOf("ja", "en", "zh", "ko")) {
+                val body = Json.parseToJsonElement(server.takeRequest().body.readUtf8()).jsonObject
+                assertEquals(language, body.getValue("lang").jsonPrimitive.content)
+            }
+            val missing = settings(source, "").copy(languageId = "en").withVoice("VITS:99")
+            assertEquals(listOf("VITS:1"), adapter.catalog(missing).voices.map { it.id })
+            val failure = runCatching { adapter.synthesize("text", missing, folder.root) }.exceptionOrNull() as TtsException
+            assertEquals(TtsFailure.MissingLanguage, failure.failure)
+            assertEquals(5, server.requestCount)
+        }
+    }
+
+    @Test fun openAiKeepsUnknownAndManualVoicesAlongsideMatchingLocaleMetadata() = runBlocking {
+        MockWebServer().use { server ->
+            server.enqueue(MockResponse().setBody("""{"voices":["unknown",{"id":"british","locale":"en-GB"},{"id":"japanese","language":"ja-JP"}]}"""))
+            val source = profile(server).copy(voiceIds = listOf("manual"))
+            val adapter = engine()
+            val config = settings(source, "").copy(languageId = "en").withVoice("saved-manual")
+            assertEquals(listOf("british", "unknown", "manual", "saved-manual"), adapter.catalog(config).voices.map { it.id })
+            server.takeRequest()
+            server.enqueue(MockResponse().setBody(Buffer().write(wav)))
+            adapter.synthesize("hello", config, folder.root)
+            val body = Json.parseToJsonElement(server.takeRequest().body.readUtf8()).jsonObject
+            assertEquals("saved-manual", body.getValue("voice").jsonPrimitive.content)
+            assertFalse(body.containsKey("language"))
+        }
+    }
+
     @Test fun manualModelDiscoveryRetainsAuthenticationFailureAndCanRetry() = runBlocking {
         MockWebServer().use { server ->
             server.enqueue(MockResponse().setResponseCode(401).setBody("API key rejected"))
@@ -111,9 +153,11 @@ class CustomTtsEngineTest {
 
     @Test fun vitsUsesInverseLengthAndJapaneseWithoutSendingUnsupportedPitch() = runBlocking {
         MockWebServer().use { server ->
+            server.enqueue(MockResponse().setBody("""{"BERT-VITS2":[{"id":3,"lang":["ja"]}]}"""))
             server.enqueue(MockResponse().setBody(Buffer().write(wav)))
             val source = profile(server, TtsCustomProtocol.Vits).copy(baseUrl = server.url("/prefix/").toString(), rate = 2f)
             engine().synthesize("こんにちは。", settings(source, "BERT-VITS2:3"), folder.root)
+            server.takeRequest() // Speaker catalog verifies the saved ID and language.
             val request = server.takeRequest()
             assertEquals("/prefix/voice/bert-vits2", request.path)
             assertEquals("application/json", request.getHeader("Content-Type"))
@@ -129,7 +173,8 @@ class CustomTtsEngineTest {
         MockWebServer().use { server ->
             server.dispatcher = object : okhttp3.mockwebserver.Dispatcher() {
                 override fun dispatch(request: RecordedRequest): MockResponse =
-                    if (request.getHeader("Content-Type") == "application/json") MockResponse().setBody(Buffer().write(wav))
+                    if (request.path!!.endsWith("voice/speakers")) MockResponse().setBody("""{"VITS":[{"id":0,"lang":["ja"]}]}""")
+                    else if (request.getHeader("Content-Type") == "application/json") MockResponse().setBody(Buffer().write(wav))
                     else MockResponse().setResponseCode(400).setBody("empty form")
             }
             val source = profile(server, TtsCustomProtocol.Vits)
@@ -139,9 +184,11 @@ class CustomTtsEngineTest {
 
     @Test fun gptSoVitsUsesServerPresetAndDoesNotSendLength() = runBlocking {
         MockWebServer().use { server ->
+            server.enqueue(MockResponse().setBody("""{"GPT-SOVITS":[{"id":2,"lang":["ja"]}]}"""))
             server.enqueue(MockResponse().setBody(Buffer().write(wav)))
             val source = profile(server, TtsCustomProtocol.Vits).copy(preset = "narrator", rate = 2f)
             engine().synthesize("日本語。", settings(source, "GPT-SOVITS:2"), folder.root)
+            server.takeRequest() // Speaker catalog verifies the saved ID and language.
             val request = server.takeRequest()
             assertEquals("/proxy/v1/voice/gpt-sovits", request.path)
             val body = Json.parseToJsonElement(request.body.readUtf8()).jsonObject

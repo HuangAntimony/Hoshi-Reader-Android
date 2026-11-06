@@ -59,6 +59,9 @@ class TtsPlaybackController internal constructor(
     private var generation = 0L
     private var book: EpubBook? = null
     private var position: TtsBookPosition? = null
+    /** A backward chapter jump retains the destination's last cue after resegmentation. */
+    private data class SourceAnchor(val chapter: Int, val offset: Int = 0, val chapterEnd: Boolean = false)
+    private var pendingAnchor: SourceAnchor? = null
     private var pendingPosition: (suspend () -> TtsBookPosition?)? = null
     private var job: Job? = null
     private var prefetch: Job? = null
@@ -100,6 +103,7 @@ class TtsPlaybackController internal constructor(
             repository.preferencesReloads.flatMapLatest {
                 repository.preferences.catch { preferences = TtsPreferences(); stop(); fail(it.toTtsError(TtsFailure.Storage)) }
             }.collect { next ->
+                val segmentationChanged = next.settings.splitAtClausePunctuation != preferences.settings.splitAtClausePunctuation
                 val prefetchChanged = next.settings.prefetchSentences != preferences.settings.prefetchSentences
                 val settingsChanged = next.settings.synthesisSettings() != preferences.settings.synthesisSettings()
                 val wordsChanged = next.words != preferences.words
@@ -107,7 +111,24 @@ class TtsPlaybackController internal constructor(
                 preferences = next
                 if (!next.settings.enabled) { stop(); return@collect }
                 output.setPlaybackRate(next.settings.playbackRate)
-                if (settingsChanged || wordsChanged || prefetchChanged || pauseChanged) invalidateUpcoming()
+                if (settingsChanged || wordsChanged || prefetchChanged || pauseChanged || segmentationChanged) invalidateUpcoming()
+                if (segmentationChanged) {
+                    // discardUpcoming above reconciles Media3's actual token before capturing the source anchor.
+                    val anchor = pendingAnchor ?: position?.sentence?.let { SourceAnchor(it.chapter, it.start) }
+                    val source = book
+                    pause()
+                    preparedIndex = null
+                    pendingPosition = null
+                    pendingAnchor = null
+                    clearOutput()
+                    if (anchor != null && source != null) {
+                        position = null
+                        mutableState.value = state.value.copy(sentences = emptyList(), index = 0, previousChapter = null, nextChapter = null)
+                        requestPosition({ resolveAnchor(source, anchor, next.settings.splitAtClausePunctuation) },
+                            startPlayback = false, anchor = anchor)
+                    }
+                    return@collect
+                }
                 val restartPending = wordsChanged && state.value.playing && state.value.preparing && !settingsChanged
                 if (settingsChanged || restartPending || wordsChanged && !state.value.playing) {
                     pause()
@@ -140,9 +161,22 @@ class TtsPlaybackController internal constructor(
             previousChapter = next.previousChapter, nextChapter = next.nextChapter)
     }
 
+    private fun adjacentAnchor(current: TtsBookPosition, direction: Int): SourceAnchor {
+        current.sentences.getOrNull(current.index + direction)?.let { return SourceAnchor(it.chapter, it.start) }
+        val chapter = if (direction > 0) current.nextChapter else current.previousChapter
+        return if (chapter != null) SourceAnchor(chapter, chapterEnd = direction < 0)
+            else SourceAnchor(current.sentence.chapter, current.sentence.start)
+    }
+
+    private suspend fun resolveAnchor(source: EpubBook, anchor: SourceAnchor, split: Boolean): TtsBookPosition? {
+        val offset = if (anchor.chapterEnd) books.chapter(source, anchor.chapter, split).lastOrNull()?.start ?: 0 else anchor.offset
+        return books.at(source, anchor.chapter, offset, split)
+    }
+
     private fun requestPosition(
         resolve: suspend () -> TtsBookPosition?, startPlayback: Boolean,
         singleSentence: Boolean = false, natural: Boolean = false,
+        anchor: SourceAnchor? = position?.sentence?.let { SourceAnchor(it.chapter, it.start) },
     ) {
         if (!preferences.settings.enabled || associated || book == null) return
         pause()
@@ -152,6 +186,7 @@ class TtsPlaybackController internal constructor(
         if (!natural) clearOutput()
         stopAfterSentence = singleSentence
         naturalAdvance = natural
+        pendingAnchor = anchor
         pendingPosition = resolve
         if (startPlayback) { play(); return }
         val token = generation
@@ -161,6 +196,7 @@ class TtsPlaybackController internal constructor(
                 val next = resolve() ?: throw TtsException(TtsFailure.EmptyText)
                 if (token != generation) return@launch
                 pendingPosition = null
+                pendingAnchor = null
                 installPosition(next)
                 mutableState.value = state.value.copy(preparing = false)
                 if (state.value.started) presentSentence?.invoke(next.sentence, false)
@@ -172,7 +208,8 @@ class TtsPlaybackController internal constructor(
     fun prepareAt(chapter: Int, offset: Int) {
         if (state.value.started) return
         val source = book ?: return
-        requestPosition({ books.at(source, chapter, offset) }, startPlayback = false)
+        val split = preferences.settings.splitAtClausePunctuation
+        requestPosition({ books.at(source, chapter, offset, split) }, startPlayback = false, anchor = SourceAnchor(chapter, offset))
     }
 
     fun attachPlayer(next: ExoPlayer) { (output as? AndroidTtsPlaybackOutput)?.attach(next) }
@@ -183,7 +220,8 @@ class TtsPlaybackController internal constructor(
 
     fun startAt(chapter: Int, offset: Int, singleSentence: Boolean = false) {
         val source = book ?: return
-        requestPosition({ books.at(source, chapter, offset) }, startPlayback = true, singleSentence = singleSentence)
+        val split = preferences.settings.splitAtClausePunctuation
+        requestPosition({ books.at(source, chapter, offset, split) }, startPlayback = true, singleSentence = singleSentence, anchor = SourceAnchor(chapter, offset))
     }
     fun toggle() { if (state.value.playing) pause() else play() }
     fun previous() = move(-1)
@@ -201,7 +239,8 @@ class TtsPlaybackController internal constructor(
         val source = book ?: return
         val index = current.index + direction
         if (index in current.sentences.indices) seek(index, natural = natural)
-        else requestPosition({ books.adjacent(source, current, direction) ?: current }, state.value.playing, natural = natural)
+        else requestPosition({ books.adjacent(source, current, direction) ?: current }, state.value.playing,
+            natural = natural, anchor = adjacentAnchor(current, direction))
     }
     private fun advance() {
         // An ended playlist cannot still contain useful lookahead. This also rejects late
@@ -231,6 +270,7 @@ class TtsPlaybackController internal constructor(
         naturalAdvance = natural
         preparedIndex = null
         pendingPosition = null
+        pendingAnchor = null
         position = position?.copy(index = index)
         mutableState.value = state.value.copy(index = index)
         if (startPlayback) play()
@@ -248,7 +288,9 @@ class TtsPlaybackController internal constructor(
         if (!preferences.settings.enabled || associated || book == null || state.value.playing) return
         if (position == null && pendingPosition == null) {
             val source = requireNotNull(book)
-            pendingPosition = { books.at(source, 0, 0) }
+            val split = preferences.settings.splitAtClausePunctuation
+            pendingAnchor = SourceAnchor(0)
+            pendingPosition = { books.at(source, 0, 0, split) }
         }
         if (sentenceFinished) {
             sentenceFinished = false
@@ -256,6 +298,7 @@ class TtsPlaybackController internal constructor(
             if (stopAfterSentence || !state.value.hasNext) return
             val source = requireNotNull(book)
             val current = requireNotNull(position)
+            pendingAnchor = adjacentAnchor(current, 1)
             pendingPosition = { books.adjacent(source, current, 1) }
             naturalAdvance = true
         }
@@ -271,6 +314,7 @@ class TtsPlaybackController internal constructor(
                     val next = resolve() ?: throw TtsException(TtsFailure.EmptyText)
                     if (generation != token || associated) return@launch
                     pendingPosition = null
+                    pendingAnchor = null
                     installPosition(next)
                 }
                 withTimeout(15_000) { output.connect() }
@@ -480,6 +524,7 @@ class TtsPlaybackController internal constructor(
         book = null
         position = null
         pendingPosition = null
+        pendingAnchor = null
         invalidateUpcoming(syncCurrent = false)
         preparedIndex = null
         heldImageIndex = null

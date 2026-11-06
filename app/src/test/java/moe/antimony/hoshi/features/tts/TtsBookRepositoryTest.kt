@@ -13,6 +13,20 @@ import org.junit.rules.TemporaryFolder
 @OptIn(ExperimentalCoroutinesApi::class)
 class TtsBookRepositoryTest {
     @get:Rule val folder = TemporaryFolder()
+    @Test fun segmentationSnapshotsSeparateCachedChaptersNavigationAndSelection() = runTest {
+        val book = EpubBook("Clauses", chapters = listOf(
+            EpubChapter("a", "a.xhtml", "application/xhtml+xml", "<p>前文、後文。</p>"),
+            EpubChapter("b", "b.xhtml", "application/xhtml+xml", "<p>次句；末尾。</p>")))
+        val repository = TtsBookRepository(UnconfinedTestDispatcher(testScheduler))
+        val coarse = repository.chapter(book, 0)
+        assertEquals(listOf("前文、後文。"), coarse.map { it.text })
+        val fine = repository.at(book, 0, 2, true)!!
+        assertEquals("後文。", fine.sentence.text)
+        assertEquals("次句；", repository.adjacent(book, fine, 1)!!.sentence.text)
+        assertSame(coarse, repository.chapter(book, 0, false))
+        assertEquals("前文、後文。", repository.selection(book, 0, "前文、後文。", 0, 0, true).text)
+    }
+
     @Test fun repeatedImagesDoNotCreatePlaybackBarriersButOrdinaryIllustrationsDo() = runTest {
         val chapters = listOf(
             EpubChapter("a", "Text/a.xhtml", "application/xhtml+xml", "<p>一。</p><img src='../images/divider.jpg'/><p>二。</p><img src='../images/art.jpg'/><p>三。</p>"),

@@ -82,7 +82,7 @@ private fun TtsLoadedPanel(viewModel: TtsViewModel, bookId: String?, onStart: ((
     var customEditor by remember { mutableStateOf<TtsCustomSource?>(null) }
     var configureSource by remember { mutableStateOf<TtsOnlineSource?>(null) }
     val context = LocalContext.current
-    val sample = stringResource(if (preferences.settings.routing().enabled) R.string.tts_dialogue_sample else R.string.tts_sample)
+    val sample = stringResource(preferences.settings.sampleRes())
     if (currentTab == 0) {
         LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refresh() }
     }
@@ -110,6 +110,10 @@ private fun TtsLoadedPanel(viewModel: TtsViewModel, bookId: String?, onStart: ((
                 SettingsContent(readingSettingsState, Modifier.fillMaxWidth().padding(20.dp), viewModel::retryReadingSettings) { settings ->
                     ReaderSheetSwitchRow(stringResource(R.string.tts_use_ruby), preferences.settings.useRubyReadings,
                         onCheckedChange = viewModel::useRubyReadings)
+                    ReaderSheetSwitchRow(stringResource(R.string.tts_split_clauses), preferences.settings.splitAtClausePunctuation,
+                        onCheckedChange = { enabled -> viewModel.settings(preferences.settings.languageId) { it.copy(splitAtClausePunctuation = enabled) } })
+                    Text(stringResource(R.string.tts_split_clauses_hint), style = MaterialTheme.typography.bodySmall,
+                        color = hoshiSurfaces.muted, modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
                     SharedReaderPlaybackSettings(settings, viewModel::readingSettings, { colorRow = it })
                 }
                 readingError?.let { failure ->
@@ -120,8 +124,8 @@ private fun TtsLoadedPanel(viewModel: TtsViewModel, bookId: String?, onStart: ((
             }
         } else {
             TtsVoiceSettings(preferences.settings, catalog, engines, busy, preview, error ?: playback.error,
-                onSettings = viewModel::settings,
-                onPreview = { viewModel.preview(TtsSentence(0, 0, 0, sample), bookId) }, onStopPreview = viewModel::stopPreview,
+                onSettings = { viewModel.settings(preferences.settings.languageId, it) },
+                onPreview = { viewModel.preview(TtsSentence(0, 0, 0, sample), bookId, preferences) }, onStopPreview = viewModel::stopPreview,
                 onRetry = { viewModel.dismissError(); viewModel.refresh(force = true) }, onConfigure = { configureSource = it },
                 onSystemSettings = {
                     try { context.startActivity(Intent("com.android.settings.TTS_SETTINGS")) }
@@ -134,12 +138,12 @@ private fun TtsLoadedPanel(viewModel: TtsViewModel, bookId: String?, onStart: ((
     }
     customEditor?.let { source ->
         TtsCustomSourceEditor(source, preferences.settings.customSources.any { it.id == source.id },
-            onTest = { draft, key, remove -> viewModel.testSource(draft, key, remove, sample) },
+            onTest = { draft, key, remove -> viewModel.testSource(draft, key, remove, sample, preferences.settings.languageId) },
             onSave = viewModel::saveSource, onDelete = { viewModel.deleteSource(source.id) }, onModels = viewModel::sourceModels,
-            onDismiss = { customEditor = null }, selectedVoice = preferences.settings.routingBySource[source.id]?.narration.orEmpty())
+            onDismiss = { customEditor = null }, selectedVoice = preferences.settings.routing(source.id).narration)
     }
     configureSource?.let { source ->
-        TtsSourceConfigurationSheet(source, preferences.settings.online[source.id] ?: TtsOnlineConfig(), viewModel) { configureSource = null }
+        TtsSourceConfigurationSheet(source, preferences.settings.online[source.id] ?: TtsOnlineConfig(), viewModel, preferences.settings) { configureSource = null }
     }
     colorRow?.let { row ->
         readingSettings?.let { settings ->
@@ -260,7 +264,7 @@ internal fun TtsFailure.messageRes(): Int = when (this) {
     TtsFailure.InvalidResponse -> R.string.tts_response_error
     TtsFailure.Storage -> R.string.tts_storage_error
     TtsFailure.NoEngine -> R.string.tts_no_engine
-    TtsFailure.MissingJapanese -> R.string.tts_missing_japanese
+    TtsFailure.MissingLanguage -> R.string.tts_missing_language
     TtsFailure.EngineUnavailable -> R.string.tts_engine_unavailable
     TtsFailure.Timeout -> R.string.tts_timeout
     TtsFailure.EmptyText -> R.string.tts_empty_text

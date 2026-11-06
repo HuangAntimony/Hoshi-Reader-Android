@@ -83,7 +83,8 @@ This project brings [Hoshi Reader](https://github.com/Manhhao/Hoshi-Reader) to A
 
 ### Text-To-Speech
 
-- Use device, online, or self-hosted voices with background playback, adjustable speed, and separate narration/dialogue voices.
+- Use device, online, or self-hosted voices with background playback and adjustable speed. Voice language follows the active profile (Japanese, English, Chinese, or Korean), with narration/dialogue voices remembered per language and service.
+- Replay dialogue marked with Japanese, curly, or straight double quotes within a paragraph; optionally split long sentences at clause punctuation for finer skipping and replay.
 - Customize global or book-specific pronunciation dictionaries with regex replacements and furigana readings.
 
 ### Sync And Backup

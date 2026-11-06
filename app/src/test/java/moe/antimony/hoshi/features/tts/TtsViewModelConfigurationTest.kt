@@ -40,6 +40,21 @@ import org.junit.rules.TemporaryFolder
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TtsViewModelConfigurationTest {
+    @Test fun languageChangeCancelsPreviewClearsOldCatalogAndCapturesTheLanguageOfEdits() = runTest {
+        val language = MutableStateFlow("ja")
+        fixture(TtsOnlineSource.MicrosoftTranslator, language = language) { model, repository ->
+            startPreview(model)
+            model.settings { it.withVoice("japanese-edited") }
+            language.value = "en"
+            runCurrent()
+            assertEquals(TtsPreviewState.Idle, model.previewState.value)
+            assertEquals("en", model.preferences.value!!.settings.languageId)
+            assertEquals("", model.preferences.value!!.settings.voice)
+            assertEquals(listOf("english"), model.catalog.value?.voices?.map { it.id })
+            assertEquals("japanese-edited", repository.preferences.first().settings.copy(languageId = "ja").voice)
+        }
+    }
+
     @Test fun deletingReplacementReturnsItsStorageReasonAndCanBeRetried() = runTest {
         val store = MemoryStore()
         fixture(TtsOnlineSource.MicrosoftTranslator, store) { model, repository ->
@@ -93,9 +108,11 @@ class TtsViewModelConfigurationTest {
             gate.complete(Unit); runCurrent()
             val state = model.preferencesLoadState.value as SettingsLoadState.Failed
             val message = state.message.resolve({ _, _ -> "Load" }, { _, _, _ -> "" })
-            assertTrue(message.contains("Cannot read TTS"))
-            assertTrue(message.contains("storage offline"))
-            assertTrue(ErrorDiagnosticEvents.buffer.drain().any { it.error === failure })
+            assertTrue(message, message.contains("Cannot read TTS"))
+            assertTrue(message, message.contains("storage offline"))
+            val events = ErrorDiagnosticEvents.buffer.drain()
+            // combine introduces a coroutine boundary; stack-trace recovery may wrap the original.
+            assertTrue(events.any { event -> generateSequence(event.error) { it.cause }.any { it === failure } })
             assertNull(model.preferences.value)
             store.readFailure = null
             model.retryPreferences(); runCurrent()
@@ -224,19 +241,20 @@ class TtsViewModelConfigurationTest {
         selected: TtsOnlineSource,
         store: MemoryStore = MemoryStore(),
         refresh: Boolean = true,
+        language: MutableStateFlow<String> = MutableStateFlow("ja"),
         beforeModel: () -> Unit = {},
         onSecondModel: ((TtsViewModel) -> Unit)? = null,
         test: suspend (TtsViewModel, TtsRepository) -> Unit,
     ) {
         val dispatcher = StandardTestDispatcher(testScheduler)
         Dispatchers.setMain(dispatcher)
-        val repository = TtsRepository(store)
+        val repository = TtsRepository(store, language)
         repository.configure(TtsOnlineSource.Azure, TtsOnlineConfig("eastasia", "saved-cipher"))
         repository.configure(TtsOnlineSource.GoogleCloud, TtsOnlineConfig(encryptedKey = "saved-cipher"))
         repository.settings { it.copy(enabled = true).selectSource(selected.id).withVoice("saved-voice") }
         val settings = repository.preferences.first().settings
         val catalogs = TtsVoiceCatalogCache()
-        catalogs.load(settings.voiceCatalogKey()!!, false) { listOf(TtsVoiceInfo("saved-voice", true)) }
+        catalogs.load(settings.voiceCatalogKey()!!, false) { listOf(TtsVoiceInfo("saved-voice", true, languages = listOf("ja-JP")), TtsVoiceInfo("english", true, languages = listOf("en-GB"))) }
         var discoveryGate: CompletableDeferred<Unit>? = null
         val device = object : TtsDeviceEngine {
             override suspend fun installedEngines(): List<TtsEngineInfo> {

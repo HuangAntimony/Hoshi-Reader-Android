@@ -69,7 +69,7 @@ class TtsVoiceCatalogCacheTest {
         assertEquals(emptyList<TtsVoiceInfo>(), TtsVoiceCatalogCache(store).cached(custom))
         cache.load(online, false) { old }
         try { cache.load(online, true) { emptyList() }; fail("Expected missing voices") }
-        catch (error: TtsException) { assertEquals(TtsFailure.MissingJapanese, error.failure) }
+        catch (error: TtsException) { assertEquals(TtsFailure.MissingLanguage, error.failure) }
         assertEquals(old, TtsVoiceCatalogCache(store).cached(online))
     }
 

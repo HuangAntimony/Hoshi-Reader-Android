@@ -25,11 +25,12 @@ class CustomTtsEngine internal constructor(
         catalogs: TtsVoiceCatalogCache) : this(transport, cipher::decrypt, io, catalogs)
     private val synthesis = Semaphore(ttsSynthesisConcurrency)
     private fun source(settings: TtsSettings) = settings.customSource()?.validate() ?: throw TtsException(TtsFailure.Configuration)
-    private fun catalog(source: TtsCustomSource, voices: List<TtsVoiceInfo>, voice: String) = TtsCatalog(source.id, source.voiceChoices(voices, voice))
+    private fun catalog(source: TtsCustomSource, voices: List<TtsVoiceInfo>, settings: TtsSettings) = TtsCatalog(source.id,
+        source.voiceChoices(voices.forLanguage(settings.languageId, allowUnknown = source.protocol == TtsCustomProtocol.OpenAi), settings.voice))
 
     suspend fun cachedCatalog(settings: TtsSettings): TtsCatalog? = withContext(io) {
         val source = source(settings)
-        catalogs.cached(TtsVoiceCatalogKey.custom(source))?.let { catalog(source, it, settings.voice) }
+        catalogs.cached(TtsVoiceCatalogKey.custom(source))?.let { catalog(source, it, settings) }
     }
     suspend fun catalog(settings: TtsSettings, force: Boolean = false): TtsCatalog = withContext(io) {
         val source = source(settings)
@@ -45,7 +46,7 @@ class CustomTtsEngine internal constructor(
                 TtsCustomProtocol.Vits -> vitsVoices(request(source, "voice/speakers"))
             }
         }
-        catalog(source, voices, settings.voice)
+        catalog(source, voices, settings)
     }
     suspend fun models(source: TtsCustomSource): List<String> = withContext(io) {
         try {
@@ -64,8 +65,10 @@ class CustomTtsEngine internal constructor(
                 val source = source(settings)
                 if (text.isBlank()) throw TtsException(TtsFailure.EmptyText)
                 val speaker = if (source.protocol == TtsCustomProtocol.Vits) {
-                    vitsSpeaker(settings.voice.ifBlank { catalog(settings).voices.firstOrNull()?.id.orEmpty() })
-                        ?: throw TtsException(TtsFailure.MissingJapanese)
+                    val voices = catalog(settings).voices
+                    val selected = if (settings.voice.isBlank()) voices.firstOrNull() else voices.firstOrNull { it.id == settings.voice }
+                    vitsSpeaker(selected?.id.orEmpty())
+                        ?: throw TtsException(TtsFailure.MissingLanguage)
                 } else null
                 directory.mkdirs()
                 for (part in OnlineTtsProtocol.chunks(text, 3000)) {
@@ -76,7 +79,7 @@ class CustomTtsEngine internal constructor(
                             if (settings.voice.isNotBlank()) put("voice", settings.voice)
                             put("speed", source.normalizeRate(settings.rate, settings.voice)); put("response_format", source.format.name.lowercase())
                         } else {
-                            put("text", part); put("id", speaker!!.second); put("lang", "ja")
+                            put("text", part); put("id", speaker!!.second); put("lang", settings.languageId)
                             put("format", source.format.name.lowercase()); put("streaming", false)
                             if (speaker.first != "GPT-SOVITS") put("length", 1f / source.normalizeRate(settings.rate, settings.voice))
                             else if (source.preset.isNotBlank()) put("preset", source.preset)
@@ -115,6 +118,11 @@ class CustomTtsEngine internal constructor(
 
     private fun parse(bytes: ByteArray): JsonElement = try { Json.parseToJsonElement(bytes.toString(Charsets.UTF_8)) }
         catch (error: Exception) { throw TtsException(TtsFailure.InvalidResponse, cause = error) }
+    private fun languageTags(value: JsonElement?): List<String> = when (value) {
+        is JsonArray -> value.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
+        is JsonPrimitive -> listOfNotNull(value.contentOrNull)
+        else -> emptyList()
+    }.filter { it.isNotBlank() }
     private fun openAiVoices(bytes: ByteArray): List<TtsVoiceInfo> = try {
         val root = parse(bytes)
         val values = if (root is JsonArray) root else root.jsonObject["voices"] ?: root.jsonObject["data"] ?: JsonArray(emptyList())
@@ -123,7 +131,8 @@ class CustomTtsEngine internal constructor(
             else {
                 val obj = value.jsonObject
                 val id = obj["id"]?.jsonPrimitive?.contentOrNull ?: obj["voice_id"]?.jsonPrimitive?.contentOrNull ?: obj["name"]?.jsonPrimitive?.contentOrNull
-                id?.let { TtsVoiceInfo(it, true, label = obj["name"]?.jsonPrimitive?.contentOrNull ?: it) }
+                id?.let { TtsVoiceInfo(it, true, label = obj["name"]?.jsonPrimitive?.contentOrNull ?: it,
+                    languages = languageTags(obj["languages"] ?: obj["language"] ?: obj["locale"])) }
             }
         }.filter { it.id.isNotBlank() }.distinctBy { it.id }
     } catch (error: Exception) { throw TtsException(TtsFailure.InvalidResponse, cause = error) }
@@ -131,10 +140,10 @@ class CustomTtsEngine internal constructor(
         val root = parse(bytes).jsonObject
         vitsModels.keys.flatMap { model -> root[model]?.jsonArray.orEmpty().mapNotNull { value ->
             val obj = value.jsonObject
-            val languages = obj["lang"]?.let { if (it is JsonArray) it.map { lang -> lang.jsonPrimitive.content } else listOf(it.jsonPrimitive.content) }.orEmpty()
+            val languages = languageTags(obj["lang"])
             val id = obj["id"]?.jsonPrimitive?.intOrNull
-            if (id == null || id < 0 || languages.isNotEmpty() && languages.none { it == "ja" || it == "jpn" || it.startsWith("ja-") }) null
-            else TtsVoiceInfo("$model:$id", true, label = obj["name"]?.jsonPrimitive?.contentOrNull ?: "$model:$id")
+            if (id == null || id < 0) null
+            else TtsVoiceInfo("$model:$id", true, label = obj["name"]?.jsonPrimitive?.contentOrNull ?: "$model:$id", languages = languages)
         } }.distinctBy { it.id }
     } catch (error: Exception) { throw TtsException(TtsFailure.InvalidResponse, cause = error) }
 }

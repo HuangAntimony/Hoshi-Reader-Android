@@ -34,7 +34,7 @@ internal fun TtsVoiceSettings(
     catalogLoading: Boolean = busy && preview == TtsPreviewState.Idle,
 ) {
     var sourcePicker by remember { mutableStateOf(false) }
-    var voicePicker by remember { mutableStateOf<TtsTextRole?>(null) }
+    var voicePicker by remember(settings.languageId, settings.engine) { mutableStateOf<TtsTextRole?>(null) }
     val routing = settings.routing()
     val source = TtsOnlineSource.from(settings.engine)
     val custom = settings.customSource()
@@ -60,11 +60,16 @@ internal fun TtsVoiceSettings(
     val dialogueConnection = dialogueVoice?.let { stringResource(if (it.network) R.string.tts_online else R.string.tts_offline) }
     Column(modifier.fillMaxWidth()) {
         Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = 12.dp)) {
+            Text(stringResource(R.string.tts_profile_language, stringResource(
+                (moe.antimony.hoshi.content.ContentLanguageProfile.fromDictionaryLanguageId(settings.languageId)
+                    ?: moe.antimony.hoshi.content.ContentLanguageProfile.Default).displayNameRes)),
+                style = MaterialTheme.typography.bodySmall, color = hoshiSurfaces.muted,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
             ReaderSheetCard(verticalPadding = 4.dp, shape = RoundedCornerShape(16.dp)) {
                 TtsCurrentVoiceRow(stringResource(R.string.tts_source), sourceTitle, null) { sourcePicker = true }
             }
             ReaderSheetSwitchRow(stringResource(R.string.tts_dialogue_routing), routing.enabled, onCheckedChange = { enabled ->
-                onSettings { it.withRouting(it.routing().copy(enabled = enabled)).withCompatibleVoiceOptions(voices) }
+                onSettings { it.withRouting(it.routing().copy(enabled = enabled)) }
             })
             ReaderSheetCard(verticalPadding = 4.dp, shape = RoundedCornerShape(16.dp)) {
                 TtsCurrentVoiceRow(stringResource(if (routing.enabled) R.string.tts_narration_voice else R.string.tts_voice), voiceTitle, connection) { voicePicker = TtsTextRole.Narration }
@@ -128,8 +133,7 @@ internal fun TtsVoiceSettings(
     if (sourcePicker) TtsProviderPicker(choices, settings.engine, onSelected = { id ->
         sourcePicker = false
         onSettings { current ->
-            val next = current.selectSource(id)
-            next.withOptions(next.options().copy(style = "", role = ""))
+            current.selectSource(id)
         }
     }, onConfigure = { sourcePicker = false; onConfigure(it) }, onSystemSettings = { sourcePicker = false; onSystemSettings() }, onDismiss = { sourcePicker = false }, onCustom = { sourcePicker = false; onCustom(it) })
     voicePicker?.let { role -> TtsVoicePicker(sourceTitle, voices, if (role == TtsTextRole.Narration) settings.voice else routing.dialogue, catalogLoading, failure,
@@ -138,7 +142,7 @@ internal fun TtsVoiceSettings(
             onSettings { current ->
                 val next = if (role == TtsTextRole.Dialogue) current.withRouting(current.routing().copy(dialogue = id))
                     else current.withVoice(id)
-                next.withCompatibleVoiceOptions(voices)
+                next
             }
         }, onRefresh = onRetry, onDismiss = { voicePicker = null }) }
 }

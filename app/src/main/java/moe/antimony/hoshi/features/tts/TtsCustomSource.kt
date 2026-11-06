@@ -60,7 +60,7 @@ internal fun TtsSettings.isCustomSource(): Boolean = engine.startsWith("custom:"
 internal fun TtsCustomSource.voiceChoices(discovered: List<TtsVoiceInfo>, voice: String): List<TtsVoiceInfo> {
     val configured = if (protocol == TtsCustomProtocol.OpenAi) voiceIds.map { TtsVoiceInfo(it, true) } else emptyList()
     val choices = (discovered + configured).distinctBy { it.id }
-    return if (voice.isNotBlank() && choices.none { it.id == voice }) choices + TtsVoiceInfo(voice, true) else choices
+    return if (protocol == TtsCustomProtocol.OpenAi && voice.isNotBlank() && choices.none { it.id == voice }) choices + TtsVoiceInfo(voice, true) else choices
 }
 
 internal fun TtsSettings.selectSource(id: String): TtsSettings {

@@ -44,11 +44,11 @@ internal data class TtsChapterText(val sentences: List<TtsSentence>, val trailin
 
 /** Written offsets use the Reader's matchable code points; ruby offsets use UTF-16 within text. */
 object TtsText {
-    fun chapter(chapter: Int, html: String, mediaType: String = "text/html"): List<TtsSentence> {
-        return extractChapter(chapter, html, mediaType).sentences
+    fun chapter(chapter: Int, html: String, mediaType: String = "text/html", splitAtClausePunctuation: Boolean = false): List<TtsSentence> {
+        return extractChapter(chapter, html, mediaType, splitAtClausePunctuation).sentences
     }
 
-    internal fun extractChapter(chapter: Int, html: String, mediaType: String, shouldHoldImage: (Element) -> Boolean = { true }): TtsChapterText {
+    internal fun extractChapter(chapter: Int, html: String, mediaType: String, splitAtClausePunctuation: Boolean = false, shouldHoldImage: (Element) -> Boolean = { true }): TtsChapterText {
         val result = mutableListOf<TtsSentence>()
         val source = StringBuilder()
         val sourceStarts = mutableListOf<Int>()
@@ -56,8 +56,7 @@ object TtsText {
         val rubies = mutableListOf<TtsRuby>()
         var offset = 0
         var imageBefore = false
-        var sentenceEnded = false
-        fun flush() {
+        fun flush(paragraphEnd: Boolean = false) {
             val value = text.toString()
             val length = value.codePoints().filter { it.isReaderMatchableCodePoint() }.count().toInt()
             if (length > 0) {
@@ -66,23 +65,20 @@ object TtsText {
                 imageBefore = false
             }
             offset += length
-            source.append(value).append('\n')
+            source.append(value)
+            if (paragraphEnd) source.append('\n')
             text.clear()
             rubies.clear()
-            sentenceEnded = false
         }
         fun append(value: String, reading: String? = null) {
             if (reading != null) {
-                if (sentenceEnded) flush()
                 rubies += TtsRuby(text.length, text.length + value.length, reading)
                 text.append(value)
                 return
             }
             value.forEach { c ->
-                if (sentenceEnded && c !in "」』）】\"’”！？!?。") flush()
                 if (c == '\n' || c == '\r') flush()
                 else if (text.isNotEmpty() || !c.isWhitespace()) text.append(c)
-                if (c in "。！？!?") sentenceEnded = true
             }
         }
         fun rubyBase(node: Node): String = when (node) {
@@ -105,8 +101,10 @@ object TtsText {
                         }
                     }
                     else -> {
+                        val paragraph = node.normalName() in setOf("p", "div", "h1", "h2", "h3", "h4", "h5", "h6", "li", "blockquote", "section", "td", "tr")
+                        if (paragraph) flush(paragraphEnd = true)
                         node.childNodes().forEach(::visit)
-                        if (node.normalName() in setOf("p", "div", "h1", "h2", "h3", "h4", "h5", "h6", "li", "blockquote", "section", "td", "tr")) flush()
+                        if (paragraph) flush(paragraphEnd = true)
                     }
                 }
             }
@@ -119,20 +117,61 @@ object TtsText {
         visit(body)
         flush()
         val chapterText = source.toString()
-        val quotes = TtsDialogue.outerQuotes(chapterText)
+        val matchable = IntArray(chapterText.length + 1)
+        var sourceCursor = 0
+        while (sourceCursor < chapterText.length) {
+            val point = chapterText.codePointAt(sourceCursor)
+            val next = sourceCursor + Character.charCount(point)
+            for (i in sourceCursor + 1..next) matchable[i] = matchable[sourceCursor] + if (point.isReaderMatchableCodePoint()) 1 else 0
+            sourceCursor = next
+        }
+        val pairs = TtsDialogue.pairedQuotes(chapterText)
+        val quotes = TtsDialogue.outerQuotes(pairs)
+        val openers = pairs.mapTo(hashSetOf()) { it.first }
+        val closers = pairs.mapTo(hashSetOf()) { it.last }
         val roles = TtsDialogue.ranges(chapterText, quotes)
-        val boundaries = quotes.flatMap { range ->
-            var end = range.last + 1
-            // Keep the existing sentence-ending punctuation/closers with the dialogue.
-            while (end < chapterText.length && chapterText[end] in "」』）】\"’”！？!?。") end++
-            listOf(range.first, end)
-        }.distinct().sorted()
+        fun trailingEnd(from: Int, limit: Int): Int {
+            var end = from
+            while (end < limit && end !in openers &&
+                (chapterText[end] in "）】！？!?。、,，─；;" || end in closers)) end++
+            return end
+        }
+        val quoteCuts = quotes.flatMap { listOf(it.first, trailingEnd(it.last + 1, chapterText.length)) }
         val sentences = result.flatMapIndexed { index, sentence ->
             val start = sourceStarts[index]
-            val first = boundaries.binarySearch(start).let { if (it >= 0) it else -it - 1 }
-            val cuts = boundaries.subList(first, boundaries.size).asSequence().takeWhile { it < start + sentence.text.length }
-                .map { it - start }.filter { cut -> cut > 0 && sentence.ruby.none { cut > it.start && cut < it.end } }.toList()
-            splitQuotes(sentence.copy(roles = TtsDialogue.slice(roles, start, start + sentence.text.length)), cuts)
+            val end = start + sentence.text.length
+            fun safe(cut: Int) = cut > start && cut < end && sentence.ruby.none { cut - start > it.start && cut - start < it.end }
+            val cuts = quoteCuts.filterTo(sortedSetOf()) { safe(it) }
+            // Pairing respects paragraph separators; a following ASCII opener
+            // can never be consumed as the previous dialogue's closing punctuation.
+            sentence.text.forEachIndexed { local, c ->
+                if (c in "。！？!?" && sentence.ruby.none { local >= it.start && local < it.end }) {
+                    val cut = trailingEnd(start + local + 1, end)
+                    if (safe(cut)) cuts += cut
+                }
+            }
+            if (splitAtClausePunctuation) {
+                val mandatory = (listOf(start) + cuts + end)
+                mandatory.zipWithNext().forEach { (from, until) ->
+                    var fragment = from
+                    var cursor = from
+                    fun count(a: Int, b: Int) = matchable[b] - matchable[a]
+                    while (cursor < until) {
+                        val point = chapterText.codePointAt(cursor)
+                        val next = cursor + Character.charCount(point)
+                        if (point <= Char.MAX_VALUE.code && point.toChar() in "、,，─；;") {
+                            val cut = trailingEnd(next, until)
+                            if (safe(cut) && count(fragment, next) >= 2 && count(cut, until) >= 2 &&
+                                chapterText.substring(next, cut).none { it in "。！？!?" }) {
+                                cuts += cut
+                                fragment = cut
+                            }
+                            cursor = cut
+                        } else cursor = next
+                    }
+                }
+            }
+            splitQuotes(sentence.copy(roles = TtsDialogue.slice(roles, start, end)), cuts.map { it - start })
         }
         return TtsChapterText(sentences, imageBefore)
     }

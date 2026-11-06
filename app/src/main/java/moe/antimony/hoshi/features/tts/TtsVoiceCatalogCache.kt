@@ -14,9 +14,9 @@ import kotlinx.coroutines.withContext
 internal data class TtsVoiceCatalogKey(val fileName: String, val configuration: String, val allowEmpty: Boolean) {
     companion object {
         fun online(source: TtsOnlineSource, config: TtsOnlineConfig) = TtsVoiceCatalogKey(
-            "${source.name}.json", hash("${config.region}\u0000${config.encryptedKey}"), false)
+            "${source.name}.json", hash("languages-v2\u0000${config.region}\u0000${config.encryptedKey}"), false)
         fun custom(source: TtsCustomSource) = TtsVoiceCatalogKey("custom-${hash(source.id)}.json",
-            hash("${source.id}\u0000${source.protocol}\u0000${source.baseUrl}\u0000${source.encryptedKey}"), true)
+            hash("languages-v2\u0000${source.id}\u0000${source.protocol}\u0000${source.baseUrl}\u0000${source.encryptedKey}"), true)
         private fun hash(value: String) = MessageDigest.getInstance("SHA-256")
             .digest(value.toByteArray()).joinToString("") { "%02x".format(it) }
     }
@@ -46,7 +46,7 @@ class TtsVoiceCatalogCache internal constructor(private val store: TtsVoiceCatal
                 if (!force) cached(key)?.let { return@withLock it }
                 val result = fetch()
                 currentCoroutineContext().ensureActive()
-                if (result.isEmpty() && !key.allowEmpty) throw TtsException(TtsFailure.MissingJapanese)
+                if (result.isEmpty() && !key.allowEmpty) throw TtsException(TtsFailure.MissingLanguage)
                 metadata.withLock {
                     remember(key, result)
                     store?.write(key, result)

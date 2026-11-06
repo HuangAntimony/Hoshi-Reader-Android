@@ -29,24 +29,24 @@ class OnlineTtsEngine internal constructor(
     suspend fun cachedCatalog(settings: TtsSettings): TtsCatalog? = withContext(io) {
         val source = source(settings)
         val config = settings.online[source.id] ?: TtsOnlineConfig()
-        catalogs.cached(TtsVoiceCatalogKey.online(source, config))?.let { TtsCatalog(source.id, it) }
+        catalogs.cached(TtsVoiceCatalogKey.online(source, config))?.let { TtsCatalog(source.id, it.forLanguage(settings.languageId)) }
     }
 
     suspend fun catalog(settings: TtsSettings, force: Boolean = false): TtsCatalog = withContext(io) {
         val source = source(settings)
         val config = settings.online[source.id] ?: TtsOnlineConfig()
         val voices = catalogs.load(TtsVoiceCatalogKey.online(source, config), force) { fetchVoices(source, config) }
-        TtsCatalog(source.id, voices)
+        TtsCatalog(source.id, voices.forLanguage(settings.languageId))
     }
 
     private suspend fun fetchVoices(source: TtsOnlineSource, config: TtsOnlineConfig): List<TtsVoiceInfo> {
         val voices = when (source) {
-            TtsOnlineSource.GoogleTranslate -> listOf(TtsVoiceInfo("ja", true))
+            TtsOnlineSource.GoogleTranslate -> listOf("ja", "en", "zh-CN", "ko").map { TtsVoiceInfo(it, true, languages = listOf(it)) }
             TtsOnlineSource.Edge -> OnlineTtsProtocol.microsoftVoices(transport.request(edgeRequest(false)).toString(Charsets.UTF_8))
             TtsOnlineSource.Azure, TtsOnlineSource.MicrosoftTranslator -> OnlineTtsProtocol.microsoftVoices(
                 azureSpeechRequest(source, config, "/cognitiveservices/voices/list").body.toString(Charsets.UTF_8))
             TtsOnlineSource.GoogleCloud -> OnlineTtsProtocol.googleVoices(transport.request(Request.Builder()
-                .url("https://texttospeech.googleapis.com/v1/voices?languageCode=ja-JP")
+                .url("https://texttospeech.googleapis.com/v1/voices")
                 .header("X-Goog-Api-Key", key(source, config)).build()).toString(Charsets.UTF_8))
         }
         return voices
@@ -60,9 +60,10 @@ class OnlineTtsEngine internal constructor(
                 val source = source(settings)
                 val config = settings.online[source.id] ?: TtsOnlineConfig()
                 val voices = catalog(settings).voices
-                val voice = if (settings.voice.isBlank()) voices.first().id else settings.voice
-                if (voices.none { it.id == voice }) throw TtsException(TtsFailure.MissingJapanese)
-                val options = settings.options()
+                val selected = if (settings.voice.isBlank()) voices.firstOrNull() else voices.firstOrNull { it.id == settings.voice }
+                val voice = selected?.id ?: throw TtsException(TtsFailure.MissingLanguage)
+                val locale = selected.localeFor(settings.languageId)
+                val options = settings.forVoice(voice).withCompatibleVoiceOptions(voices).options()
                 val rate = source.normalizeRate(settings.rate)
                 val pitch = ttsPitchRange(source, voice)?.let { settings.pitch.coerceIn(it) } ?: 0f
                 val pitchText = (if (pitch >= 0) "+" else "") + pitch.toInt() + if (source == TtsOnlineSource.Edge) "Hz" else "st"
@@ -75,18 +76,18 @@ class OnlineTtsEngine internal constructor(
                     currentCoroutineContext().ensureActive()
                     val bytes = when (source) {
                         TtsOnlineSource.Edge -> transport.edgeAudio(edgeRequest(true), OnlineTtsProtocol.ssml(
-                            part, voice, rate, pitchText, options.volume))
+                            part, voice, rate, pitchText, options.volume, locale))
                         TtsOnlineSource.Azure, TtsOnlineSource.MicrosoftTranslator -> azureSpeechRequest(source, config,
-                            "/cognitiveservices/v1", OnlineTtsProtocol.azureSsml(part, voices.first { it.id == voice }, rate, pitch, options), options).synthesisAudio()
+                            "/cognitiveservices/v1", OnlineTtsProtocol.azureSsml(part, voices.first { it.id == voice }, rate, pitch, options, locale), options).synthesisAudio()
                         TtsOnlineSource.GoogleCloud -> transport.requestResponse(Request.Builder()
                             .url("https://texttospeech.googleapis.com/v1/text:synthesize")
                             .header("X-Goog-Api-Key", credential)
-                            .post(OnlineTtsProtocol.googleBody(part, voice, rate, pitch, options).toRequestBody("application/json".toMediaType())).build())
+                            .post(OnlineTtsProtocol.googleBody(part, voice, rate, pitch, options, locale).toRequestBody("application/json".toMediaType())).build())
                             .synthesisAudio { OnlineTtsProtocol.googleAudio(it.toString(Charsets.UTF_8)) }
                         TtsOnlineSource.GoogleTranslate -> transport.requestResponse(Request.Builder()
                             .url("https://translate.google.com/_/TranslateWebserverUi/data/batchexecute?rpcids=jQ1olc")
                             .header("Referer", "https://translate.google.com/").header("User-Agent", "Mozilla/5.0")
-                            .post(FormBody.Builder().add("f.req", OnlineTtsProtocol.translateBody(part, rate < 1f)).build()).build())
+                            .post(FormBody.Builder().add("f.req", OnlineTtsProtocol.translateBody(part, rate < 1f, voice)).build()).build())
                             .synthesisAudio { OnlineTtsProtocol.translateAudio(it.toString(Charsets.UTF_8)) }
                     }
                     currentCoroutineContext().ensureActive()

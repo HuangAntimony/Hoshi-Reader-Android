@@ -4,6 +4,37 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class TtsQuoteSegmentationTest {
+    @Test fun universalQuotesApostrophesAndAdjacentOpenersUseActualPairs() {
+        val cases = listOf(
+            "前“你好”後" to listOf("前", "“你好”", "後"),
+            "앞‘안녕’뒤" to listOf("앞", "‘안녕’", "뒤"),
+            "He said \"Hello!\"\"Again?\" End" to listOf("He said ", "\"Hello!\"", "\"Again?\"", " End"),
+            "前‘don’t touch John’s book’後" to listOf("前", "‘don’t touch John’s book’", "後"),
+            "前“外「内『引用』」側”後" to listOf("前", "“外「内『引用』」側”", "後"),
+            "John's book isn't here" to listOf("John's book isn't here"),
+            "前“未閉合、後續正文" to listOf("前“未閉合、後續正文"),
+        )
+        for ((text, expected) in cases) {
+            val sentences = TtsText.chapter(0, "<p>$text</p>")
+            assertEquals(text, expected, sentences.map { it.text })
+            assertEquals(text, sentences.joinToString("") { it.text })
+        }
+        val spanning = TtsText.chapter(0, "<p>前<span>“一</span>句</p><p>二句”後</p>")
+        assertEquals(listOf("前“一句", "二句”後"), spanning.map { it.text })
+        assertTrue(spanning.all { it.roles.single().role == TtsTextRole.Narration })
+        val inline = TtsText.chapter(0, "<p>前<span>“一</span>句<span>二句”</span>後</p>")
+        assertEquals(listOf("前", "“一句二句”", "後"), inline.map { it.text })
+    }
+
+    @Test fun inlineBreaksAndImagesKeepParagraphPairingButNestedBlockStartsEndIt() {
+        val inline = TtsText.chapter(0, "<p>前<span>“一句</span><br/>二句<img src='x'/>三句”後</p>")
+        assertEquals(listOf("前", "“一句", "二句", "三句”", "後"), inline.map { it.text })
+        assertTrue(inline.subList(1, 4).all { it.roles.single().role == TtsTextRole.Dialogue })
+        assertTrue(inline[3].imageBefore)
+        val blocks = TtsText.chapter(0, "<div>前“未完<p>後文”</p></div>")
+        assertTrue(blocks.all { it.roles.all { range -> range.role == TtsTextRole.Narration } })
+    }
+
     @Test fun outerQuotesBecomeIndependentReplayUnits() {
         val cases = listOf(
             "彼女は「こんにちは」と言った。" to listOf("彼女は", "「こんにちは」", "と言った。"),
@@ -23,13 +54,13 @@ class TtsQuoteSegmentationTest {
         }
     }
 
-    @Test fun chapterPairingSurvivesNodesParagraphsAndImages() {
+    @Test fun paragraphBoundaryEndsUnmatchedQuotesButPreservesOffsetsAndImages() {
         val sentences = TtsText.chapter(2, "<p>前<span>「一</span>つ</p><img src='x'/><p>二つ」後。</p>")
-        assertEquals(listOf("前", "「一つ", "二つ」", "後。"), sentences.map { it.text })
-        assertEquals(listOf(0, 1, 3, 5), sentences.map { it.start })
-        assertEquals(listOf(1, 2, 2, 1), sentences.map { it.length })
-        assertEquals(listOf(false, false, true, false), sentences.map { it.imageBefore })
-        assertEquals(listOf(TtsTextRole.Narration, TtsTextRole.Dialogue, TtsTextRole.Dialogue, TtsTextRole.Narration),
+        assertEquals(listOf("前「一つ", "二つ」後。"), sentences.map { it.text })
+        assertEquals(listOf(0, 3), sentences.map { it.start })
+        assertEquals(listOf(3, 3), sentences.map { it.length })
+        assertEquals(listOf(false, true), sentences.map { it.imageBefore })
+        assertEquals(listOf(TtsTextRole.Narration, TtsTextRole.Narration),
             sentences.map { it.roles.single().role })
         assertTrue(sentences.all { it.chapter == 2 })
     }

@@ -11,18 +11,18 @@ internal object OnlineTtsProtocol {
     const val edgeBase = "https://speech.platform.bing.com/consumer/speech/synthesize/readaloud"
     fun microsoftVoices(body: String): List<TtsVoiceInfo> = parse {
         Json.parseToJsonElement(body).jsonArray.map { it.jsonObject }
-            .filter { it["Locale"]?.jsonPrimitive?.content.equals("ja-JP", true) }
             .map { TtsVoiceInfo(it.getValue("ShortName").jsonPrimitive.content, true,
                 it["StyleList"]?.jsonArray.orEmpty().map { value -> value.jsonPrimitive.content },
-                it["RolePlayList"]?.jsonArray.orEmpty().map { value -> value.jsonPrimitive.content }) }
+                it["RolePlayList"]?.jsonArray.orEmpty().map { value -> value.jsonPrimitive.content },
+                languages = listOfNotNull(it["Locale"]?.jsonPrimitive?.content),
+                secondaryLanguages = it["SecondaryLocaleList"]?.jsonArray.orEmpty().map { value -> value.jsonPrimitive.content }) }
             .distinctBy { it.id }.sortedBy { it.id }
     }
 
     fun googleVoices(body: String): List<TtsVoiceInfo> = parse {
         Json.parseToJsonElement(body).jsonObject["voices"]?.jsonArray.orEmpty()
             .map { it.jsonObject }
-            .filter { voice -> voice["languageCodes"]?.jsonArray.orEmpty().any { it.jsonPrimitive.content == "ja-JP" } }
-            .map { TtsVoiceInfo(it.getValue("name").jsonPrimitive.content, true) }
+            .map { TtsVoiceInfo(it.getValue("name").jsonPrimitive.content, true, languages = it["languageCodes"]?.jsonArray.orEmpty().map { tag -> tag.jsonPrimitive.content }) }
             .distinctBy { it.id }.sortedBy { it.id }
     }
 
@@ -31,14 +31,14 @@ internal object OnlineTtsProtocol {
         return "https://$region.tts.speech.microsoft.com"
     }
 
-    fun ssml(text: String, voice: String, rate: Float, pitch: String = "+0Hz", volume: Float = 0f): String {
+    fun ssml(text: String, voice: String, rate: Float, pitch: String = "+0Hz", volume: Float = 0f, locale: String = "ja-JP"): String {
         val percentage = ((rate - 1f) * 100).roundToInt()
         val speed = if (percentage >= 0) "+$percentage%" else "$percentage%"
-        return "<speak version=\"1.0\" xmlns=\"http://www.w3.org/2001/10/synthesis\" xml:lang=\"ja-JP\">" +
+        return "<speak version=\"1.0\" xmlns=\"http://www.w3.org/2001/10/synthesis\" xml:lang=\"${xml(locale)}\">" +
             "<voice name=\"${xml(voice)}\"><prosody rate=\"$speed\" pitch=\"${xml(pitch)}\" volume=\"${signed(volume.toInt())}%\">${xml(text)}</prosody></voice></speak>"
     }
 
-    fun azureSsml(text: String, voice: TtsVoiceInfo, rate: Float, pitch: Float, options: TtsSynthesisOptions): String {
+    fun azureSsml(text: String, voice: TtsVoiceInfo, rate: Float, pitch: Float, options: TtsSynthesisOptions, locale: String = "ja-JP"): String {
         val controls = options.normalized(TtsOnlineSource.Azure)
         if (controls.style.isNotBlank() && controls.style !in voice.styles || controls.role.isNotBlank() &&
             (controls.role !in voice.roles || controls.style.isBlank())) throw TtsException(TtsFailure.Configuration)
@@ -50,7 +50,7 @@ internal object OnlineTtsProtocol {
             "Comma-exact" to controls.commaMs, "Semicolon-exact" to controls.semicolonMs,
             "Enumerationcomma-exact" to controls.enumerationCommaMs, "Sentenceboundary-exact" to controls.sentenceBoundaryMs)
             .filter { it.second >= 0 }.joinToString("") { (type, duration) -> "<mstts:silence type=\"$type\" value=\"${duration}ms\"/>" }
-        return "<speak version=\"1.0\" xmlns=\"http://www.w3.org/2001/10/synthesis\" xmlns:mstts=\"https://www.w3.org/2001/mstts\" xml:lang=\"ja-JP\">" +
+        return "<speak version=\"1.0\" xmlns=\"http://www.w3.org/2001/10/synthesis\" xmlns:mstts=\"https://www.w3.org/2001/mstts\" xml:lang=\"${xml(locale)}\">" +
             "<voice name=\"${xml(voice.id)}\">$pauses$styled</voice></speak>"
     }
 
@@ -89,9 +89,9 @@ internal object OnlineTtsProtocol {
         return result
     }
 
-    fun googleBody(text: String, voice: String, rate: Float, pitch: Float = 0f, options: TtsSynthesisOptions = TtsSynthesisOptions()) = buildJsonObject {
+    fun googleBody(text: String, voice: String, rate: Float, pitch: Float = 0f, options: TtsSynthesisOptions = TtsSynthesisOptions(), locale: String = "ja-JP") = buildJsonObject {
         putJsonObject("input") { put("text", text) }
-        putJsonObject("voice") { put("languageCode", "ja-JP"); put("name", voice) }
+        putJsonObject("voice") { put("languageCode", locale); put("name", voice) }
         putJsonObject("audioConfig") {
             put("audioEncoding", if (options.format == TtsAudioFormat.Mp3) "MP3" else "LINEAR16")
             put("speakingRate", rate); put("sampleRateHertz", options.sampleRate)
@@ -105,8 +105,8 @@ internal object OnlineTtsProtocol {
         Base64.getDecoder().decode(Json.parseToJsonElement(body).jsonObject.getValue("audioContent").jsonPrimitive.content)
     }
 
-    fun translateBody(text: String, slow: Boolean): String {
-        val parameters = buildJsonArray { add(text); add("ja"); add(if (slow) JsonPrimitive(true) else JsonNull); add("null") }
+    fun translateBody(text: String, slow: Boolean, language: String = "ja"): String {
+        val parameters = buildJsonArray { add(text); add(language); add(if (slow) JsonPrimitive(true) else JsonNull); add("null") }
         return buildJsonArray { add(buildJsonArray { add(buildJsonArray {
             add("jQ1olc"); add(parameters.toString()); add(JsonNull); add("generic")
         }) }) }.toString()

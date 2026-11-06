@@ -41,6 +41,9 @@ class TtsQueuePlaybackDeviceTest {
             withContext(Dispatchers.Main) {
                 val baseline = legacyPlayback(context, file)
                 val streamed = queuedPlayback(context, file)
+                val clauses = queuedPlayback(context, file, splitClauses = true)
+                assertEquals(0, clauses.rebuffers)
+                assertEquals(0, clauses.idle)
                 Log.i("HoshiTtsQueue", "legacy=$baseline queued=$streamed contentMs=3600")
                 assertEquals("No intermediate buffering after audio starts: $streamed", 0, streamed.rebuffers)
                 assertEquals("No intermediate stop/reset: $streamed", 0, streamed.idle)
@@ -52,7 +55,7 @@ class TtsQueuePlaybackDeviceTest {
         } finally { file.delete() }
     }
 
-    private suspend fun queuedPlayback(context: Context, file: File): Metrics {
+    private suspend fun queuedPlayback(context: Context, file: File, splitClauses: Boolean = false): Metrics {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
         val player = ExoPlayer.Builder(context).build()
         val output = AndroidTtsPlaybackOutput(context).apply { attach(player) }
@@ -71,7 +74,7 @@ class TtsQueuePlaybackDeviceTest {
                 transform(data.value).also { data.value = it }
         }
         val repository = TtsRepository(store)
-        repository.settings { TtsSettings(enabled = true, prefetchSentences = 8) }
+        repository.settings { TtsSettings(enabled = true, prefetchSentences = 8, splitAtClausePunctuation = splitClauses) }
         val audio = object : TtsAudioSource {
             override suspend fun audio(sentence: TtsSentence, bookId: String?, preferences: TtsPreferences) =
                 if (sentence.text == "一。") listOf(file, file) else listOf(file)
@@ -79,12 +82,13 @@ class TtsQueuePlaybackDeviceTest {
         }
         val controller = TtsPlaybackController(TtsBookRepository(Dispatchers.IO), repository, audio, connected, scope)
         val metrics = Metrics().also { player.addAnalyticsListener(it); player.addListener(it) }
-        val expected = listOf("一。", "「二」", "と三。", "四。", "五。", "六。", "七。", "八。")
+        val expected = if (splitClauses) listOf("一文、", "二文。", "三文、", "四文。", "五文；", "六文。", "七文；", "八文。")
+            else listOf("一。", "「二」", "と三。", "四。", "五。", "六。", "七。", "八。")
         val positions = mutableListOf<String>()
         try {
             controller.load("queue-fixture", EpubBook("Queue fixture", chapters = listOf(
-                EpubChapter("one", "one.xhtml", "application/xhtml+xml", "<p>一。「二」と三。四。</p>"),
-                EpubChapter("two", "two.xhtml", "application/xhtml+xml", "<p>五。六。七。八。</p>"),
+                EpubChapter("one", "one.xhtml", "application/xhtml+xml", if (splitClauses) "<p>一文、二文。三文、四文。</p>" else "<p>一。「二」と三。四。</p>"),
+                EpubChapter("two", "two.xhtml", "application/xhtml+xml", if (splitClauses) "<p>五文；六文。七文；八文。</p>" else "<p>五。六。七。八。</p>"),
             )), false)
             controller.prepareAt(0, 0)
             withTimeout(5000) { controller.state.first { it.sentences.isNotEmpty() } }
@@ -94,13 +98,13 @@ class TtsQueuePlaybackDeviceTest {
             controller.presentSentence = { sentence, _ -> if (sentence.text != "一。") delay(1000) }
             controller.play()
             val finished = withTimeout(15_000) {
-                controller.state.first { it.error != null || it.sentence?.text == "八。" && !it.playing }
+                controller.state.first { it.error != null || it.sentence?.text == expected.last() && !it.playing }
             }
             assertNull(finished.error)
             assertEquals(expected, positions)
             assertEquals(1, prepares)
             assertEquals(initialClears, clears)
-            assertEquals(9, metrics.items) // First unit contains two voice/provider fragments.
+            assertEquals(if (splitClauses) 8 else 9, metrics.items) // First unit contains two voice/provider fragments.
             metrics.finish()
             return metrics
         } finally {

@@ -80,13 +80,13 @@ class OnlineTtsProtocolTest {
         assertFalse(hd.getValue("audioConfig").jsonObject.containsKey("pitch"))
     }
 
-    @Test fun microsoftCatalogFiltersJapaneseAndPreservesVoiceNames() {
+    @Test fun microsoftCatalogRetainsAllLanguagesAndPreservesVoiceNames() {
         val voices = OnlineTtsProtocol.microsoftVoices("""[
             {"ShortName":"en-US-JennyNeural","Locale":"en-US"},
             {"ShortName":"ja-JP-NanamiNeural","Locale":"ja-JP","LocalName":"七海"}
         ]""")
-        assertEquals(listOf("ja-JP-NanamiNeural"), voices.map { it.id })
-        assertTrue(voices.single().network)
+        assertEquals(listOf("en-US-JennyNeural", "ja-JP-NanamiNeural"), voices.map { it.id })
+        assertTrue(voices.all { it.network })
     }
 
     @Test fun googleCatalogIncludesJapaneseStandardAndHdVoices() {
@@ -95,7 +95,7 @@ class OnlineTtsProtocolTest {
           {"name":"en-US-Standard-A","languageCodes":["en-US"]},
           {"name":"ja-JP-Chirp3-HD-Aoede","languageCodes":["ja-JP"]}
         ]}""")
-        assertEquals(setOf("ja-JP-Neural2-B", "ja-JP-Chirp3-HD-Aoede"), voices.map { it.id }.toSet())
+        assertEquals(setOf("ja-JP-Neural2-B", "ja-JP-Chirp3-HD-Aoede", "en-US-Standard-A"), voices.map { it.id }.toSet())
     }
 
     @Test fun ssmlEscapesLiteralTextAndVoiceAndAppliesRate() {

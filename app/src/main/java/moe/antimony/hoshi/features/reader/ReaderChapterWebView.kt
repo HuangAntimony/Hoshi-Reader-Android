@@ -97,6 +97,7 @@ internal fun ChapterWebView(
     chapterHighlightsJson: String?,
     chapterSasayakiCuesJson: String?,
     chapterCuesReady: Boolean = true,
+    chapterCuesVersion: Any? = null,
     onNavigatePage: (ReaderNavigationDirection) -> Boolean,
     onPageCuesReady: (WebView) -> Unit,
     sasayakiTextColor: Long,
@@ -119,6 +120,7 @@ internal fun ChapterWebView(
 ) {
     val currentOnNavigatePage = rememberUpdatedState(onNavigatePage)
     val currentOnPageCuesReady = rememberUpdatedState(onPageCuesReady)
+    val currentChapterCuesVersion = rememberUpdatedState(chapterCuesVersion)
     val currentChapterCues = rememberUpdatedState(if (chapterCuesReady) chapterSasayakiCuesJson ?: "[]" else null)
     val currentOnRendererTerminated = rememberUpdatedState(onRendererTerminated)
     val currentOnTextSelected = rememberUpdatedState(onTextSelected)
@@ -262,13 +264,13 @@ internal fun ChapterWebView(
             beforeVisible = currentOnBeforeRestoreVisible.value(restoredWebView),
         )
     }
-    LaunchedEffect(readerWebView, restoreToken, chapterSasayakiCuesJson, chapterCuesReady, isWebViewRestoring) {
+    LaunchedEffect(readerWebView, restoreToken, chapterSasayakiCuesJson, chapterCuesReady, chapterCuesVersion, isWebViewRestoring) {
         val webView = readerWebView ?: return@LaunchedEffect
         val cuesJson = chapterSasayakiCuesJson ?: "[]"
         if (isWebViewRestoring || !chapterCuesReady) return@LaunchedEffect
         if (webView.tag != restoreToken) return@LaunchedEffect
-        webView.applyReaderSasayakiCues(restoreToken, cuesJson) {
-            if (webView.tag == restoreToken && !currentIsWebViewRestoring.value && currentChapterCues.value == cuesJson) {
+        webView.applyReaderSasayakiCues(restoreToken, cuesJson, chapterCuesVersion) {
+            if (webView.tag == restoreToken && !currentIsWebViewRestoring.value && currentChapterCues.value == cuesJson && currentChapterCuesVersion.value === chapterCuesVersion) {
                 currentOnPageCuesReady.value(webView)
             }
         }
@@ -1650,11 +1652,13 @@ private fun WebView.evaluateReaderSetupScript(
     evaluateJavascript(source, null)
 }
 
-private fun WebView.applyReaderSasayakiCues(loadKey: String, cuesJson: String, onReady: () -> Unit) {
-    val appliedCues = ReaderAppliedSasayakiCues(loadKey, cuesJson)
+internal fun WebView.applyReaderSasayakiCues(loadKey: String, cuesJson: String, version: Any? = null, onReady: () -> Unit) {
+    val appliedCues = ReaderAppliedSasayakiCues(loadKey, cuesJson, version)
     if (readerAppliedSasayakiCues[this] == appliedCues) { onReady(); return }
     readerAppliedSasayakiCues[this] = appliedCues
-    evaluateJavascript(ReaderPaginationScripts.applySasayakiCuesInvocation(cuesJson)) { onReady() }
+    evaluateJavascript(ReaderPaginationScripts.applySasayakiCuesInvocation(cuesJson)) {
+        if (readerAppliedSasayakiCues[this] == appliedCues) onReady()
+    }
 }
 
 private fun releaseReaderWebView(webView: HoshiReaderWebView) {
@@ -1680,6 +1684,7 @@ private fun releaseReaderWebView(webView: HoshiReaderWebView) {
 private data class ReaderAppliedSasayakiCues(
     val loadKey: String,
     val cuesJson: String,
+    val version: Any?,
 )
 
 private val readerRestoreGenerations = WeakHashMap<WebView, Long>()

@@ -304,22 +304,26 @@ fun ReaderWebView(
     val paragraphMode = effectiveSettings.viewMode == ReaderViewMode.Paginated && effectiveSettings.paragraphMode
     val prepareParagraphTtsCues = paragraphMode && hasStartedTtsSession
     val cueChapterIndex = readerPosition.loadPosition.index
-    var paragraphTtsCuesJson by remember(book, cueChapterIndex, prepareParagraphTtsCues) {
+    val splitTtsClauses = ttsPreferences?.settings?.splitAtClausePunctuation == true
+    val ttsCueVersion = remember(book, cueChapterIndex, prepareParagraphTtsCues, splitTtsClauses) { Any() }
+    val currentTtsCueVersion by rememberUpdatedState(ttsCueVersion)
+    var paragraphTtsCuesJson by remember(ttsCueVersion) {
         mutableStateOf<String?>(null)
     }
     var paragraphTtsCuesError by remember(book) { mutableStateOf<Throwable?>(null) }
-    var installedParagraphTtsChapter by remember(book) { mutableIntStateOf(-1) }
-    LaunchedEffect(book, cueChapterIndex, prepareParagraphTtsCues) {
-        installedParagraphTtsChapter = -1
+    var installedParagraphTtsVersion by remember(book) { mutableStateOf<Any?>(null) }
+    LaunchedEffect(ttsCueVersion) {
+        installedParagraphTtsVersion = null
         if (!prepareParagraphTtsCues) return@LaunchedEffect
-        paragraphTtsCuesJson = try {
-            ReaderSasayakiCues.ttsChapterCuesJson(ttsViewModel.chapterSentences(book, cueChapterIndex))
+        val prepared = try {
+            ReaderSasayakiCues.ttsChapterCuesJson(ttsViewModel.chapterSentences(book, cueChapterIndex, splitTtsClauses))
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {
             paragraphTtsCuesError = error
             "[]"
         }
+        if (currentTtsCueVersion === ttsCueVersion) paragraphTtsCuesJson = prepared
     }
     val chapterCuesReady = !paragraphMode || (isSasayakiMatchLoaded &&
         (!prepareParagraphTtsCues || paragraphTtsCuesJson != null))
@@ -1278,7 +1282,7 @@ fun ReaderWebView(
                     (!(stateHolder.effectiveSettings.paragraphMode &&
                         stateHolder.effectiveSettings.viewMode == ReaderViewMode.Paginated &&
                         ttsViewModel.playback.state.value.let { it.bookId == ttsBookId && it.started }) ||
-                        installedParagraphTtsChapter == chapterIndex)
+                        (cueChapterIndex == chapterIndex && installedParagraphTtsVersion === currentTtsCueVersion))
             },
         )
     suspend fun sasayakiMediaStopsToChapterEnd(): List<ReaderSasayakiMediaStop> =
@@ -2188,10 +2192,11 @@ fun ReaderWebView(
                             ),
                             chapterSasayakiCuesJson = chapterCuesJson,
                             chapterCuesReady = chapterCuesReady,
+                            chapterCuesVersion = ttsCueVersion.takeIf { prepareParagraphTtsCues },
                             // A local function reference compares equal even when its captured tracker changes.
                             onNavigatePage = { direction -> navigateReaderPage(direction) },
                             onPageCuesReady = { readyView ->
-                                if (prepareParagraphTtsCues) installedParagraphTtsChapter = cueChapterIndex
+                                if (prepareParagraphTtsCues && currentTtsCueVersion === ttsCueVersion) installedParagraphTtsVersion = ttsCueVersion
                                 updateParagraphPageCues(readyView)
                             },
                             sasayakiTextColor = currentSasayakiColors.textColor,
