@@ -249,7 +249,7 @@ window.hoshiParagraph = {
         return [...range.getClientRects()].filter(rect => vertical ? rect.height : rect.width);
     },
 
-    splitPoints(paragraph, pageSize, currentScroll, vertical) {
+    splitPoints(paragraph, pageSize, currentScroll, vertical, crossedRubyParagraphs) {
         const rect = paragraph.getBoundingClientRect();
         const start = (vertical ? rect.top : rect.left) + currentScroll;
         const first = Math.floor(start / pageSize);
@@ -305,14 +305,20 @@ window.hoshiParagraph = {
                 }
             }
 
-            if (hit > 0) {
+            if (hit >= 0) {
                 const position = positions[hit];
                 if (position.node.nodeType === Node.TEXT_NODE) {
-                    points.push(position);
+                    if (hit > 0) points.push(position);
                     continue;
                 }
-                const rect = this.positionRects(range, position, vertical)[0];
-                if (rect && (vertical ? rect.top : rect.left) + currentScroll >= limit) {
+                const rects = this.positionRects(range, position, vertical);
+                const rect = rects[0];
+                if (crossedRubyParagraphs && position.node.localName === 'ruby' && rect
+                    && Math.round((vertical ? rect.top : rect.left) + currentScroll) < limit
+                    && rects.some(r => Math.round((vertical ? r.top : r.left) + currentScroll) >= limit)) {
+                    crossedRubyParagraphs.add(paragraph);
+                }
+                if (hit > 0 && rect && (vertical ? rect.top : rect.left) + currentScroll >= limit) {
                     points.push(position);
                 }
             }
@@ -321,18 +327,104 @@ window.hoshiParagraph = {
         return points;
     },
 
+    rubySplitTargets(paragraphs, pageSize, vertical) {
+        const sources = [...paragraphs].map(paragraph => {
+            const style = window.getComputedStyle(paragraph);
+            return { paragraph, inlineLength: Math.min(pageSize, parseFloat(style.inlineSize) || pageSize),
+                justified: style.textAlign === 'justify' };
+        });
+        // A separate fragmentation context shares the loaded fonts without dirtying
+        // the chapter's text layout. Its viewport and columns inherit from body.
+        const probe = document.createElement('div');
+        for (const attr of document.body.attributes) {
+            if (!attr.namespaceURI && attr.name !== 'id' && attr.name !== 'style') {
+                probe.setAttribute(attr.name, attr.value);
+            }
+        }
+        probe.style.cssText = 'all:inherit!important;position:fixed!important;top:0!important;left:0!important;'
+            + 'right:auto!important;bottom:auto!important;contain:strict!important;visibility:hidden!important;'
+            + 'opacity:0!important;pointer-events:none!important';
+        try {
+            const nodeMap = new WeakMap();
+            const items = sources.map(source => {
+                let host = probe;
+                const ancestors = [];
+                for (let node = source.paragraph.parentElement; node && node !== document.body; node = node.parentElement) {
+                    ancestors.push(node);
+                }
+                for (const ancestor of ancestors.reverse()) {
+                    const clone = ancestor.cloneNode(false);
+                    host.appendChild(clone);
+                    host = clone;
+                }
+                const clone = source.paragraph.cloneNode(true);
+                host.appendChild(clone);
+                const originals = [source.paragraph], copies = [clone];
+                for (let i = 0; i < originals.length; i++) {
+                    nodeMap.set(copies[i], originals[i]);
+                    originals.push(...originals[i].childNodes);
+                    copies.push(...copies[i].childNodes);
+                }
+                const rubies = [...clone.querySelectorAll('ruby')].map(ruby => ({
+                    ruby, style: ruby.getAttribute('style'), inlineLength: source.inlineLength,
+                }));
+                // Protect all ruby in a hit paragraph: moving one can move a later cut.
+                for (const { ruby } of rubies) ruby.style.setProperty('white-space', 'nowrap', 'important');
+                return { ...source, clone, rubies };
+            });
+            document.body.appendChild(probe);
+
+            const rejected = new Set();
+            for (const item of items) for (const candidate of item.rubies) {
+                const rects = [...candidate.ruby.getClientRects()].filter(r => vertical ? r.height : r.width);
+                const lines = rects.map(r => vertical ? r.left : r.top);
+                const starts = rects.map(r => vertical ? r.top : r.left);
+                const ends = rects.map(r => vertical ? r.bottom : r.right);
+                if (!rects.length || Math.max(...lines) - Math.min(...lines) > 0.5
+                    || Math.max(...ends) - Math.min(...starts) > candidate.inlineLength + 0.5) {
+                    rejected.add(candidate);
+                }
+            }
+            // Restore oversized ruby in one write batch before remeasuring cuts.
+            for (const { ruby, style } of rejected) {
+                if (style === null) ruby.removeAttribute('style');
+                else ruby.setAttribute('style', style);
+            }
+            return items.map(({ paragraph, clone, justified, rubies }) => ({
+                paragraph, justified,
+                points: this.splitPoints(clone, pageSize, 0, vertical)
+                    .map(point => ({ ...point, node: nodeMap.get(point.node) })),
+                rubies: rubies.filter(ruby => !rejected.has(ruby)).map(({ ruby }) => nodeMap.get(ruby)),
+            }));
+        } finally {
+            probe.remove();
+        }
+    },
+
     fragmentBlocks() {
         const reader = window.hoshiReader;
         const context = reader.getScrollContext();
         const { vertical, pageSize } = context;
         const currentScroll = reader.getPagePosition(context);
-        const targets = [];
+        let targets = [];
+        const crossedRubyParagraphs = new Set();
 
         for (const paragraph of document.body.querySelectorAll('p')) {
-            const points = this.splitPoints(paragraph, pageSize, currentScroll, vertical);
+            const points = this.splitPoints(paragraph, pageSize, currentScroll, vertical, crossedRubyParagraphs);
             if (points.length) {
                 const justified = window.getComputedStyle(paragraph).textAlign === 'justify';
                 targets.push({ paragraph, points, justified });
+            }
+        }
+
+        if (crossedRubyParagraphs.size) {
+            const repaired = this.rubySplitTargets(crossedRubyParagraphs, pageSize, vertical);
+            targets = targets.filter(target => !crossedRubyParagraphs.has(target.paragraph));
+            targets.push(...repaired.filter(target => target.points.length));
+            // No geometry reads after touching originals: protection and fragmentation
+            // share the final write batch, followed by the reader's existing layout.
+            for (const { rubies } of repaired) {
+                for (const ruby of rubies) ruby.style.setProperty('white-space', 'nowrap', 'important');
             }
         }
 

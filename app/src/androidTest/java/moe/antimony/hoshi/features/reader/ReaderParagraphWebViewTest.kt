@@ -508,6 +508,76 @@ class ReaderParagraphWebViewTest {
         } finally { destroy() }
     }
 
+    @Test fun crossPageRubyKeepsAnnotationsAndCentersContinuationFragments() {
+        createView()
+        try {
+            val paragraphs = (40..130).joinToString("") { length ->
+                val ruby = if (length % 2 == 0) "<ruby>漢字仮名語<rt>かんじかなご</rt></ruby>"
+                    else "<ruby>漢<rt>かん</rt>字<rt>じ</rt>仮<rt>か</rt>名<rt>な</rt>語<rt>ご</rt></ruby>"
+                "<p><span>${"あ".repeat(length)}</span>$ruby<strong>${"い".repeat(100)}<ruby>終<rt>おわり</rt></ruby>。</strong></p>"
+            }
+            for (vertical in listOf(false, true)) {
+                load(ReaderSettings(paragraphMode = true, verticalWriting = vertical,
+                    fontSize = 43, horizontalPadding = 0, verticalPadding = 0), """
+                    <section style='line-height:1.75'>$paragraphs</section>
+                    <p id='short'><ruby>短文<rt>たんぶん</rt></ruby>。</p>
+                    <script>
+                    const originalFragments = hoshiParagraph.fragmentBlocks;
+                    hoshiParagraph.fragmentBlocks = function() {
+                        const context = hoshiReader.getScrollContext();
+                        window.rubyPages = ruby => new Set([...ruby.getClientRects()]
+                            .filter(r => context.vertical ? r.height : r.width)
+                            .map(r => Math.floor(Math.round(context.vertical ? r.top : r.left) / context.pageSize)));
+                        window.originalRubies = [...document.querySelectorAll('ruby')];
+                        window.originalAnnotations = [...document.querySelectorAll('rt')];
+                        window.crossedParagraphs = new Set(originalRubies.filter(r => rubyPages(r).size > 1).map(r => r.closest('p')));
+                        window.bodyText = () => {
+                            const walker = hoshiReader.createWalker(); let text = '', node;
+                            while (node = walker.nextNode()) text += node.textContent;
+                            return text;
+                        };
+                        window.originalText = bodyText();
+                        const methods = [[Element.prototype, 'getClientRects'], [Element.prototype, 'getBoundingClientRect'], [Range.prototype, 'getClientRects']];
+                        const saved = methods.map(([owner, key]) => owner[key]);
+                        methods.forEach(([owner, key], i) => owner[key] = function(...args) {
+                            if (originalRubies.some(r => r.style.whiteSpace === 'nowrap'))
+                                throw Error('geometry read after writing original ruby');
+                            return saved[i].apply(this, args);
+                        });
+                        try { return originalFragments.call(this); }
+                        finally { methods.forEach(([owner, key], i) => owner[key] = saved[i]); }
+                    };
+                    </script>
+                """.trimIndent())
+                assertEquals("vertical=$vertical", "\"preserved\"", evaluate("""(() => {
+                    if (!crossedParagraphs.size) return 'fixture did not cross ruby';
+                    if (originalRubies.some(r => rubyPages(r).size > 1)) return 'ruby still crosses pages';
+                    if (bodyText() !== originalText) return 'body text changed';
+                    if (!originalAnnotations.every((r,i) => r === document.querySelectorAll('rt')[i])) return 'annotation nodes changed';
+                    if (!originalRubies.every((r,i) => r === document.querySelectorAll('ruby')[i])) return 'ruby nodes changed';
+                    if (document.querySelectorAll('p').length !== 92) return 'measurement paragraphs leaked';
+                    if (document.querySelector('#short ruby').style.whiteSpace) return 'unaffected ruby was protected';
+                    const context = hoshiReader.getScrollContext(), style = getComputedStyle(document.body);
+                    const blockSize = context.vertical
+                        ? hoshiReader.pageWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)
+                        : hoshiReader.pageHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
+                    for (const p of crossedParagraphs) {
+                        const fragments = p.querySelectorAll(':scope > .hoshi-fragment');
+                        if (fragments.length < 2) return 'continuation has no centering container';
+                        for (const fragment of fragments) {
+                            const r = fragment.getBoundingClientRect();
+                            if (Math.abs((context.vertical ? r.width : r.height) - blockSize) > 1)
+                                return 'fragment lost page-sized centering box';
+                            if ((context.vertical ? r.height : r.width) > context.pageSize + 1)
+                                return 'fragment spans pages';
+                        }
+                    }
+                    return 'preserved';
+                })()"""))
+            }
+        } finally { destroy() }
+    }
+
     @Test fun longParagraphPagesAndShortTailsAreCenteredInBothDirections() {
         createView()
         try {

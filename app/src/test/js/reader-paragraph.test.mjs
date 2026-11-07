@@ -66,6 +66,38 @@ test('paragraph splitting leaves a hanging full-width space on the previous page
     }
 });
 
+test('the existing split scan records ruby spanning both sides of a page boundary', () => {
+    for (const vertical of [false, true]) for (const first of [false, true]) {
+        const { paragraph, document, reader, nodes } = paragraphRuntime({ vertical });
+        const { pageSize } = reader.getScrollContext();
+        const rect = (start, end) => vertical
+            ? { top: start, bottom: end, height: end - start }
+            : { left: start, right: end, width: end - start };
+        const ruby = { localName: 'ruby', nodeType: 1, rects: [
+            rect(pageSize - 20, pageSize), rect(pageSize, pageSize + 40),
+        ] };
+        const before = { nodeType: 3, textContent: '前', characterRects: [rect(0, 20)] };
+        nodes.splice(0, nodes.length, ...(first ? [] : [before]), ruby);
+        document.createTreeWalker = reader.createWalker;
+        document.createRange = () => ({
+            setStart(node, offset) { this.rects = [node.characterRects[offset]]; },
+            setEnd() {}, selectNode(node) { this.rects = node.rects; },
+            getClientRects() { return this.rects; },
+        });
+        const block = { getBoundingClientRect: () => rect(0, 2 * pageSize) };
+        const crossed = new Set();
+        const points = paragraph.splitPoints(block, pageSize, 3 * pageSize, vertical, crossed);
+        assert.equal(points.length, 0, 'a split inside ruby needs a new layout first');
+        assert.deepEqual([...crossed], [block], `vertical=${vertical}, first=${first}`);
+
+        // An aligned ruby can start a fraction of a pixel before the boundary.
+        ruby.rects = [rect(pageSize - 0.125, pageSize + 20), rect(pageSize + 20, pageSize + 40)];
+        crossed.clear();
+        paragraph.splitPoints(block, pageSize, 3 * pageSize, vertical, crossed);
+        assert.equal(crossed.size, 0, 'rounding must not turn a single-page ruby into a crossing');
+    }
+});
+
 test('paragraph reveal advances by elapsed time at code point boundaries without writing text', () => {
     const { paragraph, nodes, frames, highlights } = paragraphRuntime();
     const text = nodes[0].textContent;
