@@ -7,7 +7,9 @@ import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import androidx.compose.ui.unit.dp
+import moe.antimony.hoshi.R
 import moe.antimony.hoshi.ui.theme.HoshiReaderTheme
 import org.junit.Assert.*
 import org.junit.Rule
@@ -113,7 +115,9 @@ class TtsVoiceSettingsTest {
 
     @Test fun largeVoiceListSelectsRawIdentifierAndRetainsUnknownSavedVoice() {
         var selected = ""
-        val voices = (1..400).map { TtsVoiceInfo("custom-voice-$it", true) }
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val namedVoice = TtsVoiceInfo("zh-CN-XiaochenNeural", true, label = "晓辰")
+        val voices = (1..399).map { TtsVoiceInfo("custom-voice-$it", true) } + namedVoice
         compose.setContent {
             HoshiReaderTheme(darkTheme = true, dynamicColor = false) {
                 TtsVoicePicker("Fixture source", voices, "saved-voice-not-in-catalog", false, null,
@@ -121,11 +125,12 @@ class TtsVoiceSettingsTest {
             }
         }
         compose.onNodeWithText("saved-voice-not-in-catalog").assertExists()
-        compose.onNodeWithText("Automatic").assertExists()
-        compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("custom-voice-400"))
-        compose.onNodeWithText("Refresh voices").assertIsDisplayed()
-        compose.onNodeWithText("custom-voice-400").performClick()
-        compose.runOnIdle { assertEquals("custom-voice-400", selected) }
+        compose.onNodeWithText(context.getString(R.string.tts_system_default)).assertExists()
+        compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasText(namedVoice.label))
+        compose.onNodeWithText(context.getString(R.string.tts_refresh_voices)).assertIsDisplayed()
+        compose.onNodeWithText(namedVoice.id).assertIsDisplayed()
+        compose.onNodeWithText(namedVoice.label).performClick()
+        compose.runOnIdle { assertEquals(namedVoice.id, selected) }
     }
 
     @Test fun installedVoiceSelectionUpdatesItsNetworkRequirement() {

@@ -13,8 +13,10 @@ import kotlinx.coroutines.withContext
 /** Catalog identity combines the source with its connection configuration. */
 internal data class TtsVoiceCatalogKey(val fileName: String, val configuration: String, val allowEmpty: Boolean) {
     companion object {
-        fun online(source: TtsOnlineSource, config: TtsOnlineConfig) = TtsVoiceCatalogKey(
-            "${source.name}.json", hash("languages-v2\u0000${config.region}\u0000${config.encryptedKey}"), false)
+        fun online(source: TtsOnlineSource, config: TtsOnlineConfig): TtsVoiceCatalogKey {
+            val version = if (source == TtsOnlineSource.Edge || source.usesAzureRest) "microsoft-labels-v3" else "languages-v2"
+            return TtsVoiceCatalogKey("${source.name}.json", hash("$version\u0000${config.region}\u0000${config.encryptedKey}"), false)
+        }
         fun custom(source: TtsCustomSource) = TtsVoiceCatalogKey("custom-${hash(source.id)}.json",
             hash("languages-v2\u0000${source.id}\u0000${source.protocol}\u0000${source.baseUrl}\u0000${source.encryptedKey}"), true)
         private fun hash(value: String) = MessageDigest.getInstance("SHA-256")

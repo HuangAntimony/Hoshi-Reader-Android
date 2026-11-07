@@ -80,12 +80,23 @@ class OnlineTtsProtocolTest {
         assertFalse(hd.getValue("audioConfig").jsonObject.containsKey("pitch"))
     }
 
-    @Test fun microsoftCatalogRetainsAllLanguagesAndPreservesVoiceNames() {
+    @Test fun microsoftCatalogUsesProviderLabelsAndKeepsRawVoiceIdentifiers() {
         val voices = OnlineTtsProtocol.microsoftVoices("""[
             {"ShortName":"en-US-JennyNeural","Locale":"en-US"},
-            {"ShortName":"ja-JP-NanamiNeural","Locale":"ja-JP","LocalName":"七海"}
+            {"ShortName":"ja-JP-KeitaNeural","Locale":"ja-JP","FriendlyName":"Microsoft Keita Online (Natural) - Japanese (Japan)"},
+            {"ShortName":"ja-JP-NanamiNeural","Locale":"ja-JP","LocalName":"七海","DisplayName":"Nanami"},
+            {"ShortName":"zh-CN-XiaochenNeural","Locale":"zh-CN","LocalName":"晓辰","DisplayName":"Xiaochen"},
+            {"ShortName":"ko-KR-SunHiNeural","Locale":"ko-KR","LocalName":" ","DisplayName":"Sun-Hi","FriendlyName":"SunHi Online"},
+            {"ShortName":"zh-CN-XiaoxiaoNeural","Locale":"zh-CN","LocalName":null,"FriendlyName":"Microsoft Xiaoxiao Online (Natural) - Chinese (Mainland)"}
         ]""")
-        assertEquals(listOf("en-US-JennyNeural", "ja-JP-NanamiNeural"), voices.map { it.id })
+        assertEquals(mapOf(
+            "en-US-JennyNeural" to "en-US-JennyNeural",
+            "ja-JP-KeitaNeural" to "Keita",
+            "ja-JP-NanamiNeural" to "七海",
+            "ko-KR-SunHiNeural" to "Sun-Hi",
+            "zh-CN-XiaochenNeural" to "晓辰",
+            "zh-CN-XiaoxiaoNeural" to "Xiaoxiao",
+        ), voices.associate { it.id to it.label })
         assertTrue(voices.all { it.network })
     }
 

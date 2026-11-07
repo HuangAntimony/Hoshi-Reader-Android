@@ -9,13 +9,24 @@ internal object OnlineTtsProtocol {
     const val edgeToken = "6A5AA1D4EAFF4E9FB37E23D68491D6F4"
     const val edgeVersion = "143.0.3650.75"
     const val edgeBase = "https://speech.platform.bing.com/consumer/speech/synthesize/readaloud"
+    private val edgeFriendlyName = Regex("""Microsoft (.+) Online \(Natural\) - .+""")
+
     fun microsoftVoices(body: String): List<TtsVoiceInfo> = parse {
         Json.parseToJsonElement(body).jsonArray.map { it.jsonObject }
-            .map { TtsVoiceInfo(it.getValue("ShortName").jsonPrimitive.content, true,
-                it["StyleList"]?.jsonArray.orEmpty().map { value -> value.jsonPrimitive.content },
-                it["RolePlayList"]?.jsonArray.orEmpty().map { value -> value.jsonPrimitive.content },
-                languages = listOfNotNull(it["Locale"]?.jsonPrimitive?.content),
-                secondaryLanguages = it["SecondaryLocaleList"]?.jsonArray.orEmpty().map { value -> value.jsonPrimitive.content }) }
+            .map { voice ->
+                val id = voice.getValue("ShortName").jsonPrimitive.content
+                fun name(field: String) =
+                    (voice[field] as? JsonPrimitive)?.takeIf { it.isString }?.content?.trim()?.takeIf { it.isNotEmpty() }
+                val label = name("LocalName") ?: name("DisplayName") ?: name("FriendlyName")?.let {
+                    edgeFriendlyName.matchEntire(it)?.groupValues?.get(1) ?: it
+                } ?: id
+                TtsVoiceInfo(id, network = true,
+                    styles = voice["StyleList"]?.jsonArray.orEmpty().map { it.jsonPrimitive.content },
+                    roles = voice["RolePlayList"]?.jsonArray.orEmpty().map { it.jsonPrimitive.content },
+                    label = label,
+                    languages = listOfNotNull(voice["Locale"]?.jsonPrimitive?.content),
+                    secondaryLanguages = voice["SecondaryLocaleList"]?.jsonArray.orEmpty().map { it.jsonPrimitive.content })
+            }
             .distinctBy { it.id }.sortedBy { it.id }
     }
 

@@ -16,21 +16,26 @@ import org.junit.rules.TemporaryFolder
 class OnlineTtsEngineTest {
     @get:Rule val folder = TemporaryFolder()
 
-    @Test fun legacyJapaneseOnlyDiskCatalogIsRefetchedBeforeFilteringNewLanguages() = runBlocking {
+    @Test fun oldMicrosoftDiskCatalogsAreRefetchedWithCurrentMetadata() = runBlocking {
         val store = TtsVoiceCatalogStore(folder.newFolder())
         val config = TtsOnlineConfig()
         val key = TtsVoiceCatalogKey.online(TtsOnlineSource.Edge, config)
-        val legacyHash = java.security.MessageDigest.getInstance("SHA-256").digest("\u0000".toByteArray())
-            .joinToString("") { "%02x".format(it) }
-        store.write(key.copy(configuration = legacyHash), listOf(TtsVoiceInfo("old-japanese", true)))
         var requests = 0
         val engine = engine(store) {
             requests++
-            200 to """[{"Locale":"en-US","ShortName":"english"}]""".toByteArray()
+            200 to """[{"Locale":"en-US","ShortName":"english","FriendlyName":"English voice"}]""".toByteArray()
         }
         val settings = TtsSettings(engine = TtsOnlineSource.Edge.id, languageId = "en")
-        assertNull(engine.cachedCatalog(settings))
-        assertEquals("english", engine.catalog(settings).voices.single().id)
+        for (previous in listOf("\u0000", "languages-v2\u0000\u0000")) {
+            val hash = java.security.MessageDigest.getInstance("SHA-256").digest(previous.toByteArray())
+                .joinToString("") { "%02x".format(it) }
+            store.write(key.copy(configuration = hash), listOf(TtsVoiceInfo("old-voice", true, languages = listOf("en-US"))))
+            assertNull(engine.cachedCatalog(settings))
+        }
+        val voice = engine.catalog(settings).voices.single()
+        assertEquals("english", voice.id)
+        assertEquals("English voice", voice.label)
+        assertEquals(voice, engine.cachedCatalog(settings)?.voices?.single())
         assertEquals(1, requests)
     }
 
