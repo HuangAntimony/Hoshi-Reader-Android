@@ -53,7 +53,9 @@ class ReaderTtsHighlightWebViewTest {
                 val settings = ReaderSettings(viewMode = mode, paragraphMode = paragraph, verticalWriting = vertical, textAnimation = false)
                 val loaded = CountDownLatch(1)
                 val styles = ReaderContentStyles.styleTag(settings = settings, sasayakiBackgroundColor = 0xFF0000FF, readerCssTemplate = assets.readerCss)
-                val script = ReaderPaginationScripts.shellScript(settings = settings, assets = assets)
+                // Paragraph following requires chapter targets before restore; it never wraps lazily.
+                val script = ReaderPaginationScripts.shellScript(settings = settings, assets = assets,
+                    sasayakiCuesJson = """[{"id":"previous","start":0,"length":3},{"id":"tts-image-next","start":900,"length":3}]""")
                 val beforeImage = "前です".repeat(300) + "。"
                 val imageStyle = "display:block;break-before:column;break-after:column"
                 val body = "<body><p>$beforeImage</p><img width='600' height='900' style='$imageStyle' src='divider.svg'/>" +

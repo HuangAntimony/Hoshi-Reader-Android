@@ -253,6 +253,7 @@ internal fun ChapterWebView(
         )
     }
     val currentOnRestoreAccepted = rememberUpdatedState<(WebView, String) -> ReaderRestoreCompletionAction?> { restoredWebView, reportedRestoreToken ->
+        if (!restoredWebView.acceptsReaderUpdates()) return@rememberUpdatedState null
         if (restoredWebView != readerWebView || reportedRestoreToken != restoreToken) return@rememberUpdatedState null
         readerRestoreCompletionAfterVisibleAction(
             chapterFragment = chapterFragment,
@@ -302,7 +303,7 @@ internal fun ChapterWebView(
                 setBackgroundColor(android.graphics.Color.TRANSPARENT)
                 addJavascriptInterface(
                     ReaderSelectionBridge(this) { selection, selectionRects ->
-                        if (!isReleased) currentOnTextSelected.value(selection, selectionRects)
+                        if (acceptsReaderUpdates) currentOnTextSelected.value(selection, selectionRects)
                     },
                     "HoshiTextSelection",
                 )
@@ -314,11 +315,11 @@ internal fun ChapterWebView(
                 )
                 addJavascriptInterface(
                     ReaderImageTapBridge(this) { sourceUrl ->
-                        if (!isReleased) currentOnImageTapped.value(sourceUrl)
+                        if (acceptsReaderUpdates) currentOnImageTapped.value(sourceUrl)
                     },
                     "HoshiReaderImage",
                 )
-                ReaderLookupPopupWebBridge.install(this, readerPopupBridgeHolder, isActive = { !isReleased })
+                ReaderLookupPopupWebBridge.install(this, readerPopupBridgeHolder, isActive = { acceptsReaderUpdates })
                 webViewClient = EpubWebViewClient(
                     book = book,
                     fontManager = fontManager,
@@ -336,7 +337,7 @@ internal fun ChapterWebView(
             }
         },
         update = { webView ->
-            if (webView.isReleased) return@AndroidView
+            if (!webView.acceptsReaderUpdates) return@AndroidView
             webView.ttsEnabled = ttsEnabled
             webView.updateNativePopupTheme(nativePopupDark, nativePopupEInk, nativePopupSurfaces.overlay.toArgb(), nativePopupSurfaces.outline.toArgb())
             fun selectAt(x: Float, y: Float, onBlankTap: () -> Unit) {
@@ -614,14 +615,31 @@ internal fun readerSelectionMaxLength(settings: DictionarySettings): Int =
 internal fun WebView.readerNativeSelectionState(): StateFlow<Boolean>? =
     (this as? HoshiReaderWebView)?.nativeSelectionState
 
+private fun WebView.acceptsReaderUpdates(): Boolean =
+    (this as? HoshiReaderWebView)?.acceptsReaderUpdates != false
+
 internal class HoshiReaderWebView(context: Context) : HoshiWebView(context) {
+    private var isClosing = false
+
     var isReleased = false
         private set
+
+    val acceptsReaderUpdates: Boolean get() = !isClosing && !isReleased
+
+    /** Close is separate from release: Compose still owns detachment and destruction. */
+    fun beginClose() {
+        if (!acceptsReaderUpdates) return
+        isClosing = true
+        animate().cancel()
+        readerRestoreGenerations.remove(this)
+        readerAppliedSasayakiCues.remove(this)
+        readerPageTurnProgressRequestIds.remove(this)
+    }
 
     private var documentPreparationScript: ScriptHandler? = null
 
     fun installDocumentPreparation(source: String) {
-        if (isReleased || documentPreparationScript != null) return
+        if (!acceptsReaderUpdates || documentPreparationScript != null) return
         if (!WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) return
         documentPreparationScript = WebViewCompat.addDocumentStartJavaScript(
             this,
@@ -631,9 +649,9 @@ internal class HoshiReaderWebView(context: Context) : HoshiWebView(context) {
     }
 
     override fun evaluateJavascript(script: String, resultCallback: ValueCallback<String?>?) {
-        if (isReleased) return
+        if (!acceptsReaderUpdates) return
         super.evaluateJavascript(script, resultCallback?.let { callback ->
-            ValueCallback { result -> if (!isReleased) callback.onReceiveValue(result) }
+            ValueCallback { result -> if (acceptsReaderUpdates) callback.onReceiveValue(result) }
         })
     }
 
@@ -690,7 +708,7 @@ internal class HoshiReaderWebView(context: Context) : HoshiWebView(context) {
             @JavascriptInterface
             fun postMessage(active: Boolean, restoreToken: String) {
                 post {
-                    if (!isReleased && tag == restoreToken) {
+                    if (acceptsReaderUpdates && tag == restoreToken) {
                         documentHasSelection = active
                         if (!active) cancelSelectionMenuRecoveryTouch()
                         updateNativeSelectionActivity()
@@ -700,14 +718,14 @@ internal class HoshiReaderWebView(context: Context) : HoshiWebView(context) {
             @JavascriptInterface
             fun recoverMenu(request: Int, restoreToken: String) {
                 post {
-                    if (!isReleased && tag == restoreToken) recoverNativeSelectionMenu(request, restoreToken)
+                    if (acceptsReaderUpdates && tag == restoreToken) recoverNativeSelectionMenu(request, restoreToken)
                 }
             }
 
             @JavascriptInterface
             fun invalidateMenuAnchor(request: Int, restoreToken: String) {
                 post {
-                    if (!isReleased && tag == restoreToken && request == nativeSelectionAnchorGeneration) {
+                    if (acceptsReaderUpdates && tag == restoreToken && request == nativeSelectionAnchorGeneration) {
                         nativeSelectionFallbackRect = null
                         nativeSelectionAnchorGeneration++
                         cancelSelectionMenuRecoveryTouch()
@@ -723,6 +741,7 @@ internal class HoshiReaderWebView(context: Context) : HoshiWebView(context) {
     fun isNativeSelectionActive(): Boolean = nativeSelectionActivity.value
 
     fun prepareForDocument(restoreToken: String) {
+        if (!acceptsReaderUpdates) return
         tag = restoreToken
         clearNativeSelectionState()
     }
@@ -841,7 +860,7 @@ internal class HoshiReaderWebView(context: Context) : HoshiWebView(context) {
         // Cancel queued JS replies as well as an already-started touch.
         selectionMenuRecoveryRequest?.let { request ->
             selectionMenuRecoveryRequest = null
-            if (!isReleased) evaluateJavascript(ReaderSelectionCommand.CancelMenuRecovery(request.id, request.documentToken).source, null)
+            if (acceptsReaderUpdates) evaluateJavascript(ReaderSelectionCommand.CancelMenuRecovery(request.id, request.documentToken).source, null)
         }
         val touch = selectionMenuRecoveryTouch ?: return
         selectionMenuRecoveryTouch = null
@@ -886,7 +905,7 @@ internal class HoshiReaderWebView(context: Context) : HoshiWebView(context) {
     }
 
     fun showHighlightColorPicker(anchorRect: Rect? = nativeSelectionContentRect) {
-        if (isReleased) return
+        if (!acceptsReaderUpdates) return
         dismissHighlightColorPopup()
         val density = resources.displayMetrics.density
         val popupContent = LinearLayout(context).apply {
@@ -978,7 +997,7 @@ internal class HoshiReaderWebView(context: Context) : HoshiWebView(context) {
     }
 
     fun createHighlightFromNativeSelection(color: HighlightColor) {
-        if (isReleased) return
+        if (!acceptsReaderUpdates) return
         val mode = nativeSelectionActionMode
         val id = UUID.randomUUID().toString()
         selectionHighlightPending = true
@@ -1097,14 +1116,14 @@ private class EpubWebViewClient(
     private val resourceBridge = ReaderWebResourceBridge(book, fontManager)
 
     override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
-        if ((view as? HoshiReaderWebView)?.isReleased == true) return true
+        if (!view.acceptsReaderUpdates()) return true
         val target = book.resolveInternalReaderLink(request.url?.toString().orEmpty()) ?: return false
         onInternalLink(target)
         return true
     }
 
     override fun onPageFinished(view: WebView, url: String?) {
-        if ((view as? HoshiReaderWebView)?.isReleased == true) return
+        if (!view.acceptsReaderUpdates()) return
         super.onPageFinished(view, url)
         if (Uri.parse(url ?: return).host == "appassets.androidplatform.net") {
             onReaderPageFinished(view)
@@ -1431,7 +1450,7 @@ internal class ContinuousScrollTouchListener(
         val documentToken = webView.tag
         webView.evaluateJavascript("window.hoshiReader.isAtChapterBoundary('${direction.jsValue}')") { result ->
             val readerView = webView as? HoshiReaderWebView ?: return@evaluateJavascript
-            if (readerView.isReleased || !readerView.isCurrentReaderTouchListener(this) ||
+            if (!readerView.acceptsReaderUpdates || !readerView.isCurrentReaderTouchListener(this) ||
                 readerView.tag != documentToken || generation != gestureGeneration ||
                 readerView.isNativeSelectionActive()
             ) return@evaluateJavascript
@@ -1583,7 +1602,7 @@ internal class ReaderContinuousScrollBridge(private val webView: HoshiReaderWebV
     @JavascriptInterface
     fun postMessage(restoreToken: String) {
         webView.post {
-            if (!webView.isReleased && webView.tag == restoreToken) webView.onContinuousScroll?.invoke()
+            if (webView.acceptsReaderUpdates && webView.tag == restoreToken) webView.onContinuousScroll?.invoke()
         }
     }
 }
@@ -1595,6 +1614,7 @@ private class ReaderRestoreBridge(
     @JavascriptInterface
     fun postMessage(message: String) {
         webView.post {
+            if (!webView.acceptsReaderUpdates()) return@post
             val restoreCompletion = onRestoreAccepted(webView, message) ?: return@post
             webView.showAfterReaderRestore(restoreCompletion)
         }
@@ -1620,6 +1640,7 @@ private fun WebView.hideForReaderRestore() {
 }
 
 private fun WebView.showAfterReaderRestore(restoreCompletion: ReaderRestoreCompletionAction) {
+    if (!acceptsReaderUpdates()) return
     animate().cancel()
     val generation = readerRestoreGenerations[this] ?: 0L
     postVisualStateCallback(
@@ -1627,9 +1648,9 @@ private fun WebView.showAfterReaderRestore(restoreCompletion: ReaderRestoreCompl
         object : WebView.VisualStateCallback() {
             override fun onComplete(requestId: Long) {
                 post {
-                    if (readerRestoreGenerations[this@showAfterReaderRestore] == generation) {
+                    if (acceptsReaderUpdates() && readerRestoreGenerations[this@showAfterReaderRestore] == generation) {
                         restoreCompletion {
-                            if (readerRestoreGenerations[this@showAfterReaderRestore] == generation) {
+                            if (acceptsReaderUpdates() && readerRestoreGenerations[this@showAfterReaderRestore] == generation) {
                                 animate().cancel()
                                 alpha = 1f
                                 true
@@ -1648,16 +1669,18 @@ private fun WebView.evaluateReaderSetupScript(
     source: String,
     restoreToken: String,
 ) {
+    if (!acceptsReaderUpdates()) return
     readerAppliedSasayakiCues.remove(this)
     evaluateJavascript(source, null)
 }
 
 internal fun WebView.applyReaderSasayakiCues(loadKey: String, cuesJson: String, version: Any? = null, onReady: () -> Unit) {
+    if (!acceptsReaderUpdates()) return
     val appliedCues = ReaderAppliedSasayakiCues(loadKey, cuesJson, version)
     if (readerAppliedSasayakiCues[this] == appliedCues) { onReady(); return }
     readerAppliedSasayakiCues[this] = appliedCues
     evaluateJavascript(ReaderPaginationScripts.applySasayakiCuesInvocation(cuesJson)) {
-        if (readerAppliedSasayakiCues[this] == appliedCues) onReady()
+        if (acceptsReaderUpdates() && readerAppliedSasayakiCues[this] == appliedCues) onReady()
     }
 }
 

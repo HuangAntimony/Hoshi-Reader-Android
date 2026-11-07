@@ -385,6 +385,13 @@ dynamic configuration and bridge calls.
   Both reuse the existing inline highlighter with chapter targets installed before
   reveal. Paragraph following never lazily wraps missing cues. Cue-source changes
   finish the old reveal before replacing nodes; ordinary cue changes do not.
+  Explicit Reader exit flushes progress/statistics, then marks its WebView closing
+  before cancelling presentation and stopping playback. A closing WebView rejects
+  scripts, cue installation (including cached readiness), and late bridge/restore
+  callbacks. Its cue wrappers are discarded with the document by the existing
+  detach/destroy path, never bulk-unwrapped in response to the stopped TTS state.
+  This boundary is per WebView and does not apply to backgrounding or stopping TTS
+  while staying in Reader.
   Paragraph E-ink changes reload the chapter at the displayed character position
   through the existing restore gate. Do not convert the chapter's cue DOM during
   appearance refresh: saved highlights can invalidate cached text segments, and

@@ -722,6 +722,9 @@ fun ReaderWebView(
         if (plan.flushAutoSyncExport) {
             onFlushAutoSyncExport()
         }
+        // Stopping TTS clears its chapter cues. The departing document must not
+        // unwrap/normalize them before AndroidView releases the entire WebView.
+        (webView as? HoshiReaderWebView)?.beginClose()
         cancelReaderAutoPage()
         ttsViewModel.playback.stop()
         sasayakiPlayer?.stopPlayback()
