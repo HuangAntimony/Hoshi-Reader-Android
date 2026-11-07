@@ -16,14 +16,18 @@ class TtsLanguageTest {
         assertEquals("unknown", listOf(TtsVoiceInfo("unknown", true)).forLanguage("en", allowUnknown = true).single().id)
     }
 
-    @Test fun primaryLocaleWinsBeforeMultilingualSecondaryLocaleAndRegionIsRetained() {
+    @Test fun microsoftVoiceChoicesMatchThePrimaryLanguageOnly() {
         val raw = OnlineTtsProtocol.microsoftVoices("""[
-          {"ShortName":"multi","Locale":"en-US","SecondaryLocaleList":["ja-JP","zh-CN"]},
-          {"ShortName":"taiwan","Locale":"zh-TW"}, {"ShortName":"cantonese","Locale":"yue-HK"}
+          {"ShortName":"de-DE-SeraphinaMultilingualNeural","Locale":"de-DE","SecondaryLocaleList":["zh-CN","zh-HK","zh-TW"]},
+          {"ShortName":"en-AU-Isla:MAI-Voice-2","Locale":"en-AU","SecondaryLocaleList":["zh-CN"]},
+          {"ShortName":"zh-CN-XiaoxiaoMultilingualNeural","Locale":"zh-CN","SecondaryLocaleList":["en-US"]},
+          {"ShortName":"zh-TW-HsiaoChenNeural","Locale":"zh-TW"},
+          {"ShortName":"yue-CN-XiaoMinNeural","Locale":"yue-CN"}
         ]""")
-        assertEquals(listOf("cantonese", "taiwan", "multi"), raw.forLanguage("zh").map { it.id })
-        assertEquals("zh-CN", raw.first { it.id == "multi" }.localeFor("zh"))
-        assertEquals("yue-HK", raw.first { it.id == "cantonese" }.localeFor("zh"))
+        val chinese = raw.forLanguage("zh")
+        assertEquals(listOf("yue-CN-XiaoMinNeural", "zh-CN-XiaoxiaoMultilingualNeural", "zh-TW-HsiaoChenNeural"), chinese.map { it.id })
+        assertEquals(listOf("yue-CN", "zh-CN", "zh-TW"), chinese.map { it.localeFor("zh") })
+        assertEquals(listOf("en-AU-Isla:MAI-Voice-2"), raw.forLanguage("en").map { it.id })
     }
 
     @Test fun requestLanguageComesFromSelectedVoiceAndOptionsAreNormalizedLocally() {
