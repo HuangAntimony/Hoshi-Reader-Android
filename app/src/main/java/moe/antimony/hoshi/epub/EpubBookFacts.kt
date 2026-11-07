@@ -28,12 +28,7 @@ internal fun EpubBook.buildTocChapterStarts(): List<Int> =
     }.sorted()
 
 internal fun EpubBook.tocCharacterStart(href: String): Int? {
-    val base = href.readerHrefBase()
-    if (base.isBlank()) return null
-    val chapter = chapters.firstOrNull { chapter ->
-        val chapterBase = chapter.href.readerHrefBase()
-        base == chapterBase || base.endsWith("/$chapterBase") || chapterBase.endsWith("/$base")
-    } ?: return null
+    val chapter = chapters[tocHrefIndex.chapterIndex(href) ?: return null]
     val info = bookInfo.chapterInfo[chapter.href] ?: return null
     val fragment = href.substringAfter('#', "").ifBlank { null }
     val offset = fragment?.let { info.fragmentOffsets?.get(it) } ?: 0

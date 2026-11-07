@@ -404,7 +404,9 @@ dynamic configuration and bridge calls.
 - `EpubBook.tocChapterStarts` lazily caches sorted directory boundaries for that
   book snapshot. `EpubBookFacts` owns href/fragment resolution; `ReaderTocRange`
   queries the cached boundaries so page turns and statistics ticks do not rebuild
-  the directory index. A copied or reparsed book owns a fresh cache.
+  the directory index. `EpubTocHrefIndex` indexes full paths and slash-delimited
+  suffixes once, retaining the first spine match in either suffix direction.
+  A copied or reparsed book owns fresh caches.
 - `EpubBook.imageReferenceCounts` lazily caches original image references across
   distinct linear, non-navigation spine documents for that book snapshot; first
   access runs on a resource/loading worker. `ReaderWebResourceBridge` serves the
