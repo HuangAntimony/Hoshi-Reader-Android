@@ -257,22 +257,9 @@ internal fun sasayakiMedia3AudioAttributes(): AudioAttributes =
         .setUsage(C.USAGE_MEDIA)
         .build()
 
-internal fun sasayakiMediaMetadata(
-    title: String?,
-    artworkFile: File?,
-): MediaMetadata {
-    val metadata = MediaMetadata.Builder()
-        .setTitle(title)
-    if (artworkFile != null && artworkFile.isFile) {
-        metadata.setArtworkData(artworkFile.readBytes(), MediaMetadata.PICTURE_TYPE_FRONT_COVER)
-    }
-    return metadata.build()
-}
-
 internal fun sasayakiMediaItem(
     source: SasayakiPlaybackSource,
-    title: String?,
-    artworkFile: File?,
+    metadata: MediaMetadata,
 ): MediaItem =
     MediaItem.Builder()
         .setUri(
@@ -281,7 +268,5 @@ internal fun sasayakiMediaItem(
                 is SasayakiPlaybackSource.PrivateFile -> Uri.fromFile(source.file)
             },
         )
-        .setMediaMetadata(
-            sasayakiMediaMetadata(title = title, artworkFile = artworkFile),
-        )
+        .setMediaMetadata(metadata)
         .build()

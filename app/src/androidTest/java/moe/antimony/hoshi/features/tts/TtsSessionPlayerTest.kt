@@ -13,6 +13,35 @@ import org.junit.Test
 
 @OptIn(UnstableApi::class)
 class TtsSessionPlayerTest {
+    @Test fun artworkAndSentenceRefreshTogetherWithoutStartingAnIdleBook() {
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            val decoder = ExoPlayer.Builder(ApplicationProvider.getApplicationContext<Context>()).build()
+            val text = "文".repeat(180)
+            var state = TtsPlaybackState(bookId = "first", title = "First", sentences = listOf(TtsSentence(0, 0, 180, text)))
+            var artwork: ByteArray? = byteArrayOf(1, 2, 3)
+            val transport = TtsSessionPlayer(decoder, { state }, {}, {}, {}, {}, {}, { artwork })
+            try {
+                transport.refresh()
+                assertTrue(transport.currentTimeline.isEmpty)
+                assertFalse(transport.playWhenReady)
+                state = state.copy(started = true, playing = true, preparing = true)
+                transport.refresh()
+                assertEquals("First", transport.mediaMetadata.title)
+                assertEquals(text.take(160), transport.mediaMetadata.artist)
+                assertArrayEquals(artwork, transport.mediaMetadata.artworkData)
+                state = state.copy(playing = false, preparing = false)
+                transport.refresh()
+                assertEquals(text.take(160), transport.mediaMetadata.artist)
+                artwork = null
+                state = state.copy(bookId = "second", title = "Second", sentences = listOf(TtsSentence(0, 0, 2, "次。")))
+                transport.refresh()
+                assertEquals("Second", transport.mediaMetadata.title)
+                assertEquals("次。", transport.mediaMetadata.artist)
+                assertNull(transport.mediaMetadata.artworkData)
+            } finally { transport.release(); decoder.release() }
+        }
+    }
+
     @Test fun synthesisRemainsPlayingAndTransportOnlyNavigatesSentences() {
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
             val context = ApplicationProvider.getApplicationContext<Context>()

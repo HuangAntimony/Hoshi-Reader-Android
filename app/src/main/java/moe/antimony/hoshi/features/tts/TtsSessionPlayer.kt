@@ -5,6 +5,7 @@ import androidx.media3.common.*
 import androidx.media3.common.util.UnstableApi
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
+import moe.antimony.hoshi.features.playback.readingMediaMetadata
 
 /** A sentence transport, including the time spent synthesizing, with no seekable audio timeline. */
 @OptIn(UnstableApi::class)
@@ -16,6 +17,7 @@ internal class TtsSessionPlayer(
     private val previousSentence: () -> Unit,
     private val nextSentence: () -> Unit,
     private val stopSentences: () -> Unit,
+    private val artworkData: () -> ByteArray? = { null },
 ) : ForwardingSimpleBasePlayer(player) {
     fun refresh() = invalidateState()
 
@@ -33,7 +35,7 @@ internal class TtsSessionPlayer(
         if (value.hasPrevious) commands.addAll(Player.COMMAND_SEEK_TO_PREVIOUS, Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)
         if (value.hasNext) commands.addAll(Player.COMMAND_SEEK_TO_NEXT, Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)
         val playlist = sentence?.let {
-            val metadata = MediaMetadata.Builder().setTitle(value.title).setArtist(it.text.take(160)).build()
+            val metadata = readingMediaMetadata(value.title, it.text, artworkData())
             listOf(MediaItemData.Builder("${value.bookId}:${it.chapter}:${it.start}")
                 .setMediaItem(MediaItem.Builder().setMediaId("tts:${value.bookId}").setMediaMetadata(metadata).build())
                 .setMediaMetadata(metadata).setIsSeekable(false).setDurationUs(C.TIME_UNSET).build())

@@ -260,8 +260,8 @@ fun ReaderWebView(
         )
     }
     val ttsLookupPause = stateHolder.ttsLookupPause
-    LaunchedEffect(book, ttsBookId, isSasayakiPlaybackLoaded, ttsAssociated, ttsEnabled) {
-        if (ttsEnabled && isSasayakiPlaybackLoaded) ttsViewModel.playback.load(ttsBookId, book, ttsAssociated)
+    LaunchedEffect(book, ttsBookId, bookCoverFile, isSasayakiPlaybackLoaded, ttsAssociated, ttsEnabled) {
+        if (ttsEnabled && isSasayakiPlaybackLoaded) ttsViewModel.playback.load(ttsBookId, book, ttsAssociated, bookCoverFile)
         if (!ttsEnabled || ttsAssociated) {
             showTts = false
             ttsSelection = null

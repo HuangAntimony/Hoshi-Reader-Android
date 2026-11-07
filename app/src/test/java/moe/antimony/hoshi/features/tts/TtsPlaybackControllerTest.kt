@@ -18,6 +18,23 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TtsPlaybackControllerTest {
+    @Test fun rebindingBookRefreshesCoverMetadataWithoutRestartingSpeech() = runTest {
+        fixture { controller, _, _, _ ->
+            controller.play(); runCurrent()
+            val before = controller.state.value
+            val cover = File("cover.png")
+            controller.load(requireNotNull(before.bookId), book, false, cover)
+            assertEquals(cover, controller.state.value.bookCoverFile)
+            assertEquals(before.sentence, controller.state.value.sentence)
+            assertTrue(controller.state.value.playing)
+            val revision = controller.state.value.bookMetadataRevision
+            controller.load(requireNotNull(before.bookId), book, false, cover)
+            assertTrue(controller.state.value.bookMetadataRevision > revision)
+            controller.stop()
+            assertEquals(null, controller.state.value.bookCoverFile)
+        }
+    }
+
     @Test fun clauseToggleRetainsPendingNextAndPreviousChapterDestinations() = runTest {
         for (direction in listOf(1, -1)) {
             val delegate = StandardTestDispatcher(testScheduler)

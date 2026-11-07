@@ -5,6 +5,8 @@ import moe.antimony.hoshi.epub.SasayakiPlaybackData
 import android.os.Handler
 import android.os.Looper
 import java.io.File
+import androidx.media3.common.MediaMetadata
+import moe.antimony.hoshi.features.playback.readingMediaMetadata
 
 data class SasayakiAudioRestoreCallbacks(
     val onPrepared: (Int) -> Unit,
@@ -35,6 +37,7 @@ fun interface SasayakiPlaybackPreparer {
 }
 
 internal class ServiceOwnedSasayakiPlaybackPreparer(
+    private val metadataProvider: (String) -> MediaMetadata = { readingMediaMetadata(it, null, null) },
     private val playerProvider: () -> Media3SasayakiPlayerHandle,
 ) : SasayakiPlaybackPreparer {
     override fun prepare(
@@ -49,8 +52,7 @@ internal class ServiceOwnedSasayakiPlaybackPreparer(
             player = player,
             mediaItem = sasayakiMediaItem(
                 source = source,
-                title = title,
-                artworkFile = artworkFile,
+                metadata = metadataProvider(title),
             ),
             startPositionMs = startPositionMs,
             onPrepared = callbacks.onPrepared,

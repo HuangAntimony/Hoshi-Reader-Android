@@ -30,6 +30,8 @@ data class TtsPlaybackState(
     val playing: Boolean = false,
     val preparing: Boolean = false,
     val error: TtsError? = null,
+    val bookCoverFile: File? = null,
+    val bookMetadataRevision: Long = 0,
 ) {
     val sentence: TtsSentence? get() = sentences.getOrNull(index)
     val canStart: Boolean get() = bookId != null
@@ -58,6 +60,7 @@ class TtsPlaybackController internal constructor(
     val state = mutableState.asStateFlow()
     private var generation = 0L
     private var book: EpubBook? = null
+    private var bookMetadataRevision = 0L
     private var position: TtsBookPosition? = null
     /** A backward chapter jump retains the destination's last cue after resegmentation. */
     private data class SourceAnchor(val chapter: Int, val offset: Int = 0, val chapterEnd: Boolean = false)
@@ -141,14 +144,19 @@ class TtsPlaybackController internal constructor(
         }
     }
 
-    fun load(bookId: String, book: EpubBook, hasAudiobook: Boolean) {
+    fun load(bookId: String, book: EpubBook, hasAudiobook: Boolean, bookCoverFile: File? = null) {
         associated = hasAudiobook
         if (hasAudiobook) { stop(); return }
-        if (state.value.bookId == bookId) return
+        val revision = ++bookMetadataRevision
+        if (state.value.bookId == bookId) {
+            mutableState.value = state.value.copy(title = book.title, bookCoverFile = bookCoverFile, bookMetadataRevision = revision)
+            return
+        }
         stop()
         associated = false
         this.book = book
-        mutableState.value = TtsPlaybackState(bookId = bookId, title = book.title)
+        mutableState.value = TtsPlaybackState(bookId = bookId, title = book.title,
+            bookCoverFile = bookCoverFile, bookMetadataRevision = revision)
     }
 
     private fun installPosition(next: TtsBookPosition) {

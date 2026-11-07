@@ -14,6 +14,10 @@ import androidx.media3.session.MediaSessionService
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import moe.antimony.hoshi.features.playback.ReadingMediaArtwork
+import moe.antimony.hoshi.features.playback.ReadingMediaArtworkRepository
 import moe.antimony.hoshi.MainActivity
 import moe.antimony.hoshi.ui.appLanguageContext
 
@@ -21,10 +25,12 @@ import moe.antimony.hoshi.ui.appLanguageContext
 @AndroidEntryPoint
 class TtsPlaybackService : MediaSessionService() {
     @Inject lateinit var controller: TtsPlaybackController
+    @Inject internal lateinit var artworkRepository: ReadingMediaArtworkRepository
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var session: MediaSession? = null
     private var player: ExoPlayer? = null
     private var notificationLocales: LocaleList? = null
+    private var artwork: ReadingMediaArtwork? = null
     override fun onCreate() {
         super.onCreate()
         val audio = ExoPlayer.Builder(this).setWakeMode(C.WAKE_MODE_LOCAL).build().apply {
@@ -33,14 +39,30 @@ class TtsPlaybackService : MediaSessionService() {
         }
         player = audio
         controller.attachPlayer(audio)
-        val transport = TtsSessionPlayer(audio, { controller.state.value }, controller::play, controller::pause,
-            controller::previous, controller::next, controller::stop)
+        lateinit var transport: TtsSessionPlayer
+        val artwork = ReadingMediaArtwork(serviceScope, artworkRepository::load) { transport.refresh() }
+        this.artwork = artwork
+        transport = TtsSessionPlayer(audio, { controller.state.value }, controller::play, controller::pause,
+            controller::previous, controller::next, controller::stop, {
+                val state = controller.state.value
+                artwork.dataFor(state.bookId, state.bookCoverFile?.absolutePath)
+            })
         session = MediaSession.Builder(this, transport).setId("hoshi-tts-playback")
             .setSessionActivity(PendingIntent.getActivity(this, 24,
                 Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP),
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)).build()
         addSession(requireNotNull(session))
         serviceScope.launch { controller.state.collect { transport.refresh() } }
+        serviceScope.launch {
+            controller.state.map { Triple(it.bookId, it.bookCoverFile, it.bookMetadataRevision) }
+                .distinctUntilChanged().collect { (bookId, file, revision) ->
+                    val source = artworkRepository.source(file)
+                    val current = controller.state.value
+                    if (current.bookId == bookId && current.bookMetadataRevision == revision) {
+                        artwork.update(bookId, source)
+                    }
+                }
+        }
     }
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session
     override fun onUpdateNotification(session: MediaSession, startInForegroundRequired: Boolean) {
@@ -65,6 +87,8 @@ class TtsPlaybackService : MediaSessionService() {
     }
     override fun onDestroy() {
         serviceScope.cancel()
+        artwork?.clear()
+        artwork = null
         controller.detachPlayer()
         session?.release(); session = null
         player?.release(); player = null

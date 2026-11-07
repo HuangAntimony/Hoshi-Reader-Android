@@ -128,6 +128,11 @@ class SasayakiPlaybackLifecycleController(
         )
     }
 
+    fun refreshPlayerPosition(): Boolean {
+        val current = engine ?: return false
+        return syncPlayerPosition(current.currentPositionMs, current.durationMs)
+    }
+
     fun updateTick(): SasayakiPlaybackTickUpdate? {
         if (playbackState.hasPendingSeek) return null
         val engine = engine ?: return null

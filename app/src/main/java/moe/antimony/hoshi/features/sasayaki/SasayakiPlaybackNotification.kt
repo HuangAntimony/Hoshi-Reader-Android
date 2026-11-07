@@ -97,7 +97,8 @@ internal class SasayakiPlaybackNotificationProvider(
         val builder = Notification.Builder(context, SasayakiPlaybackNotificationChannelId)
             .setSmallIcon(R.drawable.ic_stat_hoshi)
             .setContentTitle(title)
-            .setContentText(languageContext.getString(R.string.sasayaki_playback))
+            .setContentText(metadata.artist?.takeIf { it.isNotBlank() }
+                ?: languageContext.getString(R.string.sasayaki_playback))
             .setContentIntent(contentIntent())
             .setCategory(Notification.CATEGORY_TRANSPORT)
             .setVisibility(Notification.VISIBILITY_PUBLIC)
