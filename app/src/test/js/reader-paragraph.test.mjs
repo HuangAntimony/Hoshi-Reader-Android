@@ -26,19 +26,45 @@ function paragraphRuntime({ vertical = false, supported = true } = {}) {
             selectNodeContents(node) { this.rect = node.rect; },
             setStart(node, offset) { this.startNode = node; this.start = offset; },
             setEnd(node, offset) { this.endNode = node; this.end = offset; },
+            getClientRects() { return [this.startNode.characterRects[this.start]]; },
         };
         ranges.push(range); return range;
     } };
     const context = {
         window: { hoshiReader: reader }, document,
+        Node: { TEXT_NODE: 3 }, NodeFilter: { SHOW_TEXT: 4, SHOW_ELEMENT: 1 },
         CSS: supported ? { highlights } : {},
         Highlight: class { constructor(range) { this.range = range; } clear() {} },
         requestAnimationFrame: callback => { frames.set(++next, callback); return next; },
         cancelAnimationFrame: id => frames.delete(id), performance: { now: () => 0 },
     };
     vm.runInNewContext(fs.readFileSync(new URL('../../main/assets/hoshi-web/reader/reader-paragraph.js', import.meta.url), 'utf8'), context);
-    return { paragraph: context.window.hoshiParagraph, window: context.window, reader, nodes, frames, ranges, highlights, listeners };
+    return { paragraph: context.window.hoshiParagraph, window: context.window, document, reader, nodes, frames, ranges, highlights, listeners };
 }
+
+test('paragraph splitting leaves a hanging full-width space on the previous page', () => {
+    for (const vertical of [false, true]) for (const shift of [0, -0.125, 0.125]) {
+        const { paragraph, document, reader, nodes } = paragraphRuntime({ vertical });
+        const { pageSize } = reader.getScrollContext();
+        const rect = (start, end) => vertical
+            ? { top: start, bottom: end, height: end - start }
+            : { left: start, right: end, width: end - start };
+        const node = { nodeType: 3, textContent: '甲　乙丙', characterRects: [
+            rect(pageSize - 59, pageSize - 20),
+            rect(pageSize - 20, pageSize + 19),
+            rect(pageSize + shift, pageSize + shift + 39),
+            rect(pageSize + shift + 39, pageSize + shift + 78),
+        ] };
+        nodes.splice(0, nodes.length, node);
+        document.createTreeWalker = reader.createWalker;
+        const block = { getBoundingClientRect: () => rect(0, 2 * pageSize) };
+
+        const points = paragraph.splitPoints(block, pageSize, 2 * pageSize, vertical);
+        assert.equal(points.length, 1, `vertical=${vertical}, shift=${shift}`);
+        assert.equal(points[0].node, node);
+        assert.equal(points[0].offset, 2);
+    }
+});
 
 test('paragraph reveal advances by elapsed time at code point boundaries without writing text', () => {
     const { paragraph, nodes, frames, highlights } = paragraphRuntime();

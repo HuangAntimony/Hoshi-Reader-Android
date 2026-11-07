@@ -292,8 +292,12 @@ window.hoshiParagraph = {
                     rects = this.positionRects(range, positions[mid], vertical);
                 }
 
-                const end = Math.max(...rects.map(rect => vertical ? rect.bottom : rect.right));
-                if (end + currentScroll > limit) {
+                // A hanging character can extend past the page without starting on it.
+                const isText = rects.length > 0 && positions[mid].node.nodeType === Node.TEXT_NODE;
+                const reachesPage = isText
+                    ? Math.round((vertical ? rects[0].top : rects[0].left) + currentScroll) >= limit
+                    : Math.max(...rects.map(rect => vertical ? rect.bottom : rect.right)) + currentScroll > limit;
+                if (reachesPage) {
                     hit = mid;
                     high = mid - 1;
                 } else {
@@ -302,9 +306,14 @@ window.hoshiParagraph = {
             }
 
             if (hit > 0) {
-                const rect = this.positionRects(range, positions[hit], vertical)[0];
+                const position = positions[hit];
+                if (position.node.nodeType === Node.TEXT_NODE) {
+                    points.push(position);
+                    continue;
+                }
+                const rect = this.positionRects(range, position, vertical)[0];
                 if (rect && (vertical ? rect.top : rect.left) + currentScroll >= limit) {
-                    points.push(positions[hit]);
+                    points.push(position);
                 }
             }
         }
