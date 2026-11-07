@@ -825,6 +825,7 @@
             border-bottom-color: rgba(255, 255, 255, 0.34);
         }
         #${LAYER_ID} .hoshi-reader-popup-control {
+            display: block;
             appearance: none;
             width: 34px;
             height: 34px;

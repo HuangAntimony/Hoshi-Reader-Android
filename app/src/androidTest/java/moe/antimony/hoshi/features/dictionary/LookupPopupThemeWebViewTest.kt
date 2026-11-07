@@ -26,6 +26,30 @@ import java.util.concurrent.TimeUnit
 class LookupPopupThemeWebViewTest {
     @get:Rule val compose = createComposeRule()
 
+    @Test fun publisherButtonHidingDoesNotHideReaderPopupControls() {
+        val assets = LookupPopupAssets.load(InstrumentationRegistry.getInstrumentation().targetContext)
+        withPopup(false, false, referenceCss = "input, button { display: none; }") { web ->
+            val result = evaluate(web, """
+                (() => {
+                    document.body.innerHTML = '<button id="publisher-button">Book content</button>';
+                    window.eval(${JSONObject.quote(assets.readerPopupHostJs)});
+                    hoshiReaderPopupHost.renderStack({popups:[{
+                        id:'fixture', frame:{left:0,top:0,width:300,height:250}, iframeUrl:'about:blank',
+                        actionBarVisible:true, ttsVisible:true, entriesCount:0
+                    }]});
+                    const controls = [...document.querySelectorAll('.hoshi-reader-popup-control')];
+                    return {count:controls.length, visible:controls.every(button => {
+                        const rect = button.getBoundingClientRect();
+                        return rect.width > 0 && rect.height > 0;
+                    }), publisherDisplay:getComputedStyle(document.getElementById('publisher-button')).display};
+                })()
+            """)
+            assertEquals(6, result.getInt("count"))
+            assertTrue("Publisher CSS must not hide the popup's navigation/audio controls: $result", result.getBoolean("visible"))
+            assertEquals("none", result.getString("publisherDisplay"))
+        }
+    }
+
     @Test fun transparentIframeMatchesItsEmbeddingColorSchemeAcrossThemeChanges() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val assets = LookupPopupAssets.load(context)
