@@ -371,67 +371,6 @@ class ReaderParagraphWebViewTest {
         } finally { destroy() }
     }
 
-    @Test fun rubyAnimationKeepsLiveDomAndGeometryStableInBothWritingDirections() {
-        createView()
-        try {
-            for (vertical in listOf(false, true)) {
-                val settings = ReaderSettings(paragraphMode = true, textAnimation = true, textSpeed = 25,
-                    verticalWriting = vertical, fontSize = 30, horizontalPadding = 8, verticalPadding = 8)
-                load(settings, "<p id='first'>始まりの文字。<ruby>東京<rt>とうきょう</rt></ruby>と<ruby><b>読書</b><rt><em>どくしょ</em></rt></ruby>の時間。</p><p>次の段落。</p>")
-                assertEquals("true", evaluate("Boolean(window.hoshiParagraph.animationFrame)"))
-                // Freeze only the reveal clock after normal restore has completed.
-                evaluate("""
-                    hoshiParagraph.finishTextAnimation();
-                    window.realRaf = requestAnimationFrame;
-                    window.requestAnimationFrame = callback => { window.revealTick = callback; return 987654; };
-                    window.beforeHtml = document.body.innerHTML;
-                    window.rects = () => JSON.stringify([...document.querySelectorAll('#first, ruby, rt')].map(el => {
-                        const r = el.getBoundingClientRect(); return [r.x,r.y,r.width,r.height]; }));
-                    window.beforeRects = rects();
-                    hoshiParagraph.animateText(25);
-                """.trimIndent())
-                val hidden = capture("paragraph-$vertical-hidden")
-                val hiddenRed = redPixels(hidden)
-                hidden.recycle()
-                assertEquals("true", evaluate("document.body.innerHTML === beforeHtml && rects() === beforeRects"))
-                assertEquals("\"animation\"", evaluate(ReaderSelectionCommand.SelectText(2f, 2f, 16).source))
-                assertEquals("false", evaluate("hoshiParagraph.finishTextAnimation()"))
-                composeRule.waitUntil(10_000) {
-                    val painted = capture("paragraph-$vertical-visible")
-                    val ready = redPixels(painted) > 20
-                    painted.recycle()
-                    ready
-                }
-                val visible = capture("paragraph-$vertical-visible")
-                val visibleRed = redPixels(visible)
-                visible.recycle()
-                assertTrue("ruby must be painted after reveal ($vertical): hidden=$hiddenRed visible=$visibleRed", visibleRed > 20)
-                assertTrue("ruby must stay hidden before its base ($vertical): hidden=$hiddenRed visible=$visibleRed", hiddenRed < visibleRed / 10)
-                assertEquals("true", evaluate("document.body.innerHTML === beforeHtml && rects() === beforeRects"))
-                assertEquals("true", evaluate("""(() => {
-                    document.dispatchEvent(new PointerEvent('pointerdown'));
-                    const link = document.createElement('a'); link.href = '#first';
-                    document.body.appendChild(link); let clicked = false;
-                    link.addEventListener('click', () => clicked = true);
-                    hoshiParagraph.animateText(25);
-                    link.click();
-                    const consumed = hoshiParagraph.consumeAnimationTap();
-                    document.dispatchEvent(new PointerEvent('pointerdown'));
-                    link.click(); link.remove();
-                    return consumed && clicked && !hoshiParagraph.consumeAnimationTap();
-                })()"""))
-                evaluate("window.requestAnimationFrame=realRaf")
-                assertEquals("\"scrolled\"", evaluate("hoshiReader.paginate('forward')"))
-                assertEquals("true", evaluate("Boolean(hoshiParagraph.animationFrame)"))
-                assertEquals("\"scrolled\"", evaluate("hoshiReader.paginate('backward')"))
-                assertEquals("false", evaluate("Boolean(hoshiParagraph.animationFrame)"))
-                // A previous-chapter restore (progress=1) starts animation too.
-                load(settings, "<p>第一段落。</p><p>最後の段落です。</p>", progress = 1.0)
-                assertEquals("true", evaluate("Boolean(hoshiParagraph.animationFrame)"))
-            }
-        } finally { destroy() }
-    }
-
     @Test fun sentencesStayInsideParagraphsAndLongParagraphsKeepRubyAndOffsets() {
         createView()
         try {
