@@ -5,9 +5,36 @@ import moe.antimony.hoshi.epub.EpubBook
 import moe.antimony.hoshi.epub.EpubChapter
 import moe.antimony.hoshi.epub.EpubTocItem
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ReaderTocRangeTest {
+    @Test
+    fun repeatedProgressQueriesDoNotTraverseTheTocAgain() {
+        val toc = CountingList(tocBook().toc)
+        val book = tocBook(toc = toc)
+        assertEquals(ReaderTocRange(4, 8), book.tocRangeAt(ReaderChapterPosition(0, 0.6)))
+        val initialReads = toc.reads
+        assertTrue(initialReads > 0)
+
+        repeat(100) {
+            assertEquals(ReaderTocRange(0, 4), book.tocRangeAt(ReaderChapterPosition(0, 0.2)))
+            assertEquals(ReaderTocRange(8, 10), book.tocRangeAt(ReaderChapterPosition(0, 1.0)))
+        }
+
+        assertEquals("Page turns and statistics refreshes must reuse the directory index", initialReads, toc.reads)
+    }
+
+    @Test
+    fun copiedBookBuildsItsOwnTocIndex() {
+        val original = tocBook()
+        assertEquals(ReaderTocRange(4, 8), original.tocRangeAt(ReaderChapterPosition(0, 0.6)))
+        val updated = original.copy(toc = listOf(EpubTocItem("Later chapter", "chapter.xhtml#part-3")))
+
+        assertEquals(ReaderTocRange(0, 8), updated.tocRangeAt(ReaderChapterPosition(0, 0.6)))
+        assertEquals(ReaderTocRange(4, 8), original.tocRangeAt(ReaderChapterPosition(0, 0.6)))
+    }
+
     @Test
     fun trueChapterRangeUsesTocFragmentsWithinOneXhtmlFile() {
         val book = tocBook()
@@ -97,5 +124,12 @@ class ReaderTocRangeTest {
                 images = emptyList(),
             ),
         )
+    }
+
+    private class CountingList<T>(private val values: List<T>) : AbstractList<T>() {
+        var reads = 0
+            private set
+        override val size: Int get() = values.size
+        override fun get(index: Int): T = values[index].also { reads++ }
     }
 }

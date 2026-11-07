@@ -15,6 +15,38 @@ private val readerBodyOpeningTagRegex = Regex("""<body\b[^>]*>""", setOf(RegexOp
 private val readerGalleryExtensions = setOf("jpg", "jpeg", "png")
 private const val CURRENT_READER_FACTS_VERSION = 3
 
+internal fun EpubBook.buildTocChapterStarts(): List<Int> =
+    buildSet {
+        add(0)
+        fun visit(item: EpubTocItem) {
+            item.href?.let(::tocCharacterStart)?.let { start ->
+                if (start in 0 until bookInfo.characterCount) add(start)
+            }
+            item.children.forEach(::visit)
+        }
+        toc.forEach(::visit)
+    }.sorted()
+
+internal fun EpubBook.tocCharacterStart(href: String): Int? {
+    val base = href.readerHrefBase()
+    if (base.isBlank()) return null
+    val chapter = chapters.firstOrNull { chapter ->
+        val chapterBase = chapter.href.readerHrefBase()
+        base == chapterBase || base.endsWith("/$chapterBase") || chapterBase.endsWith("/$base")
+    } ?: return null
+    val info = bookInfo.chapterInfo[chapter.href] ?: return null
+    val fragment = href.substringAfter('#', "").ifBlank { null }
+    val offset = fragment?.let { info.fragmentOffsets?.get(it) } ?: 0
+    return (info.currentTotal + offset).coerceIn(info.currentTotal, info.currentTotal + info.chapterCount)
+}
+
+internal fun String.readerHrefBase(): String =
+    trim()
+        .replace('\\', '/')
+        .removePrefix("/")
+        .substringBefore('#')
+        .substringBefore('?')
+
 internal fun buildBookInfo(
     chapters: List<EpubChapter>,
     toc: List<EpubTocItem> = emptyList(),

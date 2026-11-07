@@ -23,6 +23,8 @@ data class EpubBook(
     val author: String? = null,
 ) {
     internal val imageReferenceCounts: Map<String, Int> by lazy { countImageReferences() }
+    // Directory boundaries belong to this immutable book snapshot, not a page or timer tick.
+    internal val tocChapterStarts: List<Int> by lazy { buildTocChapterStarts() }
 
     fun readResource(path: String): ByteArray? {
         val normalized = path.normalizeResourceHref()

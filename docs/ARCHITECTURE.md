@@ -401,6 +401,10 @@ dynamic configuration and bridge calls.
   only new fields are written, and blank-tap false is preserved. Paragraph layout
   fields reload content; animation/speed/blank-tap updates do not. Character-based
   bookmarks, highlights and sync formats are unchanged.
+- `EpubBook.tocChapterStarts` lazily caches sorted directory boundaries for that
+  book snapshot. `EpubBookFacts` owns href/fragment resolution; `ReaderTocRange`
+  queries the cached boundaries so page turns and statistics ticks do not rebuild
+  the directory index. A copied or reparsed book owns a fresh cache.
 - `EpubBook.imageReferenceCounts` lazily caches original image references across
   distinct linear, non-navigation spine documents for that book snapshot; first
   access runs on a resource/loading worker. `ReaderWebResourceBridge` serves the

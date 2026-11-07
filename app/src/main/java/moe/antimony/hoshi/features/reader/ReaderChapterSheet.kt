@@ -45,6 +45,8 @@ import androidx.compose.ui.unit.dp
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.epub.EpubBook
 import moe.antimony.hoshi.epub.EpubTocItem
+import moe.antimony.hoshi.epub.readerHrefBase
+import moe.antimony.hoshi.epub.tocCharacterStart
 import moe.antimony.hoshi.ui.hoshiOutlinedTextFieldColors
 import moe.antimony.hoshi.ui.hoshiSingleLineTextFieldLineLimits
 import moe.antimony.hoshi.ui.rememberSyncedTextFieldState

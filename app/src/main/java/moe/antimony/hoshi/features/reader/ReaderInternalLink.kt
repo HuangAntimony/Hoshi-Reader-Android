@@ -1,6 +1,7 @@
 package moe.antimony.hoshi.features.reader
 
 import moe.antimony.hoshi.epub.EpubBook
+import moe.antimony.hoshi.epub.readerHrefBase
 import java.net.URI
 
 internal data class ReaderInternalLinkTarget(
