@@ -29,7 +29,7 @@ import moe.antimony.hoshi.ui.theme.hoshiSurfaces
 internal fun TtsVoiceSettings(
     settings: TtsSettings, catalog: TtsCatalog?, engines: List<TtsEngineInfo>, busy: Boolean,
     preview: TtsPreviewState, failure: TtsError?, onSettings: (TtsSettingsUpdate) -> Unit,
-    onPreview: () -> Unit, onStopPreview: () -> Unit, onRetry: () -> Unit,
+    onPreview: () -> Unit, onPreviewVoice: (String) -> Unit, onStopPreview: () -> Unit, onRetry: () -> Unit,
     onConfigure: (TtsOnlineSource) -> Unit, onSystemSettings: () -> Unit, modifier: Modifier = Modifier, onCustom: (String?) -> Unit = {},
     catalogLoading: Boolean = busy && preview == TtsPreviewState.Idle,
 ) {
@@ -144,7 +144,7 @@ internal fun TtsVoiceSettings(
                     else current.withVoice(id)
                 next
             }
-        }, onRefresh = onRetry, onDismiss = { voicePicker = null }) }
+        }, onPreviewVoice = onPreviewVoice, onRefresh = onRetry, onDismiss = { voicePicker = null }) }
 }
 
 @Composable

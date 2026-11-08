@@ -26,7 +26,7 @@ class TtsDialogueUiTest {
             HoshiReaderTheme(darkTheme = false, dynamicColor = false) {
                 TtsVoiceSettings(settings.value, TtsCatalog(settings.value.engine, listOf(
                     TtsVoiceInfo(if (settings.value.languageId == "en") "british" else "nanami", true))), emptyList(), false,
-                    TtsPreviewState.Idle, null, { update -> settings.value = update(settings.value) }, {}, {}, {}, {}, {})
+                    TtsPreviewState.Idle, null, { update -> settings.value = update(settings.value) }, {}, {}, {}, {}, {}, {})
             }
         }
         compose.onNodeWithText(context.getString(R.string.tts_profile_language, context.getString(R.string.profile_language_english))).assertIsDisplayed()
@@ -46,7 +46,7 @@ class TtsDialogueUiTest {
         compose.setContent {
             HoshiReaderTheme(darkTheme = false, eInkMode = eink, dynamicColor = false) {
                 TtsVoiceSettings(settings.value, TtsCatalog(settings.value.engine, voices), emptyList(), false,
-                    TtsPreviewState.Idle, null, { update -> settings.value = update(settings.value) }, {}, {}, { refreshes++ }, {}, {}, Modifier)
+                    TtsPreviewState.Idle, null, { update -> settings.value = update(settings.value) }, {}, {}, {}, { refreshes++ }, {}, {}, Modifier)
             }
         }
         compose.onNodeWithText(voiceLabel(R.string.tts_dialogue_voice)).assertDoesNotExist()

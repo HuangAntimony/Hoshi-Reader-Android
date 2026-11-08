@@ -17,7 +17,10 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import java.io.File
 import java.io.IOException
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.*
@@ -69,8 +72,8 @@ class TtsPanelStateTest {
     private lateinit var speech: MemoryStore
     private val configMessage get() = context.getString(R.string.tts_configuration_error)
 
-    private fun panel(system: Boolean = false, reader: Boolean = false, online: Boolean = false, discovery: CountDownLatch? = null, storageGate: CompletableDeferred<Unit>? = null, editor: Boolean = false, home: Boolean = false, enabled: Boolean = true) {
-        val source = if (discovery != null) "custom:manual" else if (system) androidx.test.platform.app.InstrumentationRegistry.getArguments().getString("ttsEngine").orEmpty() else if (online) TtsOnlineSource.Edge.id else TtsOnlineSource.GoogleCloud.id
+    private fun panel(system: Boolean = false, reader: Boolean = false, online: Boolean = false, discovery: CountDownLatch? = null, storageGate: CompletableDeferred<Unit>? = null, editor: Boolean = false, home: Boolean = false, enabled: Boolean = true, device: TtsDeviceEngine? = null) {
+        val source = if (discovery != null) "custom:manual" else if (device != null) "" else if (system) androidx.test.platform.app.InstrumentationRegistry.getArguments().getString("ttsEngine").orEmpty() else if (online) TtsOnlineSource.Edge.id else TtsOnlineSource.GoogleCloud.id
         val profiles = if (discovery == null) "" else """, "routingBySource":{"custom:manual":{"narration":"sample"}}, "customSources":[{"id":"custom:manual","name":"Local","baseUrl":"http://127.0.0.1:8088/v1","model":"irodori-tts","voiceIds":["neutral","bright"]}]"""
         speech = MemoryStore(preferencesOf(stringPreferencesKey("preferences") to """{"settings":{"enabled":$enabled,"engine":"$source"$profiles}}"""))
         speech.readGate = storageGate
@@ -90,7 +93,7 @@ class TtsPanelStateTest {
             okhttp3.Response.Builder().request(it.request()).protocol(okhttp3.Protocol.HTTP_1_1).code(200).message("Fixture")
                 .body("""[{"Locale":"ja-JP","ShortName":"$onlineVoice"}]""".toResponseBody()).build()
         }.build())
-        val engine = TtsEngineRouter(AndroidTtsEngine(context), OnlineTtsEngine(transport, cipher, Dispatchers.IO), CustomTtsEngine(transport, cipher::decrypt, Dispatchers.IO))
+        val engine = TtsEngineRouter(device?.let(::AndroidTtsEngine) ?: AndroidTtsEngine(context), OnlineTtsEngine(transport, cipher, Dispatchers.IO), CustomTtsEngine(transport, cipher::decrypt, Dispatchers.IO))
         val audio = TtsAudioRepository(engine, File(context.cacheDir, "tts-panel-state-fixture"), Dispatchers.IO, AndroidTtsExportFallback(context))
         val books = TtsBookRepository(Dispatchers.IO)
         val output = object : TtsPlaybackOutput {
@@ -139,7 +142,7 @@ class TtsPanelStateTest {
             return
         }
         compose.waitUntil(15_000) { !model.busy.value && model.readingSettings.value != null &&
-            if (system || online) model.catalog.value?.voices?.isNotEmpty() == true else model.error.value?.failure == TtsFailure.Configuration }
+            if (system || online || device != null) model.catalog.value?.voices?.isNotEmpty() == true else model.error.value?.failure == TtsFailure.Configuration }
     }
 
     @After fun dispose() { compose.runOnUiThread { models.clear(); scope.cancel() } }
@@ -393,6 +396,63 @@ class TtsPanelStateTest {
         compose.runOnIdle { model.preview(TtsSentence(0, 0, 0, "はい。"), null) }
         compose.waitUntil(15_000) { model.previewState.value == TtsPreviewState.Idle }
         compose.runOnIdle { Assert.assertNull(model.error.value) }
+    }
+
+    @Test fun pickerPreviewsOneVoiceAndKeepsTheSavedDialogueRouting() {
+        val voices = listOf(TtsVoiceInfo("a", false, label = "Voice A"), TtsVoiceInfo("b", false, label = "Voice B"))
+        val requests = CopyOnWriteArrayList<Pair<String, String>>()
+        panel(device = object : TtsDeviceEngine {
+            override suspend fun installedEngines() = emptyList<TtsEngineInfo>()
+            override suspend fun catalog(settings: TtsSettings) = TtsCatalog("fixture", voices)
+            override suspend fun synthesize(text: String, settings: TtsSettings, directory: File): List<File> {
+                requests += settings.voice to text
+                val rate = 16_000
+                val frames = rate * 5
+                val wav = ByteBuffer.allocate(44 + frames * 2).order(ByteOrder.LITTLE_ENDIAN).apply {
+                    put("RIFF".toByteArray()).putInt(36 + frames * 2).put("WAVEfmt ".toByteArray()).putInt(16)
+                    putShort(1).putShort(1).putInt(rate).putInt(rate * 2).putShort(2).putShort(16)
+                    put("data".toByteArray()).putInt(frames * 2)
+                    val frequency = if (settings.voice == "b") 550 else 440
+                    repeat(frames) { putShort((kotlin.math.sin(it * 2 * Math.PI * frequency / rate) * 1500).toInt().toShort()) }
+                }
+                return listOf(File.createTempFile("picker-voice-", ".wav", directory.apply { mkdirs() }).apply { writeBytes(wav.array()) })
+            }
+        })
+        val routing = TtsVoiceRouting(enabled = true, narration = "a", dialogue = "b")
+        compose.runOnIdle { model.settings { it.withRouting(routing) } }
+        compose.waitUntil(5_000) { model.preferences.value?.settings?.routing() == routing }
+
+        fun openPicker(role: Int) {
+            val label = context.getString(R.string.tts_voice_status, context.getString(role), context.getString(R.string.tts_offline))
+            compose.onNodeWithText(label).performScrollTo().performClick()
+        }
+        fun preview(title: String, count: Int) {
+            compose.onNodeWithContentDescription(context.getString(R.string.tts_preview_named_voice, title)).performTouchInput { click() }
+            compose.waitUntil(5_000) { requests.size >= count && model.previewState.value == TtsPreviewState.Playing }
+            compose.onNodeWithText(context.getString(R.string.tts_refresh_voices)).assertIsDisplayed()
+        }
+
+        openPicker(R.string.tts_narration_voice)
+        preview("Voice B", 1)
+        preview(context.getString(R.string.tts_system_default), 2)
+        androidx.test.espresso.Espresso.pressBack()
+        compose.onNodeWithText(context.getString(R.string.tts_stop_preview)).assertIsDisplayed().performClick()
+        openPicker(R.string.tts_dialogue_voice)
+        preview("Voice A", 3)
+        androidx.test.espresso.Espresso.pressBack()
+        compose.onNodeWithText(context.getString(R.string.tts_stop_preview)).performClick()
+        val sample = context.getString(R.string.tts_sample)
+        Assert.assertEquals(listOf("b" to sample, "" to sample, "a" to sample), requests.toList())
+        Assert.assertEquals(routing, model.preferences.value?.settings?.routing())
+
+        compose.onNodeWithText(context.getString(R.string.tts_preview_voice)).performClick()
+        compose.waitUntil(5_000) { model.previewState.value == TtsPreviewState.Playing }
+        Assert.assertEquals(listOf("a", "b", "a"), requests.drop(3).map { it.first })
+        compose.onNodeWithText(context.getString(R.string.tts_stop_preview)).performClick()
+        openPicker(R.string.tts_dialogue_voice)
+        compose.onNode(hasText("Voice A") and hasText("a")).performClick()
+        compose.waitUntil(5_000) { model.preferences.value?.settings?.routing()?.dialogue == "a" }
+        compose.onNodeWithText(context.getString(R.string.tts_refresh_voices)).assertDoesNotExist()
     }
 
     @Test fun readerSentenceControlsAndVolumeKeysPreservePausedInstalledEnginePlayback() {

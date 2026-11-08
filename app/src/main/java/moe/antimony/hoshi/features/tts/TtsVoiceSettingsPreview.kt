@@ -26,7 +26,7 @@ private fun TtsVoicePreview(dark: Boolean = false, eInk: Boolean = false) {
     HoshiReaderTheme(darkTheme = dark, eInkMode = eInk, dynamicColor = false) {
         Surface(Modifier.fillMaxSize(), color = hoshiSurfaces.overlay) {
             TtsVoiceSettings(settings, TtsCatalog(settings.engine, listOf(TtsVoiceInfo(settings.voice, true))), emptyList(),
-                false, TtsPreviewState.Idle, null, {}, {}, {}, {}, {}, {})
+                false, TtsPreviewState.Idle, null, {}, {}, {}, {}, {}, {}, {})
         }
     }
 }

@@ -123,9 +123,14 @@ private fun TtsLoadedPanel(viewModel: TtsViewModel, bookId: String?, onStart: ((
                 }
             }
         } else {
+            val singleVoiceSample = stringResource(preferences.settings.sampleRes(dialogue = false))
             TtsVoiceSettings(preferences.settings, catalog, engines, busy, preview, error ?: playback.error,
                 onSettings = { viewModel.settings(preferences.settings.languageId, it) },
-                onPreview = { viewModel.preview(TtsSentence(0, 0, 0, sample), bookId, preferences) }, onStopPreview = viewModel::stopPreview,
+                onPreview = { viewModel.preview(TtsSentence(0, 0, 0, sample), bookId, preferences) },
+                onPreviewVoice = { id ->
+                    val audition = preferences.copy(settings = preferences.settings.forVoice(id))
+                    viewModel.preview(TtsSentence(0, 0, 0, singleVoiceSample), bookId, audition)
+                }, onStopPreview = viewModel::stopPreview,
                 onRetry = { viewModel.dismissError(); viewModel.refresh(force = true) }, onConfigure = { configureSource = it },
                 onSystemSettings = {
                     try { context.startActivity(Intent("com.android.settings.TTS_SETTINGS")) }

@@ -20,21 +20,24 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class TtsVoiceSettingsTest {
     @get:Rule val compose = createComposeRule()
+    private val context = InstrumentationRegistry.getInstrumentation().targetContext
+    private fun text(id: Int) = context.getString(id)
+    private fun voiceStatus(status: Int) = context.getString(R.string.tts_voice_status, text(R.string.tts_voice), text(status))
 
     @Test fun previewRemainsVisibleWhileExpandedParametersScroll() {
         var starts = 0
         compose.setContent {
             HoshiReaderTheme(darkTheme = false, dynamicColor = false) {
                 TtsVoiceSettings(TtsSettings(engine = TtsOnlineSource.Azure.id), null, emptyList(), false,
-                    TtsPreviewState.Idle, null, {}, { starts++ }, {}, {}, {}, {}, Modifier.height(360.dp))
+                    TtsPreviewState.Idle, null, {}, { starts++ }, {}, {}, {}, {}, {}, Modifier.height(360.dp))
             }
         }
-        val preview = compose.onNodeWithText("Preview voice").assertIsDisplayed()
+        val preview = compose.onNodeWithText(text(R.string.tts_preview_voice)).assertIsDisplayed()
         val position = preview.fetchSemanticsNode().boundsInRoot
-        compose.onNodeWithText("Audio format").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText(text(R.string.tts_output_format)).performScrollTo().assertIsDisplayed()
         preview.assertIsDisplayed().performClick()
         assertEquals(position, preview.fetchSemanticsNode().boundsInRoot)
-        compose.onNodeWithText("Source").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText(text(R.string.tts_source)).performScrollTo().assertIsDisplayed()
         preview.assertIsDisplayed().performClick()
         compose.runOnIdle { assertEquals(2, starts) }
     }
@@ -46,11 +49,11 @@ class TtsVoiceSettingsTest {
         compose.setContent {
             HoshiReaderTheme(darkTheme = false, dynamicColor = false) {
                 TtsVoiceSettings(settings.value, null, emptyList(), false, TtsPreviewState.Idle, null,
-                    { update -> settings.value = update(settings.value) }, {}, {}, {}, {}, {})
+                    { update -> settings.value = update(settings.value) }, {}, {}, {}, {}, {}, {})
             }
         }
-        compose.onNodeWithText("Audio format").performScrollTo().performClick()
-        compose.onNodeWithText("MP3").performClick()
+        compose.onNodeWithText(text(R.string.tts_output_format)).performScrollTo().performClick()
+        compose.onNodeWithText(text(R.string.tts_format_mp3)).performClick()
         compose.runOnIdle {
             assertEquals(TtsAudioFormat.Mp3, settings.value.customSource()?.format)
             assertEquals(other, settings.value.customSources.last())
@@ -62,14 +65,14 @@ class TtsVoiceSettingsTest {
         val picker = mutableStateOf(false)
         compose.setContent {
             HoshiReaderTheme(darkTheme = false, eInkMode = true, dynamicColor = false) {
-                if (picker.value) TtsVoicePicker("Fixture", emptyList(), "", true, null, {}, {}, {})
+                if (picker.value) TtsVoicePicker("Fixture", emptyList(), "", true, null, {}, {}, {}, {})
                 else TtsVoiceSettings(TtsSettings(engine = TtsOnlineSource.Edge.id), null, emptyList(), true,
-                    TtsPreviewState.Idle, null, {}, {}, {}, {}, {}, {})
+                    TtsPreviewState.Idle, null, {}, {}, {}, {}, {}, {}, {})
             }
         }
-        compose.onNodeWithText("Loading voices…").assertIsDisplayed()
+        compose.onNodeWithText(text(R.string.tts_loading_voices)).assertIsDisplayed()
         compose.runOnIdle { picker.value = true }
-        compose.onNodeWithText("Loading voices…").assertIsDisplayed()
+        compose.onNodeWithText(text(R.string.tts_loading_voices)).assertIsDisplayed()
         compose.onAllNodes(SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.ProgressBarRangeInfo,
             androidx.compose.ui.semantics.ProgressBarRangeInfo.Indeterminate)).assertCountEquals(0)
     }
@@ -79,11 +82,11 @@ class TtsVoiceSettingsTest {
         compose.setContent {
             HoshiReaderTheme(darkTheme = false, dynamicColor = false) {
                 TtsVoiceSettings(settings.value, null, emptyList(), false, TtsPreviewState.Idle, null,
-                    { update -> settings.value = update(settings.value) }, {}, {}, {}, {}, {})
+                    { update -> settings.value = update(settings.value) }, {}, {}, {}, {}, {}, {})
             }
         }
-        compose.onNodeWithText("Engine speech rate").assertExists()
-        compose.onNodeWithText("Hoshi playback speed").assertExists()
+        compose.onNodeWithText(text(R.string.tts_rate_label)).assertExists()
+        compose.onNodeWithText(text(R.string.tts_playback_rate)).assertExists()
         val slider = compose.onNode(SemanticsMatcher("Hoshi playback speed range") {
             it.config.getOrNull(androidx.compose.ui.semantics.SemanticsProperties.ProgressBarRangeInfo)?.range == ttsPlaybackRateRange
         })
@@ -99,35 +102,34 @@ class TtsVoiceSettingsTest {
             HoshiReaderTheme(darkTheme = false, dynamicColor = false) {
                 TtsVoiceSettings(settings.value, TtsCatalog(settings.value.engine, listOf(TtsVoiceInfo("ja-JP-NanamiNeural", true))),
                     listOf(TtsEngineInfo("third.party", "Third party engine")), false, TtsPreviewState.Idle, null,
-                    { update -> settings.value = update(settings.value) }, {}, {}, {}, {}, {})
+                    { update -> settings.value = update(settings.value) }, {}, {}, {}, {}, {}, {})
             }
         }
-        compose.onNodeWithText("Source").assertExists()
-        compose.onNodeWithText("Voice · Online").assertExists()
+        compose.onNodeWithText(text(R.string.tts_source)).assertExists()
+        compose.onNodeWithText(voiceStatus(R.string.tts_online)).assertExists()
         compose.onNodeWithText("ja-JP-NanamiNeural").assertExists()
-        compose.onNodeWithText("Edge TTS").performClick()
-        compose.onNodeWithText("Choose source").assertExists()
-        compose.onNodeWithText("Device engines").assertExists()
+        compose.onNodeWithText(text(R.string.tts_source_edge)).performClick()
+        compose.onNodeWithText(text(R.string.tts_choose_source)).assertExists()
+        compose.onNodeWithText(text(R.string.tts_group_device)).assertExists()
         compose.onNodeWithText("Third party engine").assertExists()
-        compose.onNodeWithText("Microsoft Translator").performScrollTo().performClick()
+        compose.onNodeWithText(text(R.string.tts_source_microsoft_translator)).performScrollTo().performClick()
         compose.runOnIdle { assertEquals(TtsOnlineSource.MicrosoftTranslator.id, settings.value.engine); assertEquals("", settings.value.voice) }
     }
 
     @Test fun largeVoiceListSelectsRawIdentifierAndRetainsUnknownSavedVoice() {
         var selected = ""
-        val context = InstrumentationRegistry.getInstrumentation().targetContext
         val namedVoice = TtsVoiceInfo("zh-CN-XiaochenNeural", true, label = "晓辰")
         val voices = (1..399).map { TtsVoiceInfo("custom-voice-$it", true) } + namedVoice
         compose.setContent {
             HoshiReaderTheme(darkTheme = true, dynamicColor = false) {
                 TtsVoicePicker("Fixture source", voices, "saved-voice-not-in-catalog", false, null,
-                    onSelected = { selected = it }, onRefresh = {}, onDismiss = {})
+                    onSelected = { selected = it }, onPreviewVoice = {}, onRefresh = {}, onDismiss = {})
             }
         }
         compose.onNodeWithText("saved-voice-not-in-catalog").assertExists()
-        compose.onNodeWithText(context.getString(R.string.tts_system_default)).assertExists()
+        compose.onNodeWithText(text(R.string.tts_system_default)).assertExists()
         compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasText(namedVoice.label))
-        compose.onNodeWithText(context.getString(R.string.tts_refresh_voices)).assertIsDisplayed()
+        compose.onNodeWithText(text(R.string.tts_refresh_voices)).assertIsDisplayed()
         compose.onNodeWithText(namedVoice.id).assertIsDisplayed()
         compose.onNodeWithText(namedVoice.label).performClick()
         compose.runOnIdle { assertEquals(namedVoice.id, selected) }
@@ -140,20 +142,20 @@ class TtsVoiceSettingsTest {
             HoshiReaderTheme(darkTheme = false, dynamicColor = false) {
                 TtsVoiceSettings(settings.value, TtsCatalog("fixture.engine", voices),
                     listOf(TtsEngineInfo("fixture.engine", "Fixture engine")), false, TtsPreviewState.Idle, null,
-                    { update -> settings.value = update(settings.value) }, {}, {}, {}, {}, {})
+                    { update -> settings.value = update(settings.value) }, {}, {}, {}, {}, {}, {})
             }
         }
-        compose.onNodeWithText("Source").assertExists()
-        compose.onNodeWithText("Voice · Offline").assertExists()
+        compose.onNodeWithText(text(R.string.tts_source)).assertExists()
+        compose.onNodeWithText(voiceStatus(R.string.tts_offline)).assertExists()
         compose.onNodeWithText("offline-voice").performClick()
         compose.onNodeWithText("online-voice").performClick()
-        compose.onNodeWithText("Voice · Online").assertExists()
+        compose.onNodeWithText(voiceStatus(R.string.tts_online)).assertExists()
         compose.runOnIdle { assertEquals("online-voice", settings.value.voice) }
         compose.onNodeWithText("online-voice").performClick()
-        compose.onNodeWithText("Automatic").performClick()
-        compose.onNodeWithText("Voice · Offline").assertExists()
+        compose.onNodeWithText(text(R.string.tts_system_default)).performClick()
+        compose.onNodeWithText(voiceStatus(R.string.tts_offline)).assertExists()
         compose.runOnIdle { settings.value = settings.value.withVoice("unknown-saved-voice") }
-        compose.onNodeWithText("Voice").assertExists()
+        compose.onNodeWithText(text(R.string.tts_voice)).assertExists()
         compose.onNodeWithText("unknown-saved-voice").assertExists()
     }
 
@@ -164,14 +166,14 @@ class TtsVoiceSettingsTest {
         compose.setContent {
             HoshiReaderTheme(darkTheme = false, eInkMode = true, dynamicColor = false) {
                 TtsVoiceSettings(TtsSettings(), null, emptyList(), preview.value == TtsPreviewState.Preparing, preview.value, null,
-                    {}, { starts++ }, { stops++ }, {}, {}, {})
+                    {}, { starts++ }, {}, { stops++ }, {}, {}, {})
             }
         }
-        compose.onNodeWithText("Stop preview").assertIsEnabled().performClick()
+        compose.onNodeWithText(text(R.string.tts_stop_preview)).assertIsEnabled().performClick()
         compose.runOnIdle { preview.value = TtsPreviewState.Playing }
-        compose.onNodeWithText("Stop preview").performClick()
+        compose.onNodeWithText(text(R.string.tts_stop_preview)).performClick()
         compose.runOnIdle { preview.value = TtsPreviewState.Idle }
-        compose.onNodeWithText("Preview voice").performClick()
+        compose.onNodeWithText(text(R.string.tts_preview_voice)).performClick()
         compose.runOnIdle { assertEquals(2, stops); assertEquals(1, starts) }
     }
 

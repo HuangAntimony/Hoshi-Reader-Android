@@ -968,6 +968,7 @@
     <string name="tts_offline">离线</string>
     <string name="tts_preview">试听</string>
     <string name="tts_preview_voice">试听音色</string>
+    <string name="tts_preview_named_voice" comment="TTS voice picker button; %1$s is the displayed voice name.">试听 %1$s</string>
     <string name="tts_retry" comment="Retry a failed text-to-speech engine request.">重试</string>
     <string name="tts_replace" comment="Native text-selection action that opens the TTS replacement editor.">替换</string>
     <string name="tts_regex_enabled">正则表达式</string>

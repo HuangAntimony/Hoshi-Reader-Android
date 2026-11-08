@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Check
@@ -102,7 +103,8 @@ internal fun TtsProviderPicker(
 @Composable
 internal fun TtsVoicePicker(
     title: String, voices: List<TtsVoiceInfo>, selected: String, busy: Boolean,
-    failure: TtsError?, onSelected: (String) -> Unit, onRefresh: () -> Unit, onDismiss: () -> Unit,
+    failure: TtsError?, onSelected: (String) -> Unit, onPreviewVoice: (String) -> Unit,
+    onRefresh: () -> Unit, onDismiss: () -> Unit,
 ) {
     val choices = voices.withSelectedVoice(selected)
     TtsSelectionSheet(title, onDismiss) {
@@ -122,12 +124,14 @@ internal fun TtsVoicePicker(
                 }
             }
             item(key = "automatic") {
-                TtsVoiceRow(stringResource(R.string.tts_system_default), null, selected.isBlank()) { onSelected("") }
+                TtsVoiceRow(stringResource(R.string.tts_system_default), null, selected.isBlank(),
+                    onClick = { onSelected("") }, onPreview = { onPreviewVoice("") })
             }
             items(choices, key = { it.id }) { voice ->
                 val connection = if (voices.any { it.id == voice.id })
                     stringResource(if (voice.network) R.string.tts_online else R.string.tts_offline) else null
-                TtsVoiceRow(voice.label, if (voice.label != voice.id) voice.id else connection, voice.id == selected) { onSelected(voice.id) }
+                TtsVoiceRow(voice.label, if (voice.label != voice.id) voice.id else connection, voice.id == selected,
+                    onClick = { onSelected(voice.id) }, onPreview = { onPreviewVoice(voice.id) })
             }
         }
     }
@@ -137,13 +141,19 @@ internal fun List<TtsVoiceInfo>.withSelectedVoice(selected: String): List<TtsVoi
     if (selected.isBlank() || any { it.id == selected }) this else listOf(TtsVoiceInfo(selected, false)) + this
 
 @Composable
-private fun TtsVoiceRow(title: String, subtitle: String?, selected: Boolean, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 10.dp)
-        .heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Box(Modifier.size(24.dp)) { if (selected) Icon(Icons.Rounded.Check, null) }
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge)
-            subtitle?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = hoshiSurfaces.muted) }
+private fun TtsVoiceRow(title: String, subtitle: String?, selected: Boolean, onClick: () -> Unit, onPreview: () -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(end = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.weight(1f).clickable(onClick = onClick)
+            .padding(start = 20.dp, end = 8.dp, top = 10.dp, bottom = 10.dp).heightIn(min = 48.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box(Modifier.size(24.dp)) { if (selected) Icon(Icons.Rounded.Check, null) }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(title, style = MaterialTheme.typography.bodyLarge)
+                subtitle?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = hoshiSurfaces.muted) }
+            }
+        }
+        IconButton(onClick = onPreview) {
+            Icon(Icons.AutoMirrored.Rounded.VolumeUp, stringResource(R.string.tts_preview_named_voice, title), tint = hoshiSurfaces.muted)
         }
     }
 }

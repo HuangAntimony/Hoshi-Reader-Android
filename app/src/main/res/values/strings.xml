@@ -971,6 +971,7 @@
     <string name="tts_offline">Offline</string>
     <string name="tts_preview">Preview</string>
     <string name="tts_preview_voice">Preview voice</string>
+    <string name="tts_preview_named_voice" comment="TTS voice picker button; %1$s is the displayed voice name.">Preview %1$s</string>
     <string name="tts_retry" comment="Retry a failed text-to-speech engine request.">Retry</string>
     <string name="tts_replace" comment="Native text-selection action that opens the TTS replacement editor.">Replace</string>
     <string name="tts_regex_enabled">Regex</string>
