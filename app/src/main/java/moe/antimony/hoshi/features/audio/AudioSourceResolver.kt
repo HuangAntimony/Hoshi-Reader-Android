@@ -20,6 +20,7 @@ data class LocalAudioCandidate(
 data class LocalAudioFile(
     val source: String,
     val file: String,
+    val generation: String? = null,
 )
 
 object AudioSourceResolver {
@@ -58,13 +59,14 @@ object LocalAudioResolver {
         rows: List<LocalAudioEntry>,
         sourceOrder: List<String> = LocalAudioSourceOrder.defaultOrder(rows.map { it.source }),
         disabledSources: Set<String> = emptySet(),
+        generation: String? = null,
     ): List<LocalAudioCandidate> {
         val normalizedReading = katakanaToHiragana(reading)
         return rankedEntries(term, normalizedReading, rows, sourceOrder, disabledSources)
             .map { entry ->
                 LocalAudioCandidate(
                     name = entry.candidateName(term, normalizedReading),
-                    url = audioUrl(entry.source, entry.file),
+                    url = audioUrl(entry.source, entry.file, generation),
                 )
             }
             .distinctBy(LocalAudioCandidate::url)
@@ -96,17 +98,20 @@ object LocalAudioResolver {
             .toList()
     }
 
-    fun audioUrl(source: String, file: String): String =
-        "$LOCAL_AUDIO_SCHEME://${source.urlEncode()}/${file.urlEncode()}"
+    fun audioUrl(source: String, file: String, generation: String? = null): String =
+        "$LOCAL_AUDIO_SCHEME://${source.urlEncode()}/${file.urlEncode()}" +
+            (generation?.let { "?generation=${it.urlEncode()}" } ?: "")
 
     fun parseAudioUrl(url: String): LocalAudioFile? {
         if (!url.startsWith("$LOCAL_AUDIO_SCHEME://")) return null
-        val tail = url.removePrefix("$LOCAL_AUDIO_SCHEME://")
+        val tail = url.removePrefix("$LOCAL_AUDIO_SCHEME://").substringBefore('?')
         val slash = tail.indexOf('/')
         if (slash <= 0 || slash == tail.lastIndex) return null
         return LocalAudioFile(
             source = tail.substring(0, slash).urlDecode(),
             file = tail.substring(slash + 1).urlDecode(),
+            generation = url.substringAfter('?', "").split('&')
+                .firstOrNull { it.startsWith("generation=") }?.substringAfter('=')?.urlDecode(),
         )
     }
 

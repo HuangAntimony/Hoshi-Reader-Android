@@ -7,6 +7,8 @@ Release notes before v1.3.0 are in [CHANGELOG_ARCHIVE.md](CHANGELOG_ARCHIVE.md).
 
 ### Added
 
+- Choose whether to copy a local word-audio database into the app or link to its existing location without duplicating it, with source ordering and enable/disable controls, and import available again when a linked file cannot be read.
+
 - Create Chinese and Korean profiles with language-specific fonts, automatic book-profile selection, and lookup in the reader and dictionary popups, including Korean deinflection and Chinese pinyin grouping.
 
 - Switch the app between English, Simplified Chinese and the system language on Android 8–12 as well as newer versions, with the chosen language also used for newly generated notifications and background messages.

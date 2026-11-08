@@ -53,27 +53,3 @@ object LocalAudioSourceOrder {
                 }.thenBy { it },
             )
 }
-
-internal class LocalAudioSourceConfigCache(
-    private val load: () -> LocalAudioSourceConfig,
-) {
-    @Volatile
-    private var cached: LocalAudioSourceConfig? = null
-
-    fun get(): LocalAudioSourceConfig =
-        cached ?: synchronized(this) {
-            cached ?: load().also { cached = it }
-        }
-
-    fun replace(config: LocalAudioSourceConfig) {
-        synchronized(this) {
-            cached = config
-        }
-    }
-
-    fun clear() {
-        synchronized(this) {
-            cached = null
-        }
-    }
-}

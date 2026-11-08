@@ -4,6 +4,21 @@ import android.content.Context
 import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.os.Build
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
+import dagger.hilt.android.EntryPointAccessors
+import dagger.hilt.android.qualifiers.ApplicationContext
+import dagger.hilt.components.SingletonComponent
+import javax.inject.Inject
+import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import moe.antimony.hoshi.R
+import moe.antimony.hoshi.di.ApplicationScope
+import moe.antimony.hoshi.ui.ErrorDiagnosticEvents
+import moe.antimony.hoshi.ui.UiText
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -16,64 +31,79 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 
 @OptIn(UnstableApi::class)
-class WordAudioPlayer private constructor(context: Context) {
+@Singleton
+class WordAudioPlayer @Inject constructor(
+    @ApplicationContext context: Context,
+    private val localAudioRepository: LocalAudioRepository,
+    @param:ApplicationScope private val applicationScope: CoroutineScope,
+) {
     private val appContext = context.applicationContext
     private val audioManager = appContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     private val focusChangeListener = AudioManager.OnAudioFocusChangeListener { }
     private var player: ExoPlayer? = null
     private var focusRequest: AudioFocusRequest? = null
+    private var loadJob: Job? = null
+    private var generation = 0L
 
     fun play(url: String, mode: AudioPlaybackMode) {
         stop()
-        if (!requestFocus(mode)) return
-        val nextPlayer = ExoPlayer.Builder(appContext).build().apply {
-            setAudioAttributes(audioAttributes(), false)
-            addListener(
-                object : Player.Listener {
-                    override fun onPlaybackStateChanged(playbackState: Int) {
-                        if (playbackState == Player.STATE_ENDED) {
-                            this@WordAudioPlayer.stop()
-                        }
-                    }
+        val request = generation
+        loadJob = applicationScope.launch {
+            try {
+                val localFile = LocalAudioResolver.parseAudioUrl(url)
+                val data = localFile?.let { localAudioRepository.loadAudio(it) ?: error("Local audio not found.") }
+                if (request != generation || !requestFocus(mode)) return@launch
+                val nextPlayer = ExoPlayer.Builder(appContext).build()
+                player = nextPlayer
+                nextPlayer.apply {
+                    setAudioAttributes(audioAttributes(), false)
+                    addListener(
+                        object : Player.Listener {
+                            override fun onPlaybackStateChanged(playbackState: Int) {
+                                if (playbackState == Player.STATE_ENDED) {
+                                    if (player === nextPlayer) this@WordAudioPlayer.stop()
+                                }
+                            }
 
-                    override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
-                        if (!playWhenReady && reason == Player.PLAY_WHEN_READY_CHANGE_REASON_END_OF_MEDIA_ITEM) {
-                            this@WordAudioPlayer.stop()
-                        }
-                    }
+                            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                                if (!playWhenReady && reason == Player.PLAY_WHEN_READY_CHANGE_REASON_END_OF_MEDIA_ITEM) {
+                                    if (player === nextPlayer) this@WordAudioPlayer.stop()
+                                }
+                            }
 
-                    override fun onPlayerError(error: PlaybackException) {
-                        this@WordAudioPlayer.stop()
-                    }
-                },
-            )
-        }
-        runCatching {
-            val localFile = LocalAudioResolver.parseAudioUrl(url)
-            if (localFile != null) {
-                val data = LocalAudioRepository.fromContext(appContext).loadAudio(localFile)
-                    ?: error("Local audio not found.")
-                val mediaItem = MediaItem.Builder()
-                    .setUri("memory://hoshi-local-audio/${localFile.file.urlEncode()}")
-                    .setMimeType(LocalAudioResolver.mimeType(localFile.file))
-                    .build()
-                val mediaSource = ProgressiveMediaSource.Factory {
-                    ByteArrayDataSource(data)
-                }.createMediaSource(mediaItem)
-                nextPlayer.setMediaSource(mediaSource)
-            } else {
-                nextPlayer.setMediaItem(MediaItem.fromUri(url))
+                            override fun onPlayerError(error: PlaybackException) {
+                                if (player === nextPlayer) this@WordAudioPlayer.stop()
+                            }
+                        },
+                    )
+                }
+                if (localFile != null) {
+                    val mediaItem = MediaItem.Builder()
+                        .setUri("memory://hoshi-local-audio/${localFile.file.urlEncode()}")
+                        .setMimeType(LocalAudioResolver.mimeType(localFile.file))
+                        .build()
+                    val mediaSource = ProgressiveMediaSource.Factory {
+                        ByteArrayDataSource(requireNotNull(data))
+                    }.createMediaSource(mediaItem)
+                    nextPlayer.setMediaSource(mediaSource)
+                } else {
+                    nextPlayer.setMediaItem(MediaItem.fromUri(url))
+                }
+                nextPlayer.prepare()
+                nextPlayer.playWhenReady = true
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                ErrorDiagnosticEvents.buffer.record(UiText.Resource(R.string.audio_local_database_read_failed), error)
+                if (request == generation) stop()
             }
-            nextPlayer.prepare()
-            nextPlayer.playWhenReady = true
-            player = nextPlayer
-        }.onFailure {
-            nextPlayer.release()
-            abandonFocus()
         }
     }
 
     fun stop() {
+        generation++
+        loadJob?.cancel()
+        loadJob = null
         player?.release()
         player = null
         abandonFocus()
@@ -126,12 +156,13 @@ class WordAudioPlayer private constructor(context: Context) {
             .build()
 
     companion object {
-        @Volatile
-        private var instance: WordAudioPlayer? = null
-
         fun get(context: Context): WordAudioPlayer =
-            instance ?: synchronized(this) {
-                instance ?: WordAudioPlayer(context).also { instance = it }
-            }
+            EntryPointAccessors.fromApplication(context.applicationContext, WordAudioPlayerEntryPoint::class.java).wordAudioPlayer()
     }
+}
+
+@EntryPoint
+@InstallIn(SingletonComponent::class)
+internal interface WordAudioPlayerEntryPoint {
+    fun wordAudioPlayer(): WordAudioPlayer
 }

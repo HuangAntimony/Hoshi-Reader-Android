@@ -45,6 +45,11 @@ Rendering and latency claims require device evidence.
 - CI fixtures are constructed by tests or use tracked assets. Ignored `testdata/`
   may contain optional local EPUB, dictionary, font, SRT, M4B and Opus samples;
   inspect availability first.
+- If combined release compilation and debug lint fail with a missing generated
+  release Hilt Java source inside Kotlin/FIR analysis, finish
+  `./gradlew :app:assembleRelease` and then run `./gradlew lint` separately.
+  Concurrent Hilt regeneration can invalidate lint's source snapshot; do not
+  suppress the detector or treat that analyzer crash as a passing lint run.
 - JVM tests replacing `Dispatchers.Main` must cancel **and join** the ViewModel
   scope before `resetMain()`, or late callbacks can fail unrelated tests.
 - MockWebServer WebSocket fixtures must answer `onClosing` with
@@ -131,6 +136,68 @@ results and counts native session/style calls; all native handles are released.
 Both fixtures write `lookup-performance-{web,native}.json` to the debug app's cache.
 Compare paired samples rather than single runs. These measure DOM selection and
 repository lookup separately, not end-to-end popup painting latency.
+
+### Local word-audio SQLite fixtures
+
+`LocalAudioBindingTest` exercises Copy/Link publication, migration, retained-copy
+cleanup, failed/cancelled replacement and generation checks through an injected
+storage boundary. `LocalAudioSettingsViewModelTest` checks state and recoverable
+errors. `LocalAudioImportEntryDeviceTest` renders the real controls with a scratch
+ViewModel and tests import visibility across valid copies/links, removal, link
+failure/recovery and source-setting failures. It saves the displayed states as
+`cache/local-audio-entry-*.png` without loading installed settings.
+The standalone C++ fixture uses the same pinned SQLite as Android:
+
+```bash
+cmake -S tools/tests/local_audio_native -B /tmp/hoshi-local-audio-host -DCMAKE_BUILD_TYPE=Release
+cmake --build /tmp/hoshi-local-audio-host -j 4
+ctest --test-dir /tmp/hoshi-local-audio-host --output-on-failure
+# Optional ignored, read-only real corpus; prints parity, I/O and timing evidence:
+/tmp/hoshi-local-audio-host/local_audio_native_test testdata/android.db
+```
+
+It covers descriptor ownership, Unicode/nulls, OR semantics, blobs, prepared
+statement reuse, bounded slices and offsets above 4 GiB, short reads, rejected
+pipes/WAL/schema and source mutation. Host timings do not establish Android/SAF
+latency. Run `LocalAudioNativeDeviceTest` explicitly on device after the
+`install -r` procedure above; it creates only synthetic cache fixtures.
+
+For an optional real-database comparison, first copy a test-owned sample into a
+unique device Downloads filename and launch debug-only
+`moe.antimony.hoshi.features.audio.LocalAudioValidationActivity`. Select that file
+through DocumentsUI; the Activity persists only the fixture grant and URI under
+`cache/local-audio-validation/`. Stop the target process after selection to discard
+temporary grants. Run these methods explicitly, each with
+`-e localAudioRealDatabase true`; never point the fixture at a production binding:
+
+1. `LocalAudioPerformanceDeviceTest#compareFrameworkAndFdQueriesAndVerifyRealCopyLinkModes`
+2. `LocalAudioSafDeviceTest#prepareLinkForProcessRestart`
+3. `LocalAudioSafDeviceTest#reopenLinkAndReleaseFixtureGrant`
+4. `LocalAudioSafDeviceTest#revokedDocumentCannotReopenAfterProcessRestart`
+
+Use the full `moe.antimony.hoshi.features.audio.` class prefix. Stop the target
+process between the three SAF phases; they assert different PIDs. The benchmark
+requires enough free space for one temporary full-size copy and cleans it in
+`finally`. It tests actual Copy/Link switching in a scratch repository and compares
+framework SQLite opens, fresh FD sessions and a reused FD session with alternating
+query order and equal rows/blob bytes. Results and counters go to
+`cache/local-audio-validation/performance.json`. These are warm filesystem-cache
+measurements, not cold-storage latency or end-to-end playback. The SAF phases
+preserve a scratch binding across process death, release only the exact grant
+newly acquired by the fixture, verify access denial, and remove scratch state.
+After revocation, launch the same Activity with `--ez verifyOwnership true` and
+select the fixture document again. This time the repository itself takes the
+persistent grant from the temporary picker result and releases it on unlink;
+`ownership-result.json` must report `passed`, with read access true after Link and
+false after unlink. An already persisted grant is skipped, never released.
+The Activity also accepts `--ez showImportOptions true` to render the real
+Copy/Link chooser without opening a picker or changing installed audio settings;
+all three callbacks only close the fixture. Use it for dialog layout inspection.
+Android may leave an empty journal after framework fixture creation; synthetic
+fixtures explicitly use `journal_mode=DELETE` and check the directory before JNI
+opens it, so their no-sidecar assertion measures only the FD backend.
+Remove only the uploaded test-owned document after all phases; leave production
+settings, audio bindings, source documents and unrelated URI grants untouched.
 
 ### App language fixtures
 

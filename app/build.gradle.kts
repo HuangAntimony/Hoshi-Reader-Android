@@ -88,7 +88,7 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         externalNativeBuild {
             cmake {
-                targets += listOf("hoshidicts_jni")
+                targets += listOf("hoshidicts_jni", "hoshilocalaudio_jni")
             }
         }
     }

@@ -10,22 +10,11 @@ Each slice preserves current behavior except for changes required by the task.
 
 ## High priority
 
-### Move blocking audio work behind repository APIs
-
-`features/audio/AudioView.kt` chooses `Dispatchers.IO` around synchronous
-`LocalAudioRepository` operations. Hilt already provides dispatchers and
-application scope through `di/HoshiAppModule.kt` and `HoshiQualifiers.kt`.
-
-Move blocking work into repository-owned suspend APIs using those injected
-boundaries. Completion means callers can invoke them safely from Main and tests
-can control their execution. Scope cleanup elsewhere can follow the same pattern
-when the affected owner is changed.
-
 ### Reduce Compose business orchestration
 
 `features/backup/BackupSettingsView.kt` coordinates backup/restore and sync from
-remembered coroutine scope. `features/audio/AudioView.kt` also loads and mutates
-repository data directly. Move these operations and their error/state flows into
+remembered coroutine scope. `features/audio/AudioView.kt` still mutates global
+audio-source/playback preferences directly. Move these operations and their error/state flows into
 ViewModels or focused coordinators, leaving rendering and platform launchers in
 Compose.
 

@@ -32,7 +32,7 @@ Names without an extension are searchable types, not necessarily filenames.
 | Dictionary import/query | `dictionary/DictionaryRepository.kt`, `dictionary/DictionaryNativeBridge.kt`, `dictionary/DictionaryLookupQueryService.kt` | Native session and repository boundary; algorithms live in the bridge submodule |
 | Dictionary UI, updates | `features/dictionary/`, `DictionaryMutationCoordinator` | Retained search session, profile configuration and serialized mutations |
 | Lookup submission history | `features/dictionary/DictionaryLookupHistoryRepository.kt` | Global persistent original submissions from Dictionary and external lookup entry points |
-| Word audio | `features/audio/LocalAudioRepository.kt`, `features/audio/RemoteWordAudioRepository.kt`, `AudioRequestHandler` | Ordered audio candidates shared by popup playback and Anki |
+| Word audio | `features/audio/LocalAudioRepository.kt`, `LocalAudioSettingsViewModel.kt`, `LocalAudioNativeDatabase.kt`, `features/audio/RemoteWordAudioRepository.kt`, `AudioRequestHandler` | Copy/link binding, reusable read-only SQLite session and ordered candidates shared by playback and Anki |
 | Anki cards and media | `features/anki/AnkiRepository.kt`, `features/anki/AnkiBackend.kt` | Backend selection, formats, duplicate checks and export |
 | Hoshi/TTU Drive sync | `features/sync/GoogleDriveSyncManager.kt`, `features/sync/GoogleDriveSyncHandler.kt`, `features/sync/GoogleDriveFileTransfer.kt`, `features/sync/TtuSyncManager.kt`, `SyncStorage` | Provider protocols, state merge and background synchronization |
 | Backup, cleanup, cover publishing | `features/backup/`, `features/storage/`, `features/wallpaper/` | Repository-owned archive/cleanup operations and platform output targets |
@@ -264,8 +264,31 @@ Validation guidance and failure injection methods are in
   copy compatible. UI accesses them through `DictionaryNativeBridge`/repository APIs.
 - Dictionary backup retains the legacy root shape and profile metadata in
   `.hoshi-profiles/`, preserving unrelated profile settings.
-- `app/build.gradle.kts` wires two independent bundled native stacks: CMake/JNI
-  hoshidicts and Rust/UniFFI EPUB parsing. UniFFI keeps `android = true`;
+- `LocalAudioRepository` owns both private-copy and external-link imports, source
+  settings and one serialized reusable session on the injected IO dispatcher.
+  `LocalAudioSettingsViewModel` owns loading, progress, mutations and recoverable
+  errors; Compose owns the mode chooser and document launchers. Copy uses ordinary
+  content selection; Link uses `ACTION_OPEN_DOCUMENT` and a persisted read grant.
+  A failed replacement preserves the prior binding; unlink never deletes a provider
+  document. Switching Copy to Link retains the private copy until explicit cleanup.
+- Audio binding/source metadata publishes atomically in `filesDir/local-audio/`;
+  private copies use generation-specific `Audio/android-<UUID>.db` names. Legacy
+  `Audio/android.db` and its source config are adopted without copying. Startup
+  reclaims only abandoned generated files, preserving active/retained references.
+  Candidate URLs carry a binding generation so stale popups cannot read a newly
+  selected database. External bindings restored without URI grants need reselection.
+- `LocalAudioNativeDatabase`/`app/src/main/cpp/localaudio` own bundled SQLite and a
+  read-only FD VFS: duplicate the provider FD, honor its offset/length, use 64-bit
+  positioned reads, retain four prepared queries and an approximately 4 MiB page
+  cache, and close everything on replacement/read failure. It never creates
+  database/journal/temp files, opens paths, or loads extensions on Android. Link
+  requires a seekable, static standalone SQLite database; pipes and WAL databases
+  are rejected. A single document grant cannot inspect sibling WAL/journal files,
+  so select a completed export, not a database being edited by another app. File
+  metadata/header identity checks detect common replacements and mutations;
+  providers may still cache data internally. Other storage engines remain separate.
+- `app/build.gradle.kts` wires independent bundled native stacks: CMake/JNI
+  hoshidicts and local-audio SQLite, and Rust/UniFFI EPUB parsing. UniFFI keeps `android = true`;
   `cargo-ndk` builds library targets, while bindgen runs on the host. Android
   uses the JNA AAR, JVM tests the JNA jar. SDK/NDK/CMake/ABI values come from the
   build file and workflows.

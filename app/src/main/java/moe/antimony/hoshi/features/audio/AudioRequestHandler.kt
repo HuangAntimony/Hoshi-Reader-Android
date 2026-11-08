@@ -2,6 +2,7 @@ package moe.antimony.hoshi.features.audio
 
 import android.webkit.WebResourceResponse
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -14,7 +15,7 @@ class AudioRequestHandler(
     private val localAudioRepository: LocalAudioRepository,
     private val remoteAudioRepository: RemoteWordAudioRepository,
     private val fetchRemoteAudioList: (String) -> ByteArray = ::fetchRemoteAudioList,
-    private val findLocalAudioCandidates: (term: String, reading: String) -> List<LocalAudioCandidate> =
+    private val findLocalAudioCandidates: suspend (term: String, reading: String) -> List<LocalAudioCandidate> =
         localAudioRepository::findAudioCandidates,
 ) {
     fun handleAudioRequest(url: String): WebResourceResponse? {
@@ -63,7 +64,15 @@ class AudioRequestHandler(
         val query = queryParameters(uri.rawQuery.orEmpty())
         val term = query["term"].orEmpty()
         val reading = query["reading"].orEmpty()
-        val candidates = findLocalAudioCandidates(term, reading)
+        // WebView interception runs on a worker thread; the repository owns its IO dispatcher.
+        val candidates = try {
+            runBlocking { findLocalAudioCandidates(term, reading) }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            // The repository records the original error; settings offers reselect/unlink.
+            return emptyAudioResponse()
+        }
         if (candidates.isEmpty()) return emptyAudioResponse()
         val sources = candidates.joinToString(",") { candidate ->
             """{"name":${candidate.name.jsonString()},"url":${candidate.url.jsonString()}}"""

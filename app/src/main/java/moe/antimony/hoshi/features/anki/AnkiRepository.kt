@@ -430,7 +430,7 @@ internal class AnkiRepository(
         )
     }
 
-    private fun addRemoteAudio(url: String, activeBackend: AnkiBackend, backendKind: AnkiBackendKind): String? =
+    private suspend fun addRemoteAudio(url: String, activeBackend: AnkiBackend, backendKind: AnkiBackendKind): String? =
         optionalMedia {
             val data = readAnkiAudioBytes(
                 url = url,
@@ -517,9 +517,9 @@ private fun AnkiSettings.resolveAnkiCardFormat(formatId: String?): AnkiCardForma
     )
 }
 
-internal fun readAnkiAudioBytes(
+internal suspend fun readAnkiAudioBytes(
     url: String,
-    readLocalAudio: (LocalAudioFile) -> ByteArray?,
+    readLocalAudio: suspend (LocalAudioFile) -> ByteArray?,
     readRemoteAudio: (String) -> ByteArray?,
 ): ByteArray? {
     val localFile = LocalAudioResolver.parseAudioUrl(url)

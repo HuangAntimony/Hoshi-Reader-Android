@@ -1,5 +1,6 @@
 package moe.antimony.hoshi.features.anki
 
+import kotlinx.coroutines.runBlocking
 import moe.antimony.hoshi.features.audio.LocalAudioResolver
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -8,7 +9,7 @@ import org.junit.Test
 
 class AnkiRepositoryTest {
     @Test
-    fun japanesePodPhpAudioIsExportedAsMp3() {
+    fun japanesePodPhpAudioIsExportedAsMp3() = runBlocking {
         val url = "https://assets.languagepod101.com/dictionary/japanese/audiomp3.php?kanji=食べる&kana=たべる"
         val bytes = byteArrayOf(0x49, 0x44, 0x33)
         val loaded = readAnkiAudioBytes(url, readLocalAudio = { error("Unexpected local audio") }, readRemoteAudio = {
@@ -38,7 +39,7 @@ class AnkiRepositoryTest {
     }
 
     @Test
-    fun ankiAudioReadsLocalAudioUrlsFromDatabaseLoader() {
+    fun ankiAudioReadsLocalAudioUrlsFromDatabaseLoader() = runBlocking {
         val localUrl = LocalAudioResolver.audioUrl("nhk16", "taberu.mp3")
         val localAudio = byteArrayOf(1, 2, 3, 4)
         var remoteReads = 0

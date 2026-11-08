@@ -60,35 +60,4 @@ class LocalAudioSourceConfigTest {
         )
     }
 
-    @Test
-    fun cacheLoadsSourceConfigOnlyOnceUntilInvalidated() {
-        var loads = 0
-        val cache = LocalAudioSourceConfigCache {
-            loads += 1
-            LocalAudioSourceConfig(sourceOrder = listOf("nhk16", "forvo"))
-        }
-
-        assertEquals(listOf("nhk16", "forvo"), cache.get().sourceOrder)
-        assertEquals(listOf("nhk16", "forvo"), cache.get().sourceOrder)
-        assertEquals(1, loads)
-
-        cache.clear()
-        assertEquals(listOf("nhk16", "forvo"), cache.get().sourceOrder)
-        assertEquals(2, loads)
-    }
-
-    @Test
-    fun cacheReplaceUpdatesValueWithoutReloading() {
-        var loads = 0
-        val cache = LocalAudioSourceConfigCache {
-            loads += 1
-            LocalAudioSourceConfig(sourceOrder = listOf("nhk16", "forvo"))
-        }
-
-        assertEquals(listOf("nhk16", "forvo"), cache.get().sourceOrder)
-        cache.replace(LocalAudioSourceConfig(sourceOrder = listOf("forvo", "nhk16")))
-
-        assertEquals(listOf("forvo", "nhk16"), cache.get().sourceOrder)
-        assertEquals(1, loads)
-    }
 }
