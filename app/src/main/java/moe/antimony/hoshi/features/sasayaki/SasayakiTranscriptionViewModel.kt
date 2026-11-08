@@ -18,12 +18,12 @@ import moe.antimony.hoshi.epub.SasayakiMatchSource
 import moe.antimony.hoshi.ui.UiText
 
 internal enum class SasayakiMatchMode(@param:StringRes val labelRes: Int) {
-    Subtitles(R.string.sasayaki_match_source_subtitles),
     Transcription(R.string.sasayaki_transcription),
+    Subtitles(R.string.sasayaki_match_source_subtitles),
 }
 
 internal data class SasayakiTranscriptionUiState(
-    val mode: SasayakiMatchMode = SasayakiMatchMode.Subtitles,
+    val mode: SasayakiMatchMode = SasayakiMatchMode.Transcription,
     val stage: SasayakiTranscriptionStage = SasayakiTranscriptionStage.Idle,
     val through: Double = 0.0,
     val duration: Double = 0.0,

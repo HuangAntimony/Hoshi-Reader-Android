@@ -101,7 +101,7 @@ internal fun SasayakiTranscriptionSection(
     SasayakiResourceCard {
         Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             if (!currentTranscript || !state.transcriptComplete) {
-                Text(stringResource(R.string.sasayaki_transcription_speed), style = MaterialTheme.typography.labelLarge)
+                Text(stringResource(R.string.sasayaki_transcription_performance), style = MaterialTheme.typography.labelLarge)
                 SasayakiOptionControl(
                     SasayakiTranscriptionPreset.entries, preset, enabled && !state.controlsLocked,
                     label = { when (it) {

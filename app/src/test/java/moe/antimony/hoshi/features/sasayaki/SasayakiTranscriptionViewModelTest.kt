@@ -50,6 +50,7 @@ class SasayakiTranscriptionViewModelTest {
         val coordinator = SasayakiTranscriptionCoordinator(Backend(), repository, BookWorkRegistry(), backgroundScope, StandardTestDispatcher(testScheduler))
         val model = SasayakiTranscriptionViewModel(coordinator, repository, backgroundScope)
         model.bind(root, "audio") {}; runCurrent()
+        assertEquals(SasayakiMatchMode.Transcription, model.uiState.value.mode)
         // Match loading may finish after the initial Reader binding.
         model.bind(root, "audio", SasayakiMatchSource.Transcription) {}; runCurrent()
         assertEquals(SasayakiMatchMode.Transcription, model.uiState.value.mode)
@@ -63,6 +64,8 @@ class SasayakiTranscriptionViewModelTest {
         assertEquals(SasayakiMatchMode.Transcription, reopened.uiState.value.mode)
         reopened.bind(temporary.newFolder(), "audio", SasayakiMatchSource.Subtitles) {}; runCurrent()
         assertEquals(SasayakiMatchMode.Subtitles, reopened.uiState.value.mode)
+        reopened.bind(temporary.newFolder(), "audio") {}; runCurrent()
+        assertEquals(SasayakiMatchMode.Transcription, reopened.uiState.value.mode)
     }
 
     @Test fun existingTranscriptDoesNotOverrideSubtitleMatchOrManualTabChoice() = runTest {

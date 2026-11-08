@@ -3,8 +3,10 @@ package moe.antimony.hoshi.features.sasayaki
 import android.content.Context
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.hasAnyAncestor
@@ -12,6 +14,7 @@ import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
@@ -39,6 +42,22 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class SasayakiTranscriptionReaderTest {
     @get:Rule val compose = createComposeRule()
+
+    @Test fun transcriptionIsTheLeftmostDefaultMatchSource() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        compose.setContent {
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                HoshiReaderTheme {
+                    SasayakiMatchModeControl(SasayakiTranscriptionUiState().mode, enabled = true, onSelected = {})
+                }
+            }
+        }
+
+        val transcription = compose.onNodeWithText(context.getString(R.string.sasayaki_transcription))
+        val subtitles = compose.onNodeWithText(context.getString(R.string.sasayaki_match_source_subtitles))
+        assertTrue(transcription.fetchSemanticsNode().boundsInRoot.right <= subtitles.fetchSemanticsNode().boundsInRoot.left)
+        transcription.assertIsSelected()
+    }
 
     @Test fun sourceBecomesReadyAndTaskContinuesAcrossClosingAndReopeningControls() = withReader { reader ->
         compose.onNodeWithText(reader.text(R.string.sasayaki_transcription_start)).assertIsNotEnabled()
@@ -139,6 +158,7 @@ class SasayakiTranscriptionReaderTest {
     @Test fun presetSelectionIsLockedWhileRunningAndResumeUsesTheNewPreset() = withReader { reader ->
         compose.runOnIdle { reader.playback.value = SasayakiPlaybackData(0.0, audioUri = "content://test/audiobook") }
         compose.waitUntil { reader.model.uiState.value.canStart }
+        compose.onNodeWithText(reader.text(R.string.sasayaki_transcription_performance)).assertExists()
         compose.onNodeWithText(reader.text(R.string.sasayaki_transcription_fast)).performClick()
         compose.onNodeWithText(reader.text(R.string.sasayaki_transcription_fast_description)).assertExists()
         compose.onNodeWithText(reader.text(R.string.sasayaki_transcription_start)).performClick()
