@@ -4,10 +4,12 @@ import android.content.ContextWrapper
 import androidx.lifecycle.viewModelScope
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -22,6 +24,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
@@ -33,8 +37,13 @@ import moe.antimony.hoshi.ui.UiText
 import moe.antimony.hoshi.ui.resolve
 import moe.antimony.hoshi.ui.ErrorDiagnosticEvents
 import moe.antimony.hoshi.features.audio.LocalAudioRepository
+import okhttp3.mockwebserver.MockResponse
+import okhttp3.mockwebserver.MockWebServer
+import okhttp3.mockwebserver.SocketPolicy
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -1243,6 +1252,119 @@ class AnkiRepositoryBackendSelectionTest {
         assertEquals(mapOf("Media" to "|猫です。"), backend.lastFields)
         assertEquals(0, backend.addMediaFromBytesCalls)
         assertFalse(repository.mineEntry("""{"expression":"猫"}""", context.copy(sentenceAudioSuppressed = false), emptyList(), emptyList()))
+    }
+
+    @Test
+    fun stalledWordAudioTimesOutOrCancelsWithoutBlockingTextMining() = runBlocking {
+        val deck = AnkiDeck(1L, "Mining")
+        val model = AnkiNoteType(2L, "Basic", listOf("Front", "Audio"))
+        val backend = RecordingBackend(decks = listOf(deck), noteTypes = listOf(model))
+        val text = AnkiCardFormat("text", "Text", selectedDeckId = deck.id, selectedNoteTypeId = model.id,
+            fieldMappings = mapOf("Front" to "{expression}"))
+        val audio = text.copy(id = "audio", fieldMappings = text.fieldMappings + ("Audio" to "{audio}"))
+        val repository = repository(
+            settingsRepository = InMemoryAnkiSettingsRepository(AnkiSettings(
+                backendKind = AnkiBackendKind.AnkiConnect,
+                ankiConnectUrl = "https://anki.example.com",
+                cardFormats = listOf(text, audio),
+            )),
+            ankiConnectBackendFactory = { _, _ -> backend },
+        )
+        val context = AnkiMiningContext(sentence = "")
+        for (cancel in listOf(false, true)) {
+            MockWebServer().use { server ->
+                server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE))
+                val pending = async {
+                    repository.mineEntry(
+                        """{"expression":"audio","audio":"${server.url("/word.mp3")}"}""",
+                        context, listOf(deck), listOf(model), formatId = audio.id,
+                    )
+                }
+                try {
+                    assertNotNull(withContext(Dispatchers.IO) { server.takeRequest(3, TimeUnit.SECONDS) })
+                    assertTrue(withTimeout(2_000) {
+                        repository.mineEntry("""{"expression":"text"}""", context, listOf(deck), listOf(model), text.id)
+                    })
+                    assertEquals(mapOf("Front" to "text"), backend.lastFields)
+                    assertFalse(pending.isCompleted)
+                    if (cancel) {
+                        withTimeout(1_500) { pending.cancelAndJoin() }
+                        assertEquals(mapOf("Front" to "text"), backend.lastFields)
+                    } else {
+                        assertTrue(withTimeout(6_000) { pending.await() })
+                        assertEquals(mapOf("Front" to "audio"), backend.lastFields)
+                    }
+                    assertEquals(0, backend.addMediaFromBytesCalls)
+                } finally {
+                    pending.cancel()
+                    server.shutdown()
+                    pending.join()
+                }
+            }
+        }
+    }
+
+    @Test
+    fun sharedDictionaryMediaWritesSerializeAndACancelledWaiterDoesNotUpload() = runBlocking {
+        val deck = AnkiDeck(1L, "Mining")
+        val model = AnkiNoteType(2L, "Basic", listOf("Front", "Back"))
+        val preparedSecond = CompletableDeferred<Unit>()
+        val firstUpload = CompletableDeferred<Unit>()
+        val laterUpload = CompletableDeferred<Unit>()
+        val releaseFirst = CountDownLatch(1)
+        val preparations = AtomicInteger()
+        val uploads = AtomicInteger()
+        val recording = RecordingBackend(decks = listOf(deck), noteTypes = listOf(model))
+        val mediaBytes = byteArrayOf(1, 2, 3)
+        val backend = object : AnkiBackend by recording {
+            override fun checkAvailability(): Boolean {
+                if (preparations.incrementAndGet() == 2) preparedSecond.complete(Unit)
+                return true
+            }
+
+            override fun addMediaFromBytes(bytes: ByteArray, preferredName: String, mimeType: String): String? {
+                assertTrue(mediaBytes.contentEquals(bytes))
+                if (uploads.incrementAndGet() == 1) {
+                    firstUpload.complete(Unit)
+                    check(releaseFirst.await(5, TimeUnit.SECONDS))
+                } else laterUpload.complete(Unit)
+                return preferredName
+            }
+        }
+        val repository = repository(
+            settingsRepository = InMemoryAnkiSettingsRepository(AnkiSettings(
+                backendKind = AnkiBackendKind.AnkiConnect, ankiConnectUrl = "https://anki.example.com",
+                selectedDeckId = deck.id, selectedNoteTypeId = model.id,
+                fieldMappings = mapOf("Front" to "{expression}", "Back" to "{glossary}"),
+            )),
+            ankiConnectBackendFactory = { _, _ -> backend },
+            loadDictionaryMedia = { mediaBytes },
+        )
+        suspend fun mine(expression: String): Boolean {
+            val payload = buildJsonObject {
+                put("expression", expression)
+                put("glossary", """<img src="shared.png">""")
+                put("dictionaryMedia", Json.encodeToString(listOf(DictionaryMedia("Fixture", "shared.png", "shared.png"))))
+            }.toString()
+            return repository.mineEntry(payload, AnkiMiningContext(sentence = ""), listOf(deck), listOf(model))
+        }
+
+        val first = async { mine("first") }
+        try {
+            withTimeout(2_000) { firstUpload.await() }
+            val cancelled = async { mine("cancelled") }
+            withTimeout(2_000) { preparedSecond.await() }
+            assertNull(withTimeoutOrNull(250) { laterUpload.await() })
+            withTimeout(1_000) { cancelled.cancelAndJoin() }
+            val next = async { mine("next") }
+            releaseFirst.countDown()
+            assertTrue(first.await())
+            assertTrue(next.await())
+            assertEquals(2, uploads.get())
+            assertEquals("next", recording.lastFields["Front"])
+        } finally {
+            releaseFirst.countDown()
+        }
     }
 
     private fun repository(

@@ -574,8 +574,12 @@ and copying an asset snapshot creates independent template caches.
   popup DOM/history.
 - Reader popup mining resolves word audio in the popup and starts in the reader
   scope once Android receives the request. Dismissal drops its reply without
-  cancelling the job. A new request waits for older dismissed jobs to finish
-  using shared media paths.
+  cancelling the job. Sentence audio is prepared independently for each request.
+  Sasayaki clips use request-owned temporary files released after mining.
+- Anki word audio is loaded before the repository's write lock. HTTP downloads
+  have four-second connection and read timeouts, a 15-second total timeout,
+  and follow the caller's cancellation. The lock covers shared media writes,
+  uploads and note creation. Optional synchronization runs after release.
 - `DictionarySearchSession` retains search/popup navigation history across tabs.
   Successful book opening resets it before book-profile activation; failed opening
   leaves it. Clearing the Dictionary input preserves displayed lookup content and

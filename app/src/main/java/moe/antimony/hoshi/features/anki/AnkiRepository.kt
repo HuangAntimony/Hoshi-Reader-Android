@@ -31,6 +31,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.coroutineContext
 
@@ -44,7 +46,10 @@ internal class AnkiRepository(
     private val loadDictionaryMedia: (DictionaryMedia) -> ByteArray?,
     private val loadTermDictionaries: () -> List<AnkiTermDictionary>,
     dictionaryChangeVersions: Flow<Long> = flowOf(0L),
+    private val wordAudioDownloader: AnkiWordAudioDownloader = AnkiWordAudioDownloader(),
 ) {
+    private val miningWrites = Mutex()
+
     @Inject
     constructor(
         @ApplicationContext context: Context,
@@ -53,6 +58,7 @@ internal class AnkiRepository(
         localAudioRepository: LocalAudioRepository,
         dictionaryRepository: DictionaryRepository,
         dictionaryMutationCoordinator: DictionaryMutationCoordinator,
+        wordAudioDownloader: AnkiWordAudioDownloader,
     ) : this(
         context = context,
         ankiDroidBackendFactory = ankiDroidBackendFactory::create,
@@ -71,6 +77,7 @@ internal class AnkiRepository(
             }
         },
         dictionaryChangeVersions = dictionaryMutationCoordinator.state.map { it.completedChangeVersion }.distinctUntilChanged(),
+        wordAudioDownloader = wordAudioDownloader,
     )
 
     internal constructor(
@@ -264,73 +271,78 @@ internal class AnkiRepository(
         val needsCover = fieldMappings.referencesAnkiHandlebar("{book-cover}")
         val needsSasayakiAudio = fieldMappings.referencesAnkiHandlebar("{sasayaki-audio}")
         val needsSentenceAudio = !context.sentenceAudioSuppressed && fieldMappings.referencesAnkiHandlebar("{sentence-audio}")
-        val uploadedAudio = mutableMapOf<String, Result<String?>>()
-        suspend fun uploadSentence(path: String, required: Boolean): String? {
-            val uploaded = uploadedAudio.getOrPut(path) {
-                runCatching { addHashedMediaFile(path, "hoshi_sasayaki", activeBackend, settings.backendKind) }
-            }
-            return uploaded.getOrElse { error ->
-                if (error is CancellationException || required) throw error
-                ErrorDiagnosticEvents.buffer.record(UiText.Resource(R.string.anki_operation_failed), error)
-                null
-            }
-        }
+        if (needsSentenceAudio && context.sentenceAudioPath.isNullOrBlank()) return@withContext false
         val needsAudio = fieldMappings.referencesAnkiHandlebar("{audio}")
-        val mediaContext = AnkiMiningContext(
-            sentence = context.sentence,
-            documentTitle = context.documentTitle,
-            coverPath = context.coverPath?.takeIf { needsCover }?.let {
-                optionalMedia { addHashedMediaFile(it, AnkiCoverMediaPrefix, activeBackend, settings.backendKind) }
-            },
-            sasayakiAudioPath = context.sasayakiAudioPath?.takeIf { needsSasayakiAudio }?.let {
-                uploadSentence(it, required = false)
-            },
-            sentenceAudioPath = context.sentenceAudioPath?.takeIf { needsSentenceAudio }?.let { uploadSentence(it, required = true) },
-            sentenceOffset = context.sentenceOffset,
-        )
-        if (needsSentenceAudio && mediaContext.sentenceAudioPath.isNullOrBlank()) return@withContext false
-        val mediaPayload = payload.copy(
-            audio = payload.audio.takeIf { needsAudio && it.isNotBlank() }
-                ?.let { addRemoteAudio(it, activeBackend, settings.backendKind) }
-                .orEmpty(),
-        )
-        val renderedFields = fieldMappings.mapValues { (_, template) ->
-            AnkiHandlebarRenderer.render(
-                template = template,
-                payload = mediaPayload,
-                context = mediaContext,
-                selectedGlossaryFallback = settings.selectedGlossaryFallback,
-                termDictionaries = termDictionaries,
+        val wordAudio = payload.audio.takeIf { needsAudio && it.isNotBlank() }?.let { prepareWordAudio(it) }
+
+        val added = miningWrites.withLock {
+            coroutineContext.ensureActive()
+            val uploadedAudio = mutableMapOf<String, Result<String?>>()
+            suspend fun uploadSentence(path: String, required: Boolean): String? {
+                val uploaded = uploadedAudio.getOrPut(path) {
+                    runCatching { addHashedMediaFile(path, "hoshi_sasayaki", activeBackend, settings.backendKind) }
+                }
+                return uploaded.getOrElse { error ->
+                    if (error is CancellationException || required) throw error
+                    ErrorDiagnosticEvents.buffer.record(UiText.Resource(R.string.anki_operation_failed), error)
+                    null
+                }
+            }
+            val mediaContext = AnkiMiningContext(
+                sentence = context.sentence,
+                documentTitle = context.documentTitle,
+                coverPath = context.coverPath?.takeIf { needsCover }?.let {
+                    optionalMedia { addHashedMediaFile(it, AnkiCoverMediaPrefix, activeBackend, settings.backendKind) }
+                },
+                sasayakiAudioPath = context.sasayakiAudioPath?.takeIf { needsSasayakiAudio }?.let {
+                    uploadSentence(it, required = false)
+                },
+                sentenceAudioPath = context.sentenceAudioPath?.takeIf { needsSentenceAudio }?.let { uploadSentence(it, required = true) },
+                sentenceOffset = context.sentenceOffset,
+            )
+            if (needsSentenceAudio && mediaContext.sentenceAudioPath.isNullOrBlank()) return@withLock false
+            val mediaPayload = payload.copy(
+                audio = wordAudio?.let { addWordAudio(it, activeBackend, settings.backendKind) }.orEmpty(),
+            )
+            val renderedFields = fieldMappings.mapValues { (_, template) ->
+                AnkiHandlebarRenderer.render(
+                    template = template,
+                    payload = mediaPayload,
+                    context = mediaContext,
+                    selectedGlossaryFallback = settings.selectedGlossaryFallback,
+                    termDictionaries = termDictionaries,
+                )
+            }
+            val dictionaryMediaNames = payload.dictionaryMedia
+                .filter { media -> media.filename.isNotEmpty() && renderedFields.values.any { media.filename in it } }
+                .associate { media ->
+                    media.filename to addDictionaryMedia(media, activeBackend, settings.backendKind).orEmpty()
+                }.filterValues { it.isNotBlank() }
+            val fields = renderedFields.mapValues { (_, rendered) ->
+                dictionaryMediaNames.entries.fold(rendered) { value, (filename, name) -> value.replace(filename, name) }
+                    .let(::normalizeAnkiDictionaryHtml)
+            }.filterValues { it.isNotBlank() }
+
+            coroutineContext.ensureActive()
+            activeBackend.addNote(
+                deck = deck,
+                noteType = noteType,
+                fieldsByName = fields,
+                tags = AnkiHandlebarRenderer.renderTags(
+                    template = format.tags,
+                    payload = mediaPayload,
+                    context = mediaContext,
+                    selectedGlossaryFallback = settings.selectedGlossaryFallback,
+                    termDictionaries = termDictionaries,
+                ).split(Regex("\\s+")).filter { it.isNotBlank() }.toSet(),
+                allowDupes = settings.allowDupes,
+                duplicateScope = settings.duplicateScope,
+                checkDuplicatesAcrossAllModels = settings.checkDuplicatesAcrossAllModels,
             )
         }
-        val dictionaryMediaNames = payload.dictionaryMedia
-            .filter { media -> media.filename.isNotEmpty() && renderedFields.values.any { media.filename in it } }
-            .associate { media ->
-                media.filename to addDictionaryMedia(media, activeBackend, settings.backendKind).orEmpty()
-            }.filterValues { it.isNotBlank() }
-        val fields = renderedFields.mapValues { (_, rendered) ->
-            dictionaryMediaNames.entries.fold(rendered) { value, (filename, name) -> value.replace(filename, name) }
-                .let(::normalizeAnkiDictionaryHtml)
-        }.filterValues { it.isNotBlank() }
-
-        coroutineContext.ensureActive()
-        val added = activeBackend.addNote(
-            deck = deck,
-            noteType = noteType,
-            fieldsByName = fields,
-            tags = AnkiHandlebarRenderer.renderTags(
-                template = format.tags,
-                payload = mediaPayload,
-                context = mediaContext,
-                selectedGlossaryFallback = settings.selectedGlossaryFallback,
-                termDictionaries = termDictionaries,
-            ).split(Regex("\\s+")).filter { it.isNotBlank() }.toSet(),
-            allowDupes = settings.allowDupes,
-            duplicateScope = settings.duplicateScope,
-            checkDuplicatesAcrossAllModels = settings.checkDuplicatesAcrossAllModels,
-        )
         if (added) {
             try {
+                coroutineContext.ensureActive()
                 when (settings.backendKind) {
                     AnkiBackendKind.AnkiConnect -> if (settings.ankiConnectForceSync) activeBackend.sync()
                     AnkiBackendKind.AnkiDroid -> if (settings.ankiDroidForceSync) activeBackend.sync()
@@ -434,23 +446,31 @@ internal class AnkiRepository(
         )
     }
 
-    private suspend fun addRemoteAudio(url: String, activeBackend: AnkiBackend, backendKind: AnkiBackendKind): String? =
+    private data class PreparedWordAudio(val media: AnkiAudioMediaFile, val bytes: ByteArray)
+
+    private suspend fun prepareWordAudio(url: String): PreparedWordAudio? =
         optionalMedia {
             val data = readAnkiAudioBytes(
                 url = url,
                 readLocalAudio = localAudioRepository::loadAudio,
-                readRemoteAudio = { remoteUrl -> URL(remoteUrl).openStream().use { it.readBytes() } },
+                readRemoteAudio = wordAudioDownloader::download,
             )
                 ?: return@optionalMedia null
-            val media = ankiAudioMediaFile(url, data)
-            val file = mediaCacheFile(media.preferredName)
-            file.writeBytes(data)
-            addMediaFile(file.absolutePath, file.name, media.mimeType, activeBackend, backendKind)
+            PreparedWordAudio(ankiAudioMediaFile(url, data), data)
         }
 
-    private fun addDictionaryMedia(media: DictionaryMedia, activeBackend: AnkiBackend, backendKind: AnkiBackendKind): String? =
+    private suspend fun addWordAudio(audio: PreparedWordAudio, activeBackend: AnkiBackend, backendKind: AnkiBackendKind): String? =
+        optionalMedia {
+            coroutineContext.ensureActive()
+            val file = mediaCacheFile(audio.media.preferredName)
+            file.writeBytes(audio.bytes)
+            addMediaFile(file.absolutePath, file.name, audio.media.mimeType, activeBackend, backendKind)
+        }
+
+    private suspend fun addDictionaryMedia(media: DictionaryMedia, activeBackend: AnkiBackend, backendKind: AnkiBackendKind): String? =
         optionalMedia {
             val data = loadDictionaryMedia(media) ?: return@optionalMedia null
+            coroutineContext.ensureActive()
             val file = mediaCacheFile("hoshi_dict_${sha1Hex(data)}.${media.path.substringAfterLast('.', "bin")}")
             file.writeBytes(data)
             addMediaFile(file.absolutePath, file.name, mimeTypeForPath(media.path), activeBackend, backendKind)
@@ -472,10 +492,12 @@ internal class AnkiRepository(
         activeBackend: AnkiBackend,
         backendKind: AnkiBackendKind,
     ): String? {
+        coroutineContext.ensureActive()
         val file = File(path).takeIf { it.isFile } ?: return null
         val data = file.readBytes()
         val name = "${prefix}_${sha1Hex(data)}.${file.extension}"
         val mimeType = mimeTypeForPath(path)
+        coroutineContext.ensureActive()
         return when {
             backendKind != AnkiBackendKind.AnkiConnect -> addMediaFile(path, name, mimeType, activeBackend, backendKind)
             prefix == AnkiCoverMediaPrefix -> activeBackend.addCoverFromBytes(data, name, mimeType)
@@ -483,7 +505,7 @@ internal class AnkiRepository(
         }
     }
 
-    private fun addMediaFile(
+    private suspend fun addMediaFile(
         path: String,
         preferredName: String,
         mimeType: String,
@@ -492,9 +514,12 @@ internal class AnkiRepository(
     ): String? {
         val file = File(path).takeIf { it.isFile } ?: return null
         if (backendKind == AnkiBackendKind.AnkiConnect) {
-            return activeBackend.addMediaFromBytes(file.readBytes(), preferredName, mimeType)
+            val bytes = file.readBytes()
+            coroutineContext.ensureActive()
+            return activeBackend.addMediaFromBytes(bytes, preferredName, mimeType)
         }
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        coroutineContext.ensureActive()
         return activeBackend.addMediaFromUri(uri.toString(), preferredName, mimeType)
     }
 
@@ -530,7 +555,7 @@ private fun AnkiSettings.resolveAnkiCardFormat(formatId: String?): AnkiCardForma
 internal suspend fun readAnkiAudioBytes(
     url: String,
     readLocalAudio: suspend (LocalAudioFile) -> ByteArray?,
-    readRemoteAudio: (String) -> ByteArray?,
+    readRemoteAudio: suspend (String) -> ByteArray?,
 ): ByteArray? {
     val localFile = LocalAudioResolver.parseAudioUrl(url)
     return if (localFile != null) {

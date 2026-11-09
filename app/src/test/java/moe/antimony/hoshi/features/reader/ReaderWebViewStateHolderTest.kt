@@ -4,6 +4,7 @@ import androidx.compose.ui.unit.IntSize
 import kotlin.io.path.createTempDirectory
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -1021,7 +1022,7 @@ class ReaderWebViewStateHolderTest {
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun acceptedMiningFinishesAfterDismissalBeforeTheReopenedPopupWrites() = runTest {
+    fun dismissedMiningContinuesWhileTheReopenedPopupCanPrepareIndependently() = runTest {
         val holder = stateHolder()
         val original = lookupPopup()
         val child = lookupPopup()
@@ -1048,12 +1049,33 @@ class ReaderWebViewStateHolderTest {
         holder.updateLookupPopups(listOf(reopened))
         submit(reopened) {}
         runCurrent()
-        assertEquals(listOf(child.id), written)
+        assertEquals(listOf(child.id, reopened.id), written)
 
         finishWrite.complete(Unit)
         runCurrent()
-        assertEquals(listOf(child.id, original.id, reopened.id), written)
+        assertEquals(listOf(child.id, reopened.id, original.id), written)
         assertEquals(listOf(child.id, reopened.id), replies)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun leavingReaderCancelsAcceptedMiningAfterPopupDismissal() = runTest {
+        val holder = stateHolder()
+        val popup = lookupPopup()
+        val prepared = CompletableDeferred<Unit>()
+        var completed = false
+        holder.updateLookupPopups(listOf(popup))
+        holder.startLookupMining(backgroundScope, popup.id, onResult = { error("Unexpected reply") }) {
+            prepared.await()
+            completed = true
+            true
+        }
+        runCurrent()
+        holder.updateLookupPopups(emptyList())
+        backgroundScope.cancel()
+        prepared.complete(Unit)
+        runCurrent()
+        assertFalse(completed)
     }
 
     @Test

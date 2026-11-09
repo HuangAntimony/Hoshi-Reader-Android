@@ -28,6 +28,27 @@ import org.junit.runner.RunWith
 @OptIn(UnstableApi::class)
 @RunWith(AndroidJUnit4::class)
 class SasayakiSyncPlaybackDeviceTest {
+    @Test fun overlappingExportsOfOneCueKeepBothClipsIntact() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val root = kotlin.io.path.createTempDirectory(context.cacheDir.toPath(), "sasayaki-clips-").toFile()
+        try {
+            val source = SasayakiPlaybackSource.PrivateFile(File(root, "fixture.wav").also(::writeSilentWave))
+            val cue = SasayakiMatch("cue", 0.0, 2.0, "fixture", 0, 0, 7)
+            val exporter = SasayakiCueAudioExporter(context, outputRoot = root.resolve("clips"))
+            val (short, long) = withContext(Dispatchers.IO) {
+                awaitAll(
+                    async { exporter.export(source, cue, SasayakiCueAudioRange(0.0, 1.0)) },
+                    async { exporter.export(source, cue, SasayakiCueAudioRange(0.0, 2.0)) },
+                ).map { requireNotNull(it) }
+            }
+            assertNotEquals(short, long)
+            assertTrue(short.length() > 0)
+            assertTrue(long.length() > short.length())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
     @Test fun localSyncEchoKeepsPlayingForwardAndChangedRemotePositionStillSeeks() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val root = File(context.cacheDir, "sasayaki-sync-${System.nanoTime()}").apply { mkdirs() }

@@ -60,6 +60,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -992,10 +993,14 @@ fun ReaderWebView(
                     onResult = { mined -> replyReaderPopupMessage(message.popupId, messageId, mined.toString()) },
                 ) {
                     var generated: File? = null
+                    var exportedAudiobook: File? = null
                     try {
                         val cue = popup.sasayakiCue
-                        val audiobook = if ((needsSasayaki || needsSentence && linkedAudio) && cue != null)
-                            withContext(Dispatchers.IO) { audioPlayer?.exportCueAudio(cue, popup.state.selection.sentence) } else null
+                        val audiobook = if ((needsSasayaki || needsSentence && linkedAudio) && cue != null) {
+                            runInterruptible(Dispatchers.IO) {
+                                audioPlayer?.exportCueAudio(cue, popup.state.selection.sentence).also { exportedAudiobook = it }
+                            }
+                        } else null
                         val sentenceAudio = if (needsSentence) {
                             if (linkedAudio) audiobook ?: throw TtsException(TtsFailure.AudioUnavailable)
                             else {
@@ -1015,7 +1020,10 @@ fun ReaderWebView(
                     catch (error: Exception) {
                         ankiOperationError = error
                         false
-                    } finally { generated?.delete() }
+                    } finally {
+                        generated?.delete()
+                        exportedAudiobook?.delete()
+                    }
                 }
             }
             is ReaderLookupPopupBridgeMessage.DuplicateCheck -> {

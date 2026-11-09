@@ -36,18 +36,20 @@ internal class SasayakiCueAudioExporter(
         range: SasayakiCueAudioRange,
     ): File? = runCatching {
         outputRoot.mkdirs()
-        val output = outputRoot.resolve(outputFileName(cue))
+        val cueKey = cue.id.hashCode().toLong().and(0xffffffffL)
+        val output = File.createTempFile("hoshi_sasayaki_${cueKey}_", ".aac", outputRoot)
         val transformerOutput = outputRoot.resolve("${output.name}.tmp.m4a")
-        if (output.exists()) output.delete()
-        if (transformerOutput.exists()) transformerOutput.delete()
         val completed = AtomicBoolean(false)
         val failure = AtomicReference<Throwable?>(null)
         val transformerRef = AtomicReference<Transformer?>(null)
         val done = CountDownLatch(1)
-        val exportThread = HandlerThread("HoshiSasayakiCueExport").also { it.start() }
-        val handler = Handler(exportThread.looper)
+        val exportThread = HandlerThread("HoshiSasayakiCueExport")
+        var exportHandler: Handler? = null
+        var keepOutput = false
 
         try {
+            exportThread.start()
+            val handler = Handler(exportThread.looper).also { exportHandler = it }
             handler.post {
                 runCatching {
                     val transformer = Transformer.Builder(appContext)
@@ -80,30 +82,28 @@ internal class SasayakiCueAudioExporter(
                 }
             }
 
-            val finished = done.await(timeoutMs, TimeUnit.MILLISECONDS)
-            if (!finished) {
-                handler.post { transformerRef.get()?.cancel() }
-                output.delete()
-                transformerOutput.delete()
-                return@runCatching null
-            }
-            if (!completed.get() || failure.get() != null) {
-                output.delete()
-                transformerOutput.delete()
-                return@runCatching null
-            }
-            if (!AacAdtsCueAudioRewriter.rewrite(input = transformerOutput, output = output)) {
-                output.delete()
-                transformerOutput.delete()
-                return@runCatching null
-            }
-            transformerOutput.delete()
-            output.takeIf { it.isFile && it.length() > 0L }
+            if (!done.await(timeoutMs, TimeUnit.MILLISECONDS)) return@runCatching null
+            if (!completed.get() || failure.get() != null) return@runCatching null
+            if (!AacAdtsCueAudioRewriter.rewrite(input = transformerOutput, output = output)) return@runCatching null
+            keepOutput = output.length() > 0L
+            output.takeIf { keepOutput }
         } finally {
+            // The muxer may still be opening its path after a timeout.
+            val cleanupPosted = done.count > 0L && exportHandler?.post {
+                try {
+                    transformerRef.get()?.cancel()
+                } finally {
+                    transformerOutput.delete()
+                }
+            } == true
+            if (!cleanupPosted) transformerOutput.delete()
             exportThread.quitSafely()
-            transformerOutput.delete()
+            if (!keepOutput) output.delete()
         }
-    }.getOrNull()
+    }.getOrElse { error ->
+        if (error is InterruptedException) throw error
+        null
+    }
 
     private fun editedMediaItem(
         source: SasayakiPlaybackSource,
@@ -134,9 +134,6 @@ internal class SasayakiCueAudioExporter(
 
     private val SasayakiCueAudioRange.endPositionMs: Long
         get() = (endTime * 1000.0).toLong().coerceAtLeast(startPositionMs + 1L)
-
-    private fun outputFileName(cue: SasayakiMatch): String =
-        "hoshi_sasayaki_${cue.id.hashCode().toLong().and(0xffffffffL)}.aac"
 
     private companion object {
         const val ExportTimeoutMs = 30_000L
