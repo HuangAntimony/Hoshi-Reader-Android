@@ -20,7 +20,7 @@ Hoshi Reader Android 是使用 Kotlin 和 Jetpack Compose 开发的原生 Androi
 | [README.md](README.md) / [README.zh-CN.md](README.zh-CN.md) | 人类的项目介绍、安装与使用入口 | 用户开始使用项目所需的信息变化 |
 | [CHANGELOG.md](docs/CHANGELOG.md) / [CHANGELOG_ARCHIVE.md](docs/CHANGELOG_ARCHIVE.md) | 人类可快速浏览的版本变化；archive 保存历史 | 用户可感知的 App 行为变化或正式发布 |
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Agent 的当前代码地图、职责和实现契约，包括错误处理、状态/并发、存储、生命周期与安全边界 | owner、跨层约束、数据/API 契约或检索入口变化 |
-| [VALIDATION.md](docs/VALIDATION.md) | Agent 可复用的测试、自动化、性能测量方法，以及已验证的避坑信息 | 验证方法、fixture/设备限制、证据判定或通用自动化陷阱变化 |
+| [VALIDATION.md](docs/VALIDATION.md) | Agent 的验证入口、设备数据保护、证据判定和跨工具操作步骤 | 符合下方 [Validation 维护规则](#validation-维护规则) 时 |
 | [ARCHITECTURE_REFACTORING.md](docs/ARCHITECTURE_REFACTORING.md) | 尚未解决的架构债务与未来方向 | 确认新缺口，或已有目标完成/缩小 |
 | [IOS_UPSTREAM_SYNC_QUEUE.md](docs/IOS_UPSTREAM_SYNC_QUEUE.md) | 当前 iOS upstream 对齐队列 | upstream 评估或切片状态变化 |
 | [TRANSLATING.md](docs/TRANSLATING.md) | 本地化贡献操作说明 | 翻译流程变化 |
@@ -32,6 +32,12 @@ Hoshi Reader Android 是使用 Kotlin 和 Jetpack Compose 开发的原生 Androi
 - 重构与同步队列保留剩余工作和影响后续决策的取舍，完成项移出队列。
 - iOS 同步队列的 `Covered Or No Android Action` 只保留本轮对照结论。每次刷新替换旧记录，待办清空后只保留 Git 历史提示。
 - 调整文档结构时同步更新导航和引用；中英文 README 的产品事实保持一致。
+
+### Validation 维护规则
+
+- 仅在可跨任务复用的验证要求发生变化，或遗漏已验证的限制会造成数据风险、无法复现或误判时，更新 `VALIDATION.md`。新增功能、回归测试或跑完一轮验证本身都不触发更新。
+- 测试清单、断言、参数、样本规模和输出路径由测试源码或脚本维护。跨工具步骤或安全前置条件确实需要说明时，只写入口、必要步骤和证据判定。单次手工清单、设备型号、截图和跑分留在当前任务或 PR。
+- 先找已有规则并原位合并。提交前删掉已被源码覆盖、重复或失效的说明，避免按功能追加验证日志。
 
 ### Changelog 写法
 
