@@ -17,24 +17,7 @@ details against official documentation when implementing platform-facing slices.
 
 ## Current Queue
 
-### 1. Hide the status bar while a fullscreen image is open
-
-Status: Pending
-
-Commits: `18072c8` (system status bar only).
-
-- Dependency/value: independent; gallery and reader images already cover app chrome.
-- iOS behavior: opening a fullscreen image hides the status bar even outside focus mode.
-- Android current gap: `features/reader/ReaderWebView.kt`'s system-bar effect and
-  `ReaderChrome.kt::readerSystemBarVisibility` depend only on `focusMode`.
-  `fullscreenImage` drives `ReaderFullscreenImageOverlay` but does not hide the
-  status bar when opened from the gallery in ordinary mode.
-- Suggested slice: include fullscreen-image visibility in the existing system-bar
-  owner and restore the correct focus-dependent state on dismissal.
-- Validation: extend `ReaderChromeTest`; device checks for gallery and inline
-  images, dismissal/back, both focus states and existing navigation-bar behavior.
-
-### 2. Show sub-minute transcription remaining time
+### 1. Show sub-minute transcription remaining time
 
 Status: Pending
 
@@ -56,15 +39,13 @@ Only concrete remaining behavior is listed; covered portions are summarized belo
 
 | Commit | Remaining Android work | Slice |
 | --- | --- | --- |
-| `18072c8` | Fullscreen-image status-bar visibility | 1 |
-| `3dfa9ef` | Sub-minute transcription ETA label | 2 |
+| `3dfa9ef` | Sub-minute transcription ETA label | 1 |
 
 ## Suggested Implementation Order
 
 All remaining slices are independent.
 
-1. Hide the status bar while a fullscreen image is open.
-2. Show sub-minute transcription remaining time.
+1. Show sub-minute transcription remaining time.
 
 ## Covered Or No Android Action
 
@@ -83,6 +64,7 @@ Code-backed coverage for the refreshed range:
 
 | Upstream changes | Covered behavior / reason |
 | --- | --- |
+| `18072c8` | `ReaderWebView` and `ReaderChrome` hide the status bar for fullscreen images from the gallery or page and restore focus-dependent visibility on dismissal. |
 | `f4a7db0` | `reader/reader.css` uses `visibility: hidden` for toggled ruby annotations, preserving geometry; `shared/selection.js` reveals adjacent ruby. Layout-preserving toggle behavior is covered; Android retains its dotted marker. |
 | `bc80d6e`, `864deb9` | `DictionarySearchIframe` renders unmatched source text; `shared/selection.js::findParagraph` keeps lookup within `li`. Existing iframe and selection tests cover both. |
 | `30b3b19`, `d226044`, `f12897d`, `5a85d4e`, `67237b0`, `d8bba19`, `fb707c7` | Android owns chrome, focus, safe-area and viewport sizing in `ReaderChrome`, `ReaderWebViewChrome`, `ReaderViewportCssLayout` and generated layout; bottom progress disables soft wrapping. SwiftUI/UIKit label, edge-effect and home-button workarounds do not transfer directly. |

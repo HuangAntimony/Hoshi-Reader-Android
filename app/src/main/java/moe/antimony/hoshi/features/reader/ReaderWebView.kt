@@ -1967,12 +1967,13 @@ fun ReaderWebView(
             controller?.show(WindowInsetsCompat.Type.systemBars())
         }
     }
-    LaunchedEffect(context, view, focusMode) {
+    val isFullscreenImageVisible = fullscreenImage != null
+    LaunchedEffect(context, view, focusMode, isFullscreenImageVisible) {
         val activity = context.findActivity()
         val controller = activity?.window?.let { window ->
             WindowCompat.getInsetsController(window, view)
         } ?: return@LaunchedEffect
-        val visibility = readerSystemBarVisibility(focusMode)
+        val visibility = readerSystemBarVisibility(focusMode, isFullscreenImageVisible)
         if (visibility.showStatusBar) {
             controller.show(WindowInsetsCompat.Type.statusBars())
         } else {

@@ -297,9 +297,12 @@ fun readerInfoBubbleMetrics(): ReaderInfoBubbleMetrics =
         cornerRadiusDp = 24,
     )
 
-fun readerSystemBarVisibility(focusMode: Boolean): ReaderSystemBarVisibility =
+fun readerSystemBarVisibility(
+    focusMode: Boolean,
+    isFullscreenImageVisible: Boolean,
+): ReaderSystemBarVisibility =
     ReaderSystemBarVisibility(
-        showStatusBar = !focusMode,
+        showStatusBar = !focusMode && !isFullscreenImageVisible,
         showNavigationBar = false,
     )
 

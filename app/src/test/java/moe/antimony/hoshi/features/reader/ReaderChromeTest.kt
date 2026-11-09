@@ -569,14 +569,22 @@ class ReaderChromeTest {
     }
 
     @Test
-    fun readerSystemBarsShowStatusOutsideFocusAndHideAllInFocus() {
+    fun readerSystemBarsHideStatusInFocusOrWhileViewingAFullscreenImage() {
         assertEquals(
             ReaderSystemBarVisibility(showStatusBar = true, showNavigationBar = false),
-            readerSystemBarVisibility(focusMode = false),
+            readerSystemBarVisibility(focusMode = false, isFullscreenImageVisible = false),
         )
         assertEquals(
             ReaderSystemBarVisibility(showStatusBar = false, showNavigationBar = false),
-            readerSystemBarVisibility(focusMode = true),
+            readerSystemBarVisibility(focusMode = false, isFullscreenImageVisible = true),
+        )
+        assertEquals(
+            ReaderSystemBarVisibility(showStatusBar = false, showNavigationBar = false),
+            readerSystemBarVisibility(focusMode = true, isFullscreenImageVisible = true),
+        )
+        assertEquals(
+            ReaderSystemBarVisibility(showStatusBar = false, showNavigationBar = false),
+            readerSystemBarVisibility(focusMode = true, isFullscreenImageVisible = false),
         )
     }
 

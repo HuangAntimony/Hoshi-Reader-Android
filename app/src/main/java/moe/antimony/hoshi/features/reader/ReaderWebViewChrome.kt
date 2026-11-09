@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
@@ -19,6 +20,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -348,15 +350,10 @@ internal fun rememberCurrentStatusBarPadding(): Dp {
 }
 
 @Composable
+@OptIn(ExperimentalLayoutApi::class)
 internal fun rememberStableStatusBarPadding(): Dp {
-    val currentTop = rememberCurrentStatusBarPadding()
-    var stableTop by remember { mutableStateOf(0.dp) }
-    LaunchedEffect(currentTop) {
-        if (currentTop > stableTop) {
-            stableTop = currentTop
-        }
-    }
-    return if (currentTop > 0.dp) currentTop else stableTop
+    val density = LocalDensity.current
+    return with(density) { WindowInsets.statusBarsIgnoringVisibility.getTop(this).toDp() }
 }
 
 @Composable
