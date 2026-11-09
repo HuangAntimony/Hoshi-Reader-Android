@@ -17,38 +17,13 @@ details against official documentation when implementing platform-facing slices.
 
 ## Current Queue
 
-### 1. Dictionary numeric-string frequencies and on-demand media mapping
-
-Status: Pending
-
-Commits: `a1babc9` (frequency parsing only), `e266954`.
-
-- Dependency/value: independent native-engine work; accepts additional Yomitan
-  frequency data and avoids mapping every dictionary media payload up front.
-- iOS behavior: the hoshidicts updates add numeric-string frequency parsing and
-  map media blobs on demand. Exact dependency changes are
-  [a28d82e to fcea33f](https://github.com/Manhhao/hoshidicts/compare/a28d82eb0f169b8ceff79e8c99ffe0b96709ab27...fcea33f98f940e45505d51049b2f855123d54f39)
-  and [e6af33e](https://github.com/Manhhao/hoshidicts/commit/e6af33e1ab3241e16b885ec81f048f05d81f766b).
-- Android current gap: bridge `35ab0f0` embeds engine `4aa43ad`. Under
-  `third_party/hoshidicts-kotlin-bridge/app/src/main/cpp/hoshidicts/`,
-  `src/json/yomitan_parser.cpp::parse_frequency` lacks the quoted-number fallback;
-  `src/query.cpp::add_dict` maps all of `media.bin`, and `get_media_file_view`
-  reads that mapping directly without a per-blob cache.
-- Suggested slice: update the native engine through the bridge owner, preserving
-  the multilingual pipeline and Kotlin ABI, then advance Android's bridge pointer.
-  Do not add unused upstream remove/reorder APIs merely to match the revision.
-- Validation: extend `DictionaryFrequencyNativeTest` with numeric strings;
-  exercise repeated/concurrent media reads, missing media, query replacement and
-  session destruction. Measure large-media dictionary memory on a device before
-  claiming an improvement; run native packaging checks from VALIDATION.
-
-### 2. Anki media filtering and remote cover reuse
+### 1. Anki media filtering and remote cover reuse
 
 Status: Pending
 
 Commits: `81c60d2` (dictionary media and existing covers only).
 
-- Dependency/value: independent of slice 1; reduces unnecessary media reads and
+- Dependency/value: independent; reduces unnecessary media reads and
   uploads during card creation.
 - iOS behavior: upload media referenced by the final rendered fields; reuse a
   cover already stored by AnkiConnect.
@@ -62,7 +37,7 @@ Commits: `81c60d2` (dictionary media and existing covers only).
   `AnkiConnectBackendTest` for selected/excluded glossaries, absent media fields,
   existing/missing covers and lookup-failure fallback; assert request sequences.
 
-### 3. Transfer queue totals, remaining time and interrupted rows
+### 2. Transfer queue totals, remaining time and interrupted rows
 
 Status: Pending
 
@@ -85,7 +60,7 @@ Commits: `21d5546` (presentation and aggregate accounting only).
   `SyncTransferTrackerTest`, `GoogleDriveSyncManagerTest` and `SyncQueueViewTest`,
   including device scroll retention and E-ink rendering.
 
-### 4. Keep the selected statistics period current across date changes
+### 3. Keep the selected statistics period current across date changes
 
 Status: Pending
 
@@ -105,7 +80,7 @@ Commits: `e2e0f31` (selected-period anchor only).
   current-period rollover, historical browsing, return to latest and reset changes;
   retain existing `StatisticsViewReloadTest` lifecycle coverage.
 
-### 5. Hide the status bar while a fullscreen image is open
+### 4. Hide the status bar while a fullscreen image is open
 
 Status: Pending
 
@@ -122,7 +97,7 @@ Commits: `18072c8` (system status bar only).
 - Validation: extend `ReaderChromeTest`; device checks for gallery and inline
   images, dismissal/back, both focus states and existing navigation-bar behavior.
 
-### 6. Show sub-minute transcription remaining time
+### 5. Show sub-minute transcription remaining time
 
 Status: Pending
 
@@ -144,25 +119,22 @@ Only concrete remaining behavior is listed; covered portions are summarized belo
 
 | Commit | Remaining Android work | Slice |
 | --- | --- | --- |
-| `a1babc9` | Numeric-string frequency parsing | 1 |
-| `e266954` | On-demand native dictionary media mapping | 1 |
-| `81c60d2` | Filter dictionary media and reuse uploaded AnkiConnect covers | 2 |
-| `21d5546` | Aggregate transfer accounting and pending/interrupted/grouped rows | 3 |
-| `e2e0f31` | Reconcile selected statistics period on day/reset-time changes | 4 |
-| `18072c8` | Fullscreen-image status-bar visibility | 5 |
-| `3dfa9ef` | Sub-minute transcription ETA label | 6 |
+| `81c60d2` | Filter dictionary media and reuse uploaded AnkiConnect covers | 1 |
+| `21d5546` | Aggregate transfer accounting and pending/interrupted/grouped rows | 2 |
+| `e2e0f31` | Reconcile selected statistics period on day/reset-time changes | 3 |
+| `18072c8` | Fullscreen-image status-bar visibility | 4 |
+| `3dfa9ef` | Sub-minute transcription ETA label | 5 |
 
 ## Suggested Implementation Order
 
-All remaining slices are independent. Address dictionary/Anki value and transfer
-state first, followed by independent UI refinements:
+All remaining slices are independent. Prioritize Anki media handling and transfer
+state, then address the UI refinements.
 
-1. Dictionary numeric-string frequencies and on-demand media mapping.
-2. Anki media filtering and remote cover reuse.
-3. Transfer queue totals, remaining time and interrupted rows.
-4. Keep the selected statistics period current across date changes.
-5. Hide the status bar while a fullscreen image is open.
-6. Show sub-minute transcription remaining time.
+1. Anki media filtering and remote cover reuse.
+2. Transfer queue totals, remaining time and interrupted rows.
+3. Keep the selected statistics period current across date changes.
+4. Hide the status bar while a fullscreen image is open.
+5. Show sub-minute transcription remaining time.
 
 ## Covered Or No Android Action
 
@@ -192,7 +164,8 @@ Code-backed coverage for the refreshed range:
 | `a1c9996` | Single/bulk new-shelf moves exist. `NewShelfMoveDialog`, `BookshelfView`, `BookshelfRepository` and `BookshelfViewModel` use NFC names for creation, rename, duplicate checks, move targets and published state; `BookRepository.saveShelves` rejects canonical-name collisions before writing sidecars. |
 | `21d5546` (transport portion), `bb4e92d` | `GoogleDriveFileTransfer`, `DriveUploadSessions` and `BookTransferScheduler` implement resumable uploads and shared bounded upload/download scheduling; upstream job classification adds no further transport gap. |
 | `3f53018`, `e2e0f31` (reload portion), `642ad22` | Bookshelf/statistics repositories dispatch blocking work off main; `StatisticsLifecycleReloader` refreshes on resume. `TtuStatistics.reconciled` and `GoogleDriveSyncManager.mergeBook` remove overlap between legacy totals and sessions. Only selected-period rollover remains open. |
-| `a1babc9` (other portions) | The multilingual engine caches Japanese preprocessing definitions; `DictionaryLookupQueryService` atomically replaces sessions after remove/reorder. iOS does not call the newly added native mutation APIs, so they do not create an Android UI gap. |
+| `a1babc9` | Engine `55e56e3` accepts quoted integer frequencies in `yomitan_parser::parse_frequency` and caches Japanese preprocessing definitions. `DictionaryLookupQueryService` atomically replaces sessions after remove/reorder. iOS leaves the native mutation APIs unused. |
+| `e266954` | Engine `55e56e3` maps the media index when loading a dictionary. `DictionaryQuery::get_media_file_view` maps and caches each requested payload on demand. |
 | `81c60d2` (cover/audio selection), `9e815be` | `AnkiRepository` filters cover/word/sentence audio by template use; `AnkiUiState.popupSettings` propagates reachability into rebuilt popup documents. Only dictionary-media pruning and existing-cover reuse remain open. |
 | `3b75b1e` | Android's `SasayakiCueAudioExporter` exports clipped AAC off main; `AacAdtsCueAudioRewriter` repackages encoded samples without a second lossy encode. The SwiftLAME-to-LAME migration does not require an Android codec change. |
 | `4969643`, `91af547` | `NakuruResources`/`SasayakiModelStore` retain downloaded models independently of recognizer lifetime; Apple locale reservation is inapplicable. `NakuruTranscriptAligner` already has unique/chapter anchors, bounded tail assignment, exact-match density and timing trim, with fixture tests. |
