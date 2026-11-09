@@ -385,8 +385,6 @@ Stop the fixture and remove only this reverse mapping after testing.
 - Material 3 `ModalBottomSheet` applies its caller modifier before the internal
   sheet offset; an outer `border` can remain on the scrim at the unshifted height.
   Check short and shrinking E-ink sheets, not only full-height lists.
-  `SyncQueueViewTest` captures the real dialog window and checks for stray lines
-  above the sheet while its queue shrinks.
 
 - Cold launch normally lands on Bookshelf; open a book before testing Reader.
   Single-tap text opens lookup; long press tests native selection/highlights.
@@ -606,10 +604,12 @@ including empty environment values. Protocol and activity tests live under
 `DriveFileTransferTest` covers resumable protocol recovery and persistence with
 MockWebServer. `BookTransferSchedulerTest` and `SyncTransferTrackerTest` cover
 concurrency and monotonic-clock effective speed measurement without real network timing.
-`SyncQueueViewTest` renders isolated upload/download rows and checks that active
-row reordering/completion preserves the queue head or the user's manually scrolled
-position without accessing the book repository or account; its screenshot is in target cache
-`sync-queue-fixture.png`.
+`SyncQueueViewTest` renders generated queue state without accessing the installed
+library or Drive account. It checks settings and queue loading cues, directional
+summaries, ETA labels, grouping, error details and scroll retention through row
+changes and restore. It also checks the full-page E-ink background and static
+loading cue as the queue shrinks. Screenshots are in target cache as
+`sync-queue-fixture.png` and `sync-queue-page-*.png`.
 
 For device restart recovery, build/install the debug and androidTest APKs under
 the signature/data-protection rules above. Start

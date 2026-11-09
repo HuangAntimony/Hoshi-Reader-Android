@@ -11,11 +11,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.performScrollToKey
 import org.junit.Assert.assertEquals
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.onAllNodesWithText
@@ -27,6 +31,7 @@ import moe.antimony.hoshi.ui.theme.HoshiReaderTheme
 import androidx.test.platform.app.InstrumentationRegistry
 import android.graphics.Bitmap
 import java.io.File
+import moe.antimony.hoshi.R
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -35,11 +40,17 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class SyncQueueViewTest {
     @get:Rule val compose = createComposeRule()
+    private val indeterminateProgress = SemanticsMatcher.expectValue(
+        SemanticsProperties.ProgressBarRangeInfo, ProgressBarRangeInfo.Indeterminate,
+    )
 
     private fun queue(keys: List<Int>, active: Set<Int>): GoogleDriveSyncState = GoogleDriveSyncState(
         queue = keys.map { SyncQueueItem("$it", "Book $it", SyncTransferDirection.Upload, null) },
         activeTransfers = active.associate { "$it" to SyncFileTransfer(it.toLong(), SyncTransferDirection.Upload,
             SyncFileType.epub, SyncTransferPhase.Transferring, 512, 1024, 0, 1024.0) },
+        transferSummaries = if (active.isEmpty()) emptyMap() else mapOf(
+            SyncTransferDirection.Upload to SyncTransferSummary(512L * active.size, 1024L * keys.size, 1024.0 * active.size, 4.0),
+        ),
     )
 
     @Test fun keepsQueueTopWhenActiveBooksReorderAndCompletedBooksLeave() {
@@ -61,7 +72,7 @@ class SyncQueueViewTest {
         val state = mutableStateOf(queue((0..39).toList(), (0..7).toSet()))
         val restoration = StateRestorationTester(compose)
         restoration.setContent { HoshiReaderTheme { Box(Modifier.height(420.dp)) { SyncQueueContent(state.value, {}) } } }
-        compose.onNode(hasScrollToIndexAction()).performScrollToIndex(20)
+        compose.onNode(hasScrollToIndexAction()).performScrollToKey("book:20")
         compose.onNodeWithText("8.0 KiB/s", substring = true).assertIsDisplayed()
         val before = compose.onNodeWithText("Book 20").fetchSemanticsNode().boundsInRoot.top
         restoration.emulateSavedInstanceStateRestore()
@@ -93,11 +104,24 @@ class SyncQueueViewTest {
     @Test fun emptyQueueOnlyClaimsBooksSyncedAfterACompletedCheck() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val allSynced = context.getString(moe.antimony.hoshi.R.string.sync_queue_all_synced)
-        val state = mutableStateOf(GoogleDriveSyncState(isSyncing = true))
+        val state = mutableStateOf(GoogleDriveSyncState(
+            isSyncing = true,
+            isCheckingForChanges = true,
+            errorMessage = moe.antimony.hoshi.ui.UiText.Literal("Earlier check failed"),
+        ))
         compose.setContent { HoshiReaderTheme { SyncQueueContent(state.value, {}) } }
 
         compose.onNodeWithText(allSynced).assertDoesNotExist()
         compose.onNodeWithText(context.getString(moe.antimony.hoshi.R.string.sync_queue_checking)).assertIsDisplayed()
+        compose.onNode(indeterminateProgress).assertIsDisplayed()
+        compose.onNodeWithText(context.getString(R.string.sync_upload_speed, "0 B/s")).assertDoesNotExist()
+        compose.runOnIdle { state.value = GoogleDriveSyncState(isSyncing = true, lastSync = 1L) }
+        compose.onNodeWithText(context.getString(R.string.sync_queue_syncing_books)).assertIsDisplayed()
+        compose.onNodeWithText(allSynced).assertDoesNotExist()
+        compose.runOnIdle { state.value = queue(listOf(0), setOf(0)).copy(isSyncing = true, isCheckingForChanges = true) }
+        compose.onNodeWithText(context.getString(R.string.sync_queue_syncing_section)).assertIsDisplayed()
+        compose.onNodeWithText("Book 0").assertIsDisplayed()
+        compose.onNodeWithText(context.getString(R.string.sync_queue_checking)).assertDoesNotExist()
         compose.runOnIdle { state.value = GoogleDriveSyncState(errorMessage = moe.antimony.hoshi.ui.UiText.Literal("State fixture failed")) }
         compose.onNodeWithText(allSynced).assertDoesNotExist()
         compose.onNodeWithText(context.getString(moe.antimony.hoshi.R.string.sync_queue_interrupted)).assertIsDisplayed()
@@ -106,6 +130,41 @@ class SyncQueueViewTest {
         compose.onNodeWithText(context.getString(moe.antimony.hoshi.R.string.sync_queue_not_checked)).assertIsDisplayed()
         compose.runOnIdle { state.value = GoogleDriveSyncState(lastSync = 1L) }
         compose.onNodeWithText(allSynced).assertIsDisplayed()
+    }
+
+    @Test fun queueSettingsShowActivityUntilFileProgressIsAvailable() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val state = mutableStateOf(GoogleDriveSyncState(isSyncing = true, isCheckingForChanges = true))
+        var opened = 0
+        var started = 0
+        compose.setContent {
+            HoshiReaderTheme {
+                SyncQueueSettingsControls(state.value, { opened++ }, { started++ })
+            }
+        }
+        val checking = context.getString(R.string.sync_queue_checking_short)
+        val syncNow = compose.onNodeWithText(context.getString(R.string.sync_now))
+        compose.onNodeWithText(checking).assertIsDisplayed()
+        compose.onNodeWithText(context.getString(R.string.sync_queue)).performClick()
+        compose.runOnIdle { assertEquals(1, opened) }
+        compose.onNode(indeterminateProgress).assertIsDisplayed()
+        syncNow.assertIsNotEnabled()
+        compose.runOnIdle { state.value = state.value.copy(isCheckingForChanges = false) }
+        compose.onNodeWithText(context.getString(R.string.sync_queue_syncing_section)).assertIsDisplayed()
+        compose.runOnIdle { state.value = state.value.copy(isCheckingForChanges = true, progress = SyncProgress(1, 3)) }
+        compose.onNodeWithText(context.getString(R.string.sync_queue_progress, 1, 3)).assertIsDisplayed()
+        compose.onNodeWithText(checking).assertDoesNotExist()
+        compose.runOnIdle {
+            state.value = state.value.copy(progress = null, queue = listOf(SyncQueueItem(
+                "failed", "Failed book", null, moe.antimony.hoshi.ui.UiText.Literal("Earlier check failed"),
+            )))
+        }
+        compose.onNodeWithText(context.resources.getQuantityString(R.plurals.sync_queue_failed, 1, 1)).assertIsDisplayed()
+        compose.onNodeWithText(checking).assertDoesNotExist()
+        compose.runOnIdle { state.value = GoogleDriveSyncState() }
+        compose.onNode(indeterminateProgress).assertDoesNotExist()
+        syncNow.assertIsEnabled().performClick()
+        compose.runOnIdle { assertEquals(1, started) }
     }
 
     @Test fun shrinkingEInkQueueStaysFullScreenWithoutBackdrop() {
@@ -125,7 +184,10 @@ class SyncQueueViewTest {
         compose.onNodeWithContentDescription(back).assertIsDisplayed()
         val titleTop = compose.onNodeWithText(title).fetchSemanticsNode().boundsInRoot.top
         for (count in listOf(3, 1, 0)) {
-            compose.runOnIdle { state.value = queue((0 until count).toList(), (0 until count).toSet()) }
+            compose.runOnIdle {
+                state.value = if (count == 0) GoogleDriveSyncState(isSyncing = true, isCheckingForChanges = true)
+                else queue((0 until count).toList(), (0 until count).toSet())
+            }
             compose.waitForIdle()
             compose.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsProperties.PaneTitle)).assertCountEquals(0)
             assertEquals(titleTop, compose.onNodeWithText(title).fetchSemanticsNode().boundsInRoot.top, 1f)
@@ -145,6 +207,8 @@ class SyncQueueViewTest {
                 }
             } finally { bitmap.recycle() }
         }
+        compose.onNodeWithText(context.getString(R.string.sync_queue_checking)).assertIsDisplayed()
+        compose.onNode(indeterminateProgress).assertDoesNotExist()
         compose.onNodeWithContentDescription(back).performClick()
         compose.runOnIdle { assertEquals(1, closed) }
         androidx.test.espresso.Espresso.pressBack()
@@ -156,22 +220,40 @@ class SyncQueueViewTest {
             "a" to SyncFileTransfer(1, SyncTransferDirection.Upload, SyncFileType.epub, SyncTransferPhase.Transferring, 512, 1024, 0, 1024.0),
             "b" to SyncFileTransfer(2, SyncTransferDirection.Download, SyncFileType.epub, SyncTransferPhase.Transferring, 256, 1024, 256, 2048.0),
         )
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val waitingSize = context.getString(R.string.sync_transfer_amount, "512 B", "2.0 KiB")
         compose.setContent {
             HoshiReaderTheme {
                 SyncQueueScreen(GoogleDriveSyncState(
                     queue = listOf(SyncQueueItem("a", "Upload fixture", SyncTransferDirection.Upload, null),
                         SyncQueueItem("b", "Download fixture", SyncTransferDirection.Download, null),
-                        SyncQueueItem("c", "Waiting fixture", SyncTransferDirection.Upload, null)),
+                        SyncQueueItem("c", "Waiting fixture", SyncTransferDirection.Upload, null, pendingBytes = 3072),
+                        SyncQueueItem("d", "Interrupted fixture", SyncTransferDirection.Upload,
+                            moe.antimony.hoshi.ui.UiText.Literal("Disconnected"),
+                            interruptedTransfer = active.getValue("a").copy(bytesPerSecond = 0.0))),
                     activeTransfers = active,
+                    transferSummaries = mapOf(
+                        SyncTransferDirection.Upload to SyncTransferSummary(512, 2048, 1024.0, 59.9),
+                        SyncTransferDirection.Download to SyncTransferSummary(256, 1024, 2048.0, 60.0),
+                    ),
                 ), {})
             }
         }
         compose.onNodeWithText("Upload fixture").assertIsDisplayed()
         compose.onNodeWithText("Download fixture").assertIsDisplayed()
         compose.onNodeWithText("Waiting fixture").assertIsDisplayed()
-        compose.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsProperties.ProgressBarRangeInfo)).assertCountEquals(2)
+        compose.onNodeWithText("3.0 KiB").assertIsDisplayed()
+        compose.onNodeWithText(waitingSize).assertIsDisplayed()
+        compose.onNodeWithText(context.getString(R.string.sync_transfer_remaining_under_minute)).assertIsDisplayed()
+        compose.onNodeWithText(context.getString(R.string.sync_transfer_remaining_minutes, 1)).assertIsDisplayed()
+        compose.onNodeWithText(context.getString(R.string.sync_queue_syncing_section)).assertIsDisplayed()
+        compose.onNodeWithText(context.getString(R.string.sync_queue_waiting_section)).assertIsDisplayed()
         compose.onAllNodesWithText("1.0 KiB/s", substring = true).assertCountEquals(2)
         compose.onAllNodesWithText("2.0 KiB/s", substring = true).assertCountEquals(2)
+        compose.onNode(hasScrollToIndexAction()).performScrollToKey("book:d")
+        compose.onNodeWithText(context.getString(R.string.sync_queue_failed_section)).assertExists()
+        compose.onNodeWithText(context.getString(R.string.sync_transfer_stage,
+            context.getString(R.string.sync_file_epub), context.getString(R.string.sync_transfer_interrupted))).assertIsDisplayed()
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         instrumentation.uiAutomation.takeScreenshot()?.let { bitmap ->
             File(instrumentation.targetContext.cacheDir, "sync-queue-fixture.png").outputStream().use {

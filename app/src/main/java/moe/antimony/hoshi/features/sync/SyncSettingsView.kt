@@ -41,7 +41,6 @@ import androidx.compose.material.icons.rounded.SwapVert
 import moe.antimony.hoshi.ui.HoshiAlertDialog as AlertDialog
 import moe.antimony.hoshi.ui.HoshiButton as Button
 import androidx.compose.material3.BottomSheetDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import moe.antimony.hoshi.ui.HoshiDropdownMenu as DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -777,42 +776,14 @@ fun SyncSettingsView(
                             )
                             SettingsDivider()
                         }
-                        val progress = hoshiState.progress
-                        val failed = hoshiState.queue.count { it.error != null }
-                        ListItem(
-                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                            modifier = Modifier.clickable(onClick = onOpenQueue),
-                            headlineContent = { Text(stringResource(R.string.sync_queue)) },
-                            supportingContent = progress?.let {
-                                {
-                                    LinearProgressIndicator(
-                                        progress = { progress.done.toFloat() / progress.total },
-                                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                                    )
-                                }
-                            },
-                            trailingContent = {
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    when {
-                                        progress != null -> Text(stringResource(R.string.sync_queue_progress, progress.done, progress.total))
-                                        failed > 0 -> Text(pluralStringResource(R.plurals.sync_queue_failed, failed, failed), color = colorScheme.error)
-                                        hoshiState.queue.isNotEmpty() -> Text(hoshiState.queue.size.toString())
-                                        else -> Text(stringResource(R.string.sync_queue_empty))
-                                    }
-                                    Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = colorScheme.onSurfaceVariant)
-                                }
-                            },
-                        )
-                        SettingsDivider()
-                        TextButton(
-                            onClick = {
+                        SyncQueueSettingsControls(
+                            state = hoshiState,
+                            onOpenQueue = onOpenQueue,
+                            onSyncNow = {
                                 hoshiSync.setAttachDismissed(false)
                                 scope.launch { hoshiSync.sync() }
                             },
-                            enabled = !hoshiState.isSyncing,
-                        ) {
-                            Text(stringResource(R.string.sync_now))
-                        }
+                        )
                         SettingsDivider()
                         TextButton(
                             onClick = { showDownloadAllConfirmation = true },
@@ -862,6 +833,65 @@ fun SyncSettingsView(
                     if (currentSettings.provider == SyncProvider.Ttu) GoogleCloudOAuthSetupCard()
                 }
             }
+        }
+    }
+}
+
+@Composable
+internal fun SyncQueueSettingsControls(
+    state: GoogleDriveSyncState,
+    onOpenQueue: () -> Unit,
+    onSyncNow: () -> Unit,
+) {
+    val colors = MaterialTheme.colorScheme
+    val progress = state.progress
+    val summaries = state.transferSummaries
+    val failed = state.queue.count { it.error != null }
+    Column {
+        ListItem(
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+            modifier = Modifier.clickable(onClick = onOpenQueue),
+            headlineContent = { Text(stringResource(R.string.sync_queue)) },
+            supportingContent = when {
+                summaries.isNotEmpty() -> ({
+                    Column(Modifier.fillMaxWidth().padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        for ((direction, summary) in summaries.entries.sortedBy { it.key }) {
+                            SyncTransferSummaryView(direction, summary, Modifier.fillMaxWidth())
+                        }
+                    }
+                })
+                progress != null -> ({
+                    LinearProgressIndicator(
+                        progress = { progress.done.toFloat() / progress.total },
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    )
+                })
+                else -> null
+            },
+            trailingContent = {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    when {
+                        progress != null -> Text(stringResource(R.string.sync_queue_progress, progress.done, progress.total))
+                        failed > 0 -> Text(pluralStringResource(R.plurals.sync_queue_failed, failed, failed), color = colors.error)
+                        state.queue.isNotEmpty() -> Text(state.queue.size.toString())
+                        state.isCheckingForChanges -> Text(stringResource(R.string.sync_queue_checking_short))
+                        state.isSyncing -> Text(stringResource(R.string.sync_queue_syncing_section))
+                        else -> Text(stringResource(R.string.sync_queue_empty))
+                    }
+                    Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = colors.onSurfaceVariant)
+                }
+            },
+        )
+        SettingsDivider()
+        Row(
+            Modifier.fillMaxWidth().padding(end = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TextButton(onClick = onSyncNow, enabled = !state.isSyncing) {
+                Text(stringResource(R.string.sync_now))
+            }
+            if (state.isSyncing) SyncBusyIndicator()
         }
     }
 }

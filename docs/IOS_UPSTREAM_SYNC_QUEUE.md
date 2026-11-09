@@ -17,30 +17,7 @@ details against official documentation when implementing platform-facing slices.
 
 ## Current Queue
 
-### 1. Transfer queue totals, remaining time and interrupted rows
-
-Status: Pending
-
-Commits: `21d5546` (presentation and aggregate accounting only).
-
-- Dependency/value: independent; streaming, resumable uploads and shared bounded
-  transfer scheduling are already implemented.
-- iOS behavior: total/completed bytes and remaining time per direction, pending
-  row sizes/covers, interrupted progress, and Syncing/Waiting/Failed groups.
-- Android current gap: `features/sync/GoogleDriveSyncManager.kt` exposes book
-  counts and active file snapshots; `SyncQueueItem` lacks pending sizes/covers
-  and retained transfer state. `trackTransfer` removes snapshots in `finally`.
-  `SyncTransferTracker.kt` accounts only for the current file; `SyncQueueView.kt`
-  displays active speeds and a flat list without aggregate byte progress or ETA.
-- Suggested slice: add application-owned queue accounting and interrupted
-  snapshots, then render summaries and groups. Preserve Android's dedicated queue
-  page, E-ink behavior, configurable concurrency and effective-speed semantics.
-- Validation: deterministic clock/byte tests for completion, retries, resumed
-  offsets, unknown sizes, new work and failure retention; extend
-  `SyncTransferTrackerTest`, `GoogleDriveSyncManagerTest` and `SyncQueueViewTest`,
-  including device scroll retention and E-ink rendering.
-
-### 2. Keep the selected statistics period current across date changes
+### 1. Keep the selected statistics period current across date changes
 
 Status: Pending
 
@@ -60,7 +37,7 @@ Commits: `e2e0f31` (selected-period anchor only).
   current-period rollover, historical browsing, return to latest and reset changes;
   retain existing `StatisticsViewReloadTest` lifecycle coverage.
 
-### 3. Hide the status bar while a fullscreen image is open
+### 2. Hide the status bar while a fullscreen image is open
 
 Status: Pending
 
@@ -77,7 +54,7 @@ Commits: `18072c8` (system status bar only).
 - Validation: extend `ReaderChromeTest`; device checks for gallery and inline
   images, dismissal/back, both focus states and existing navigation-bar behavior.
 
-### 4. Show sub-minute transcription remaining time
+### 3. Show sub-minute transcription remaining time
 
 Status: Pending
 
@@ -99,20 +76,17 @@ Only concrete remaining behavior is listed; covered portions are summarized belo
 
 | Commit | Remaining Android work | Slice |
 | --- | --- | --- |
-| `21d5546` | Aggregate transfer accounting and pending/interrupted/grouped rows | 1 |
-| `e2e0f31` | Reconcile selected statistics period on day/reset-time changes | 2 |
-| `18072c8` | Fullscreen-image status-bar visibility | 3 |
-| `3dfa9ef` | Sub-minute transcription ETA label | 4 |
+| `e2e0f31` | Reconcile selected statistics period on day/reset-time changes | 1 |
+| `18072c8` | Fullscreen-image status-bar visibility | 2 |
+| `3dfa9ef` | Sub-minute transcription ETA label | 3 |
 
 ## Suggested Implementation Order
 
-All remaining slices are independent. Prioritize transfer state, then address
-the UI refinements.
+All remaining slices are independent.
 
-1. Transfer queue totals, remaining time and interrupted rows.
-2. Keep the selected statistics period current across date changes.
-3. Hide the status bar while a fullscreen image is open.
-4. Show sub-minute transcription remaining time.
+1. Keep the selected statistics period current across date changes.
+2. Hide the status bar while a fullscreen image is open.
+3. Show sub-minute transcription remaining time.
 
 ## Covered Or No Android Action
 
@@ -140,6 +114,7 @@ Code-backed coverage for the refreshed range:
 | `d9f1b72`, `62982b7`, `3d2f77a`, `daf0fd7`, `e596fe1`, `c69f203`, `62e5889`, `1cfbf71`, `ca7e053`, `45ac6e9`, `241c92b`, `1c5d525`, `77eaee3`, `4777715`, `def6cec`, `08bcbb4`, `55988cc` | `SyncStorage`, `GoogleDriveSyncManager`, `GoogleDriveClient`, `BookRepository`, `SyncReloadScheduler` and `SyncAttachPrompt` cover provider separation, sidecars/tombstones, archive covers, shelf recreation, cached versions, coalesced reload, retries, streaming, conflict choices and on-demand downloads. Swift file extraction requires no port. |
 | `a8d422c`, `d9f1b72` (book actions) | `BookContextMenu` groups Read/Unread under Mark. `BookRepository` enables Read from cached bookinfo without a local EPUB. Confirmed Unread resets the bookmark and retains session tombstones through `BookStatisticsStore`; `BookshelfViewModel` refreshes progress and action availability. |
 | `a1c9996` | Single/bulk new-shelf moves exist. `NewShelfMoveDialog`, `BookshelfView`, `BookshelfRepository` and `BookshelfViewModel` use NFC names for creation, rename, duplicate checks, move targets and published state; `BookRepository.saveShelves` rejects canonical-name collisions before writing sidecars. |
+| `21d5546` (queue presentation) | `SyncQueueAccounting` and `SyncQueueView` provide directional byte totals and ETA, pending sizes and covers, retained interruptions and grouped rows. Android shows ETA once size and effective speed are available and keeps the full waiting list. |
 | `21d5546` (transport portion), `bb4e92d` | `GoogleDriveFileTransfer`, `DriveUploadSessions` and `BookTransferScheduler` implement resumable uploads and shared bounded upload/download scheduling; upstream job classification adds no further transport gap. |
 | `3f53018`, `e2e0f31` (reload portion), `642ad22` | Bookshelf/statistics repositories dispatch blocking work off main; `StatisticsLifecycleReloader` refreshes on resume. `TtuStatistics.reconciled` and `GoogleDriveSyncManager.mergeBook` remove overlap between legacy totals and sessions. Only selected-period rollover remains open. |
 | `a1babc9` | Engine `55e56e3` accepts quoted integer frequencies in `yomitan_parser::parse_frequency` and caches Japanese preprocessing definitions. `DictionaryLookupQueryService` atomically replaces sessions after remove/reorder. iOS leaves the native mutation APIs unused. |

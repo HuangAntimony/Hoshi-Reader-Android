@@ -460,7 +460,7 @@
     <string name="reader_appearance_delete_font_title_format" comment="Imported-font delete confirmation, intentionally matching book and profile delete confirmation formats.">Delete \"%1$s\"?</string>
     <string name="action_enable">Enable</string>
     <string name="sync_ttu_sync">ッツ Sync</string>
-    <string name="sync_title">Syncing</string>
+    <string name="sync_title" comment="Sync settings page title">Syncing</string>
     <string name="sync_section_behaviour" comment="Sync settings group label, intentionally matching other settings group labels.">Behaviour</string>
     <string name="sync_section_data">Data</string>
     <string name="sync_direction">Direction</string>
@@ -893,7 +893,7 @@
     <string name="sasayaki_transcription_download_message">Transcription needs about %1$d MiB of additional files (speech model and processing components). Downloaded files can be reused offline. Your audio stays on this device.</string>
     <string name="sasayaki_transcription_download_action">Download and transcribe</string>
     <string name="sasayaki_transcription_saved_progress">Transcribed %1$s / %2$s</string>
-    <string name="sasayaki_transcription_remaining">About %1$d min left</string>
+    <string name="sasayaki_transcription_remaining" comment="Sasayaki transcription time estimate">About %1$d min left</string>
     <string name="sasayaki_transcription_aligning">Aligning with book…</string>
     <string name="sasayaki_transcription_pausing">Saving progress…</string>
     <string name="sasayaki_transcription_clear">Clear Transcription</string>
@@ -934,7 +934,9 @@
     <string name="sync_queue">Queue</string>
     <string name="sync_queue_empty">Empty</string>
     <string name="sync_queue_all_synced">All Books Synced</string>
-    <string name="sync_queue_checking">Checking book states. The transfer queue will appear when ready.</string>
+    <string name="sync_queue_checking_short">Checking</string>
+    <string name="sync_queue_checking">Checking for Changes</string>
+    <string name="sync_queue_syncing_books">Syncing Books</string>
     <string name="sync_queue_interrupted">Sync stopped before the transfer queue was ready.</string>
     <string name="sync_queue_not_checked">Book states have not been checked yet.</string>
     <string name="sync_queue_progress" translatable="false">%1$d / %2$d</string>
@@ -1269,6 +1271,13 @@
     <string name="sync_transfer_stage" comment="Drive file transfer queue">%1$s · %2$s</string>
     <string name="sync_transfer_amount" comment="Drive file transfer queue">%1$s / %2$s</string>
     <string name="sync_transfer_percent" comment="Drive file transfer queue">%1$d%% · %2$s</string>
+    <string name="sync_transfer_amount_unknown" comment="Drive file transfer queue">%1$s transferred</string>
+    <string name="sync_transfer_remaining_under_minute" comment="Drive file transfer queue">Less than 1 min left</string>
+    <string name="sync_transfer_remaining_minutes" comment="Drive file transfer queue">About %1$d min left</string>
+    <string name="sync_transfer_interrupted" comment="Drive file transfer queue">Interrupted</string>
+    <string name="sync_queue_syncing_section" comment="Drive file transfer queue">Syncing</string>
+    <string name="sync_queue_waiting_section" comment="Drive file transfer queue">Waiting</string>
+    <string name="sync_queue_failed_section" comment="Drive file transfer queue">Failed</string>
     <string name="dictionary_history_title">Lookup history</string>
     <string name="dictionary_history_clear_confirm">Clear all lookup history?</string>
     <string name="dictionary_history_load_failed">Failed to load lookup history</string>

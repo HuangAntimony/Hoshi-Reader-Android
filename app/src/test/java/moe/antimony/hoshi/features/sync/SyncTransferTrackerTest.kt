@@ -64,10 +64,10 @@ class SyncTransferTrackerTest {
         val old = tracker.begin("a", SyncTransferDirection.Upload, SyncFileType.epub)
         val fresh = tracker.begin("a", SyncTransferDirection.Download, SyncFileType.cover)
         tracker.update("a", old, DriveTransferUpdate(100, 100, deltaBytes = 100))
-        tracker.finish("a", old)
+        assertNull(tracker.finish("a", old))
         assertEquals(fresh, tracker.snapshot().getValue("a").id)
         assertEquals(0L, tracker.snapshot().getValue("a").bytes)
-        tracker.finish("a", fresh)
+        assertEquals(fresh, tracker.finish("a", fresh)?.id)
         assertTrue(tracker.snapshot().isEmpty())
     }
 
@@ -85,5 +85,16 @@ class SyncTransferTrackerTest {
         assertEquals(28.0, tracker.snapshot().values.sumOf { it.bytesPerSecond }, 0.01)
         tracker.finish("a", a)
         assertEquals(setOf("b"), tracker.snapshot().keys)
+    }
+
+    @Test fun callbacksFromBeforeResetCannotReviveOrReplaceActiveProgress() {
+        val tracker = SyncTransferTracker { 0L }
+        val obsolete = tracker.begin("book", SyncTransferDirection.Download, SyncFileType.epub)
+        tracker.clear()
+        val current = tracker.begin("book", SyncTransferDirection.Upload, SyncFileType.epub, totalBytes = 15)
+        tracker.update("book", obsolete, DriveTransferUpdate(10, 10, confirmedBytes = 10))
+        assertNull(tracker.finish("book", obsolete))
+        assertEquals(SyncFileTransfer(current, SyncTransferDirection.Upload, SyncFileType.epub, totalBytes = 15),
+            tracker.snapshot().getValue("book"))
     }
 }

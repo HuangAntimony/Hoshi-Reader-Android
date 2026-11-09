@@ -80,6 +80,13 @@ class BookStatisticsStore private constructor(
 
     suspend fun loadSessions(bookRoot: File): ReadingSessions = locked { readSessions(bookRoot) }
 
+    /** Queue projection checks the supplied book directory without migrating its sidecars. */
+    internal suspend fun hasStoredSessions(bookRoot: File): Boolean = withContext(ioDispatcher) {
+        storageLock.withLock {
+            readSessions(bookRoot, reset = resetMinutes(), migrateLegacy = false).values.any { it.value != null }
+        }
+    }
+
     internal suspend fun hasLiveSessions(folder: String): Boolean = locked {
         readCoalesced(folder).values.any { it.value != null }
     }
@@ -269,13 +276,15 @@ class BookStatisticsStore private constructor(
     private fun readCoalesced(folder: String): ReadingSessions =
         SyncBook.mergeRecords(readSessions(activeRoot(folder)), readSessions(archiveRoot(folder)))
 
-    private fun readSessions(root: File): ReadingSessions {
+    private fun readSessions(root: File, reset: Int = resetTime, migrateLegacy: Boolean = true): ReadingSessions {
         val file = root.resolve("statistics.json")
         if (!file.exists()) return emptyMap()
         val element = json.parseToJsonElement(file.readText())
         if (element !is JsonArray) return json.decodeFromJsonElement(serializer, element)
         val daily = json.decodeFromJsonElement(ListSerializer(ReadingStatistics.serializer()), element)
-        return TtuStatistics.legacySessions(daily, root.name, resetTime).also { writeSessions(root, it) }
+        return TtuStatistics.legacySessions(daily, root.name, reset).also {
+            if (migrateLegacy) writeSessions(root, it)
+        }
     }
 
     private fun readMetadata(root: File): BookMetadata {

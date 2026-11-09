@@ -13,6 +13,19 @@ import org.junit.rules.TemporaryFolder
 class BookStatisticsStoreTest {
     @get:Rule val temporary = TemporaryFolder()
 
+    @Test fun readingArchiveEligibilityDoesNotMigrateLegacyStatistics() = runBlocking {
+        val files = temporary.newFolder()
+        val store = BookRepository(files).statisticsStore
+        val archive = files.resolve("Books/statistics_archive/book").apply { mkdirs() }
+        val legacy = SyncFormat.json.encodeToString(listOf(day(10)))
+        val statistics = archive.resolve("statistics.json").apply { writeText(legacy) }
+
+        assertTrue(store.hasStoredSessions(archive))
+        assertEquals(legacy, statistics.readText())
+        assertTrue(store.loadSessions(archive).values.any { it.value != null })
+        assertNotEquals(legacy, statistics.readText())
+    }
+
     @Test fun archiveAndRestoreKeepLiveSessionsFirstOnEqualStampsLikeIos() = runBlocking {
         val files = temporary.newFolder()
         val repository = BookRepository(files)

@@ -458,7 +458,7 @@
     <string name="reader_appearance_delete_font_title_format" comment="Imported-font delete confirmation, intentionally matching book and profile delete confirmation formats.">删除“%1$s”？</string>
     <string name="action_enable">启用</string>
     <string name="sync_ttu_sync">ッツ 同步</string>
-    <string name="sync_title">同步</string>
+    <string name="sync_title" comment="Sync settings page title">同步</string>
     <string name="sync_section_behaviour" comment="Sync settings group label, intentionally matching other settings group labels.">行为</string>
     <string name="sync_section_data">数据</string>
     <string name="sync_direction">方向</string>
@@ -891,7 +891,7 @@
     <string name="sasayaki_transcription_download_message">转写还需下载约 %1$d MiB 的文件（语音模型及运行组件），下载后可离线重复使用。音频不会上传。</string>
     <string name="sasayaki_transcription_download_action">下载并转写</string>
     <string name="sasayaki_transcription_saved_progress">已转写 %1$s / %2$s</string>
-    <string name="sasayaki_transcription_remaining">约剩 %1$d 分钟</string>
+    <string name="sasayaki_transcription_remaining" comment="Sasayaki transcription time estimate">约剩 %1$d 分钟</string>
     <string name="sasayaki_transcription_aligning">正在匹配正文…</string>
     <string name="sasayaki_transcription_pausing">正在保存进度…</string>
     <string name="sasayaki_transcription_clear">清除转写</string>
@@ -932,7 +932,9 @@
     <string name="sync_queue">队列</string>
     <string name="sync_queue_empty">空</string>
     <string name="sync_queue_all_synced">所有书籍已同步</string>
-    <string name="sync_queue_checking">正在检查书籍状态，传输队列准备好后会显示。</string>
+    <string name="sync_queue_checking_short">检查中</string>
+    <string name="sync_queue_checking">正在检查变更</string>
+    <string name="sync_queue_syncing_books">正在同步书籍</string>
     <string name="sync_queue_interrupted">同步已中断，传输队列尚未准备好。</string>
     <string name="sync_queue_not_checked">尚未检查书籍状态。</string>
     <plurals name="sync_queue_failed">
@@ -1247,6 +1249,13 @@
     <string name="sync_transfer_stage" comment="Drive file transfer queue">%1$s · %2$s</string>
     <string name="sync_transfer_amount" comment="Drive file transfer queue">%1$s / %2$s</string>
     <string name="sync_transfer_percent" comment="Drive file transfer queue">%1$d%% · %2$s</string>
+    <string name="sync_transfer_amount_unknown" comment="Drive file transfer queue">已传输 %1$s</string>
+    <string name="sync_transfer_remaining_under_minute" comment="Drive file transfer queue">剩余不到 1 分钟</string>
+    <string name="sync_transfer_remaining_minutes" comment="Drive file transfer queue">预计剩余 %1$d 分钟</string>
+    <string name="sync_transfer_interrupted" comment="Drive file transfer queue">已中断</string>
+    <string name="sync_queue_syncing_section" comment="Drive file transfer queue">同步中</string>
+    <string name="sync_queue_waiting_section" comment="Drive file transfer queue">等待中</string>
+    <string name="sync_queue_failed_section" comment="Drive file transfer queue">失败</string>
     <string name="dictionary_history_title">查词历史</string>
     <string name="dictionary_history_clear_confirm">清空全部查词历史？</string>
     <string name="dictionary_history_load_failed">读取查词历史失败</string>

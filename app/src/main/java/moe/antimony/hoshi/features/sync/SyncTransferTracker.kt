@@ -28,9 +28,9 @@ internal class SyncTransferTracker(private val clock: () -> Long = { System.nano
     private val active = linkedMapOf<String, Active>()
     private var nextId = 0L
 
-    @Synchronized fun begin(key: String, direction: SyncTransferDirection, type: SyncFileType): Long {
+    @Synchronized fun begin(key: String, direction: SyncTransferDirection, type: SyncFileType, totalBytes: Long? = null): Long {
         val id = ++nextId
-        active[key] = Active(SyncFileTransfer(id, direction, type))
+        active[key] = Active(SyncFileTransfer(id, direction, type, totalBytes = totalBytes))
         return id
     }
 
@@ -46,12 +46,16 @@ internal class SyncTransferTracker(private val clock: () -> Long = { System.nano
             entry.lastActivity = now
         }
         if (update.deltaBytes > 0 || update.confirmedBytes > entry.state.confirmedBytes) entry.lastActivity = now
-        entry.state = entry.state.copy(phase = update.phase, bytes = update.bytes, totalBytes = update.totalBytes, confirmedBytes = update.confirmedBytes)
+        entry.state = entry.state.copy(phase = update.phase, bytes = update.bytes,
+            totalBytes = update.totalBytes?.takeIf { it >= 0 } ?: entry.state.totalBytes, confirmedBytes = update.confirmedBytes)
     }
 
-    @Synchronized fun finish(key: String, id: Long) {
-        if (active[key]?.state?.id == id) active.remove(key)
-    }
+    @Synchronized fun finish(key: String, id: Long): SyncFileTransfer? =
+        if (active[key]?.state?.id == id) active.remove(key)?.state else null
+
+    @Synchronized fun clear() = active.clear()
+
+    @Synchronized fun hasActive(): Boolean = active.isNotEmpty()
 
     @Synchronized fun snapshot(): Map<String, SyncFileTransfer> {
         val now = clock()
