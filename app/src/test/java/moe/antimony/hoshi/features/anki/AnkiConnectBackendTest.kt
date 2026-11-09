@@ -1,5 +1,7 @@
 package moe.antimony.hoshi.features.anki
 
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
@@ -7,6 +9,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -280,6 +283,56 @@ class AnkiConnectBackendTest {
     }
 
     @Test
+    fun existingCoverSkipsUploadAndReturnsTheImageReference() = runBlocking {
+        val transport = FakeAnkiConnectTransport("""{"result":["$CoverName"],"error":null}""")
+        val backend = AnkiConnectBackend("https://anki.example.com", transport, apiKey = "hoshi-secret")
+
+        assertEquals("""<img src="$CoverName">""", backend.addCoverFromBytes(byteArrayOf(1, 2, 3), CoverName, "image/png"))
+
+        assertEquals(listOf("getMediaFilesNames"), transport.actions)
+        val request = transport.lastBody()
+        assertEquals(CoverName, request.getValue("params").jsonObject.getValue("pattern").jsonPrimitive.content)
+        assertEquals("hoshi-secret", request.getValue("key").jsonPrimitive.content)
+    }
+
+    @Test
+    fun missingCoverOrFailedLookupFallsBackToUpload() = runBlocking {
+        for (lookupResponse in listOf(
+            """{"result":[],"error":null}""",
+            """{"result":["other_$CoverName"],"error":null}""",
+            """{"result":null,"error":"unsupported action"}""",
+            """{"result":false,"error":null}""",
+        )) {
+            val transport = FakeAnkiConnectTransport(lookupResponse, """{"result":"$CoverName","error":null}""")
+            val backend = AnkiConnectBackend("https://anki.example.com", transport)
+
+            assertEquals("""<img src="$CoverName">""", backend.addCoverFromBytes(byteArrayOf(1, 2, 3), CoverName, "image/png"))
+
+            assertEquals(listOf("getMediaFilesNames", "storeMediaFile"), transport.actions)
+            val upload = transport.lastBody().getValue("params").jsonObject
+            assertEquals(CoverName, upload.getValue("filename").jsonPrimitive.content)
+            assertEquals("AQID", upload.getValue("data").jsonPrimitive.content)
+        }
+    }
+
+    @Test
+    fun cancelledCoverLookupDoesNotUpload() = runBlocking {
+        val cancelled = CancellationException("cover lookup cancelled")
+        val actions = mutableListOf<String>()
+        val backend = AnkiConnectBackend("https://anki.example.com", AnkiConnectTransport { _, body, _ ->
+            actions += Json.parseToJsonElement(body).jsonObject.getValue("action").jsonPrimitive.content
+            throw cancelled
+        })
+
+        val error = runCatching {
+            backend.addCoverFromBytes(byteArrayOf(1, 2, 3), CoverName, "image/png")
+        }.exceptionOrNull()
+
+        assertSame(cancelled, error)
+        assertEquals(listOf("getMediaFilesNames"), actions)
+    }
+
+    @Test
     fun addNoteIgnoresFieldsOutsideSelectedNoteType() {
         val transport = FakeAnkiConnectTransport("""{"result":123,"error":null}""")
         val backend = AnkiConnectBackend("https://anki.example.com", transport)
@@ -375,5 +428,9 @@ class AnkiConnectBackendTest {
         private companion object {
             val json = Json { ignoreUnknownKeys = true }
         }
+    }
+
+    private companion object {
+        const val CoverName = "hoshi_cover_7037807198c22a7d2b0807371d763779a84fdfcf.png"
     }
 }

@@ -33,6 +33,8 @@ Release notes before v1.3.0 are in [CHANGELOG_ARCHIVE.md](CHANGELOG_ARCHIVE.md).
 
 ### Changed
 
+- Create Anki cards with only the dictionary media their fields use, and reuse book covers already stored in AnkiConnect.
+
 - Put Transcription first in audiobook matching and select it by default for books without a match, with clearer explanations of each preset’s effect on transcription time and device load.
 
 - Show the current matched Sasayaki sentence alongside the book cover in system media controls, including during background playback and after seeking.

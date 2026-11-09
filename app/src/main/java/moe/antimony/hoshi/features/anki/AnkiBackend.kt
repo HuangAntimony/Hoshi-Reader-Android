@@ -27,6 +27,8 @@ interface AnkiBackend {
     ): Boolean
     fun addMediaFromUri(uriString: String, preferredName: String, mimeType: String): String?
     fun addMediaFromBytes(bytes: ByteArray, preferredName: String, mimeType: String): String? = null
+    suspend fun addCoverFromBytes(bytes: ByteArray, preferredName: String, mimeType: String): String? =
+        addMediaFromBytes(bytes, preferredName, mimeType)
     fun openNotes(
         deck: AnkiDeck,
         noteType: AnkiNoteType,

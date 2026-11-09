@@ -17,27 +17,7 @@ details against official documentation when implementing platform-facing slices.
 
 ## Current Queue
 
-### 1. Anki media filtering and remote cover reuse
-
-Status: Pending
-
-Commits: `81c60d2` (dictionary media and existing covers only).
-
-- Dependency/value: independent; reduces unnecessary media reads and
-  uploads during card creation.
-- iOS behavior: upload media referenced by the final rendered fields; reuse a
-  cover already stored by AnkiConnect.
-- Android current gap: `features/anki/AnkiRepository.kt::mineEntry` uploads every
-  `payload.dictionaryMedia` before rendering fields, although cover/audio fields
-  are already filtered. `AnkiConnectBackend.kt::addMediaFromBytes` always calls
-  `storeMediaFile`, without checking the existing content-hashed cover name.
-- Suggested slice: filter dictionary media from final fields and check remote
-  cover existence for AnkiConnect, preserving the other Anki backends.
-- Validation: extend `AnkiRepositoryBackendSelectionTest` and
-  `AnkiConnectBackendTest` for selected/excluded glossaries, absent media fields,
-  existing/missing covers and lookup-failure fallback; assert request sequences.
-
-### 2. Transfer queue totals, remaining time and interrupted rows
+### 1. Transfer queue totals, remaining time and interrupted rows
 
 Status: Pending
 
@@ -60,7 +40,7 @@ Commits: `21d5546` (presentation and aggregate accounting only).
   `SyncTransferTrackerTest`, `GoogleDriveSyncManagerTest` and `SyncQueueViewTest`,
   including device scroll retention and E-ink rendering.
 
-### 3. Keep the selected statistics period current across date changes
+### 2. Keep the selected statistics period current across date changes
 
 Status: Pending
 
@@ -80,7 +60,7 @@ Commits: `e2e0f31` (selected-period anchor only).
   current-period rollover, historical browsing, return to latest and reset changes;
   retain existing `StatisticsViewReloadTest` lifecycle coverage.
 
-### 4. Hide the status bar while a fullscreen image is open
+### 3. Hide the status bar while a fullscreen image is open
 
 Status: Pending
 
@@ -97,7 +77,7 @@ Commits: `18072c8` (system status bar only).
 - Validation: extend `ReaderChromeTest`; device checks for gallery and inline
   images, dismissal/back, both focus states and existing navigation-bar behavior.
 
-### 5. Show sub-minute transcription remaining time
+### 4. Show sub-minute transcription remaining time
 
 Status: Pending
 
@@ -119,22 +99,20 @@ Only concrete remaining behavior is listed; covered portions are summarized belo
 
 | Commit | Remaining Android work | Slice |
 | --- | --- | --- |
-| `81c60d2` | Filter dictionary media and reuse uploaded AnkiConnect covers | 1 |
-| `21d5546` | Aggregate transfer accounting and pending/interrupted/grouped rows | 2 |
-| `e2e0f31` | Reconcile selected statistics period on day/reset-time changes | 3 |
-| `18072c8` | Fullscreen-image status-bar visibility | 4 |
-| `3dfa9ef` | Sub-minute transcription ETA label | 5 |
+| `21d5546` | Aggregate transfer accounting and pending/interrupted/grouped rows | 1 |
+| `e2e0f31` | Reconcile selected statistics period on day/reset-time changes | 2 |
+| `18072c8` | Fullscreen-image status-bar visibility | 3 |
+| `3dfa9ef` | Sub-minute transcription ETA label | 4 |
 
 ## Suggested Implementation Order
 
-All remaining slices are independent. Prioritize Anki media handling and transfer
-state, then address the UI refinements.
+All remaining slices are independent. Prioritize transfer state, then address
+the UI refinements.
 
-1. Anki media filtering and remote cover reuse.
-2. Transfer queue totals, remaining time and interrupted rows.
-3. Keep the selected statistics period current across date changes.
-4. Hide the status bar while a fullscreen image is open.
-5. Show sub-minute transcription remaining time.
+1. Transfer queue totals, remaining time and interrupted rows.
+2. Keep the selected statistics period current across date changes.
+3. Hide the status bar while a fullscreen image is open.
+4. Show sub-minute transcription remaining time.
 
 ## Covered Or No Android Action
 
@@ -166,7 +144,7 @@ Code-backed coverage for the refreshed range:
 | `3f53018`, `e2e0f31` (reload portion), `642ad22` | Bookshelf/statistics repositories dispatch blocking work off main; `StatisticsLifecycleReloader` refreshes on resume. `TtuStatistics.reconciled` and `GoogleDriveSyncManager.mergeBook` remove overlap between legacy totals and sessions. Only selected-period rollover remains open. |
 | `a1babc9` | Engine `55e56e3` accepts quoted integer frequencies in `yomitan_parser::parse_frequency` and caches Japanese preprocessing definitions. `DictionaryLookupQueryService` atomically replaces sessions after remove/reorder. iOS leaves the native mutation APIs unused. |
 | `e266954` | Engine `55e56e3` maps the media index when loading a dictionary. `DictionaryQuery::get_media_file_view` maps and caches each requested payload on demand. |
-| `81c60d2` (cover/audio selection), `9e815be` | `AnkiRepository` filters cover/word/sentence audio by template use; `AnkiUiState.popupSettings` propagates reachability into rebuilt popup documents. Only dictionary-media pruning and existing-cover reuse remain open. |
+| `81c60d2`, `9e815be` | `AnkiRepository` reads dictionary media referenced by rendered note fields and filters cover and audio by template use. `AnkiConnectBackend` reuses exact content-hashed cover names, with upload as the fallback. `AnkiUiState.popupSettings` propagates template reachability into rebuilt popup documents. |
 | `3b75b1e` | Android's `SasayakiCueAudioExporter` exports clipped AAC off main; `AacAdtsCueAudioRewriter` repackages encoded samples without a second lossy encode. The SwiftLAME-to-LAME migration does not require an Android codec change. |
 | `4969643`, `91af547` | `NakuruResources`/`SasayakiModelStore` retain downloaded models independently of recognizer lifetime; Apple locale reservation is inapplicable. `NakuruTranscriptAligner` already has unique/chapter anchors, bounded tail assignment, exact-match density and timing trim, with fixture tests. |
 | `f093cf2`, `d1bb57f` | Swift/C++ string conversion workaround and Apple memory entitlements have no Android counterpart to port. |

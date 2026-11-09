@@ -265,7 +265,7 @@ internal class AnkiRepository(
         val needsSasayakiAudio = fieldMappings.referencesAnkiHandlebar("{sasayaki-audio}")
         val needsSentenceAudio = !context.sentenceAudioSuppressed && fieldMappings.referencesAnkiHandlebar("{sentence-audio}")
         val uploadedAudio = mutableMapOf<String, Result<String?>>()
-        fun uploadSentence(path: String, required: Boolean): String? {
+        suspend fun uploadSentence(path: String, required: Boolean): String? {
             val uploaded = uploadedAudio.getOrPut(path) {
                 runCatching { addHashedMediaFile(path, "hoshi_sasayaki", activeBackend, settings.backendKind) }
             }
@@ -280,7 +280,7 @@ internal class AnkiRepository(
             sentence = context.sentence,
             documentTitle = context.documentTitle,
             coverPath = context.coverPath?.takeIf { needsCover }?.let {
-                optionalMedia { addHashedMediaFile(it, "hoshi_cover", activeBackend, settings.backendKind) }
+                optionalMedia { addHashedMediaFile(it, AnkiCoverMediaPrefix, activeBackend, settings.backendKind) }
             },
             sasayakiAudioPath = context.sasayakiAudioPath?.takeIf { needsSasayakiAudio }?.let {
                 uploadSentence(it, required = false)
@@ -294,22 +294,26 @@ internal class AnkiRepository(
                 ?.let { addRemoteAudio(it, activeBackend, settings.backendKind) }
                 .orEmpty(),
         )
-        val dictionaryMediaTags = payload.dictionaryMedia.associate { media ->
-            media.filename to addDictionaryMedia(media, activeBackend, settings.backendKind).orEmpty()
-        }.filterValues { it.isNotBlank() }
-        val fields = fieldMappings.mapValues { (_, template) ->
-            dictionaryMediaTags.entries.fold(
-                AnkiHandlebarRenderer.render(
-                    template = template,
-                    payload = mediaPayload,
-                    context = mediaContext,
-                    selectedGlossaryFallback = settings.selectedGlossaryFallback,
-                    termDictionaries = termDictionaries,
-                ),
-            ) { value, (filename, tag) -> value.replace(filename, tag) }
+        val renderedFields = fieldMappings.mapValues { (_, template) ->
+            AnkiHandlebarRenderer.render(
+                template = template,
+                payload = mediaPayload,
+                context = mediaContext,
+                selectedGlossaryFallback = settings.selectedGlossaryFallback,
+                termDictionaries = termDictionaries,
+            )
+        }
+        val dictionaryMediaNames = payload.dictionaryMedia
+            .filter { media -> media.filename.isNotEmpty() && renderedFields.values.any { media.filename in it } }
+            .associate { media ->
+                media.filename to addDictionaryMedia(media, activeBackend, settings.backendKind).orEmpty()
+            }.filterValues { it.isNotBlank() }
+        val fields = renderedFields.mapValues { (_, rendered) ->
+            dictionaryMediaNames.entries.fold(rendered) { value, (filename, name) -> value.replace(filename, name) }
                 .let(::normalizeAnkiDictionaryHtml)
         }.filterValues { it.isNotBlank() }
 
+        coroutineContext.ensureActive()
         val added = activeBackend.addNote(
             deck = deck,
             noteType = noteType,
@@ -462,15 +466,21 @@ internal class AnkiRepository(
         null
     }
 
-    private fun addHashedMediaFile(
+    private suspend fun addHashedMediaFile(
         path: String,
         prefix: String,
         activeBackend: AnkiBackend,
         backendKind: AnkiBackendKind,
     ): String? {
         val file = File(path).takeIf { it.isFile } ?: return null
-        val name = "${prefix}_${sha1Hex(file.readBytes())}.${file.extension}"
-        return addMediaFile(path, name, mimeTypeForPath(path), activeBackend, backendKind)
+        val data = file.readBytes()
+        val name = "${prefix}_${sha1Hex(data)}.${file.extension}"
+        val mimeType = mimeTypeForPath(path)
+        return when {
+            backendKind != AnkiBackendKind.AnkiConnect -> addMediaFile(path, name, mimeType, activeBackend, backendKind)
+            prefix == AnkiCoverMediaPrefix -> activeBackend.addCoverFromBytes(data, name, mimeType)
+            else -> activeBackend.addMediaFromBytes(data, name, mimeType)
+        }
     }
 
     private fun addMediaFile(
@@ -563,6 +573,8 @@ private fun isSupportedAnkiAudioExtension(extension: String): Boolean =
 
 private fun sha1Hex(data: ByteArray): String =
     MessageDigest.getInstance("SHA-1").digest(data).joinToString("") { "%02x".format(it) }
+
+private const val AnkiCoverMediaPrefix = "hoshi_cover"
 
 private const val TAG = "AnkiRepository"
 
