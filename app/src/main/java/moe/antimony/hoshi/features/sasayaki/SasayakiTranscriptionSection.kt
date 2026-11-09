@@ -130,8 +130,13 @@ internal fun SasayakiTranscriptionSection(
                 state.remainingSeconds?.takeIf {
                     state.stage == SasayakiTranscriptionStage.Transcribing && it.isFinite() && it >= 0
                 }?.let { seconds ->
+                    val remaining = if (seconds < 60) {
+                        stringResource(R.string.sasayaki_transcription_remaining_under_minute)
+                    } else {
+                        stringResource(R.string.sasayaki_transcription_remaining, ceil(seconds / 60).toInt())
+                    }
                     Text(
-                        stringResource(R.string.sasayaki_transcription_remaining, ceil(seconds / 60).toInt()),
+                        remaining,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

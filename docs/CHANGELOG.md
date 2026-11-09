@@ -57,6 +57,7 @@ Release notes before v1.3.0 are in [CHANGELOG_ARCHIVE.md](CHANGELOG_ARCHIVE.md).
 
 ### Fixed
 
+- Show “Less than 1 min left” when audiobook transcription is estimated to finish in under a minute.
 - Hide the status bar while viewing a fullscreen image from the page or image gallery and keep the image controls in place.
 - Keep Statistics on the latest week, month or year when the date rolls over, preserve historical browsing, and return to the current period when the daily reset time changes.
 - Keep lookup popup controls visible when a book's stylesheet hides buttons.

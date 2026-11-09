@@ -1,10 +1,13 @@
 package moe.antimony.hoshi.features.sasayaki
 
 import android.content.Context
+import android.content.res.Configuration
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertCountEquals
@@ -22,6 +25,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import java.io.File
+import java.util.Locale
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -57,6 +61,50 @@ class SasayakiTranscriptionReaderTest {
         val subtitles = compose.onNodeWithText(context.getString(R.string.sasayaki_match_source_subtitles))
         assertTrue(transcription.fetchSemanticsNode().boundsInRoot.right <= subtitles.fetchSemanticsNode().boundsInRoot.left)
         transcription.assertIsSelected()
+    }
+
+    @Test fun transcriptionRemainingTimeShowsSubMinuteLabelInBothLanguages() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val locale = mutableStateOf(Locale.ENGLISH)
+        val state = mutableStateOf(SasayakiTranscriptionUiState(stage = SasayakiTranscriptionStage.Transcribing))
+        compose.setContent {
+            val configuration = Configuration(context.resources.configuration).apply { setLocale(locale.value) }
+            val resources = context.createConfigurationContext(configuration).resources
+            CompositionLocalProvider(LocalResources provides resources) {
+                HoshiReaderTheme {
+                    SasayakiTranscriptionSection(
+                        state = state.value, enabled = true,
+                        preset = SasayakiTranscriptionPreset.Balanced, onPresetChange = {},
+                        onStart = {}, onPause = {}, onConfirmDownload = {},
+                        onRequestClear = {}, onDismissClear = {}, onConfirmClear = {},
+                    )
+                }
+            }
+        }
+
+        fun setRemaining(seconds: Double?, stage: SasayakiTranscriptionStage = SasayakiTranscriptionStage.Transcribing) {
+            compose.runOnIdle { state.value = state.value.copy(remainingSeconds = seconds, stage = stage) }
+        }
+
+        setRemaining(60.0)
+        compose.onNodeWithText("About 1 min left").assertIsDisplayed()
+        setRemaining(60.01)
+        compose.onNodeWithText("About 2 min left").assertIsDisplayed()
+        for (seconds in listOf(59.99, 0.0)) {
+            setRemaining(seconds)
+            compose.onNodeWithText("Less than 1 min left").assertIsDisplayed()
+        }
+
+        for (seconds in listOf(null, -1.0, Double.NaN, Double.POSITIVE_INFINITY)) {
+            setRemaining(seconds)
+            compose.onNodeWithText(" min left", substring = true).assertDoesNotExist()
+        }
+        setRemaining(30.0, SasayakiTranscriptionStage.Aligning)
+        compose.onNodeWithText(" min left", substring = true).assertDoesNotExist()
+
+        setRemaining(30.0)
+        compose.runOnIdle { locale.value = Locale.SIMPLIFIED_CHINESE }
+        compose.onNodeWithText("剩余不到 1 分钟").assertIsDisplayed()
     }
 
     @Test fun sourceBecomesReadyAndTaskContinuesAcrossClosingAndReopeningControls() = withReader { reader ->

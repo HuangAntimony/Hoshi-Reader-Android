@@ -894,6 +894,7 @@
     <string name="sasayaki_transcription_download_action">Download and transcribe</string>
     <string name="sasayaki_transcription_saved_progress">Transcribed %1$s / %2$s</string>
     <string name="sasayaki_transcription_remaining" comment="Sasayaki transcription time estimate">About %1$d min left</string>
+    <string name="sasayaki_transcription_remaining_under_minute" comment="Sasayaki transcription time estimate">Less than 1 min left</string>
     <string name="sasayaki_transcription_aligning">Aligning with book…</string>
     <string name="sasayaki_transcription_pausing">Saving progress…</string>
     <string name="sasayaki_transcription_clear">Clear Transcription</string>

@@ -17,35 +17,15 @@ details against official documentation when implementing platform-facing slices.
 
 ## Current Queue
 
-### 1. Show sub-minute transcription remaining time
-
-Status: Pending
-
-Commits: `3dfa9ef`.
-
-- Dependency/value: independent small UI correction near transcription completion.
-- iOS behavior: display "less than 1 min left" below 60 seconds.
-- Android current gap: `features/sasayaki/SasayakiTranscriptionSection.kt` always
-  formats `ceil(seconds / 60)` with `sasayaki_transcription_remaining`; EN/ZH
-  resources contain only the approximate-minute form, including zero minutes.
-- Suggested slice: add the localized sub-minute branch while keeping the current
-  finite/nonnegative and Transcribing-stage guards.
-- Validation: boundary cases at 0, below 60 and 60 seconds, absent/nonfinite values
-  and non-transcribing stages; run localization checks and verify the UI label.
+No open slices.
 
 ## Open Commit Inventory
 
-Only concrete remaining behavior is listed; covered portions are summarized below.
-
-| Commit | Remaining Android work | Slice |
-| --- | --- | --- |
-| `3dfa9ef` | Sub-minute transcription ETA label | 1 |
+No upstream commits with remaining Android work.
 
 ## Suggested Implementation Order
 
-All remaining slices are independent.
-
-1. Show sub-minute transcription remaining time.
+No slices to schedule.
 
 ## Covered Or No Android Action
 
@@ -81,6 +61,7 @@ Code-backed coverage for the refreshed range:
 | `a1babc9` | Engine `55e56e3` accepts quoted integer frequencies in `yomitan_parser::parse_frequency` and caches Japanese preprocessing definitions. `DictionaryLookupQueryService` atomically replaces sessions after remove/reorder. iOS leaves the native mutation APIs unused. |
 | `e266954` | Engine `55e56e3` maps the media index when loading a dictionary. `DictionaryQuery::get_media_file_view` maps and caches each requested payload on demand. |
 | `81c60d2`, `9e815be` | `AnkiRepository` reads dictionary media referenced by rendered note fields and filters cover and audio by template use. `AnkiConnectBackend` reuses exact content-hashed cover names, with upload as the fallback. `AnkiUiState.popupSettings` propagates template reachability into rebuilt popup documents. |
+| `3dfa9ef` | `SasayakiTranscriptionSection` shows a localized sub-minute label for valid estimates below 60 seconds during transcription. |
 | `3b75b1e` | Android's `SasayakiCueAudioExporter` exports clipped AAC off main; `AacAdtsCueAudioRewriter` repackages encoded samples without a second lossy encode. The SwiftLAME-to-LAME migration does not require an Android codec change. |
 | `4969643`, `91af547` | `NakuruResources`/`SasayakiModelStore` retain downloaded models independently of recognizer lifetime; Apple locale reservation is inapplicable. `NakuruTranscriptAligner` already has unique/chapter anchors, bounded tail assignment, exact-match density and timing trim, with fixture tests. |
 | `f093cf2`, `d1bb57f` | Swift/C++ string conversion workaround and Apple memory entitlements have no Android counterpart to port. |

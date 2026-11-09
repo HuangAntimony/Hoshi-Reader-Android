@@ -892,6 +892,7 @@
     <string name="sasayaki_transcription_download_action">下载并转写</string>
     <string name="sasayaki_transcription_saved_progress">已转写 %1$s / %2$s</string>
     <string name="sasayaki_transcription_remaining" comment="Sasayaki transcription time estimate">约剩 %1$d 分钟</string>
+    <string name="sasayaki_transcription_remaining_under_minute" comment="Sasayaki transcription time estimate">剩余不到 1 分钟</string>
     <string name="sasayaki_transcription_aligning">正在匹配正文…</string>
     <string name="sasayaki_transcription_pausing">正在保存进度…</string>
     <string name="sasayaki_transcription_clear">清除转写</string>
