@@ -56,6 +56,7 @@ class StatisticsReadingTimeSectionTest {
     @get:Rule val compose = createComposeRule()
     private val job = SupervisorJob()
     private var today = LocalDate.parse("2026-06-30")
+    private val resetMinutes = MutableStateFlow(0)
     private lateinit var model: StatisticsViewModel
     private val dark = mutableStateOf(false)
     private val eInk = mutableStateOf(false)
@@ -108,6 +109,19 @@ class StatisticsReadingTimeSectionTest {
         assertPeriod("2026-06-21", 100)
         next().assertIsEnabled().performClick()
         assertPeriod("2026-06-28", 500)
+    }
+
+    @Test fun resetTimeJumpsToCurrentPageWithoutChangingPageCount() {
+        show()
+        previous().performClick()
+        assertPeriod("2026-06-21", 100)
+
+        compose.runOnIdle { resetMinutes.value = 120 }
+
+        assertPeriod("2026-06-28", 500)
+        next().assertIsNotEnabled()
+        previous().assertIsEnabled().performClick()
+        assertPeriod("2026-06-21", 100)
     }
 
     @Test fun modeSwitchDuringNavigationCancelsOldAnimation() {
@@ -220,7 +234,7 @@ class StatisticsReadingTimeSectionTest {
             override suspend fun clearArchive(): Unit = error("Unused")
         }
         compose.runOnUiThread {
-            model = StatisticsViewModel(repository, MutableStateFlow(StatisticsTargetSettings()), {}, MutableStateFlow(0),
+            model = StatisticsViewModel(repository, MutableStateFlow(StatisticsTargetSettings()), {}, resetMinutes,
                 object : StatisticsDateProvider { override fun currentDate(resetMinutes: Int) = today },
                 Dispatchers.Main.immediate, CoroutineScope(job + Dispatchers.Main.immediate))
             model.reload()

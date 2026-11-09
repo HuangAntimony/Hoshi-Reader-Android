@@ -25,12 +25,13 @@ internal fun rememberStatisticsChartPagerState(
     onSelectPage: (Int) -> Unit,
 ): PagerState = key(range.mode, range.pageCount) {
     val pager = rememberPagerState(initialPage = range.selectedPage, pageCount = { range.pageCount })
-    val currentRange by rememberUpdatedState(range)
     val currentOnSelectPage by rememberUpdatedState(onSelectPage)
-    LaunchedEffect(pager) {
+    LaunchedEffect(pager, range.selectedPage) {
+        // A reset-time change can select the latest page without changing the page count.
+        if (pager.settledPage != range.selectedPage) pager.scrollToPage(range.selectedPage)
         snapshotFlow { if (pager.isScrollInProgress) null else pager.settledPage }
             .filterNotNull().distinctUntilChanged().collect { page ->
-                if (page != currentRange.selectedPage) currentOnSelectPage(page)
+                if (page != range.selectedPage) currentOnSelectPage(page)
             }
     }
     pager

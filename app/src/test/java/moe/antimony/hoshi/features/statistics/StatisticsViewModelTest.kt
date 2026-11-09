@@ -230,6 +230,102 @@ class StatisticsViewModelTest {
     }
 
     @Test
+    fun latestPageFollowsWeekMonthAndYearRolloverAfterPagingBack() = runBlocking {
+        val dateProvider = FakeStatisticsDateProvider(LocalDate.parse("2026-12-31"))
+        val data = snapshot(day("2025-12-20", 1_000), day("2026-12-31", 2_000))
+        val boundaries = listOf(
+            StatisticsRangeMode.Week to statisticsStartOfWeek(dateProvider.date).plusWeeks(1),
+            StatisticsRangeMode.Month to LocalDate.parse("2027-01-01"),
+            StatisticsRangeMode.Year to LocalDate.parse("2027-01-01"),
+        )
+        for ((mode, boundary) in boundaries) {
+            dateProvider.date = boundary.minusDays(1)
+            viewModel(snapshot = data, dateProvider = dateProvider).use { vm ->
+                vm.reload()
+                vm.onEvent(StatisticsEvent.SelectRangeMode(mode))
+                val latestPage = vm.uiState.value.currentRange.selectedPage
+                vm.onEvent(StatisticsEvent.SelectPeriodPage(latestPage - 1))
+                vm.onEvent(StatisticsEvent.SelectPeriodPage(latestPage))
+
+                dateProvider.date = boundary
+                vm.reload()
+
+                val state = vm.uiState.value
+                assertEquals(mode.name, boundary, state.today.date)
+                assertEquals(mode.name, boundary, state.currentRange.range.start)
+                assertEquals(mode.name, latestPage + 1, state.currentRange.selectedPage)
+                assertEquals(boundary, state.heatmap.windowRange.end)
+            }
+        }
+    }
+
+    @Test
+    fun dayRolloverPreservesHistoricalPeriodAndBucket() = runBlocking {
+        val dateProvider = FakeStatisticsDateProvider(LocalDate.parse("2026-06-30"))
+        viewModel(
+            snapshot = snapshot(day("2026-05-20", 1_000), day("2026-06-30", 2_000)),
+            dateProvider = dateProvider,
+        ).use { vm ->
+            vm.reload()
+            vm.onEvent(StatisticsEvent.SelectRangeMode(StatisticsRangeMode.Month))
+            vm.onEvent(StatisticsEvent.SelectPeriodPage(0))
+            vm.onEvent(StatisticsEvent.SelectTrendBucket("2026-05-20"))
+
+            dateProvider.date = LocalDate.parse("2026-07-01")
+            vm.reload()
+
+            val state = vm.uiState.value
+            assertEquals(dateProvider.date, state.today.date)
+            assertEquals(range("2026-05-01", "2026-05-31"), state.currentRange.range)
+            assertEquals(range("2026-05-20", "2026-05-20"), state.currentRange.selectedBucket)
+            assertEquals(1_000, state.currentRange.summary.totalCharacters)
+        }
+    }
+
+    @Test
+    fun dayChangeClearsBucketWhenFollowingCurrentPeriod() = runBlocking {
+        val dateProvider = FakeStatisticsDateProvider(LocalDate.parse("2026-06-29"))
+        viewModel(snapshot = snapshot(day("2026-06-29", 1_000)), dateProvider = dateProvider).use { vm ->
+            vm.reload()
+            vm.onEvent(StatisticsEvent.SelectRangeMode(StatisticsRangeMode.Month))
+            vm.onEvent(StatisticsEvent.SelectTrendBucket("2026-06-29"))
+
+            dateProvider.date = dateProvider.date.plusDays(1)
+            vm.reload()
+
+            assertEquals(range("2026-06-01", "2026-06-30"), vm.uiState.value.currentRange.range)
+            assertNull(vm.uiState.value.currentRange.selectedBucket)
+        }
+    }
+
+    @Test
+    fun resetTimeChangeReturnsHistoricalSelectionToCurrentPeriod() = runBlocking {
+        val resetMinutes = MutableStateFlow(0)
+        viewModel(
+            repository = FakeStatisticsRepository(snapshot(day("2026-05-20", 1_000), day("2026-06-30", 2_000))),
+            resetMinutes = resetMinutes,
+            dateProvider = object : StatisticsDateProvider {
+                override fun currentDate(resetMinutes: Int): LocalDate =
+                    if (resetMinutes == 0) LocalDate.parse("2026-07-01") else LocalDate.parse("2026-06-30")
+            },
+        ).use { vm ->
+            vm.reload()
+            vm.onEvent(StatisticsEvent.SelectRangeMode(StatisticsRangeMode.Month))
+            vm.onEvent(StatisticsEvent.SelectPeriodPage(0))
+            vm.onEvent(StatisticsEvent.SelectTrendBucket("2026-05-20"))
+
+            resetMinutes.value = 120
+
+            val state = vm.uiState.value
+            assertEquals(LocalDate.parse("2026-06-30"), state.today.date)
+            assertEquals(range("2026-06-01", "2026-06-30"), state.currentRange.range)
+            assertEquals(state.currentRange.pageCount - 1, state.currentRange.selectedPage)
+            assertNull(state.currentRange.selectedBucket)
+            assertEquals(2_000, state.currentRange.summary.totalCharacters)
+        }
+    }
+
+    @Test
     fun heatmapIntensityUsesAllHistoryIndependentOfPeriod() = runBlocking {
         viewModel(snapshot = snapshot(day("2025-12-20", 1_000), day("2026-06-29", 6_000))).use { vm ->
             vm.reload()
@@ -405,26 +501,25 @@ class StatisticsViewModelTest {
         viewModel(
             repository = FakeStatisticsRepository(snapshot),
             settings = settings,
-            resetMinutes = resetMinutes,
+            resetMinutes = MutableStateFlow(resetMinutes),
             dateProvider = dateProvider,
         )
 
     private fun viewModel(
         repository: StatisticsRepository,
         settings: StatisticsTargetSettings = StatisticsTargetSettings(),
-        resetMinutes: Int = 0,
+        resetMinutes: MutableStateFlow<Int> = MutableStateFlow(0),
         dateProvider: StatisticsDateProvider = FakeStatisticsDateProvider(LocalDate.parse("2026-06-30")),
         beforeUpdate: () -> Unit = {},
     ): ViewModelHandle {
         val scope = CoroutineScope(Dispatchers.Unconfined + Job())
         val settingsFlow = MutableStateFlow(settings)
-        val resetMinutesFlow = MutableStateFlow(resetMinutes)
         return ViewModelHandle(
             StatisticsViewModel(
                 repository = repository,
                 settings = settingsFlow,
                 updateSettings = { transform -> beforeUpdate(); settingsFlow.value = transform(settingsFlow.value) },
-                resetMinutes = resetMinutesFlow,
+                resetMinutes = resetMinutes,
                 dateProvider = dateProvider,
                 calculationDispatcher = Dispatchers.Unconfined,
                 coroutineScope = scope,
@@ -461,7 +556,7 @@ class StatisticsViewModelTest {
     }
 
     private class FakeStatisticsDateProvider(
-        private val date: LocalDate,
+        var date: LocalDate,
     ) : StatisticsDateProvider {
         override fun currentDate(resetMinutes: Int): LocalDate = date
     }

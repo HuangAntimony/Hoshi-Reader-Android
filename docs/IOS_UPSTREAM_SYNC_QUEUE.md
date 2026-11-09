@@ -17,27 +17,7 @@ details against official documentation when implementing platform-facing slices.
 
 ## Current Queue
 
-### 1. Keep the selected statistics period current across date changes
-
-Status: Pending
-
-Commits: `e2e0f31` (selected-period anchor only).
-
-- Dependency/value: independent; dashboard reload and Today/heatmap refresh exist.
-- iOS behavior: after a day change, advance a selected period containing the old
-  today to the new current period; preserve deliberate historical browsing.
-  Changing reset time resets the selected reference to today.
-- Android current gap: `features/statistics/StatisticsViewModel.kt` stores a
-  non-null `referenceDate` on `SelectPeriodPage`; neither `reload` nor reset-minute
-  changes update it. Paging away and back to the latest period can leave the
-  previous week/month/year selected after a boundary, despite fresh Today values.
-- Suggested slice: reconcile selection against the previous/current statistics
-  date and reset setting while retaining historical-period and bucket behavior.
-- Validation: extend `StatisticsViewModelTest` with mutable date/reset flows,
-  current-period rollover, historical browsing, return to latest and reset changes;
-  retain existing `StatisticsViewReloadTest` lifecycle coverage.
-
-### 2. Hide the status bar while a fullscreen image is open
+### 1. Hide the status bar while a fullscreen image is open
 
 Status: Pending
 
@@ -54,7 +34,7 @@ Commits: `18072c8` (system status bar only).
 - Validation: extend `ReaderChromeTest`; device checks for gallery and inline
   images, dismissal/back, both focus states and existing navigation-bar behavior.
 
-### 3. Show sub-minute transcription remaining time
+### 2. Show sub-minute transcription remaining time
 
 Status: Pending
 
@@ -76,17 +56,15 @@ Only concrete remaining behavior is listed; covered portions are summarized belo
 
 | Commit | Remaining Android work | Slice |
 | --- | --- | --- |
-| `e2e0f31` | Reconcile selected statistics period on day/reset-time changes | 1 |
-| `18072c8` | Fullscreen-image status-bar visibility | 2 |
-| `3dfa9ef` | Sub-minute transcription ETA label | 3 |
+| `18072c8` | Fullscreen-image status-bar visibility | 1 |
+| `3dfa9ef` | Sub-minute transcription ETA label | 2 |
 
 ## Suggested Implementation Order
 
 All remaining slices are independent.
 
-1. Keep the selected statistics period current across date changes.
-2. Hide the status bar while a fullscreen image is open.
-3. Show sub-minute transcription remaining time.
+1. Hide the status bar while a fullscreen image is open.
+2. Show sub-minute transcription remaining time.
 
 ## Covered Or No Android Action
 
@@ -116,7 +94,8 @@ Code-backed coverage for the refreshed range:
 | `a1c9996` | Single/bulk new-shelf moves exist. `NewShelfMoveDialog`, `BookshelfView`, `BookshelfRepository` and `BookshelfViewModel` use NFC names for creation, rename, duplicate checks, move targets and published state; `BookRepository.saveShelves` rejects canonical-name collisions before writing sidecars. |
 | `21d5546` (queue presentation) | `SyncQueueAccounting` and `SyncQueueView` provide directional byte totals and ETA, pending sizes and covers, retained interruptions and grouped rows. Android shows ETA once size and effective speed are available and keeps the full waiting list. |
 | `21d5546` (transport portion), `bb4e92d` | `GoogleDriveFileTransfer`, `DriveUploadSessions` and `BookTransferScheduler` implement resumable uploads and shared bounded upload/download scheduling; upstream job classification adds no further transport gap. |
-| `3f53018`, `e2e0f31` (reload portion), `642ad22` | Bookshelf/statistics repositories dispatch blocking work off main; `StatisticsLifecycleReloader` refreshes on resume. `TtuStatistics.reconciled` and `GoogleDriveSyncManager.mergeBook` remove overlap between legacy totals and sessions. Only selected-period rollover remains open. |
+| `3f53018`, `e2e0f31` (reload portion), `642ad22` | Bookshelf/statistics repositories dispatch blocking work off main; `StatisticsLifecycleReloader` refreshes on resume. `TtuStatistics.reconciled` and `GoogleDriveSyncManager.mergeBook` remove overlap between legacy totals and sessions. |
+| `e2e0f31` (selected period) | `StatisticsViewModel` advances the current period on date changes, preserves historical selection, and returns to the current period when reset time changes. `StatisticsChartPager` follows the resulting page selection. |
 | `a1babc9` | Engine `55e56e3` accepts quoted integer frequencies in `yomitan_parser::parse_frequency` and caches Japanese preprocessing definitions. `DictionaryLookupQueryService` atomically replaces sessions after remove/reorder. iOS leaves the native mutation APIs unused. |
 | `e266954` | Engine `55e56e3` maps the media index when loading a dictionary. `DictionaryQuery::get_media_file_view` maps and caches each requested payload on demand. |
 | `81c60d2`, `9e815be` | `AnkiRepository` reads dictionary media referenced by rendered note fields and filters cover and audio by template use. `AnkiConnectBackend` reuses exact content-hashed cover names, with upload as the fallback. `AnkiUiState.popupSettings` propagates template reachability into rebuilt popup documents. |

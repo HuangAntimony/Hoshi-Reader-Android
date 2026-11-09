@@ -9,13 +9,13 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -51,14 +51,14 @@ internal class StatisticsViewModel internal constructor(
         repository = repository,
         settings = settingsRepository.settings,
         updateSettings = settingsRepository::update,
-        resetMinutes = readerSettingsRepository.settings.map { it.statisticsResetMinutes },
+        resetMinutes = readerSettingsRepository.statisticsResetMinutes,
         dateProvider = dateProvider,
         calculationDispatcher = calculationDispatcher,
         coroutineScope = null,
     ) {
         val syncReload = SyncReloadScheduler(scope, { syncStorage.applyReaderState != null }, ::reload)
         scope.launch {
-            combine(statisticsStore.changes, syncStorage.booksChanged, readerSettingsRepository.settings.map { it.statisticsResetMinutes }.distinctUntilChanged()) { _, _, _ -> Unit }
+            combine(statisticsStore.changes, syncStorage.booksChanged, resetMinutes) { _, _, _ -> Unit }
                 .collect { syncReload.schedule() }
         }
     }
@@ -67,15 +67,13 @@ internal class StatisticsViewModel internal constructor(
         get() = coroutineScope ?: viewModelScope
 
     private val snapshot = MutableStateFlow(StatisticsSnapshot(days = emptyList(), availableYears = emptyList()))
-    private val selection = MutableStateFlow(StatisticsSelectionState())
+    private val selection = MutableStateFlow(StatisticsSelectionState(today = dateProvider.currentDate(0)))
     private val isLoading = MutableStateFlow(true)
-    private var currentResetMinutes = 0
     private val _uiState = MutableStateFlow(
         buildStatisticsUiState(
             snapshot = snapshot.value,
             settings = StatisticsTargetSettings(),
             selection = selection.value,
-            today = currentDate(),
             isLoading = true,
         ),
     )
@@ -92,19 +90,21 @@ internal class StatisticsViewModel internal constructor(
     private fun observeSettings() {
         observationJob = scope.launch {
             try {
-                combine(snapshot, settings, resetMinutes, selection, isLoading) { snapshot, settings, resetMinutes, selection, isLoading ->
-                    currentResetMinutes = resetMinutes
-                    withContext(calculationDispatcher) {
-                        buildStatisticsUiState(
-                            snapshot = snapshot,
-                            settings = settings,
-                            selection = selection,
-                            today = currentDate(),
-                            isLoading = isLoading,
-                        )
+                coroutineScope {
+                    launch { resetMinutes.collect { refreshCalendar(it) } }
+                    val confirmedSelection = selection.filter { it.resetMinutes != null }
+                    combine(snapshot, settings, confirmedSelection, isLoading) { snapshot, settings, selection, isLoading ->
+                        withContext(calculationDispatcher) {
+                            buildStatisticsUiState(
+                                snapshot = snapshot,
+                                settings = settings,
+                                selection = selection,
+                                isLoading = isLoading,
+                            )
+                        }
+                    }.combine(loadError) { state, error -> state.copy(loadError = error) }.collect { state ->
+                        _uiState.value = state
                     }
-                }.combine(loadError) { state, error -> state.copy(loadError = error) }.collect { state ->
-                    _uiState.value = state
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -126,6 +126,7 @@ internal class StatisticsViewModel internal constructor(
 
     fun reload() {
         dismissLoadError()
+        refreshCalendar()
         if (observationJob?.isActive != true) observeSettings()
         val generation = ++reloadGeneration
         reloadJob?.cancel()
@@ -167,15 +168,21 @@ internal class StatisticsViewModel internal constructor(
                 current.copy(rangeMode = event.mode, referenceDate = null, selectedBucketKey = null)
             }
             is StatisticsEvent.SelectPeriodPage -> selection.update { current ->
-                val pageCount = uiState.value.currentRange.pageCount
-                if (event.index !in 0 until pageCount) current else current.copy(
-                    referenceDate = statisticsPeriodPageAnchor(current.rangeMode, event.index, pageCount, currentDate()),
-                    selectedBucketKey = null,
-                )
+                val displayed = uiState.value
+                val range = displayed.currentRange
+                if (range.mode != current.rangeMode || event.index !in 0 until range.pageCount) {
+                    current
+                } else {
+                    val referenceDate = if (event.index == range.pageCount - 1) null else {
+                        statisticsPeriodPageAnchor(range.mode, event.index, range.pageCount, displayed.today.date)
+                    }
+                    current.copy(referenceDate = referenceDate, selectedBucketKey = null)
+                }
             }
             is StatisticsEvent.SelectTrendBucket -> selection.update { current ->
-                val valid = event.key == null || uiState.value.currentRange.trendPoints.any {
-                    it.key == event.key && statisticsTrendBucket(current.rangeMode, it.key)?.start?.isAfter(currentDate()) == false
+                val displayed = uiState.value
+                val valid = event.key == null || displayed.currentRange.trendPoints.any {
+                    it.key == event.key && statisticsTrendBucket(current.rangeMode, it.key)?.start?.isAfter(displayed.today.date) == false
                 }
                 if (valid) current.copy(
                     selectedBucketKey = event.key.takeUnless { it == current.selectedBucketKey },
@@ -184,7 +191,23 @@ internal class StatisticsViewModel internal constructor(
         }
     }
 
-    private fun currentDate(): LocalDate = dateProvider.currentDate(currentResetMinutes)
+    private fun refreshCalendar(resetMinutes: Int? = null) {
+        selection.update { current ->
+            val minutes = resetMinutes ?: current.resetMinutes
+            val today = dateProvider.currentDate(minutes ?: 0)
+            val previousAnchor = current.referenceDate ?: current.today
+            val resetChanged = minutes != current.resetMinutes
+            val currentPeriodRolled = today != current.today &&
+                selectedStatisticsRange(current.rangeMode, previousAnchor, current.today).contains(current.today)
+            val followToday = resetChanged || currentPeriodRolled
+            current.copy(
+                today = today,
+                resetMinutes = minutes,
+                referenceDate = if (followToday) null else current.referenceDate,
+                selectedBucketKey = if (followToday && previousAnchor != today) null else current.selectedBucketKey,
+            )
+        }
+    }
 
     private fun updateTargets(transform: (StatisticsTargetSettings) -> StatisticsTargetSettings) {
         scope.launch {
@@ -201,6 +224,8 @@ internal class StatisticsViewModel internal constructor(
 }
 
 private data class StatisticsSelectionState(
+    val today: LocalDate,
+    val resetMinutes: Int? = null,
     val rangeMode: StatisticsRangeMode = StatisticsRangeMode.Week,
     val referenceDate: LocalDate? = null,
     val selectedBucketKey: String? = null,
@@ -212,9 +237,9 @@ private fun buildStatisticsUiState(
     snapshot: StatisticsSnapshot,
     settings: StatisticsTargetSettings,
     selection: StatisticsSelectionState,
-    today: LocalDate,
     isLoading: Boolean,
 ): StatisticsUiState {
+    val today = selection.today
     val daysByDate = snapshot.days.associateBy { it.date }
     val rangeMode = selection.rangeMode
     val activity = snapshot.days.filter { it.isActiveReadingDay() && !it.date.isAfter(today) }
