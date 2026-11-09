@@ -41,6 +41,8 @@ Release notes before v1.3.0 are in [CHANGELOG_ARCHIVE.md](CHANGELOG_ARCHIVE.md).
 
 - Reduce repeated work when selecting text and searching dictionaries, while refreshing lookup sessions after profile switches and partially completed dictionary imports.
 
+- Use the new dictionary index for imports and automatically migrate existing indexes when their dictionaries are first opened.
+
 - Remove automatic layout corrections for publisher paragraph containers, blank spacers and image margins.
 
 - Replace visual novel mode with iOS-style paragraph mode and settings controls, including centered passages and continuation pages even around hanging spaces and ruby annotations, sentence limits, text reveal with synchronized ruby and gaiji that continues through TTS/Sasayaki following without freezing, smoother page turns in chapters with many narration cues, reliable E-ink switching with saved highlights and narration following after layout-mode changes or resuming from unmatched pages, optional blank-tap advance without skipping text animation, automatic statistics start on page turns and Sasayaki playback bounded to the current page even after cue navigation, with its setting grouped under Paragraph Mode, while migrating existing settings.
@@ -72,6 +74,7 @@ Release notes before v1.3.0 are in [CHANGELOG_ARCHIVE.md](CHANGELOG_ARCHIVE.md).
 - Create, recolor and remove highlights when selections touch ruby annotations.
 - Show saved settings immediately when their controls appear, avoiding a flash of defaults.
 - Keep names containing middle dots intact during lookup and prevent old Dictionary audio from replaying when opening a book.
+- Recognize more Japanese inflections written with emphatic small っ and avoid false matches across katakana word boundaries.
 - Preserve lookup access to dictionaries excluded from aggregate Anki fields, and handle selected-definition fallbacks correctly.
 - Keep audio-source menus inside scaled lookup popups.
 - Show useful error details when operations fail, and improve update checks when download mirrors return invalid responses.

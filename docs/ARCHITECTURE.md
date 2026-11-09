@@ -263,6 +263,10 @@ Validation guidance and failure injection methods are in
   Import, term/Kanji query, deinflection, frequency, pitch, styles and media are
   owned by `third_party/hoshidicts-kotlin-bridge`; keep the parent's Kotlin ABI
   copy compatible. UI accesses them through `DictionaryNativeBridge`/repository APIs.
+- New dictionary imports use native format 5. Opening an older dictionary can
+  write a new `phf.table` and remove its legacy index files. Keep the dictionary
+  directory writable during session creation. Builds that require the legacy
+  index files cannot open a migrated dictionary without restoring those files.
 - Dictionary backup retains the legacy root shape and profile metadata in
   `.hoshi-profiles/`, preserving unrelated profile settings.
 - `LocalAudioRepository` owns both private-copy and external-link imports, source
