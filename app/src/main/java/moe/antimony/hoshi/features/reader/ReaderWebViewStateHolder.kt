@@ -304,6 +304,11 @@ internal class ReaderWebViewStateHolder(
         isWebViewRestoring = false
     }
 
+    fun pageProgress(index: ReaderPageIndex?, currentPage: Int?): ReaderPageProgress? {
+        if (!effectiveSettings.usesPageCounts) return null
+        return index?.progress(readerPosition.displayedPosition, currentPage)
+    }
+
     fun goToNextChapter(lastIndex: Int): ReaderChapterPosition? {
         val next = readerPosition.loadPosition.nextOrNull(lastIndex) ?: return null
         return jumpTo(next)

@@ -9,6 +9,50 @@ import org.junit.Test
 
 class ReaderPaginationScriptsTest {
     @Test
+    fun freshDocumentsOnlyInstallExplicitNarrationCues() {
+        for (mode in ReaderViewMode.entries) {
+            val settings = ReaderSettings(viewMode = mode)
+            val noCues = ReaderPaginationScripts.shellScript(settings = settings)
+            assertFalse(noCues.contains("window.hoshiReader.applySasayakiCues([]);"))
+            val explicitClear = ReaderPaginationScripts.shellScript(settings = settings, sasayakiCuesJson = "[]")
+            assertTrue(explicitClear.contains("window.hoshiReader.applySasayakiCues([]);"))
+            val cues = "[{\"id\":\"cue\",\"start\":0,\"length\":2}]"
+            val narration = ReaderPaginationScripts.shellScript(settings = settings, sasayakiCuesJson = cues)
+            assertTrue(narration.contains("window.hoshiReader.applySasayakiCues($cues);"))
+        }
+    }
+
+    @Test
+    fun compiledTemplateReusesStaticAssetsWithoutCachingChapterParameters() {
+        val template = ReaderScriptTemplate("start __HOSHI_ASSET__ __HOSHI_TOKEN__ end",
+            mapOf("__HOSHI_ASSET__" to "nested __HOSHI_VALUE__"))
+        assertEquals("start nested first token-one end", template.render(mapOf(
+            "__HOSHI_VALUE__" to "first", "__HOSHI_TOKEN__" to "token-one")))
+        assertEquals("start nested second __HOSHI_VALUE__ end", template.render(mapOf(
+            "__HOSHI_VALUE__" to "second", "__HOSHI_TOKEN__" to "__HOSHI_VALUE__")))
+    }
+
+    @Test
+    fun scriptTemplatesDoNotRetainSettingsRestoreTokensOrMeasurementMode() {
+        for (mode in ReaderViewMode.entries) {
+            val first = ReaderPaginationScripts.shellScriptWithRestoreToken(
+                settings = ReaderSettings(viewMode = mode, blurImages = true),
+                restoreToken = "first-token", measurementOnly = true)
+            val second = ReaderPaginationScripts.shellScriptWithRestoreToken(
+                initialProgress = 0.3, settings = ReaderSettings(viewMode = mode, blurImages = false),
+                restoreToken = "second-token")
+            assertTrue(first.contains("window.hoshiReaderMeasurement = true;"))
+            assertTrue(first.contains("blurImages: true"))
+            assertFalse(second.contains("first-token"))
+            assertFalse(second.contains("window.hoshiReaderMeasurement = true;"))
+            assertTrue(second.contains("blurImages: false"))
+            assertTrue(second.contains("window.hoshiReader.restoreProgress(0.3);"))
+            assertTrue(second.contains("second-token"))
+            assertFalse(second.contains("__HOSHI_"))
+        }
+    }
+
+    @Test
     fun generatedParagraphScriptDoesNotExposeTemplatePlaceholders() {
         val script = ReaderPaginationScripts.shellScript(
             settings = ReaderSettings(paragraphMode = true),

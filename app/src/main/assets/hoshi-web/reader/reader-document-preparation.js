@@ -4,7 +4,9 @@
   // The native WebView already stays invisible until restore. Avoid laying out
   // publisher content before the reader has installed its viewport/styles and
   // prepared the ruby/paragraph DOM.
-  if (global.top !== global || !global.location.pathname.startsWith('/epub/')) return;
+  var path = global.location.pathname;
+  if (global.top !== global || !(path.startsWith('/epub/') ||
+      /^\/reader-pages\/[a-f0-9-]{36}\/epub\//.test(path))) return;
   if (global.hoshiReaderDocumentPreparation) return;
 
   var root = null;

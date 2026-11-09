@@ -106,6 +106,7 @@ internal fun ReaderGoToSheet(
     onHighlightDelete: (ReaderHighlight) -> Unit,
     onGalleryImageSelected: (String) -> Unit,
     onDismiss: () -> Unit,
+    pageIndex: ReaderPageIndex? = null,
 ) {
     var showJumpDialog by remember { mutableStateOf(false) }
     val coverBitmap = remember(book) { book.decodeCoverImageBitmap() }
@@ -156,6 +157,7 @@ internal fun ReaderGoToSheet(
         )
         when (selectedTab) {
             ReaderGoToTab.Chapters -> ReaderGoToChaptersTab(
+                pageIndex = pageIndex,
                 book = book,
                 currentPosition = currentPosition,
                 progressDisplay = progressDisplay,
@@ -163,6 +165,8 @@ internal fun ReaderGoToSheet(
                 modifier = Modifier.weight(1f),
             )
             ReaderGoToTab.Highlights -> ReaderGoToHighlightsTab(
+                progressDisplay = progressDisplay,
+                pageIndex = pageIndex,
                 book = book,
                 highlights = highlights,
                 onJump = onHighlightJump,
@@ -170,6 +174,7 @@ internal fun ReaderGoToSheet(
                 modifier = Modifier.weight(1f),
             )
             ReaderGoToTab.Search -> ReaderSearchTab(
+                pageIndex = pageIndex,
                 searchState = searchState,
                 progressDisplay = progressDisplay,
                 totalCharacters = book.bookInfo.characterCount,
@@ -287,6 +292,7 @@ private fun ReaderSearchTab(
     totalCharacters: Int,
     onJump: (ReaderSearchResult) -> Unit,
     modifier: Modifier = Modifier,
+    pageIndex: ReaderPageIndex? = null,
 ) {
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
@@ -314,6 +320,7 @@ private fun ReaderSearchTab(
             modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 8.dp),
         )
         ReaderSearchResultsContent(
+            pageIndex = pageIndex,
             query = searchState.submittedQuery,
             searching = searchState.searching,
             failure = searchState.failure,
@@ -423,6 +430,7 @@ private fun ReaderSearchResultsContent(
     totalCharacters: Int,
     onJump: (ReaderSearchResult) -> Unit,
     modifier: Modifier = Modifier,
+    pageIndex: ReaderPageIndex? = null,
 ) {
     val resultsByChapter = remember(results) { results.groupBy { it.chapterIndex } }
     when {
@@ -470,6 +478,7 @@ private fun ReaderSearchResultsContent(
                 }
                 items(chapterResults) { result ->
                     ReaderSearchResultRow(
+                        pageIndex = pageIndex,
                         result = result,
                         progressDisplay = progressDisplay,
                         totalCharacters = totalCharacters,
@@ -490,8 +499,10 @@ private fun ReaderSearchResultRow(
     totalCharacters: Int,
     chapterLabel: String,
     onClick: () -> Unit,
+    pageIndex: ReaderPageIndex? = null,
 ) {
-    val positionText = progressDisplay.countWithPercentText(result.character, totalCharacters)
+    val positionText = progressDisplay.countWithPercentText(result.character, totalCharacters,
+        pageIndex?.pageAt(result.character, result.chapterIndex)?.toString())
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -535,6 +546,7 @@ private fun ReaderGoToChaptersTab(
     progressDisplay: ReaderProgressDisplay,
     onJump: (ReaderChapterPosition, String?) -> Unit,
     modifier: Modifier = Modifier,
+    pageIndex: ReaderPageIndex? = null,
 ) {
     val currentCharacter = book.characterCountAt(currentPosition.index, currentPosition.progress)
     val rows = remember(book, currentCharacter) { book.chapterRows(currentCharacter) }
@@ -552,6 +564,7 @@ private fun ReaderGoToChaptersTab(
     ) {
         items(rows) { row ->
             ReaderChapterListRow(
+                pageIndex = pageIndex,
                 row = row,
                 progressDisplay = progressDisplay,
                 onClick = {
@@ -569,10 +582,12 @@ internal fun readerCurrentChapterRowIndex(rows: List<ReaderChapterRow>): Int? =
 @Composable
 private fun ReaderGoToHighlightsTab(
     book: EpubBook,
+    progressDisplay: ReaderProgressDisplay,
     highlights: List<ReaderHighlight>,
     onJump: (ReaderHighlight) -> Unit,
     onDelete: (ReaderHighlight) -> Unit,
     modifier: Modifier = Modifier,
+    pageIndex: ReaderPageIndex? = null,
 ) {
     val sections = remember(book, highlights) { ReaderHighlightSections.sections(book, highlights) }
     val formatter = remember {
@@ -607,6 +622,7 @@ private fun ReaderGoToHighlightsTab(
                     ReaderHighlightRow(
                         highlight = highlight,
                         createdAtText = highlight.createdAtDisplayText(formatter),
+                        positionText = pageIndex?.pageAt(highlight.character)?.toString() ?: progressDisplay.countText(highlight.character),
                         onJump = { onJump(highlight) },
                         onDelete = { onDelete(highlight) },
                     )

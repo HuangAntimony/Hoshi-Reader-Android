@@ -7,6 +7,8 @@ Release notes before v1.3.0 are in [CHANGELOG_ARCHIVE.md](CHANGELOG_ARCHIVE.md).
 
 ### Added
 
+- Choose pages, character/word counts or no counts in the reader, with book and chapter page progress retained during chapter changes, counts cached across app restarts and shown while chapters load, page positions in contents and accurate text positions after leading image pages in search results and highlights, whole-page turns and counts with accurate boundaries around trailing punctuation, and faster initial counts for books using custom fonts that yield to chapter loading and reading interactions.
+
 - Choose whether to copy a local word-audio database into the app or link to its existing location without duplicating it, with source ordering and enable/disable controls, and import available again when a linked file cannot be read.
 
 - Create Chinese and Korean profiles with language-specific fonts, automatic book-profile selection, and lookup in the reader and dictionary popups, including Korean deinflection and Chinese pinyin grouping.
@@ -58,7 +60,7 @@ Release notes before v1.3.0 are in [CHANGELOG_ARCHIVE.md](CHANGELOG_ARCHIVE.md).
 - Prevent intermittent bookshelf sorting errors after successful EPUB imports, and distinguish refresh failures from import failures.
 - Prevent book styles from shrinking the reading area in paginated and continuous modes.
 - Keep book assignments intact by correctly detecting duplicate shelf names during creation and renaming.
-- Reduce chapter loading delays by processing large publisher stylesheets faster, preparing ruby and paragraphs before initial layout, loading image-reference counts in parallel, and speeding up pagination in chapters with extensive ruby annotations.
+- Reduce chapter loading and page-counting delays in books with long chapters, large stylesheets, custom fonts and extensive ruby annotations, and avoid an extra pause just after a chapter appears.
 - Restore missing illustration chapters and gallery images in EPUBs with XHTML fallbacks, and recover bitmap covers from simple SVG wrappers or alternative declared covers when the preferred cover is broken on import or opening existing books.
 - Keep word lookups and sentence context within the tapped dictionary list item instead of joining neighboring definitions.
 - Keep the full query visible and tappable in the Dictionary tab even when its beginning has no dictionary match.

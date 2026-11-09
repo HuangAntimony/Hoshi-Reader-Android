@@ -174,7 +174,8 @@ class ReaderPaginationWebViewTest {
         assertTrue(scriptFinished.await(5, TimeUnit.SECONDS))
         assertFalse(result.optBoolean("missingSetNativeSelectionActive"))
         assertFalse(result.optBoolean("missingHandlePagedBodyScroll"))
-        assertEquals(100, result.getInt("scrollTop"))
+        assertEquals(100, result.getInt("logicalScroll"))
+        assertEquals(100, result.getInt("scrollTopAfterRelease"))
         assertEquals(100, result.getInt("lastPageScroll"))
     }
 }
@@ -188,6 +189,9 @@ private fun progressAtPageStartScript(): String =
         window.hoshiReader.getScrollContext = function() {
             return { vertical: true, scrollEl: { scrollTop: 100, scrollLeft: 0 }, pageSize: 100, maxScroll: 200 };
         };
+        // The fixture spans the mocked viewport; production now reuses node bounds.
+        var metrics = window.hoshiReader.buildPaginationMetrics();
+        for (var entry of metrics.textRanges) { entry.start = 0; entry.end = 200; }
         return window.hoshiReader.calculateProgress();
     })();
     """.trimIndent()
@@ -214,8 +218,11 @@ private fun nativeSelectionScrollLockScript(): String =
         window.hoshiReader.setNativeSelectionActive(true);
         window.__scrollEl.scrollTop = 200;
         window.hoshiReader.handlePagedBodyScroll();
+        var logicalScroll = window.hoshiReader.getPagePosition(window.hoshiReader.getScrollContext());
+        window.hoshiReader.setNativeSelectionActive(false);
         return {
-            scrollTop: window.__scrollEl.scrollTop,
+            logicalScroll: logicalScroll,
+            scrollTopAfterRelease: window.__scrollEl.scrollTop,
             lastPageScroll: window.lastPageScroll
         };
     })();

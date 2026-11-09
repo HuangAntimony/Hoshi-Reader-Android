@@ -42,6 +42,28 @@ class ReaderSettingsRepositoryTest {
     @get:Rule
     val tempFolder = TemporaryFolder()
 
+    @Test fun countPreferenceMigratesOnceAndProfilePagesWinOverLegacyVisibility() = runBlocking {
+        repository().use { handle ->
+            handle.editPreferences {
+                this[booleanPreferencesKey("readerSettingsMigratedFromSharedPreferences")] = true
+                this[booleanPreferencesKey("readerShowCharacters")] = false
+            }
+            assertEquals(ReaderProgressCount.Off, handle.settings.first().progressCount)
+            assertEquals("Off", handle.preferences()[stringPreferencesKey("readerProgressCount")])
+            assertNull(handle.preferences()[booleanPreferencesKey("readerShowCharacters")])
+            handle.repository.update { it.copy(progressCount = ReaderProgressCount.Pages) }
+            assertEquals(ReaderProgressCount.Pages, handle.settings.first().progressCount)
+        }
+        val profiles = ProfileRepository(tempFolder.newFolder("count-profile"))
+        val file = profiles.readerSettingsFile().apply { parentFile!!.mkdirs() }
+        file.writeText("""{"progressCount":"Pages","showCharacters":false}""")
+        repository(profileRepository = profiles, fileName = "count-profile.preferences_pb").use { handle ->
+            assertEquals(ReaderProgressCount.Pages, handle.settings.first().progressCount)
+            val saved = kotlinx.serialization.json.Json.parseToJsonElement(file.readText()).toString()
+            assertFalse(saved.contains("showCharacters"))
+        }
+    }
+
     @Test fun statisticsReadsGlobalResetTimeWithoutLoadingDisplayOrProfile() = runBlocking {
         val root = tempFolder.newFolder("statistics-global")
         val profiles = ProfileRepository(root)
@@ -346,7 +368,7 @@ class ReaderSettingsRepositoryTest {
             assertTrue(settings.showTitle)
             assertTrue(settings.showProgress)
             assertFalse(settings.showChapterProgress)
-            assertTrue(settings.showCharacters)
+            assertEquals(ReaderProgressCount.Characters, settings.progressCount)
             assertTrue(settings.showPercentage)
             assertTrue(settings.alwaysShowProgress)
             assertTrue(settings.showProgressTop)
@@ -556,7 +578,7 @@ class ReaderSettingsRepositoryTest {
                     showTitle = false,
                     showProgress = false,
                     showChapterProgress = true,
-                    showCharacters = false,
+                    progressCount = ReaderProgressCount.Off,
                     showPercentage = false,
                     alwaysShowProgress = false,
                     showProgressTop = false,
@@ -622,7 +644,7 @@ class ReaderSettingsRepositoryTest {
             assertFalse(saved.showTitle)
             assertFalse(saved.showProgress)
             assertTrue(saved.showChapterProgress)
-            assertFalse(saved.showCharacters)
+            assertEquals(ReaderProgressCount.Off, saved.progressCount)
             assertFalse(saved.showPercentage)
             assertFalse(saved.alwaysShowProgress)
             assertFalse(saved.showProgressTop)

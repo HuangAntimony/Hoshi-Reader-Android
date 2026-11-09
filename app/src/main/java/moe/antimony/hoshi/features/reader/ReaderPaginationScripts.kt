@@ -92,51 +92,48 @@ internal object ReaderPaginationScripts {
         initialFragment: String? = null,
         restoreToken: String,
         assets: ReaderWebAssets? = null,
+        measurementOnly: Boolean = false,
     ): String {
         val initialRestoreScript = initialFragment?.let { fragment ->
             "window.hoshiReader.jumpToFragment(${fragment.javaScriptStringLiteral()});"
         } ?: "window.hoshiReader.restoreProgress($initialProgress);"
         val source = ReaderPaginationAssetSource.load(assets)
         val template = when (settings.viewMode) {
-            ReaderViewMode.Paginated -> source.paginated
-            ReaderViewMode.Continuous -> source.continuous
+            ReaderViewMode.Paginated -> source.paginatedTemplate
+            ReaderViewMode.Continuous -> source.continuousTemplate
         }
-        val restoreScripts = readerRestoreScripts(
+        val restoreScripts = if (measurementOnly) {
+            "window.hoshiReader.calculatePageStartsForMeasurement().then(starts => window.HoshiReaderPages.postMessage(${restoreToken.javaScriptStringLiteral()}, JSON.stringify(starts)));"
+        } else readerRestoreScripts(
             sasayakiCuesJson = sasayakiCuesJson,
             highlightsJson = highlightsJson,
             initialRestoreScript = initialRestoreScript,
         )
         val generatedLayout = ReaderGeneratedLayout.from(settings)
-        val body = template
-            .replace("__HOSHI_HIGHLIGHTS_SCRIPT__", source.highlights)
-            .replace("__HOSHI_READER_VIEWPORT_SCRIPT__", source.readerViewport)
-            .replace("__HOSHI_READER_SASAYAKI_SCRIPT__", source.readerSasayaki)
-            .replace("__HOSHI_READER_TEXT_SEMANTICS_SCRIPT__", source.readerTextSemantics)
-            .replace("__HOSHI_READER_DOM_TEXT_SCRIPT__", source.readerDomText)
-            .replace("__HOSHI_READER_MEDIA_SEMANTICS_SCRIPT__", source.readerMediaSemantics)
-            .replace("__HOSHI_RESTORE_TOKEN_LITERAL__", restoreToken.javaScriptStringLiteral())
-            .replace("__HOSHI_READER_PARAGRAPH_SCRIPT__", source.paragraph)
-            .replace("__HOSHI_PARAGRAPH_ENABLED__", settings.paragraphMode.toString())
-            .replace("__HOSHI_PARAGRAPH_MAX_SENTENCES__", settings.maxSentencesPerPage.coerceIn(0, 10).toString())
-            .replace("__HOSHI_PARAGRAPH_SPLIT_DIALOGUE__", settings.splitDialogue.toString())
-            .replace("__HOSHI_PARAGRAPH_TEXT_ANIMATION__", settings.textAnimation.toString())
-            .replace("__HOSHI_PARAGRAPH_TEXT_SPEED__", settings.textSpeed.coerceParagraphTextSpeed().toString())
-            .replace("__HOSHI_CONTINUOUS_HORIZONTAL_PADDING_RATIO__", generatedLayout.viewportHorizontalPaddingRatio.toString())
-            .replace("__HOSHI_CONTINUOUS_VERTICAL_PADDING_RATIO__", generatedLayout.viewportVerticalPaddingRatio.toString())
-            .replace("__HOSHI_VERTICAL_PADDING_BLOCK_RATIO__", (settings.verticalPadding / 200.0).toString())
-            .replace("__HOSHI_VERTICAL_PADDING_GAP_RATIO__", (settings.verticalPadding / 100.0).toString())
-            .replace("__HOSHI_IMAGE_WIDTH_VIEWPORT_RATIO__", generatedLayout.imageWidthViewportRatio.toString())
-            .replace("__HOSHI_IMAGE_HEIGHT_VIEWPORT_RATIO__", generatedLayout.imageHeightViewportRatio.toString())
-            .replace("__HOSHI_IMAGE_WIDTH_REDUCTION_PX__", generatedLayout.imageWidthReductionPx.toString())
-            .replace("__HOSHI_TRAILING_SPACER_HEIGHT_LITERAL__", settings.trailingSpacerHeightCss.javaScriptSingleQuotedStringLiteral())
-            .replace("__HOSHI_TRAILING_SPACER_WIDTH_LITERAL__", settings.trailingSpacerWidthCss.javaScriptSingleQuotedStringLiteral())
-            .replace("__HOSHI_BLUR_IMAGES__", settings.blurImages.toString())
-            .replace("__HOSHI_RESTORE_SCRIPTS__", restoreScripts)
-        return "<script>\n$body\n</script>"
+        val body = template.render(mapOf(
+            "__HOSHI_RESTORE_TOKEN_LITERAL__" to restoreToken.javaScriptStringLiteral(),
+            "__HOSHI_PARAGRAPH_ENABLED__" to settings.paragraphMode.toString(),
+            "__HOSHI_PARAGRAPH_MAX_SENTENCES__" to settings.maxSentencesPerPage.coerceIn(0, 10).toString(),
+            "__HOSHI_PARAGRAPH_SPLIT_DIALOGUE__" to settings.splitDialogue.toString(),
+            "__HOSHI_PARAGRAPH_TEXT_ANIMATION__" to settings.textAnimation.toString(),
+            "__HOSHI_PARAGRAPH_TEXT_SPEED__" to settings.textSpeed.coerceParagraphTextSpeed().toString(),
+            "__HOSHI_CONTINUOUS_HORIZONTAL_PADDING_RATIO__" to generatedLayout.viewportHorizontalPaddingRatio.toString(),
+            "__HOSHI_CONTINUOUS_VERTICAL_PADDING_RATIO__" to generatedLayout.viewportVerticalPaddingRatio.toString(),
+            "__HOSHI_VERTICAL_PADDING_BLOCK_RATIO__" to (settings.verticalPadding / 200.0).toString(),
+            "__HOSHI_VERTICAL_PADDING_GAP_RATIO__" to (settings.verticalPadding / 100.0).toString(),
+            "__HOSHI_IMAGE_WIDTH_VIEWPORT_RATIO__" to generatedLayout.imageWidthViewportRatio.toString(),
+            "__HOSHI_IMAGE_HEIGHT_VIEWPORT_RATIO__" to generatedLayout.imageHeightViewportRatio.toString(),
+            "__HOSHI_IMAGE_WIDTH_REDUCTION_PX__" to generatedLayout.imageWidthReductionPx.toString(),
+            "__HOSHI_TRAILING_SPACER_HEIGHT_LITERAL__" to settings.trailingSpacerHeightCss.javaScriptSingleQuotedStringLiteral(),
+            "__HOSHI_TRAILING_SPACER_WIDTH_LITERAL__" to settings.trailingSpacerWidthCss.javaScriptSingleQuotedStringLiteral(),
+            "__HOSHI_BLUR_IMAGES__" to settings.blurImages.toString(),
+            "__HOSHI_RESTORE_SCRIPTS__" to restoreScripts,
+        ))
+        return "<script>\n" + (if (measurementOnly) "window.hoshiReaderMeasurement = true;\n" else "") + "$body\n</script>"
     }
 }
 
-private data class ReaderPaginationAssetSource(
+internal data class ReaderPaginationAssetSource(
     val paginated: String,
     val continuous: String,
     val paragraph: String,
@@ -147,23 +144,34 @@ private data class ReaderPaginationAssetSource(
     val readerMediaSemantics: String,
     val highlights: String,
 ) {
+    private val components: Map<String, String>
+        get() = mapOf(
+            "__HOSHI_HIGHLIGHTS_SCRIPT__" to highlights,
+            "__HOSHI_READER_VIEWPORT_SCRIPT__" to readerViewport,
+            "__HOSHI_READER_SASAYAKI_SCRIPT__" to readerSasayaki,
+            "__HOSHI_READER_TEXT_SEMANTICS_SCRIPT__" to readerTextSemantics,
+            "__HOSHI_READER_DOM_TEXT_SCRIPT__" to readerDomText,
+            "__HOSHI_READER_MEDIA_SEMANTICS_SCRIPT__" to readerMediaSemantics,
+            "__HOSHI_READER_PARAGRAPH_SCRIPT__" to paragraph,
+        )
+    val paginatedTemplate by lazy { ReaderScriptTemplate(paginated, components) }
+    val continuousTemplate by lazy { ReaderScriptTemplate(continuous, components) }
+
     companion object {
-        fun load(assets: ReaderWebAssets?): ReaderPaginationAssetSource {
-            if (assets != null) {
-                return ReaderPaginationAssetSource(
-                    paginated = assets.readerPaginatedJs,
-                    continuous = assets.readerContinuousJs,
-                    paragraph = assets.readerParagraphJs,
-                    readerViewport = assets.readerViewportJs,
-                    readerSasayaki = assets.readerSasayakiJs,
-                    readerTextSemantics = assets.readerTextSemanticsJs,
-                    readerDomText = assets.readerDomTextJs,
-                    readerMediaSemantics = assets.readerMediaSemanticsJs,
-                    highlights = assets.highlightsJs,
-                )
-            }
-            return SourceTreeReaderPaginationAssets.value
-        }
+        fun load(assets: ReaderWebAssets?): ReaderPaginationAssetSource =
+            assets?.paginationSource ?: SourceTreeReaderPaginationAssets.value
+
+        fun from(assets: ReaderWebAssets): ReaderPaginationAssetSource = ReaderPaginationAssetSource(
+            paginated = assets.readerPaginatedJs,
+            continuous = assets.readerContinuousJs,
+            paragraph = assets.readerParagraphJs,
+            readerViewport = assets.readerViewportJs,
+            readerSasayaki = assets.readerSasayakiJs,
+            readerTextSemantics = assets.readerTextSemanticsJs,
+            readerDomText = assets.readerDomTextJs,
+            readerMediaSemantics = assets.readerMediaSemanticsJs,
+            highlights = assets.highlightsJs,
+        )
     }
 }
 
@@ -198,7 +206,7 @@ private fun readerRestoreScripts(
     initialRestoreScript: String,
 ): String = listOfNotNull(
     highlightsJson?.let { "window.hoshiHighlights.applyHighlights($it);" },
-    "window.hoshiReader.applySasayakiCues(${sasayakiCuesJson ?: "[]"});",
+    sasayakiCuesJson?.let { "window.hoshiReader.applySasayakiCues($it);" },
     initialRestoreScript,
 ).joinToString(separator = "\n")
 

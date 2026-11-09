@@ -14,6 +14,7 @@ internal data class ReaderWebResource(
     val data: ByteArray,
     val statusCode: Int = HttpURLConnection.HTTP_OK,
     val reasonPhrase: String = "OK",
+    val headers: Map<String, String> = emptyMap(),
 ) {
     fun toWebResourceResponse(): WebResourceResponse =
         WebResourceResponse(
@@ -21,7 +22,7 @@ internal data class ReaderWebResource(
             encoding,
             statusCode,
             reasonPhrase,
-            emptyMap(),
+            headers,
             data.inputStream(),
         )
 

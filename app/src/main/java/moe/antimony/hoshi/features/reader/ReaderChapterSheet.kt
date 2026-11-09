@@ -163,6 +163,7 @@ internal fun ReaderChapterListRow(
     row: ReaderChapterRow,
     progressDisplay: ReaderProgressDisplay,
     onClick: () -> Unit,
+    pageIndex: ReaderPageIndex? = null,
 ) {
     val eInkMode = LocalHoshiEInkMode.current
     val isCurrentEInkRow = eInkMode && row.isCurrent
@@ -212,7 +213,7 @@ internal fun ReaderChapterListRow(
         )
         row.characterCount?.let { count ->
             Text(
-                text = progressDisplay.countText(count),
+                text = pageIndex?.pageAt(count, row.spineIndex, preferSpineStart = true)?.toString() ?: progressDisplay.countText(count),
                 color = rowMetaColor,
                 style = MaterialTheme.typography.bodyMedium,
             )

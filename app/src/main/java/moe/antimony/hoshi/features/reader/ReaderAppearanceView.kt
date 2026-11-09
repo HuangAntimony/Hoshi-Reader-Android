@@ -631,18 +631,19 @@ private fun ReaderAppearanceContent(
                     )
                     if (readerAppearanceShowsAlwaysShowProgress(settings)) {
                         AppearanceDivider(palette)
-                        SwitchRow(
-                            label = stringResource(
-                                if (progressDisplay.usesWords) {
-                                    R.string.reader_appearance_show_word_count
-                                } else {
-                                    R.string.reader_appearance_show_character_count
-                                },
-                            ),
-                            checked = settings.showCharacters,
-                            onCheckedChange = { checked ->
-                                onSettingsChange { current -> current.copy(showCharacters = checked) }
+                        val countLabels = listOf(
+                            stringResource(R.string.reader_count_off),
+                            stringResource(if (progressDisplay.usesWords) R.string.reader_count_words else R.string.reader_count_characters),
+                            stringResource(R.string.reader_count_pages),
+                        )
+                        SegmentedRow(
+                            label = stringResource(R.string.reader_count),
+                            options = countLabels,
+                            selected = countLabels[settings.progressCount.ordinal],
+                            onSelected = { label ->
+                                onSettingsChange { current -> current.copy(progressCount = ReaderProgressCount.entries[countLabels.indexOf(label)]) }
                             },
+                            palette = palette,
                         )
                         AppearanceDivider(palette)
                         SwitchRow(

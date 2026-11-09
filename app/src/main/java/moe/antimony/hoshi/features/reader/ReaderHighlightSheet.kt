@@ -35,6 +35,7 @@ internal fun ReaderHighlightRow(
     createdAtText: String,
     onJump: () -> Unit,
     onDelete: () -> Unit,
+    positionText: String = highlight.character.toString(),
 ) {
     Row(
         modifier = Modifier
@@ -62,7 +63,7 @@ internal fun ReaderHighlightRow(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = "$createdAtText (${highlight.character})",
+                text = "$createdAtText ($positionText)",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,

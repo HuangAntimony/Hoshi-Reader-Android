@@ -78,3 +78,10 @@ test('duplicate installation does not save the temporary display as publisher st
     f.window.hoshiReaderDocumentPreparation.resume();
     assert.equal(f.root.style.getPropertyValue('display'), '');
 });
+
+test('measurement snapshots suppress publisher layout just like visible chapters', () => {
+    const f = fixture({ path: '/reader-pages/12345678-abcd-abcd-abcd-123456789abc/epub/chapter.xhtml' });
+    assert.equal(f.root.style.getPropertyValue('display'), 'none');
+    f.window.hoshiReaderDocumentPreparation.resume();
+    assert.equal(f.root.style.getPropertyValue('display'), '');
+});

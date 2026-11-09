@@ -1267,4 +1267,10 @@
     <string name="profile_language_korean">韩语</string>
     <string name="dictionary_scan_non_chinese">扫描非汉语文本</string>
     <string name="dictionary_scan_non_korean">扫描非韩语文本</string>
+    <string name="reader_count" comment="Reader progress count unit">计数</string>
+    <string name="reader_count_off" comment="Reader progress count unit">关闭</string>
+    <string name="reader_count_characters" comment="Reader progress count unit">字符</string>
+    <string name="reader_count_words" comment="Reader progress count unit">词</string>
+    <string name="reader_count_pages" comment="Reader progress count unit">页</string>
+    <string name="reader_page_measurement_failed">无法计算阅读页数</string>
 </resources>

@@ -25,7 +25,8 @@ Names without an extension are searchable types, not necessarily filenames.
 | Bookshelf, covers | `features/bookshelf/`, `BookCoverThumbnailStore` | Shelf UI/repository and persistent cover derivatives |
 | Reading statistics | `epub/BookStatisticsStore.kt`, `features/statistics/` | Session transactions, archives, aggregation and dashboard state |
 | Reader lifecycle, progress, restore | `features/reader/ReaderWebView.kt`, `features/reader/ReaderChapterWebView.kt`, `features/reader/ReaderWebViewStateHolder.kt` | WebView attachment, document generations, navigation and accepted position |
-| Reader commands and resources | `ReaderPaginationScripts.kt`, `ReaderWebAssets.kt`, `ReaderWebResourceBridge.kt` in `features/reader/` | Typed commands, asset composition and safe resource loading |
+| Reader page counts and position labels | `ReaderPageCounter`, `ReaderPageMeasurementCoordinator`, `ReaderPageMeasurementScheduler`, `ReaderPageMeasurer`, `ReaderPageMeasurementResources`, `ReaderPageIndex`, `ReaderPageCountRepository` in `features/reader/` | Reader-scoped measurement, layout cache and character/page conversion |
+| Reader commands and resources | `ReaderPaginationScripts.kt`, `ReaderScriptTemplate.kt`, `ReaderWebAssets.kt`, `ReaderWebResourceBridge.kt` in `features/reader/` | Typed commands, asset composition and safe resource loading |
 | Reader layout, paragraph mode, highlighting | Web `reader/` (ownership table below) | Mode runtimes and shared text/media semantics |
 | Selection, native handles, lookup context | `features/reader/ReaderSelectionBridge.kt`, Web `shared/selection*.js` | Selection state, source offsets and native menu integration |
 | Popup stack, history, geometry | `features/reader/ReaderLookupPopupBridge.kt`, Web `popup/reader-popup-host.js`, `popup/popup.js` | Shared iframe lookup host and native service bridge |
@@ -321,14 +322,19 @@ use the existing safe loader.
 `allowUniversalAccessFromFileURLs` stays disabled.
 Kotlin retains only small typed commands, parameter escaping, asset loading,
 dynamic configuration and bridge calls.
+`ReaderWebAssets` owns immutable asset snapshots and their lazily compiled
+`ReaderScriptTemplate` parts. Static components are expanded once per snapshot;
+chapter setup appends literals and escaped parameters without rescanning the full
+runtime. Templates never retain chapter tokens, settings or restore commands,
+and copying an asset snapshot creates independent template caches.
 
 | Web asset under `reader/` | Owns | Consumers |
 | --- | --- | --- |
 | `reader-text-semantics.js` | Normalization, raw/matchable counts and character predicate, Sasayaki punctuation ownership and search range semantics | Paginated (including paragraph) and continuous |
 | `reader-dom-text.js` | Live DOM ruby normalization, selected body-text slices and Sasayaki structural boundaries | Paginated/continuous normalization; selection and Sasayaki adapters across modes |
 | `reader-media-semantics.js` | Image/gaiji setup, SVG ratio, blur/tint, tap bridge, scoped loading, asynchronous image-reference counts and image-hold eligibility | Paginated (including paragraph) and continuous |
-| `reader-document-preparation.js` | Defer initial publisher layout until reader viewport/styles and ruby/paragraph DOM are prepared | Chapter WebView document-start hook; all modes resume before content geometry/font readiness |
-| `reader-paginated.js` | Columns, snapping, page metrics and page restore | Paginated |
+| `reader-document-preparation.js` | Defer initial publisher layout until reader viewport/styles and ruby/paragraph DOM are prepared | Chapter WebView document-start hook; all modes resume before content geometry, with explicit paginated font preloading before resume |
+| `reader-paginated.js` | Columns, snapping, page metrics, page-start measurement, current page and restore | Paginated |
 | `reader-continuous.js` | Inset body scrolling, viewport bounds and scroll restore | Continuous |
 | `reader-paragraph.js` | iOS paragraph splitting/centering, cross-column fragments, Range reveal and current-page cue IDs | Paginated when paragraph mode is enabled |
 | `reader-sasayaki.js`, `highlights.js` | Live-DOM cue presentation and persistent/search highlight operations | Both modes |
@@ -364,16 +370,28 @@ dynamic configuration and bridge calls.
 - Reader initialization starts image-reference counts alongside image setup and
   DOM preparation. Ruby normalization and paragraph sentence/block preparation run
   before document preparation resumes display, avoiding layout of the unprepared
-  chapter. Then await fonts/images before measuring cross-column fragments and
+  chapter. Paginated documents preload only the explicit reader-owned font face
+  while hidden, overlapping DOM preparation; publisher/fallback font lists are
+  not proactively loaded. Then await fonts/images before measuring cross-column fragments and
   building character indexes; image counts must settle before cues/highlights and
   position restore so media holds use the correct counts. Unknown counts preserve
   ordinary holds. No counts request blocks structural DOM preparation.
+  A fresh document installs narration cues only when an explicit cue payload is
+  supplied; an absent payload already has empty runtime state and must not trigger
+  a second text-index build. Explicit empty payloads still perform cue clearing.
+  `ReaderChapterWebView` records the setup's document token, cue payload (empty
+  when absent) and segmentation version. Cue delivery after accepted restore
+  reuses that snapshot; changed content or versions still install normally, and
+  document replacement/close invalidates pending installation callbacks.
 - Paragraph mode extends the ordinary paginated DOM: split only inside paragraphs,
   center blocks and mark cross-column fragments. Vertical
   Android pagination uses Y/page-height; horizontal pagination uses X/page-width.
   Paragraphs and continuation fragments use the same page-sized CSS block box,
   `align-content`, intrinsic inline sizing and automatic inline margins to center
   content in both axes, retaining the common starting edge of explicit lines.
+  Fragment detection indexes text/element nodes in a virtual UTF-16 coordinate
+  space and binary-searches only page boundaries, keeping surrogate pairs intact.
+  Hidden positions are skipped without discarding visible candidates to their left.
   Fragment wrappers provide per-page layout containers; Android does not require
   the iOS selection workaround that originally motivated them. Spacing-only
   paragraphs keep their anchors in flow without occupying page space.
@@ -383,7 +401,16 @@ dynamic configuration and bridge calls.
   progress measures individual characters only for nodes crossing the viewport
   boundary. Punctuation-only nodes participate in reveal, while ruby annotations
   stay outside the body-text index. `buildNodeOffsets()` invalidates the metrics
-  after cue/highlight wrapping or unwrapping; content reflow replaces the document.
+  and replaces the ordered node/text/count snapshot after cue/highlight wrapping
+  or unwrapping; content reflow replaces the document. Position restoration and
+  geometry scans reuse that snapshot instead of traversing/filtering/counting the
+  same DOM again. Geometry scans reuse one Range
+  and batch adjacent single-BMP Japanese text nodes only when their rectangles
+  map unambiguously within one page, falling back to individual reads otherwise.
+  Page boundaries binary-search UTF-16 code-point boundaries and count intervening
+  prefixes once in bounded, yieldable chunks; ruby stabilization remains intact.
+  An overflowing suffix containing
+  only uncounted punctuation/whitespace must not claim the next page's text start.
 - Inline narration cue spans reserve their paint boxes with a transparent outline
   during initial layout. Blink otherwise creates a box on the first background
   highlight and invalidates the containing layout, making each new cue reflow a
@@ -427,6 +454,82 @@ dynamic configuration and bridge calls.
   Afterwards lookup/media/link/popup operations retain priority; optional blank tap
   calls the same native navigation entry as swipe/keys. Native selection and restore
   locks apply to every entry.
+- `ReaderProgressCount` is profile appearance state: Off, Characters or Pages.
+  Legacy visibility migrates before decoding in preferences, profile JSON and
+  backup reads; new fields win and only new fields are written. English retains
+  estimated words, other languages characters, including continuous mode.
+  `ReaderPageIndex` supplies one-based book/TOC chapter progress and row labels;
+  percentages, statistics, contents summaries, jump input and durable positions
+  remain character-based. Pending counts show an ellipsis in progress and use
+  language counts for rows; measurement failure records its original diagnostic
+  and falls back until the next enable, open or layout change.
+  Known indexes remain visible during chapter restore. `ReaderWebViewStateHolder`
+  derives provisional progress from the navigation target (first/last physical page
+  at chapter boundaries); actual page callbacks are scoped to the restore epoch.
+  `ReaderPageBridge` checks both the loaded and expected document tokens, including
+  while chapter cues delay the next load and the old document remains attached.
+- `ReaderPageCounter` reads the layout cache as soon as the viewport and layout
+  are known, only in Pages and paginated modes; cache hits publish page progress
+  before visible document restore. Only a cache miss waits for reader readiness
+  and the activity gate before creating a measurement WebView. Readiness changes
+  alone do not restart fingerprint/cache reads; the synchronous restore cancellation
+  hook is installed only for active measurement. Physical viewport changes restart
+  publication to match Reader's count-state reset, even if CSS rounding leaves the
+  persisted layout key unchanged. Its lifecycle cancels work on background, exit, book/profile
+  or layout replacement. `ReaderPageMeasurementCoordinator` retains completed
+  spines for the same layout; generations reject superseded results. One attached,
+  transparent `ReaderPageMeasurer` runs on Main, sequentially reusing document
+  preparation, styles, fonts and safe resources without interaction, playback,
+  statistics, bookmark writes or reveal. Cancellation destroys that instance;
+  never use process-wide WebView
+  [`pauseTimers()`](https://developer.android.com/reference/android/webkit/WebView#pauseTimers())
+  for measurement. `ReaderPageMeasurementScheduler` pauses hidden work during
+  visible restore, touch/navigation and playback reveal. Restore completion alone
+  permits immediate measurement; actual foreground input requires one quiet second,
+  and a restore does not restart that deadline. The token-checked bridge reads a thread-safe activity snapshot;
+  intentional pauses reset the idle measurement timeout. Page turns and gestures
+  retain the in-flight document. Visible restore synchronously cancels and destroys
+  that document before loading foreground content, because a JS gate cannot stop
+  already queued native layout. Completed spines and known counts survive this
+  cancellation; a restore generation also restarts work after a same-frame readiness
+  transition. Cache hits bypass the scheduler and measuring WebView.
+- `ReaderPageMeasurementResources` gives each immutable measurement instance a
+  unique `/reader-pages/<uuid>/` URL namespace. Font, CSS and image responses in
+  that namespace allow Blink resource-cache reuse across spines; HTML and errors
+  receive no cache headers. Font URLs and relative EPUB resources share the namespace.
+  Another measurement instance cannot resolve those URLs, so book/font replacement
+  cannot reuse stale decoded resources. Ordinary root-absolute publisher URLs and
+  remote-resource fallback retain `ReaderWebResourceBridge` behavior without added
+  cache headers. This renderer cache is separate from the persisted page index.
+  Hidden initialization waits for image setup and font readiness, but skips the
+  visible image-settle timer and playback-only image-reference fetch.
+- Page starts reuse `paginationMetrics` and normalized body-text offsets, querying
+  individual character geometry only at page boundaries. Hidden pagination-metric and page-boundary
+  scans yield between node batches (a 4 ms budget checked between batches) and consult
+  the native foreground gate. Continuations use background-priority `scheduler.postTask`,
+  with a closed-after-delivery `MessageChannel` fallback (timers only if neither API
+  exists). Do not wait for a new idle period for every batch: it dominates total
+  counting time even with an untouched foreground page. Visible pagination drains
+  the same steps synchronously. DOM preparation and
+  native layout remain synchronous, with activity gates between preparation phases. Page reporting derives
+  the ordinal directly from the actual scroll offset, without forcing the deferred
+  chapter-geometry scan before restore. The paginated scroll context caps turns,
+  restores and jumps at the last whole-page boundary. Count reachable whole-page
+  stops, including image-only pages and excluding the synthetic tail spacer.
+  Duplicate offsets are retained; visible document-token
+  callbacks report the actual page because characters cannot distinguish image
+  pages. Known spine identities take precedence for row locations. TOC chapters
+  retain existing character-boundary grouping, including shared image offsets.
+  Text locations select the last matching page start, including offset zero after
+  leading images; TOC spine entries explicitly prefer the first physical page.
+- Injected `ReaderPageCountRepository` hashes book content/spine order and stable
+  font contents on IO, and atomically stores only complete results under `cacheDir`.
+  The key also includes viewport/density, layout settings, content language,
+  WebView/system version and algorithm version; font-library revision invalidates
+  only the session. `readerPageCountKey` uses the stable content-language ID rather
+  than a runtime object's identity. Keep one latest layout per book, treat corrupt data as a miss,
+  and exclude this rebuildable cache from backup/sync. Cache hits create no
+  measurement WebView.
 - `ReaderParagraphSettingsMigration` converts legacy VN preferences and profile JSON
   before enum decoding, including display migration/backup reads. New fields win,
   only new fields are written, and blank-tap false is preserved. Paragraph layout
@@ -456,7 +559,7 @@ dynamic configuration and bridge calls.
 - `HoshiReaderWebView` installs one document-start preparation script when supported
   and removes it on release. It only defers top-level `/epub/` documents at the
   appassets origin, preserving the publisher's inline display property. Mode
-  initialization resumes layout before measuring content geometry or awaiting fonts;
+  initialization resumes layout before measuring content geometry;
   the existing restore/visual-state gate still controls visibility. Unsupported
   WebViews retain the ordinary initialization path.
 - DOM selection state owns the navigation lock. `blocked` is distinct from a

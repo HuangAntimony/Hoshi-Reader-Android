@@ -19,6 +19,9 @@ internal data class ReaderWebAssets(
     val highlightsJs: String,
     val readerCss: String,
 ) {
+    // Bound to this immutable asset snapshot; copy() gets its own compiled templates.
+    internal val paginationSource by lazy { ReaderPaginationAssetSource.from(this) }
+
     companion object {
         @Volatile
         private var cached: ReaderWebAssets? = null

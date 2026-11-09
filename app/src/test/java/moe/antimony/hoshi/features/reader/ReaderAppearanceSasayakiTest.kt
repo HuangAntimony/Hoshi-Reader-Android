@@ -50,7 +50,7 @@ class ReaderAppearanceSasayakiTest {
         )
         assertTrue(
             readerAppearanceShowsAlwaysShowProgress(
-                ReaderSettings(showCharacters = false, showPercentage = false),
+                ReaderSettings(progressCount = ReaderProgressCount.Off, showPercentage = false),
             ),
         )
     }

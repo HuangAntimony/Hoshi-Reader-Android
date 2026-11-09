@@ -178,9 +178,9 @@ class ReaderChromeTest {
             totalCharacters = 169325,
         )
 
-        assertEquals("0.21%", state.progressText(ReaderSettings(showCharacters = false)))
+        assertEquals("0.21%", state.progressText(ReaderSettings(progressCount = ReaderProgressCount.Off)))
         assertEquals("355 / 169325", state.progressText(ReaderSettings(showPercentage = false)))
-        assertEquals("", state.progressText(ReaderSettings(showCharacters = false, showPercentage = false)))
+        assertEquals("", state.progressText(ReaderSettings(progressCount = ReaderProgressCount.Off, showPercentage = false)))
     }
 
     @Test
@@ -239,7 +239,7 @@ class ReaderChromeTest {
             ReaderContentChromeInsets(topDp = 34, bottomDp = 18),
             readerContentChromeInsets(
                 state = state,
-                settings = ReaderSettings(showTitle = false, showCharacters = false, showPercentage = false),
+                settings = ReaderSettings(showTitle = false, progressCount = ReaderProgressCount.Off, showPercentage = false),
             ),
         )
         assertEquals(
@@ -498,7 +498,7 @@ class ReaderChromeTest {
                 ReaderSettings(
                     alwaysShowProgress = false,
                     showProgressTop = false,
-                    showCharacters = false,
+                    progressCount = ReaderProgressCount.Off,
                     showPercentage = false,
                 ),
             ).showProgressInBottomBar,
@@ -522,7 +522,7 @@ class ReaderChromeTest {
             "",
             readerBottomSafeProgressText(
                 state,
-                settings.copy(showCharacters = false, showPercentage = false),
+                settings.copy(progressCount = ReaderProgressCount.Off, showPercentage = false),
                 focusMode = true,
             ),
         )

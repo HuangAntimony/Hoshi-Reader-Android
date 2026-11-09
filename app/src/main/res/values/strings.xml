@@ -1289,4 +1289,10 @@
     <string name="profile_language_korean">Korean</string>
     <string name="dictionary_scan_non_chinese">Scan Non-Chinese Text</string>
     <string name="dictionary_scan_non_korean">Scan Non-Korean Text</string>
+    <string name="reader_count" comment="Reader progress count unit">Count</string>
+    <string name="reader_count_off" comment="Reader progress count unit">Off</string>
+    <string name="reader_count_characters" comment="Reader progress count unit">Characters</string>
+    <string name="reader_count_words" comment="Reader progress count unit">Words</string>
+    <string name="reader_count_pages" comment="Reader progress count unit">Pages</string>
+    <string name="reader_page_measurement_failed">Could not calculate reader pages</string>
 </resources>

@@ -7,6 +7,19 @@ import org.junit.Test
 
 class ReaderWebAssetsTest {
     @Test
+    fun copyingAssetsDoesNotShareCompiledTemplates() {
+        val original = ReaderWebAssets(selectionJs = "", readerPaginatedJs = "first __HOSHI_RESTORE_TOKEN_LITERAL__",
+            readerContinuousJs = "", readerParagraphJs = "", readerViewportJs = "", readerDocumentPreparationJs = "",
+            readerTextSemanticsJs = "", readerDomTextJs = "", readerMediaSemanticsJs = "", readerSasayakiJs = "",
+            highlightsJs = "", readerCss = "")
+        val parameters = mapOf("__HOSHI_RESTORE_TOKEN_LITERAL__" to "token")
+        assertTrue(original.paginationSource.paginatedTemplate.render(parameters).startsWith("first"))
+        val copy = original.copy(readerPaginatedJs = "second __HOSHI_RESTORE_TOKEN_LITERAL__")
+        assertTrue(copy.paginationSource.paginatedTemplate.render(parameters).startsWith("second"))
+        assertTrue(original.paginationSource.paginatedTemplate.render(parameters).startsWith("first"))
+    }
+
+    @Test
     fun readerWebAssetsExistInNeutralAssetTree() {
         val assets = listOf(
             "hoshi-web/shared/language-ja.js",
@@ -45,5 +58,17 @@ class ReaderWebAssetsTest {
         val css = ReaderContentStyles.css()
 
         assertFalse(css.contains("__HOSHI_"))
+    }
+
+    @Test
+    fun onlyExplicitReaderFontFacesArePreloaded() {
+        val settings = ReaderSettings(selectedFont = "Custom Font")
+        val custom = ReaderContentStyles.css(settings, fontFaceUrl = "https://appassets.androidplatform.net/fonts/custom.ttf")
+        assertTrue(custom.contains("--hoshi-preload-face: 'Custom Font';"))
+        val system = ReaderContentStyles.css(settings)
+        assertTrue(system.contains("--hoshi-preload-face: ;"))
+        val publisher = ReaderContentStyles.css(settings.copy(selectedFont = ReaderFontManager.publisherFont),
+            fontFaceUrl = "https://appassets.androidplatform.net/fonts/custom.ttf")
+        assertTrue(publisher.contains("--hoshi-preload-face: ;"))
     }
 }

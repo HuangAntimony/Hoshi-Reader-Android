@@ -267,6 +267,7 @@ internal object ReaderContentStyles {
                     writing-mode: ${settings.writingModeCss} !important;
                 }
                 body {
+                    --hoshi-preload-face: ${if (fontFaceCss.isNotEmpty()) fontFaceFamily else ""};
                     $bodyFontFamilyCss
                     $bodyFontVariantCss
                     font-size: ${settings.fontSize}px !important;

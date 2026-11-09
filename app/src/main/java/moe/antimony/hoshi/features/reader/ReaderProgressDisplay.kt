@@ -39,8 +39,8 @@ data class ReaderProgressDisplay(
     fun countText(rawCount: Int): String =
         formatDisplayNumber(displayCount(rawCount))
 
-    fun countWithPercentText(rawCount: Int, totalRawCount: Int): String =
-        "${countText(rawCount)} (${rawProgressPercentText(rawCount, totalRawCount)})"
+    fun countWithPercentText(rawCount: Int, totalRawCount: Int, positionLabel: String? = null): String =
+        "${positionLabel ?: countText(rawCount)} (${rawProgressPercentText(rawCount, totalRawCount)})"
 
     fun speedText(rawSpeed: Int): String =
         "${formatDisplayNumber(displayCount(rawSpeed))} / h"

@@ -63,7 +63,8 @@ class ReaderDocumentPreparationWebViewTest {
                 val label = "deferred=$deferred $mode vertical=$vertical picture=$picture"
                 val settings = ReaderSettings(viewMode = mode, paragraphMode = paragraph, verticalWriting = vertical, fontSize = 24,
                     horizontalPadding = 3, verticalPadding = 3, textAnimation = false)
-                val body = if (picture) "<p><img src='$image'/></p>" else
+                // Keep this picture on page zero without relying on publisher-margin normalization.
+                val body = if (picture) "<p style='margin:0'><img src='$image'/></p>" else
                     "<p>「<ruby>読書<rt>どくしょ</rt></ruby>の時間です。本文を読みます。」</p>".repeat(160)
                 val html = """<html xmlns="http://www.w3.org/1999/xhtml" style="display: block !important"><head><meta name="viewport" content="width=1600"/><title>Fixture</title></head><body>$body</body></html>"""
                 val loaded = CountDownLatch(1)
@@ -129,7 +130,7 @@ class ReaderDocumentPreparationWebViewTest {
                         })
                     }
                     assertTrue("$label visual state", painted.await(10, TimeUnit.SECONDS))
-                    composeRule.waitUntil(5_000) {
+                    try { composeRule.waitUntil(5_000) {
                         val screenshot = instrumentation.uiAutomation.takeScreenshot()
                         var red = 0
                         for (y in 0 until screenshot.height step 20) for (x in 0 until screenshot.width step 20) {
@@ -138,6 +139,13 @@ class ReaderDocumentPreparationWebViewTest {
                         }
                         screenshot.recycle()
                         red > 100
+                    } } catch (failure: Throwable) {
+                        throw AssertionError("$label image geometry: " + evaluate(webView, """
+                            (()=>{const img=document.querySelector('img');return {rect:img.getBoundingClientRect().toJSON(),
+                            natural:[img.naturalWidth,img.naturalHeight], display:getComputedStyle(img).display,
+                            visibility:getComputedStyle(img).visibility, opacity:getComputedStyle(img).opacity,
+                            scroll:[document.body.scrollLeft,document.body.scrollTop], body:document.body.getBoundingClientRect().toJSON(), viewport:[innerWidth,innerHeight]};})()
+                        """.trimIndent()), failure)
                     }
                 } else {
                     evaluate(webView, "window.testRestored=false;window.hoshiReader.restoreProgress(0.5);true")

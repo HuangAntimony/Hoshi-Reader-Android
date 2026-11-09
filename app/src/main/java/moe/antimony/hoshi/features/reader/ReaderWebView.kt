@@ -250,6 +250,7 @@ fun ReaderWebView(
     val view = LocalView.current
     val systemDarkTheme = LocalSystemDarkTheme.current
     val clampedInitialIndex = initialChapterIndex.coerceIn(0, book.chapters.lastIndex)
+    val pageMeasurementScheduler = remember(book) { ReaderPageMeasurementScheduler() }
     val stateHolder = remember(book) {
         ReaderWebViewStateHolder(
             initialSettings = readerSettings,
@@ -536,6 +537,7 @@ fun ReaderWebView(
         webView?.evaluateJavascript(ReaderPaginationScripts.clearSearchHighlightInvocation(), null)
     }
     fun jumpToPositionWithHistory(position: ReaderChapterPosition, fragment: String? = null) {
+        pageMeasurementScheduler.onForegroundActivity()
         clearSearchHighlight()
         cancelReaderAutoPage()
         val statistics = statisticsForSave()
@@ -544,6 +546,7 @@ fun ReaderWebView(
         saveReaderPosition(savedPosition, statistics)
     }
     fun navigateJumpBack() {
+        pageMeasurementScheduler.onForegroundActivity()
         clearSearchHighlight()
         cancelReaderAutoPage()
         val statistics = statisticsForSave()
@@ -552,6 +555,7 @@ fun ReaderWebView(
         saveReaderPosition(savedPosition, statistics)
     }
     fun navigateJumpForward() {
+        pageMeasurementScheduler.onForegroundActivity()
         clearSearchHighlight()
         cancelReaderAutoPage()
         val statistics = statisticsForSave()
@@ -823,6 +827,7 @@ fun ReaderWebView(
         }
     }
     fun goToNextChapter(): Boolean {
+        pageMeasurementScheduler.onForegroundActivity()
         if (!stateHolder.canAcceptReaderNavigationInput()) return false
         cancelReaderAutoPage()
         startStatisticsForProgressChangeIfNeeded()
@@ -837,6 +842,7 @@ fun ReaderWebView(
         return false
     }
     fun goToPreviousChapter(): Boolean {
+        pageMeasurementScheduler.onForegroundActivity()
         if (!stateHolder.canAcceptReaderNavigationInput()) return false
         cancelReaderAutoPage()
         startStatisticsForProgressChangeIfNeeded()
@@ -883,6 +889,7 @@ fun ReaderWebView(
         saveReaderPosition(savedPosition)
     }
     fun navigateReaderPage(direction: ReaderNavigationDirection): Boolean {
+        pageMeasurementScheduler.onForegroundActivity()
         val currentWebView = webView ?: return false
         if (!stateHolder.beginReaderNavigationInput()) return false
         cancelReaderAutoPage()
@@ -916,6 +923,7 @@ fun ReaderWebView(
         }
     }
     fun handleReaderInteraction() {
+        pageMeasurementScheduler.onForegroundActivity()
         cancelReaderAutoPage()
         stateHolder.enterFocusModeForReaderInteraction()
     }
@@ -1213,12 +1221,17 @@ fun ReaderWebView(
             closeLookupPopupsAndSelection()
         }
     }
+    var pageCounts by remember(book, effectiveSettings.readerContentReloadKey(), stateHolder.webViewViewportSize,
+        fontLibraryState.revision, contentLanguageProfile, profileState.effectiveProfileId) { mutableStateOf(ReaderPageCounts()) }
+    var pageLocation by remember(book, stateHolder.webViewRestoreEpoch) { mutableStateOf<Pair<Int, Int>?>(null) }
+    val pageIndex = pageCounts.index.takeIf { effectiveSettings.usesPageCounts }
     val chromeState = remember(
         book,
         readerPosition.displayedPosition,
         stateHolder.backTargetPosition,
         stateHolder.forwardTargetPosition,
         statisticsState,
+        pageIndex, pageLocation, pageCounts.failed,
     ) {
         val currentCharacter = book.characterCountAt(
             readerPosition.displayedPosition.index,
@@ -1226,6 +1239,9 @@ fun ReaderWebView(
         )
         val chapterRange = book.tocRangeAt(readerPosition.displayedPosition)
         ReaderChromeState(
+            pageProgress = stateHolder.pageProgress(pageIndex,
+                pageLocation?.takeIf { it.first == readerPosition.displayedPosition.index }?.second),
+            pageCountsFailed = pageCounts.failed,
             title = book.title,
             currentCharacter = currentCharacter,
             totalCharacters = book.bookInfo.characterCount,
@@ -1267,6 +1283,7 @@ fun ReaderWebView(
         }.getOrDefault(emptyList())
     }
     suspend fun evaluateReaderJavascript(source: String): String? {
+        pageMeasurementScheduler.onForegroundActivity()
         val targetWebView = webView ?: return null
         return suspendCancellableCoroutine { continuation ->
             targetWebView.evaluateJavascript(source) { result ->
@@ -1502,6 +1519,7 @@ fun ReaderWebView(
         audiobookCue: SasayakiMatch? = null,
         canPresent: () -> Boolean = { true },
     ): ReaderPlaybackRevealResult {
+        pageMeasurementScheduler.onForegroundActivity()
         if (!canPresent() || !awaitReaderChapterReady(stateHolder.readerPosition.displayedPosition.index)) {
             return ReaderPlaybackRevealResult(null, false)
         }
@@ -1576,6 +1594,7 @@ fun ReaderWebView(
         }
         pendingSasayakiCue = null
         if (source == SasayakiCueRevealSource.MatchRefresh) {
+            pageMeasurementScheduler.onForegroundActivity()
             targetWebView.evaluateJavascript(
                 ReaderPaginationScripts.highlightSasayakiCueInvocation(
                     cue.toCueRange(), reveal = false,
@@ -2065,6 +2084,14 @@ fun ReaderWebView(
                     bottom = contentChromeInsets.bottomDp.dp,
                 ),
         ) {
+            ReaderPageCounter(
+                book = book, bookRoot = bookRoot, profileId = profileState.effectiveProfileId, settings = effectiveSettings,
+                viewportSize = stateHolder.webViewViewportSize, readerReady = !stateHolder.isWebViewRestoring,
+                contentLanguage = contentLanguageProfile, fontManager = fontManager,
+                repository = appContainer.readerPageCountRepository, bookRepository = bookRepository,
+                onCountsChanged = { pageCounts = it }, modifier = Modifier.fillMaxSize(),
+                scheduler = pageMeasurementScheduler,
+            )
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                 val readerLookupPopupViewport = ReaderLookupPopupViewport(
                     width = maxWidth.value.toDouble(),
@@ -2130,6 +2157,11 @@ fun ReaderWebView(
                                     rootSelectionHighlight = null
                                 }
                             },
+                            onPageChanged = { page ->
+                                if (generation == stateHolder.webViewGeneration && restoreEpoch == stateHolder.webViewRestoreEpoch) {
+                                    pageLocation = restoreChapterIndex to page
+                                }
+                            },
                             onWebViewReady = { webView = it },
                             onRendererTerminated = { terminatedView ->
                                 if (webView === terminatedView && stateHolder.onRendererTerminated(
@@ -2150,6 +2182,7 @@ fun ReaderWebView(
                             isWebViewRestoring = stateHolder.isWebViewRestoring,
                             webViewRestoreEpoch = stateHolder.webViewRestoreEpoch,
                             onRestoreStarted = stateHolder::markWebViewRestoring,
+                            onBeforeDocumentLoad = { pageMeasurementScheduler.setReaderReady(false) },
                             onRestoreCompleted = {
                                 if (generation == stateHolder.webViewGeneration && restoreEpoch == stateHolder.webViewRestoreEpoch) {
                                     stateHolder.markWebViewRestored()
@@ -2208,6 +2241,7 @@ fun ReaderWebView(
                             onClearLookupPopup = ::closeLookupPopupsAndSelection,
                             onReaderTapOutside = ::handleReaderTapOutside,
                             onReaderInteraction = ::handleReaderInteraction,
+                            onReaderInput = pageMeasurementScheduler::onForegroundActivity,
                             onImageTapped = ::openFullscreenImage,
                             onHighlightChanged = ::changeHighlight,
                             ttsEnabled = ttsEnabled,
@@ -2346,6 +2380,7 @@ fun ReaderWebView(
         if (showGoTo) {
             ReaderGoToSheet(
                 book = book,
+                pageIndex = pageIndex,
                 currentPosition = readerPosition.displayedPosition,
                 progressDisplay = progressDisplay,
                 highlights = highlights.orEmpty(),
@@ -2374,6 +2409,7 @@ fun ReaderWebView(
                         progress = if (count > 0) (offset.toDouble() / count).coerceIn(0.0, 1.0) else 0.0,
                     )
                     val statistics = statisticsForSave()
+                    pageMeasurementScheduler.onForegroundActivity()
                     val savedPosition = stateHolder.jumpToSearchResult(target, offset, result.matchLength)
                     resetStatisticsBaseline()
                     saveReaderPosition(savedPosition, statistics)

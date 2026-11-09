@@ -536,7 +536,7 @@ function loadReader(body, sourceUrl = readerPaginatedUrl, options = {}) {
         document,
         Node: { ELEMENT_NODE: 1, TEXT_NODE: 3 },
         NodeFilter: { SHOW_TEXT: 4, FILTER_ACCEPT: 1, FILTER_REJECT: 2 },
-        setTimeout(callback) {
+        setTimeout: options.setTimeout ?? function(callback) {
             callback();
             return 0;
         },
@@ -664,10 +664,15 @@ for (const vertical of [true, false]) {
         const reads = [0, 0, 0];
         let fallbackReads = 0;
         document.createRange = () => {
-            let index;
+            let index, end;
             return {
-                selectNodeContents(node) { index = body.childNodes.indexOf(node); },
-                getClientRects() { reads[index] += 1; return rects[index]; },
+                selectNodeContents(node) { index = end = body.childNodes.indexOf(node); },
+                setStart(node) { index = body.childNodes.indexOf(node); },
+                setEnd(node) { end = body.childNodes.indexOf(node); },
+                getClientRects() {
+                    if (index !== end) return rects.slice(index, end + 1).flat();
+                    reads[index] += 1; return rects[index];
+                },
                 getBoundingClientRect() {
                     assert.equal(index, 1, 'bounding fallback is only needed for an empty rect list');
                     fallbackReads += 1;
@@ -1001,7 +1006,9 @@ test('reader initialization waits for fonts and images before indexing and resto
             window.hoshiParagraph.layoutParagraphs = () => events.push('paragraph');
             window.hoshiParagraph.fragmentBlocks = () => events.push('fragments');
         }
+        const buildOffsets = reader.buildNodeOffsets.bind(reader);
         reader.buildNodeOffsets = () => {
+            buildOffsets();
             events.push('offsets');
         };
 
@@ -1033,7 +1040,49 @@ test('reader initialization waits for fonts and images before indexing and resto
     }
 });
 
-for (const [firstText, secondText] of [['一二', '三四五'], ['가힣', 'ㄱㆎ한']]) {
+test('measurement initializes without fetching playback image-reference counts', async () => {
+    const { reader, window } = loadReader(new TestElement('body'), readerPaginatedUrl, {
+        mediaSemanticsScript: `window.hoshiReaderMediaSemantics = {
+            loadImageReferenceCounts() { throw new Error('playback references must not be fetched by measurement'); },
+            setupReaderImages() { return Promise.resolve(); }
+        };`,
+        restoreScripts: 'window.__measured = true;',
+    });
+    window.hoshiReaderMeasurement = true;
+    reader.measurementYield = () => Promise.resolve();
+    reader.initialize();
+    for (let i = 0; i < 20; i++) await Promise.resolve();
+    assert.equal(window.__measured, true);
+});
+
+test('measurement waits for image setup and fonts without an extra image timer', async () => {
+    const body = new TestElement('body');
+    body.appendChild(new TestElement('img'));
+    const timers = [];
+    const { reader, window, document } = loadReader(body, readerPaginatedUrl, {
+        mediaSemanticsScript: `window.hoshiReaderMediaSemantics = {
+            setupReaderImages() { return new Promise(resolve => window.__imagesReady = resolve); }
+        };`,
+        setTimeout: (callback, delay) => timers.push({ callback, delay }),
+        restoreScripts: 'window.__measured = true;',
+    });
+    let fontsReady;
+    document.fonts.ready = new Promise(resolve => { fontsReady = resolve; });
+    window.hoshiReaderMeasurement = true;
+    reader.measurementYield = () => Promise.resolve();
+    reader.initialize();
+    for (let i = 0; i < 20; i++) await Promise.resolve();
+    assert.equal(window.__measured, undefined);
+    window.__imagesReady();
+    for (let i = 0; i < 20; i++) await Promise.resolve();
+    assert.equal(window.__measured, undefined, 'font readiness still gates geometry');
+    fontsReady();
+    for (let i = 0; i < 20; i++) await Promise.resolve();
+    assert.deepEqual(timers, [], 'resource completion must not add a fixed delay');
+    assert.equal(window.__measured, true);
+});
+
+for (const [firstText, secondText] of [['一二', '三四五'], ['가힣', 'ㄱㆎ한'], ['一𠮟', '三𠮟五']]) {
     test(`paginated restoreProgress lands on the page containing ${secondText}`, async () => {
         const body = new TestElement('body');
         body.scrollTop = 0;
@@ -1055,6 +1104,9 @@ for (const [firstText, secondText] of [['一二', '三四五'], ['가힣', 'ㄱ�
             reader.snapPosition = position;
         };
         reader.refreshSasayakiCuePresentation = () => {};
+        reader.buildNodeOffsets();
+        reader.createWalker = () => { throw new Error('restore must reuse the text index'); };
+        reader.countChars = () => { throw new Error('restore must not recount the chapter'); };
 
         await reader.restoreProgress(0.6);
         for (let i = 0; i < 5; i += 1) {
@@ -1252,7 +1304,7 @@ for (const [beforeText, visibleText] of [['古都', '３年生'], ['가힣', '�
     });
 }
 
-test('paginated content metrics include final partial page when real text reaches it', () => {
+test('paginated content metrics stop on a whole page despite trailing text overflow', () => {
     const body = new TestElement('body');
     body.scrollTop = 0;
     body.scrollHeight = 4250;
@@ -1268,26 +1320,22 @@ test('paginated content metrics include final partial page when real text reache
 
     const metrics = reader.buildPaginationMetrics();
 
-    assert.equal(metrics.maxScroll, 3450);
+    assert.equal(metrics.maxScroll, 3200);
 });
 
-test('paginated forward navigation reaches final partial page', () => {
+test('paginated forward navigation stops at the last whole page', () => {
     const body = new TestElement('body');
     body.scrollTop = 3200;
+    body.scrollHeight = 4250;
+    const tail = new TestText('終');
+    tail.rects = [testRect(800, 900)];
+    body.appendChild(tail);
     const { reader } = loadReader(body);
-    reader.getScrollContext = () => ({
-        vertical: true,
-        scrollEl: body,
-        pageSize: 800,
-        maxScroll: 3450,
-    });
-    reader.paginationMetrics = { minScroll: 0, maxScroll: 3450, totalChars: 1, textRanges: [] };
+    reader.pageHeight = 800;
     reader.refreshSasayakiCuePresentation = () => {};
 
-    const result = reader.paginate('forward');
-
-    assert.equal(result, 'scrolled');
-    assert.equal(body.scrollTop, 3450);
+    assert.equal(reader.paginate('forward'), 'limit');
+    assert.equal(body.scrollTop, 3200);
 });
 
 for (const sourceUrl of [readerPaginatedUrl, readerContinuousUrl]) {
@@ -1318,22 +1366,18 @@ for (const sourceUrl of [readerPaginatedUrl, readerContinuousUrl]) {
     });
 }
 
-test('paginated backward navigation leaves final partial page by one page', () => {
+test('paginated chapter-end restore lands on the last whole page', async () => {
     const body = new TestElement('body');
-    body.scrollTop = 3450;
+    body.scrollTop = 0;
+    body.scrollHeight = 4250;
+    const tail = new TestText('終');
+    tail.rects = [testRect(4000, 4100)];
+    body.appendChild(tail);
     const { reader } = loadReader(body);
-    reader.getScrollContext = () => ({
-        vertical: true,
-        scrollEl: body,
-        pageSize: 800,
-        maxScroll: 3450,
-    });
-    reader.paginationMetrics = { minScroll: 0, maxScroll: 3450, totalChars: 1, textRanges: [] };
+    reader.pageHeight = 800;
     reader.refreshSasayakiCuePresentation = () => {};
 
-    const result = reader.paginate('backward');
-
-    assert.equal(result, 'scrolled');
+    await reader.restoreProgress(1);
     assert.equal(body.scrollTop, 3200);
 });
 
@@ -1548,11 +1592,11 @@ test('paginated Sasayaki ignores subpixel rounding on the current page but repor
     }
 });
 
-test('paginated Sasayaki does not report a page turn when the target clamps to the current last page', () => {
+test('paginated Sasayaki does not report a page turn when the target clamps to the last whole page', () => {
     const body = new TestElement('body');
     body.scrollHeight = 7_189;
     body.scrollWidth = 480;
-    body.scrollTop = 6_400;
+    body.scrollTop = 6_312;
     const target = new TestElement('span');
     target.rect = testRect(900, 920);
     body.appendChild(target);
@@ -1560,7 +1604,7 @@ test('paginated Sasayaki does not report a page turn when the target clamps to t
     reader.pageHeight = 789;
 
     assert.equal(reader.scrollToRange(target), false);
-    assert.equal(body.scrollTop, 6_400);
+    assert.equal(body.scrollTop, 6_312);
 });
 
 test('paginated Sasayaki media stop plan lists every image page before target cue', () => {
@@ -2105,5 +2149,345 @@ for (const sourceUrl of [readerPaginatedUrl, readerContinuousUrl]) {
         assert.deepEqual(Array.from(reader.sasayakiMediaElements()), [ordinary]);
         assert.equal(reader.sasayakiMediaStopsToChapterEnd().length, 1);
         assert.equal(body.querySelectorAll('img').length, 2);
+    });
+}
+
+for (const vertical of [true, false]) {
+    test(`page starts retain image pages and stop at the last whole page (${vertical ? 'vertical' : 'horizontal'})`, () => {
+        const body = new TestElement('body');
+        body.scrollTop = 0;
+        body.scrollLeft = 0;
+        body.scrollHeight = 4250;
+        body.scrollWidth = 4250;
+        const intro = new TestText('𠮟가、');
+        intro.rects = [{ top: 20, bottom: 60, left: 20, right: 60, width: 40, height: 40 }];
+        const tail = new TestText('終');
+        tail.rects = [{ top: 4000, bottom: 4100, left: 4000, right: 4100, width: 100, height: 100 }];
+        body.appendChild(intro);
+        body.appendChild(tail);
+        const { reader, window } = loadReader(body, readerPaginatedUrl, { writingMode: vertical ? 'vertical-rl' : 'horizontal-tb' });
+        reader.pageHeight = 800;
+        reader.pageWidth = 800;
+        reader.buildNodeOffsets();
+        const starts = reader.calculatePageStarts();
+        assert.deepEqual(Array.from(starts), [0, 2, 2, 2, 2]);
+        const messages = [];
+        window.hoshiReaderPageReporting = true;
+        window.HoshiReaderPage = { postMessage: (token, page) => messages.push([token, page]) };
+        reader.refreshSasayakiCuePresentation = () => {};
+        reader.setPagePosition(reader.getScrollContext(), 3450);
+        assert.equal(reader.getPagePosition(reader.getScrollContext()), 3200);
+        assert.equal(reader.currentPage(), 4);
+        assert.deepEqual(messages, [['restore-token', 4]]);
+    });
+}
+
+test('page starts use code point boundaries and only measure characters crossing a page', () => {
+    const body = new TestElement('body');
+    body.scrollTop = 0;
+    body.scrollHeight = 2400;
+    const node = new TestText('𠮟、가終');
+    node.rects = [testRect(10, 40), testRect(810, 840)];
+    body.appendChild(node);
+    const { reader, document } = loadReader(body);
+    reader.pageHeight = 800;
+    reader.buildNodeOffsets();
+    let characterReads = 0;
+    const createRange = document.createRange;
+    document.createRange = () => {
+        const range = createRange();
+        const original = range.getClientRects.bind(range);
+        range.getClientRects = () => {
+            if (range.endOffset - range.startOffset <= 2) {
+                characterReads++;
+                assert.notEqual(range.startOffset, 1, 'never split a surrogate pair');
+                const top = range.startOffset < 3 ? 10 : 810;
+                return [testRect(top, top + 40)];
+            }
+            return original();
+        };
+        return range;
+    };
+    assert.deepEqual(Array.from(reader.calculatePageStarts()), [0, 1]);
+    assert.ok(characterReads <= 3, 'binary search only the crossing node');
+    const empty = new TestElement('body');
+    empty.scrollTop = 0;
+    empty.scrollHeight = 800;
+    const emptyReader = loadReader(empty).reader;
+    emptyReader.pageHeight = 800;
+    emptyReader.buildNodeOffsets();
+    assert.deepEqual(Array.from(emptyReader.calculatePageStarts()), [0]);
+});
+
+for (const vertical of [true, false]) {
+    test(`page starts ignore trailing punctuation overflowing the previous page (${vertical ? 'vertical' : 'horizontal'})`, () => {
+        const body = new TestElement('body');
+        body.scrollHeight = body.scrollWidth = 2400;
+        const rect = start => vertical ? testRect(start, start + 30)
+            : testRect(10, 40, start, start + 30);
+        const hanging = new TestText('前。　');
+        hanging.rangeRects = (start, end) => [rect(750), rect(784), rect(818)].slice(start, end);
+        const previousColumn = new TestText('残り');
+        previousColumn.rects = [rect(30)];
+        const nextPage = new TestText('次頁');
+        nextPage.rects = [rect(850)];
+        body.appendChild(hanging);
+        body.appendChild(previousColumn);
+        body.appendChild(nextPage);
+        const { reader } = loadReader(body, readerPaginatedUrl, {
+            writingMode: vertical ? 'vertical-rl' : 'horizontal-tb',
+        });
+        reader.pageHeight = reader.pageWidth = 800;
+        reader.buildNodeOffsets();
+        assert.deepEqual(Array.from(reader.calculatePageStarts()), [0, 3]);
+    });
+}
+
+test('current page reporting never scans chapter geometry, including rounded whole pages', () => {
+    const body = new TestElement('body');
+    body.scrollTop = 0;
+    body.scrollHeight = 4250;
+    const { reader, window } = loadReader(body);
+    reader.pageHeight = 800;
+    reader.buildPaginationMetrics = () => { throw new Error('page reporting must not build metrics'); };
+    const messages = [];
+    window.hoshiReaderPageReporting = true;
+    window.HoshiReaderPage = { postMessage: (token, page) => messages.push(page) };
+    for (const scroll of [0, 799.2, 800.8, 1600, 3199.2, 3200.8]) {
+        body.scrollTop = scroll;
+        reader.notifyPageChanged();
+    }
+    assert.deepEqual(messages, [0, 1, 1, 2, 4, 4]);
+});
+
+test('pagination metrics reuse indexed character counts and one geometry Range', () => {
+    const body = new TestElement('body');
+    for (let i = 0; i < 200; i++) {
+        const node = new TestText('𠮟る、本文');
+        node.rect = testRect(10, 40);
+        body.appendChild(node);
+    }
+    const { reader, document } = loadReader(body);
+    reader.pageHeight = 800;
+    reader.buildNodeOffsets();
+    let counts = 0, ranges = 0;
+    const walk = document.createTreeWalker;
+    const furigana = reader.isFurigana;
+    document.createTreeWalker = () => { throw new Error('geometry must reuse the indexed nodes'); };
+    reader.isFurigana = () => { throw new Error('ruby filtering already ran while indexing'); };
+    const count = reader.countChars.bind(reader);
+    reader.countChars = text => { counts++; return count(text); };
+    const create = document.createRange;
+    document.createRange = () => { ranges++; return create(); };
+    assert.equal(reader.buildPaginationMetrics().totalChars, 800);
+    assert.equal(counts, 0, 'the unchanged text index already owns the counts');
+    assert.equal(ranges, 1, 'do not allocate a live Range for every text node');
+    body.firstChild.nodeValue = '新';
+    document.createTreeWalker = walk;
+    reader.isFurigana = furigana;
+    reader.buildNodeOffsets();
+    assert.equal(reader.buildPaginationMetrics().totalChars, 797, 'reindexing replaces cached counts');
+});
+
+test('pagination batches adjacent single-character geometry without changing node bounds', () => {
+    const body = new TestElement('body');
+    const nodes = Array.from({ length: 96 }, (_, index) => {
+        const node = new TestText('文');
+        node.rects = [testRect(index * 5, index * 5 + 4)];
+        body.appendChild(node);
+        return node;
+    });
+    const { reader, document } = loadReader(body);
+    reader.pageHeight = 800;
+    reader.buildNodeOffsets();
+    let reads = 0;
+    const create = document.createRange;
+    document.createRange = () => {
+        const range = create();
+        range.getClientRects = () => {
+            reads++;
+            const start = nodes.indexOf(range.startNode);
+            const end = nodes.indexOf(range.endNode);
+            return nodes.slice(start, end + 1).flatMap(node => node.rects);
+        };
+        return range;
+    };
+    const metrics = reader.buildPaginationMetrics();
+    assert.deepEqual(Array.from(metrics.textRanges, entry => [entry.node, entry.start, entry.end]),
+        nodes.map((node, index) => [node, index * 5, index * 5 + 4]));
+    assert.ok(reads <= 3, 'a range may read up to 32 adjacent one-character nodes together');
+});
+
+test('ambiguous character batches fall back to individual geometry', () => {
+    const body = new TestElement('body');
+    const first = new TestText('一'); first.rects = [testRect(20, 40)];
+    const second = new TestText('二'); second.rects = [testRect(820, 840), testRect(850, 860)];
+    body.appendChild(first); body.appendChild(second);
+    const { reader, document } = loadReader(body);
+    reader.pageHeight = 800;
+    reader.buildNodeOffsets();
+    const create = document.createRange;
+    document.createRange = () => {
+        const range = create();
+        range.getClientRects = () => range.startNode === range.endNode
+            ? range.startNode.rects : [...first.rects, ...second.rects];
+        return range;
+    };
+    const entries = reader.buildPaginationMetrics().textRanges;
+    assert.deepEqual(Array.from(entries, entry => [entry.start, entry.end]), [[20, 40], [820, 860]]);
+});
+
+test('page boundaries binary-search Unicode without indexing every character', () => {
+    const body = new TestElement('body');
+    body.scrollHeight = 3200;
+    const text = '𠮟、あ'.repeat(2000);
+    const node = new TestText(text);
+    node.rects = [testRect(10, 40), testRect(810, 840), testRect(1610, 1640)];
+    body.appendChild(node);
+    const { reader, document } = loadReader(body);
+    reader.pageHeight = 800;
+    reader.buildNodeOffsets();
+    reader.buildPaginationMetrics();
+    let predicates = 0, geometry = 0, normalizedLength = 0;
+    const predicate = reader.isMatchableChar.bind(reader);
+    reader.isMatchableChar = char => { predicates++; return predicate(char); };
+    const count = reader.countChars.bind(reader);
+    reader.countChars = text => { normalizedLength += text.length; return count(text); };
+    const create = document.createRange;
+    document.createRange = () => {
+        const range = create();
+        range.getClientRects = () => {
+            geometry++;
+            assert.notEqual(range.startOffset % 4, 1, 'start must not split a surrogate pair');
+            assert.notEqual(range.endOffset % 4, 1, 'end must not split a surrogate pair');
+            const top = range.startOffset < 2400 ? 10 : range.startOffset < 5600 ? 810 : 1610;
+            return [testRect(top, top + 30)];
+        };
+        return range;
+    };
+    assert.deepEqual(Array.from(reader.calculatePageStarts()), [0, 1200, 2800]);
+    assert.ok(geometry <= 30, 'only binary-search the two page boundaries');
+    assert.equal(predicates, 0, 'do not call a JS character predicate for the whole node');
+    assert.ok(normalizedLength <= text.length, 'page prefixes must not repeatedly recount earlier pages');
+});
+
+test('page boundary counting yields through a large collapsed prefix', () => {
+    const body = new TestElement('body'); body.scrollHeight = 1600;
+    const node = new TestText('𠮟 、'.repeat(40000));
+    node.rects = [testRect(10, 40), testRect(810, 840)];
+    body.appendChild(node);
+    const { reader, document } = loadReader(body);
+    reader.pageHeight = 800;
+    reader.buildNodeOffsets(); reader.buildPaginationMetrics();
+    const count = reader.countChars.bind(reader);
+    reader.countChars = text => {
+        assert.ok(text.length <= 4096, 'count long prefixes in bounded chunks');
+        return count(text);
+    };
+    const create = document.createRange;
+    document.createRange = () => {
+        const range = create();
+        range.getClientRects = () => [testRect(range.startOffset < 120000 ? 10 : 810,
+            range.startOffset < 120000 ? 40 : 840)];
+        return range;
+    };
+    const steps = reader.pageStartSteps();
+    let step, yields = 0;
+    do { step = steps.next(); if (!step.done) yields++; } while (!step.done);
+    assert.deepEqual(Array.from(step.value), [0, 30000]);
+    assert.ok(yields >= 25, 'a long prefix must let the cooperative driver yield');
+});
+
+test('paginated preparation loads the selected font before exposing document layout', async () => {
+    const events = [];
+    const { reader, window, document } = loadReader(new TestElement('body'), readerPaginatedUrl, {
+        mediaSemanticsScript: `window.hoshiReaderMediaSemantics = {
+            loadImageReferenceCounts() { return Promise.resolve(); },
+            setupReaderImages() { return Promise.resolve(); }
+        };`,
+        restoreScripts: 'window.__restored = true;',
+    });
+    let loaded;
+    document.fonts.load = font => {
+        assert.equal(font, 'italic 600 43px \"CustomFont\"');
+        events.push('font');
+        return new Promise(resolve => { loaded = resolve; });
+    };
+    const style = window.getComputedStyle;
+    window.getComputedStyle = (...args) => ({ ...style(...args), fontStyle: 'italic', fontWeight: '600',
+        fontSize: '43px', fontFamily: 'CustomFont, serif',
+        getPropertyValue: name => name === '--hoshi-preload-face' ? '\"CustomFont\"' : '' });
+    window.hoshiReaderDocumentPreparation = { resume() { events.push('layout'); } };
+    reader.initialize();
+    for (let i = 0; i < 20; i++) await Promise.resolve();
+    assert.deepEqual(events, ['font']);
+    assert.equal(window.__restored, undefined);
+    loaded();
+    for (let i = 0; i < 30; i++) await Promise.resolve();
+    assert.deepEqual(events, ['font', 'layout']);
+    assert.equal(window.__restored, true);
+});
+
+test('publisher and fallback fonts are not explicitly preloaded', () => {
+    const { reader, window, document } = loadReader(new TestElement('body'));
+    const style = window.getComputedStyle;
+    window.getComputedStyle = (...args) => ({ ...style(...args), fontFamily: 'Publisher, CjkOnly',
+        getPropertyValue: () => '' });
+    document.fonts.load = () => { throw new Error('an unused publisher or fallback face must not be loaded'); };
+    assert.equal(reader.preloadBodyFont(), null);
+});
+
+for (const scheduling of ['postTask', 'messageChannel', 'timer']) {
+    test(`cooperative measurement uses ${scheduling} tasks and resumes after foreground work`, async () => {
+        const body = new TestElement('body');
+        body.scrollHeight = 2400;
+        for (let i = 0; i < 120; i++) {
+            const text = new TestText('𠮟日本語');
+            text.rect = testRect(i * 16, i * 16 + 15, 0, 100);
+            body.appendChild(text);
+        }
+        const tasks = [];
+        const { reader, window } = loadReader(body, readerPaginatedUrl, { setTimeout: callback => tasks.push(callback) });
+        reader.pageHeight = 800;
+        reader.buildNodeOffsets();
+        const expected = Array.from(reader.calculatePageStarts());
+        reader.paginationMetrics = null;
+        let allowed = false;
+        let clock = 0;
+        let channels = 0;
+        let closedPorts = 0;
+        window.performance = { now: () => clock += 4 };
+        window.HoshiReaderPages = { canMeasure: () => allowed };
+        window.requestIdleCallback = () => { throw new Error('counting must not wait for repeated idle periods'); };
+        if (scheduling === 'postTask') window.scheduler = { postTask(callback, options) {
+            assert.equal(options.priority, 'background');
+            tasks.push(callback);
+        } };
+        if (scheduling === 'messageChannel') window.MessageChannel = class {
+            constructor() {
+                channels++;
+                this.port1 = { close: () => closedPorts++ };
+                this.port2 = { close: () => closedPorts++, postMessage: () => tasks.push(() => this.port1.onmessage()) };
+            }
+        };
+        const pending = reader.calculatePageStartsForMeasurement();
+        await Promise.resolve();
+        assert.equal(reader.paginationMetrics, null);
+        assert.equal(tasks.length, 1);
+        tasks.shift()();
+        await Promise.resolve();
+        assert.equal(reader.paginationMetrics, null);
+        allowed = true;
+        let completed = false;
+        pending.then(() => { completed = true; });
+        let turns = 0;
+        while (!completed && turns++ < 100) {
+            if (tasks.length) tasks.shift()();
+            await Promise.resolve();
+        }
+        assert.ok(completed);
+        assert.ok(turns > 3, 'large scans must yield between batches');
+        assert.deepEqual(Array.from(await pending), expected);
+        assert.equal(closedPorts, channels * 2, 'fallback ports must be released after every task');
     });
 }

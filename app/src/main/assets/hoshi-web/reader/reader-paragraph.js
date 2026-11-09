@@ -264,51 +264,76 @@ window.hoshiParagraph = {
             : n.nodeType === Node.TEXT_NODE || !n.firstChild || n.localName === 'ruby' ? NodeFilter.FILTER_ACCEPT
             : NodeFilter.FILTER_SKIP
         });
-        const positions = [];
+        // Index nodes, not individual characters. A virtual UTF-16 coordinate
+        // keeps binary search logarithmic without allocating an object per glyph.
+        const segments = [];
+        let length = 0;
         let node;
-
         while (node = walker.nextNode()) {
-            if (node.nodeType !== Node.TEXT_NODE) {
-                positions.push({ node });
-                continue;
-            }
-            for (let i = 0; i < node.textContent.length;) {
-                positions.push({ node, offset: i });
-                i += String.fromCodePoint(node.textContent.codePointAt(i)).length;
-            }
+            const size = node.nodeType === Node.TEXT_NODE ? node.textContent.length : 1;
+            if (size) segments.push({ node, start: length, end: length + size });
+            length += size;
         }
+        const positionAt = index => {
+            let low = 0, high = segments.length - 1;
+            while (low < high) {
+                const mid = (low + high) >> 1;
+                if (segments[mid].end <= index) low = mid + 1;
+                else high = mid;
+            }
+            const segment = segments[low];
+            if (segment.node.nodeType !== Node.TEXT_NODE) {
+                return { node: segment.node, index, next: index + 1 };
+            }
+            const text = segment.node.textContent;
+            let offset = index - segment.start;
+            if (offset > 0 && text.charCodeAt(offset) >= 0xDC00 && text.charCodeAt(offset) <= 0xDFFF
+                && text.charCodeAt(offset - 1) >= 0xD800 && text.charCodeAt(offset - 1) <= 0xDBFF) offset--;
+            index = segment.start + offset;
+            return { node: segment.node, offset, index,
+                next: index + (text.codePointAt(offset) > 0xFFFF ? 2 : 1) };
+        };
 
         const range = document.createRange();
         for (let column = first + 1; column <= last; column++) {
             const limit = column * pageSize;
             let low = 0;
-            let high = positions.length - 1;
-            let hit = -1;
+            let high = length;
+            let hit = null;
 
-            while (low <= high) {
-                let mid = (low + high) >> 1;
-                let rects = this.positionRects(range, positions[mid], vertical);
-                while (!rects.length && ++mid <= high) {
-                    rects = this.positionRects(range, positions[mid], vertical);
+            while (low < high) {
+                let position = positionAt(Math.floor((low + high) / 2));
+                const midpoint = position.index;
+                let rects = this.positionRects(range, position, vertical);
+                while (!rects.length && position.next < high) {
+                    position = positionAt(position.next);
+                    rects = this.positionRects(range, position, vertical);
+                }
+                // A hidden suffix says nothing about visible positions to its
+                // left. Keep searching that interval instead of discarding it.
+                if (!rects.length) {
+                    high = midpoint;
+                    continue;
                 }
 
                 // A hanging character can extend past the page without starting on it.
-                const isText = rects.length > 0 && positions[mid].node.nodeType === Node.TEXT_NODE;
+                const isText = rects.length > 0 && position.node.nodeType === Node.TEXT_NODE;
                 const reachesPage = isText
                     ? Math.round((vertical ? rects[0].top : rects[0].left) + currentScroll) >= limit
                     : Math.max(...rects.map(rect => vertical ? rect.bottom : rect.right)) + currentScroll > limit;
                 if (reachesPage) {
-                    hit = mid;
-                    high = mid - 1;
+                    hit = position;
+                    high = midpoint;
                 } else {
-                    low = mid + 1;
+                    low = position.next;
                 }
             }
 
-            if (hit >= 0) {
-                const position = positions[hit];
+            if (hit) {
+                const position = hit.node.nodeType === Node.TEXT_NODE
+                    ? { node: hit.node, offset: hit.offset } : { node: hit.node };
                 if (position.node.nodeType === Node.TEXT_NODE) {
-                    if (hit > 0) points.push(position);
+                    if (hit.index > 0) points.push(position);
                     continue;
                 }
                 const rects = this.positionRects(range, position, vertical);
@@ -318,7 +343,7 @@ window.hoshiParagraph = {
                     && rects.some(r => Math.round((vertical ? r.top : r.left) + currentScroll) >= limit)) {
                     crossedRubyParagraphs.add(paragraph);
                 }
-                if (hit > 0 && rect && (vertical ? rect.top : rect.left) + currentScroll >= limit) {
+                if (hit.index > 0 && rect && (vertical ? rect.top : rect.left) + currentScroll >= limit) {
                     points.push(position);
                 }
             }

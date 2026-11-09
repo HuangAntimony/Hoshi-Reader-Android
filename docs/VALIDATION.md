@@ -111,6 +111,132 @@ tagged note, checks fetching/mining/duplicates/browsing, saves `cache/kuma3-smok
 under the target app, and deletes only its tagged note in `finally`; it does not
 sign in or synchronize.
 
+### Reader page measurements
+
+`ReaderPageMeasurementWebViewTest` uses generated multi-spine text/image books
+and scratch font/book/cache repositories. It compares attached hidden measurement
+with actual visible page turns in both writing directions and paragraph modes,
+and checks Unicode/space paths, in-flight cancellation, cache reopen plus font,
+viewport and content invalidation. The font fixture also verifies one font request
+across consecutive chapters and that a new measurement uses a replaced font file
+at the same path; its scratch copy uses device Roboto and Droid Sans Mono. Run this
+class through the data-preserving instrumentation procedure above. Its
+`HoshiPageCounts` log reports uncached fixture measurement and JS/native page-turn
+round trips, not painting latency or cold-storage performance. Keep all WebView
+creation, use and destruction explicitly on Main, including after repository IO;
+Compose test continuation interceptors do not establish Android Looper affinity.
+The leading-image fixture checks text labels and chapter-boundary progress against
+physical page turns in all four paginated layouts. To verify persistence beyond
+one process, run only `diskCacheSurvivesProcessRestartWithoutStartingMeasurement`
+twice: first with `-e pageCacheRestart capture -e pageCacheRun RUN_ID`, then with
+`-e pageCacheRestart verify -e pageCacheRun RUN_ID` using the same alphanumeric or
+hyphenated ID. Verification requires a different PID, unchanged cache timestamp
+and no hidden WebView while visible restore remains pending and foreground activity
+blocks measurement. This opt-in
+case uses only `cache/page-cache-restart-RUN_ID` and removes it after verification.
+Repeated idle callbacks in hidden WebViews can dominate total counting time.
+Measure both whole-book throughput and foreground responsiveness after changing
+batch scheduling; page-turn latency alone is insufficient. Keep the native
+activity gate on all continuation paths, including compatibility fallbacks.
+
+`ReaderPagePerformanceTest` is an opt-in paired comparison of the paginated web
+runtime before and after page-count support. Copy the baseline revision's
+`reader/reader-paginated.js` into the debug app's
+`cache/reader-page-performance-baseline/reader-paginated.js` using `git show` and
+`adb shell run-as`, then run this class with `-e pagePerformance true`. The default
+fixture has six generated 800-paragraph spines; `-e paragraphs N` and
+`-e rounds N` adjust its size and repetition count. Use `-e vertical true/false`,
+`-e paragraph true/false` and `-e variants baseline,disabled,ready,measuring`
+to focus a follow-up comparison. The first round is warmup;
+subsequent rounds rotate baseline, reporting disabled, page reporting ready and
+concurrent uncached measurement. The measuring case uses the production activity
+scheduler, allows cold work to start before chapter navigation, then reports
+foreground restore and page-turn activity. Restore cancels and destroys unfinished
+measurement before loading visible content; page turns pause/resume the same
+hidden document. The load timer includes cancellation cost. Pair it with
+`ReaderPageMeasurementWebViewTest.foregroundActivityPausesAnAttachedMeasurementAndResumesIt`
+to verify that pausing retains and eventually completes the attached document.
+With `-e variants measuring -e rounds 1 -e idleCompletion true`, additionally
+interrupt three observed geometry batches, assert no more batches execute during
+the foreground quiet period, and wait for all six spines to complete; the report
+includes interruption response times and completion time including those pauses,
+plus hidden JS phase timings to distinguish scans from native document layout.
+All cases use the same current APK and other
+web assets, so this isolates the changed pagination runtime and measurement
+contention, not bookshelf routing, complete Compose recomposition or cache IO.
+
+The test writes `cache/reader-page-performance.json` with chapter load-to-restore,
+load-to-visual-state, geometry builds before restore, per-turn JS/native response
+and visual-state latency, frame gaps and whether a measurement job was active
+(including a deliberately paused job). A visual-state callback means the DOM is ready for drawing, not that physical display
+refresh has completed. Compare repeated pairs and the active-measurement subset;
+idle turns after measurement finishes can hide stalls in overall medians.
+The visible fixture uses `evaluateReaderSetupScript` and delivers the ready cue
+snapshot after visual restore, matching `ReaderChapterWebView`; `postRestoreCueMs`
+reports this handoff separately. Direct script evaluation alone misses redundant
+post-restore cue installation and its text-index/geometry invalidation.
+For a reported book, `-e bookFixture true -e fontFixture true` uses the isolated
+EPUB/Klee One files described below; `-e openingSpine N -e navigationSpine N`
+select long text chapters with at least 26 reachable pages. Match `-e fontSize N`,
+`-e horizontalPadding N` and `-e viewportHeight N` as well as writing/paragraph
+mode. This never navigates the user's live book or writes its progress.
+`-e progress 0.5` restores both fixture chapters midway through their text to
+exercise character-target lookup separately from the chapter-start fast path;
+the report records `initialProgress` for every sample. Keep the same progress
+and enough remaining pages for the 25-turn comparison in both versions.
+`cache/reader-page-index-performance.json` separately measures native page-index
+lookup scaling. Preserve the raw reports with the task's baseline SHA and tested
+WebView version; do not treat the earlier single-layout timing log as an A/B test.
+
+`ReaderPageThroughputTest` measures uninterrupted whole-book completion separately
+from foreground latency. Put the comparison revision's `reader-paginated.js` at
+`cache/reader-page-throughput/baseline.js`, then run with `-e pageThroughput true`.
+It uses six generated spines by default. `-e bookFixture true` reads only an isolated
+EPUB copy at `cache/reader-page-throughput/book.epub`; extraction uses a unique
+scratch directory removed after the test. Never point this fixture at the library
+or write its metadata, bookmarks or settings. Keep personal EPUBs out of Git.
+`-e rounds N`, `-e paragraph true/false`, `-e vertical true/false` and `-e fontSize N`
+control the comparison. `-e variants current,fallback` exercises `MessageChannel`
+with the scheduler API disabled in the test-owned hidden document.
+`cache/reader-page-throughput-results.json` records total/per-spine elapsed time,
+continuation wait time, DOM preparation/fragmentation, metric work and font request
+counts; the test requires every page-start offset
+to match across variants. Rotate repeated runs and include any compatibility path
+before claiming improved cold-count performance.
+`ReaderPageMeasurementWebViewTest` also compares batched text geometry and page
+starts against individual Range reads in the same real document, before checking
+each visible page turn. Keep this oracle when changing geometry batching; equal
+whole-book page totals alone do not prove that node bounds or page offsets agree.
+Changes to text-node splitting also require per-code-point rectangle comparisons:
+identical page starts can hide changed line breaks within a page. Run those
+diagnostic scans separately from timing comparisons, since their geometry reads
+distort cold-count latency.
+When native scheduling/resource loading changes, capture offsets with the old APK
+using `-e variants current -e captureReference true`, then run the new APK with
+`-e variants current -e compareReference true` and identical fixture/layout arguments.
+`cache/reader-page-throughput/reference-pages.json` holds the exact per-spine arrays;
+keep the matching book fingerprint, settings, viewport and APK revision with the
+task evidence, and recapture when any input changes. Comparing only JS variants
+in the new APK does not exercise the previous native implementation.
+
+For a reported slow book, match the actual font, weight, padding and viewport;
+publisher-font results do not represent a downloaded-font profile. The optional
+`-e fontFixture true` case reads test-owned `KleeOne-Regular.ttf` and
+`KleeOne-SemiBold.ttf` copies from the same fixture directory and selects weight 600.
+`-e horizontalPadding N` and `-e viewportHeight N` match the reader's CSS dimensions.
+The `unpaced` variant disables foreground quiet periods and JS yields **only in the
+isolated test**, bounding the potential gain from removing scheduling safeguards.
+It is not a usable reading policy or evidence that foreground responsiveness is safe.
+Each sample uses distinct font URLs to avoid accidental cross-variant renderer-cache
+reuse. Compare all page starts and report the actual profile/viewport alongside timing.
+Long batches of WebView tests can heat the device enough to change both native
+layout and JS timings. Record `adb shell dumpsys thermalservice` around throughput
+comparisons; let the device return to the same thermal status before comparing
+runs, and retain throttled samples separately rather than attributing their slowdown
+to a code change. Keep the device unlocked during instrumentation: cooling with
+the screen off can activate the keyguard and stall attached WebView/Compose work;
+discard that run and resume only after the user unlocks the device.
+
 ### Dictionary language fixtures
 
 `DictionaryLanguagesNativeTest` imports generated dictionaries into JUnit temporary

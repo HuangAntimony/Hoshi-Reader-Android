@@ -17,33 +17,7 @@ details against official documentation when implementing platform-facing slices.
 
 ## Current Queue
 
-### 1. Reader page counts and position labels
-
-Status: Pending
-
-Commits: `95ce7f5`.
-
-- Dependency/value: builds on reader-owned viewport sizing; adds a user-selectable
-  page unit for book/chapter progress and location labels.
-- iOS behavior: choose Off/Characters/Pages; collect page-start offsets per
-  spine, cache them for the layout, and derive book/chapter page counts and
-  contents/search/highlight position labels.
-  Continuous mode retains character counts; unfinished measurements show a
-  waiting state.
-- Android current gap: `features/reader/ReaderSettings.kt` and
-  `ReaderAppearanceView.kt` expose a count visibility toggle;
-  `ReaderProgressDisplay.kt` supports only Characters/Words. Existing chapter
-  pagination in `ReaderPaginationScripts.kt` has no whole-book page-start cache
-  or page-unit setting feeding chrome and contents/search/highlight labels.
-- Suggested slice: add page-unit preference, layout-keyed page measurements and
-  offset conversion through existing reader owners. Retain Android word counts
-  and durable character-based bookmarks; invalidate counts when layout or book
-  content changes, and cancel obsolete measurement work.
-- Validation: settings migration and count/position-label tests; JS pagination tests;
-  real WebView checks across chapters, writing directions, font/padding changes,
-  images and mode switches, including cache invalidation and restore.
-
-### 2. Dictionary numeric-string frequencies and on-demand media mapping
+### 1. Dictionary numeric-string frequencies and on-demand media mapping
 
 Status: Pending
 
@@ -68,13 +42,13 @@ Commits: `a1babc9` (frequency parsing only), `e266954`.
   session destruction. Measure large-media dictionary memory on a device before
   claiming an improvement; run native packaging checks from VALIDATION.
 
-### 3. Anki media filtering and remote cover reuse
+### 2. Anki media filtering and remote cover reuse
 
 Status: Pending
 
 Commits: `81c60d2` (dictionary media and existing covers only).
 
-- Dependency/value: independent of slice 2; reduces unnecessary media reads and
+- Dependency/value: independent of slice 1; reduces unnecessary media reads and
   uploads during card creation.
 - iOS behavior: upload media referenced by the final rendered fields; reuse a
   cover already stored by AnkiConnect.
@@ -88,7 +62,7 @@ Commits: `81c60d2` (dictionary media and existing covers only).
   `AnkiConnectBackendTest` for selected/excluded glossaries, absent media fields,
   existing/missing covers and lookup-failure fallback; assert request sequences.
 
-### 4. Transfer queue totals, remaining time and interrupted rows
+### 3. Transfer queue totals, remaining time and interrupted rows
 
 Status: Pending
 
@@ -111,7 +85,7 @@ Commits: `21d5546` (presentation and aggregate accounting only).
   `SyncTransferTrackerTest`, `GoogleDriveSyncManagerTest` and `SyncQueueViewTest`,
   including device scroll retention and E-ink rendering.
 
-### 5. Keep the selected statistics period current across date changes
+### 4. Keep the selected statistics period current across date changes
 
 Status: Pending
 
@@ -131,7 +105,7 @@ Commits: `e2e0f31` (selected-period anchor only).
   current-period rollover, historical browsing, return to latest and reset changes;
   retain existing `StatisticsViewReloadTest` lifecycle coverage.
 
-### 6. Hide the status bar while a fullscreen image is open
+### 5. Hide the status bar while a fullscreen image is open
 
 Status: Pending
 
@@ -148,7 +122,7 @@ Commits: `18072c8` (system status bar only).
 - Validation: extend `ReaderChromeTest`; device checks for gallery and inline
   images, dismissal/back, both focus states and existing navigation-bar behavior.
 
-### 7. Show sub-minute transcription remaining time
+### 6. Show sub-minute transcription remaining time
 
 Status: Pending
 
@@ -170,27 +144,25 @@ Only concrete remaining behavior is listed; covered portions are summarized belo
 
 | Commit | Remaining Android work | Slice |
 | --- | --- | --- |
-| `95ce7f5` | Page-count preference, measurements, display and position labels | 1 |
-| `a1babc9` | Numeric-string frequency parsing | 2 |
-| `e266954` | On-demand native dictionary media mapping | 2 |
-| `81c60d2` | Filter dictionary media and reuse uploaded AnkiConnect covers | 3 |
-| `21d5546` | Aggregate transfer accounting and pending/interrupted/grouped rows | 4 |
-| `e2e0f31` | Reconcile selected statistics period on day/reset-time changes | 5 |
-| `18072c8` | Fullscreen-image status-bar visibility | 6 |
-| `3dfa9ef` | Sub-minute transcription ETA label | 7 |
+| `a1babc9` | Numeric-string frequency parsing | 1 |
+| `e266954` | On-demand native dictionary media mapping | 1 |
+| `81c60d2` | Filter dictionary media and reuse uploaded AnkiConnect covers | 2 |
+| `21d5546` | Aggregate transfer accounting and pending/interrupted/grouped rows | 3 |
+| `e2e0f31` | Reconcile selected statistics period on day/reset-time changes | 4 |
+| `18072c8` | Fullscreen-image status-bar visibility | 5 |
+| `3dfa9ef` | Sub-minute transcription ETA label | 6 |
 
 ## Suggested Implementation Order
 
-All remaining slices are independent. Address state/layout correctness first,
-then broader reader/dictionary/Anki value, followed by independent UI refinements:
+All remaining slices are independent. Address dictionary/Anki value and transfer
+state first, followed by independent UI refinements:
 
-1. Reader page counts and position labels.
-2. Dictionary numeric-string frequencies and on-demand media mapping.
-3. Anki media filtering and remote cover reuse.
-4. Transfer queue totals, remaining time and interrupted rows.
-5. Keep the selected statistics period current across date changes.
-6. Hide the status bar while a fullscreen image is open.
-7. Show sub-minute transcription remaining time.
+1. Dictionary numeric-string frequencies and on-demand media mapping.
+2. Anki media filtering and remote cover reuse.
+3. Transfer queue totals, remaining time and interrupted rows.
+4. Keep the selected statistics period current across date changes.
+5. Hide the status bar while a fullscreen image is open.
+6. Show sub-minute transcription remaining time.
 
 ## Covered Or No Android Action
 
@@ -213,7 +185,7 @@ Code-backed coverage for the refreshed range:
 | `bc80d6e`, `864deb9` | `DictionarySearchIframe` renders unmatched source text; `shared/selection.js::findParagraph` keeps lookup within `li`. Existing iframe and selection tests cover both. |
 | `30b3b19`, `d226044`, `f12897d`, `5a85d4e`, `67237b0`, `d8bba19`, `fb707c7` | Android owns chrome, focus, safe-area and viewport sizing in `ReaderChrome`, `ReaderWebViewChrome`, `ReaderViewportCssLayout` and generated layout; bottom progress disables soft wrapping. SwiftUI/UIKit label, edge-effect and home-button workarounds do not transfer directly. |
 | `c2e323b`, `59c6120`, `d310ea2`, `0288a79`, `44c92da`, `0cb196a`, `e8d5ffa` | Paragraph mode follows the `bb4e92d` reader implementation in `reader/reader-paragraph.js`, extending Android pagination with a live DOM and Range reveal. `ReaderAppearanceView` follows its sentence/speed sliders, labels and conditional controls; Android's page-swipe threshold follows the paragraph settings. Sasayaki settings and the playback sheet group page advance under Paragraph Mode. Legacy VN configuration migrates to profile-owned paragraph settings; Android retains optional blank-tap advance and uses CSS to center passages and continuation pages in both axes. Narration following leaves the current reveal running, while document restore still animates; Sasayaki chapter cues and, after TTS is first started, TTS chapter cues are installed before reveal without replacing the inline highlighter. `69ed0d1` page-end overlap handling and page-bounded Sasayaki playback are owned by the service controller with generation-checked Reader callbacks. Page ranges follow iOS crossing-based stopping and never restrict cue following; restore and chapter jumps replace the range from the destination page. |
-| `95ce7f5` (chapter/spine distinction) | `ReaderTocRange` already distinguishes spine positions from true TOC chapters, including fragments within a single XHTML file; page-count behavior remains open. |
+| `95ce7f5` | `ReaderProgressCount`, `ReaderPageIndex` and Reader-owned measurement/cache provide Off/Characters/Pages, book/TOC chapter pages and contents/search/highlight positions. Android retains estimated English words, character-based durable positions and shared-offset TOC grouping; image pages count separately. JVM/JS and isolated WebView fixtures cover migration, layout invalidation and actual page stops. |
 | `6403ae3` | `ReaderContentStyles` clears publisher root max-width/max-height in all modes while preserving descendant limits and continuous insets; publisher writing modes are stripped. |
 | `d9f1b72`, `62982b7`, `3d2f77a`, `daf0fd7`, `e596fe1`, `c69f203`, `62e5889`, `1cfbf71`, `ca7e053`, `45ac6e9`, `241c92b`, `1c5d525`, `77eaee3`, `4777715`, `def6cec`, `08bcbb4`, `55988cc` | `SyncStorage`, `GoogleDriveSyncManager`, `GoogleDriveClient`, `BookRepository`, `SyncReloadScheduler` and `SyncAttachPrompt` cover provider separation, sidecars/tombstones, archive covers, shelf recreation, cached versions, coalesced reload, retries, streaming, conflict choices and on-demand downloads. Swift file extraction requires no port. |
 | `a8d422c`, `d9f1b72` (book actions) | `BookContextMenu` groups Read/Unread under Mark. `BookRepository` enables Read from cached bookinfo without a local EPUB. Confirmed Unread resets the bookmark and retains session tombstones through `BookStatisticsStore`; `BookshelfViewModel` refreshes progress and action availability. |

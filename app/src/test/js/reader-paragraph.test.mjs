@@ -66,6 +66,57 @@ test('paragraph splitting leaves a hanging full-width space on the previous page
     }
 });
 
+test('hidden text after a page boundary does not hide an earlier split candidate', () => {
+    for (const vertical of [false, true]) for (const tail of [true, false]) {
+        const { paragraph, document, reader, nodes } = paragraphRuntime({ vertical });
+        const rect = start => vertical ? { top:start, bottom:start+5, height:5 }
+            : { left:start, right:start+5, width:5 };
+        nodes.splice(0, nodes.length,
+            { nodeType:3, textContent:'甲', rects:[rect(90)] },
+            { nodeType:3, textContent:'乙', rects:[rect(100)] },
+            { nodeType:3, textContent:'隠𠮷隠', rects:[] },
+            ...(tail ? [{ nodeType:3, textContent:'丙', rects:[rect(110)] }] : []));
+        document.createTreeWalker = reader.createWalker;
+        document.createRange = () => ({
+            setStart(node) { this.node = node; }, setEnd() {},
+            getClientRects() { return this.node.rects; },
+        });
+        const block = { getBoundingClientRect: () => vertical ? { top:0, height:200 } : { left:0, width:200 } };
+        const points = paragraph.splitPoints(block, 100, 0, vertical);
+        assert.equal(points.length, 1);
+        assert.equal(points[0].node, nodes[1]);
+        assert.equal(points[0].offset, 0);
+    }
+});
+
+test('paragraph cuts search UTF-16 boundaries without enumerating every character', () => {
+    for (const vertical of [false, true]) {
+        const { paragraph, document, reader, nodes } = paragraphRuntime({ vertical });
+        const { pageSize } = reader.getScrollContext();
+        const text = '甲𠮷乙'.repeat(4000);
+        let textReads = 0, queries = 0;
+        const node = { nodeType: 3, get textContent() { textReads++; return text; } };
+        nodes.splice(0, nodes.length, node);
+        document.createTreeWalker = reader.createWalker;
+        const rect = (start, end) => vertical ? { top:start, bottom:end, height:end-start }
+            : { left:start, right:end, width:end-start };
+        document.createRange = () => ({
+            setStart(_, offset) { this.offset = offset; assert.notEqual(offset % 4, 2); },
+            setEnd(_, offset) { assert.notEqual(offset % 4, 2); },
+            getClientRects() {
+                queries++;
+                const page = this.offset < 4000 ? 0 : this.offset < 12000 ? 1 : 2;
+                return [rect(page * pageSize + 10, page * pageSize + 30)];
+            },
+        });
+        const block = { getBoundingClientRect: () => rect(0, 3 * pageSize) };
+        const points = paragraph.splitPoints(block, pageSize, 0, vertical);
+        assert.deepEqual(Array.from(points, point => point.offset), [4000, 12000]);
+        assert.ok(queries < 40, 'query only the two binary-searched boundaries');
+        assert.ok(textReads < 100, 'do not walk all code points to construct a position array');
+    }
+});
+
 test('the existing split scan records ruby spanning both sides of a page boundary', () => {
     for (const vertical of [false, true]) for (const first of [false, true]) {
         const { paragraph, document, reader, nodes } = paragraphRuntime({ vertical });
