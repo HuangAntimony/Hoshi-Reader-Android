@@ -572,6 +572,10 @@ and copying an asset snapshot creates independent template caches.
   Reduced-motion scrolling sets `touch-action: none` on the popup root and its
   embedding iframe; ordinary scrolling keeps `pan-y`. Theme-only changes preserve
   popup DOM/history.
+- Reader popup mining resolves word audio in the popup and starts in the reader
+  scope once Android receives the request. Dismissal drops its reply without
+  cancelling the job. A new request waits for older dismissed jobs to finish
+  using shared media paths.
 - `DictionarySearchSession` retains search/popup navigation history across tabs.
   Successful book opening resets it before book-profile activation; failed opening
   leaves it. Clearing the Dictionary input preserves displayed lookup content and

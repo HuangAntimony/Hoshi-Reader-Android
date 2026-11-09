@@ -2,6 +2,11 @@ package moe.antimony.hoshi.features.reader
 
 import androidx.compose.ui.unit.IntSize
 import kotlin.io.path.createTempDirectory
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
 import moe.antimony.hoshi.content.ContentLanguageProfile
 import moe.antimony.hoshi.epub.BookInfo
 import moe.antimony.hoshi.epub.EpubBook
@@ -1012,6 +1017,43 @@ class ReaderWebViewStateHolderTest {
             assertEquals(1, resumes)
             assertFalse(pauseState.pending)
         }
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun acceptedMiningFinishesAfterDismissalBeforeTheReopenedPopupWrites() = runTest {
+        val holder = stateHolder()
+        val original = lookupPopup()
+        val child = lookupPopup()
+        val reopened = lookupPopup()
+        val finishWrite = CompletableDeferred<Unit>()
+        val written = mutableListOf<String>()
+        val replies = mutableListOf<String>()
+        fun submit(popup: LookupPopupItem, write: suspend () -> Unit) {
+            holder.startLookupMining(backgroundScope, popup.id, onResult = { replies += popup.id }) {
+                write()
+                written += popup.id
+                true
+            }
+        }
+        holder.updateLookupPopups(listOf(original, child))
+        submit(original) {
+            finishWrite.await()
+        }
+        submit(child) {}
+        advanceTimeBy(1_000)
+        assertEquals(listOf(child.id), written)
+
+        holder.updateLookupPopups(emptyList())
+        holder.updateLookupPopups(listOf(reopened))
+        submit(reopened) {}
+        runCurrent()
+        assertEquals(listOf(child.id), written)
+
+        finishWrite.complete(Unit)
+        runCurrent()
+        assertEquals(listOf(child.id, original.id, reopened.id), written)
+        assertEquals(listOf(child.id, reopened.id), replies)
     }
 
     @Test

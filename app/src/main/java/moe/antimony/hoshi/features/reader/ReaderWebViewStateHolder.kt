@@ -4,6 +4,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.IntSize
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.joinAll
+import kotlinx.coroutines.launch
 import moe.antimony.hoshi.features.dictionary.LookupPopupItem
 import moe.antimony.hoshi.features.sasayaki.SasayakiSheetTab
 
@@ -50,6 +56,7 @@ internal class ReaderWebViewStateHolder(
 
     var lookupPopups by mutableStateOf<List<LookupPopupItem>>(emptyList())
         private set
+    private val miningJobs = mutableMapOf<String, Job>()
 
     var readerPosition by mutableStateOf(ReaderPositionState(initialPosition))
         private set
@@ -192,6 +199,30 @@ internal class ReaderWebViewStateHolder(
             sasayakiLookupPause.resume()
             ttsLookupPause.resume()
         }
+    }
+
+    fun startLookupMining(
+        readerScope: CoroutineScope,
+        popupId: String,
+        onResult: (Boolean) -> Unit,
+        mine: suspend () -> Boolean,
+    ) {
+        if (!readerScope.isActive || popupId in miningJobs) return
+        val openPopupIds = lookupPopups.mapTo(mutableSetOf()) { it.id }
+        // Avoid introducing overlapping media writes when a new popup replaces
+        // one that still has an accepted request finishing in the reader.
+        val dismissedJobs = miningJobs.filterKeys { it !in openPopupIds }.values.toList()
+        val job = readerScope.launch(start = CoroutineStart.LAZY) {
+            try {
+                dismissedJobs.joinAll()
+                val added = mine()
+                if (lookupPopups.any { it.id == popupId }) onResult(added)
+            } finally {
+                miningJobs.remove(popupId)
+            }
+        }
+        miningJobs[popupId] = job
+        job.start()
     }
 
     fun recordDisplayedProgress(progress: Double): ReaderChapterPosition {

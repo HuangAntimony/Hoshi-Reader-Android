@@ -218,7 +218,6 @@ fun ReaderWebView(
     var ttsSelection by remember(bookRoot) { mutableStateOf<ReaderSelectionData?>(null) }
     var ankiOperationError by remember(bookRoot) { mutableStateOf<Throwable?>(null) }
     var ankiSynchronizationWarning by remember(bookRoot) { mutableStateOf<Throwable?>(null) }
-    val ttsMiningJobs = remember { mutableMapOf<String, Job>() }
     var pendingSasayakiMatchUpdate by remember(bookRoot) { mutableStateOf<PendingSasayakiMatchUpdate?>(null) }
     val paragraphPlayback = remember(bookRoot) { ReaderParagraphPlaybackState() }
     val sasayakiTranscriptionViewModel: SasayakiTranscriptionViewModel = hiltViewModel()
@@ -747,8 +746,6 @@ fun ReaderWebView(
     }
     fun setLookupPopups(nextPopups: List<LookupPopupItem>) {
         val activeIds = nextPopups.mapTo(mutableSetOf()) { it.id }
-        ttsMiningJobs.filterKeys { it !in activeIds }.values.forEach { it.cancel() }
-        ttsMiningJobs.keys.retainAll(activeIds)
         readerPopupHistories = readerPopupHistories.filterKeys(activeIds::contains)
         rootSelectionHighlight = rootSelectionHighlight?.takeIf { highlight ->
             highlight.popupId == null || highlight.popupId in activeIds
@@ -984,13 +981,16 @@ fun ReaderWebView(
             is ReaderLookupPopupBridgeMessage.MineEntry -> {
                 val popup = popupById(message.popupId) ?: return
                 val messageId = message.messageId ?: return
-                if (ttsMiningJobs[message.popupId]?.isActive == true) return
                 val needsSentence = ankiUiState.usesHandlebar(message.formatId, "{sentence-audio}")
                 val needsSasayaki = ankiUiState.usesHandlebar(message.formatId, "{sasayaki-audio}")
                 val linkedAudio = ttsAssociated
                 val audioPlayer = sasayakiPlayer
                 val selectionChapter = popup.readerChapterIndex ?: readerPosition.displayedPosition.index
-                ttsMiningJobs[message.popupId] = scope.launch {
+                stateHolder.startLookupMining(
+                    readerScope = scope,
+                    popupId = message.popupId,
+                    onResult = { mined -> replyReaderPopupMessage(message.popupId, messageId, mined.toString()) },
+                ) {
                     var generated: File? = null
                     try {
                         val cue = popup.sasayakiCue
@@ -1009,13 +1009,12 @@ fun ReaderWebView(
                             sentenceAudioPath = sentenceAudio?.absolutePath,
                             sentenceAudioSuppressed = needsSentence && !linkedAudio && sentenceAudio == null,
                         )
-                        val mined = ankiViewModel.minePreparedEntry(message.formatId, message.payloadJson, ankiContext,
+                        ankiViewModel.minePreparedEntry(message.formatId, message.payloadJson, ankiContext,
                             onWarning = { ankiSynchronizationWarning = it })
-                        replyReaderPopupMessage(message.popupId, messageId, mined.toString())
                     } catch (error: CancellationException) { throw error }
                     catch (error: Exception) {
                         ankiOperationError = error
-                        replyReaderPopupMessage(message.popupId, messageId, "false")
+                        false
                     } finally { generated?.delete() }
                 }
             }
