@@ -136,6 +136,7 @@
     <string name="bookshelf_importing_named_format">正在导入 %1$s...</string>
     <string name="bookshelf_importing_progress_format">正在导入 %1$d / %2$d...</string>
     <string name="bookshelf_legacy_migration_progress_format">正在整理旧版书籍 %1$d / %2$d...</string>
+    <string name="book_storage_migration_failed">无法修正书籍的存储统计归类。</string>
     <string name="bookshelf_sync_failed">同步失败。</string>
     <string name="bookshelf_remote_books_load_failed">无法从 Google Drive 获取书籍。</string>
     <string name="bookshelf_remote_book_import_failed">无法从 Google Drive 导入书籍。</string>

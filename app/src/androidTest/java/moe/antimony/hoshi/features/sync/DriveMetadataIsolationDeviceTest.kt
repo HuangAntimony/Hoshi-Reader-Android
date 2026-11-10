@@ -51,7 +51,7 @@ class DriveMetadataIsolationDeviceTest {
         val settings = SyncSettingsRepository(MemoryPreferences(), NoTtu, Dispatchers.IO)
         settings.update { it.copy(enabled = true, transferConcurrency = 8) }
         val manager = GoogleDriveSyncManager(store, GoogleDriveSyncHandler(client), client, settings, books, root,
-            File(root, "cache").apply { mkdirs() }, scope, Dispatchers.Main.immediate, Dispatchers.IO, { true }, {}, {}, transport)
+            scope, Dispatchers.Main.immediate, Dispatchers.IO, { true }, {}, {}, transport)
         try {
             withContext(Dispatchers.IO) {
                 repeat(8) { index ->

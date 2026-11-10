@@ -138,6 +138,7 @@
     <string name="bookshelf_importing_named_format">Importing %1$s...</string>
     <string name="bookshelf_importing_progress_format">Importing %1$d / %2$d...</string>
     <string name="bookshelf_legacy_migration_progress_format">Preparing older books %1$d / %2$d...</string>
+    <string name="book_storage_migration_failed">Unable to correct book storage accounting.</string>
     <string name="bookshelf_sync_failed">Sync failed.</string>
     <string name="bookshelf_remote_books_load_failed">Failed to fetch books from Google Drive.</string>
     <string name="bookshelf_remote_book_import_failed">Failed to import book from Google Drive.</string>

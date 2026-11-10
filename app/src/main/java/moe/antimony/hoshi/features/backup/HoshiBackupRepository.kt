@@ -279,7 +279,9 @@ class HoshiBackupRepository @Inject constructor(
                 archiveFile.outputStream().use { output -> input.copyTo(output) }
                 unzipInto(archiveFile, tempRoot, ::remapBooksRestoreEntryName)
                 reconcileRestoredBookMetadata(tempRoot)
-                replaceDestinationWithRestoredFolder(target, tempRoot, destination)
+                bookRepository.storageLock.withLock {
+                    replaceDestinationWithRestoredFolder(target, tempRoot, destination)
+                }
             } catch (error: Throwable) {
                 tempRoot.deleteRecursively()
                 throw error

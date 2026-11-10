@@ -85,6 +85,20 @@ class BookRepository private constructor(
 
     val currentBookFile: File get() = fileDataSource.currentBookFile
 
+    internal suspend fun migrateCacheGroups(cacheDirectory: File, completionMarker: File) = withContext(ioDispatcher) {
+        try {
+            storageLock.withLock {
+                withReservedBookMigrationLock {
+                    migrateBookCacheGroups(fileDataSource.booksDirectory, cacheDirectory, completionMarker)
+                }
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            ErrorDiagnosticEvents.buffer.record(UiText.Resource(R.string.book_storage_migration_failed), error)
+        }
+    }
+
     suspend fun loadAllBooks(): List<File> = fileDataSource.loadAllBooks()
 
     suspend fun loadBookEntries(

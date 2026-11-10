@@ -55,9 +55,9 @@ private const val HASH_HEX_LENGTH = 16
 private const val HASH_SUFFIX_UTF8_BYTES = HASH_HEX_LENGTH + 1
 
 /** A pre-archive Android version could import this exact title as a regular book. */
-internal fun migrateReservedStatisticsBook(booksDirectory: java.io.File) = synchronized(reservedBookMigrationLock) {
+internal fun migrateReservedStatisticsBook(booksDirectory: java.io.File) = withReservedBookMigrationLock {
     val legacy = booksDirectory.resolve(STATISTICS_ARCHIVE_DIRECTORY)
-    if (!legacy.resolve("metadata.json").isFile && !legacy.resolve("statistics_archive.epub").isFile && !legacy.resolve("META-INF/container.xml").isFile) return@synchronized
+    if (!legacy.resolve("metadata.json").isFile && !legacy.resolve("statistics_archive.epub").isFile && !legacy.resolve("META-INF/container.xml").isFile) return@withReservedBookMigrationLock
     val destination = booksDirectory.resolve(STATISTICS_ARCHIVE_DIRECTORY.toImportedBookStorageName())
     check(!destination.exists()) { "The reserved book folder cannot be migrated because its destination exists." }
     val metadataFile = legacy.resolve("metadata.json")
@@ -82,3 +82,6 @@ internal fun migrateReservedStatisticsBook(booksDirectory: java.io.File) = synch
 }
 
 private val reservedBookMigrationLock = Any()
+
+internal fun <T> withReservedBookMigrationLock(action: () -> T): T =
+    synchronized(reservedBookMigrationLock, action)

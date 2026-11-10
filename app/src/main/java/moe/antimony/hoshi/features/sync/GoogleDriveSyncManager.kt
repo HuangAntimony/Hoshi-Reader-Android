@@ -2,7 +2,10 @@ package moe.antimony.hoshi.features.sync
 
 import android.os.SystemClock
 import java.io.File
+import java.io.IOException
+import java.nio.file.DirectoryIteratorException
 import java.nio.file.Files
+import java.nio.file.NoSuchFileException
 import java.nio.file.StandardCopyOption
 import java.util.UUID
 import javax.inject.Inject
@@ -30,7 +33,6 @@ import kotlinx.serialization.Serializable
 import moe.antimony.hoshi.BuildConfig
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.di.ApplicationScope
-import moe.antimony.hoshi.di.CacheDir
 import moe.antimony.hoshi.di.FilesDir
 import moe.antimony.hoshi.di.IoDispatcher
 import moe.antimony.hoshi.di.MainDispatcher
@@ -140,7 +142,6 @@ class GoogleDriveSyncManager internal constructor(
     private val settings: SyncSettingsRepository,
     private val books: BookRepository,
     private val filesDir: File,
-    private val cacheDir: File,
     private val scope: CoroutineScope,
     private val mainDispatcher: CoroutineDispatcher,
     private val ioDispatcher: CoroutineDispatcher,
@@ -162,11 +163,10 @@ class GoogleDriveSyncManager internal constructor(
         ttu: TtuDriveHandler,
         books: BookRepository,
         @FilesDir filesDir: File,
-        @CacheDir cacheDir: File,
         @ApplicationScope scope: CoroutineScope,
         @MainDispatcher mainDispatcher: CoroutineDispatcher,
         @IoDispatcher ioDispatcher: CoroutineDispatcher,
-    ) : this(store, drive, client, settings, books, filesDir, cacheDir, scope, mainDispatcher, ioDispatcher,
+    ) : this(store, drive, client, settings, books, filesDir, scope, mainDispatcher, ioDispatcher,
         { auth.status(SyncProvider.Gdrive).isLinked }, auth::revokeAccess, ttu::clearCache, fileTransfer,
         SystemClock::elapsedRealtime, auth::recoveryRequired, auth::completeRecovery)
 
@@ -199,17 +199,33 @@ class GoogleDriveSyncManager internal constructor(
     private var downloads = setOf<String>()
     private val busy = mutableMapOf<String, Long>()
     private val wakeSignal = MutableStateFlow(0)
+    private val downloadStagingDirectory = filesDir.resolve(".drive-downloads")
     var flushReader: (suspend (String) -> Unit)? = null
     var stopReader: (suspend (String) -> Unit)? = null
     var reloadSyncedMatch: (suspend (String) -> Unit)? = null
 
     private val initialization = scope.async(start = CoroutineStart.LAZY) {
         cache = withContext(ioDispatcher) {
+            cleanAbandonedDownloads()
             runCatching { SyncFormat.decode<GoogleDriveSyncCache>(filesDir.resolve("drive-sync.json").readText()) }.getOrDefault(GoogleDriveSyncCache())
         }
         mutableState.value = state.value.copy(attachPending = cache.attachPending)
         runCatching { store.prepareLibrary() }
         Unit
+    }
+
+    private fun cleanAbandonedDownloads() {
+        try {
+            Files.newDirectoryStream(downloadStagingDirectory.toPath(), "payload-*.part").use { parts ->
+                parts.forEach { Files.deleteIfExists(it) }
+            }
+        } catch (_: NoSuchFileException) {
+            // The staging directory is created when the first download starts.
+        } catch (error: IOException) {
+            ErrorDiagnosticEvents.buffer.record(UiText.Resource(R.string.about_storage_cleanup_failed), error)
+        } catch (error: DirectoryIteratorException) {
+            ErrorDiagnosticEvents.buffer.record(UiText.Resource(R.string.about_storage_cleanup_failed), error)
+        }
     }
 
     init {
@@ -1332,9 +1348,13 @@ class GoogleDriveSyncManager internal constructor(
         val name = reference.value!!
         val payload = SyncPayload(key, fileType, record.generation, record.deleted, reference.modified, SyncTransferDirection.Download, name)
         val file = findFile(listing, key, record.generation, name) ?: throw GoogleDriveApiException("$name is missing from Google Drive.", 404)
-        val temporary = cacheDir.resolve(UUID.randomUUID().toString())
+        val temporary = downloadStagingDirectory.resolve("payload-${UUID.randomUUID()}.part")
         try {
             trackTransfer(epoch, payload, file.payloadSize, { it }, retainReaderError) { update ->
+                withContext(ioDispatcher) {
+                    Files.createDirectories(downloadStagingDirectory.toPath())
+                    Files.createFile(temporary.toPath())
+                }
                 fileTransfer.download(driveUrl("files/${file.id.urlPathSegment()}", mapOf("alt" to "media")), temporary, file.payloadSize) { value ->
                     update(value)
                     value.totalBytes?.takeIf { it > 0 }?.let { onProgress(value.bytes.toDouble() / it) }

@@ -18,6 +18,7 @@ import moe.antimony.hoshi.features.sasayaki.transcription.LegacySasayakiResource
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.runBlocking
 import moe.antimony.hoshi.di.IoDispatcher
+import moe.antimony.hoshi.epub.BookRepository
 import moe.antimony.hoshi.features.bookshelf.BookCoverRecoveryDecoderFactory
 import moe.antimony.hoshi.features.bookshelf.BookCoverFetcher
 import moe.antimony.hoshi.features.bookshelf.BookCoverKeyer
@@ -45,6 +46,7 @@ class HoshiApplication : Application(), Configuration.Provider, SingletonImageLo
     @Inject internal lateinit var googleDriveSyncLifecycle: Lazy<GoogleDriveSyncLifecycle>
     @Inject internal lateinit var workerFactory: HiltWorkerFactory
     @Inject @IoDispatcher internal lateinit var ioDispatcher: CoroutineDispatcher
+    @Inject internal lateinit var bookRepository: Lazy<BookRepository>
     @Inject internal lateinit var bookCoverThumbnailStore: Lazy<BookCoverThumbnailStore>
 
     override val workManagerConfiguration: Configuration
@@ -58,6 +60,9 @@ class HoshiApplication : Application(), Configuration.Provider, SingletonImageLo
         nonfatalDiagnosticsLogger.start()
         applicationScope.launch { webViewDebuggingSettings.initialize() }
         applicationScope.launch { legacySasayakiResourceCleanup.clean() }
+        applicationScope.launch(ioDispatcher) {
+            bookRepository.get().migrateCacheGroups(cacheDir, noBackupFilesDir.resolve("book-cache-group-v1"))
+        }
         prepareUpdateStartupState()
         updateScheduler.get().sync()
         dictionaryAutoUpdateScheduler.get().registerProcessForegroundChecks()
