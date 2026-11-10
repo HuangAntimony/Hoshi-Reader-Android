@@ -5,8 +5,16 @@ import android.database.sqlite.SQLiteDatabase
 import android.os.ParcelFileDescriptor
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import moe.antimony.hoshi.features.anki.readAnkiAudioBytes
 import java.io.File
 import java.io.IOException
+import java.net.URLEncoder
 import java.nio.file.Files
 import java.security.MessageDigest
 import org.junit.Assert.assertArrayEquals
@@ -19,6 +27,40 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class LocalAudioNativeDeviceTest {
+    @Test
+    fun popupLookupReturnsLowercaseRecordingForCapitalizedTerms() = withFixture(
+        seedExtraRows = { database ->
+            database.execSQL("INSERT INTO entries(expression, source, file) VALUES ('hello', 'english', 'hello.mp3')")
+            database.execSQL("INSERT INTO android(file, source, data) VALUES (?, ?, ?)", arrayOf("hello.mp3", "english", fixtureAudio()))
+        },
+    ) { file ->
+        val audio = fixtureAudio()
+        val repository = LocalAudioRepository(file.parentFile!!.resolve("repository"))
+        check(repository.dbFile.parentFile!!.mkdirs())
+        file.copyTo(repository.dbFile)
+        val handler = AudioRequestHandler(
+            localAudioRepository = repository,
+            remoteAudioRepository = RemoteWordAudioRepository(AudioHttpClient { _, _ -> error("Unexpected remote request") }, Dispatchers.IO),
+            fetchRemoteAudioList = { error("Unexpected custom audio request") },
+        )
+
+        try {
+            for (term in listOf("hello", "Hello", "HELLO")) {
+                val target = "hoshi-local-audio-source://get/?term=$term&reading=$term"
+                val query = URLEncoder.encode(target, "UTF-8")
+                val response = requireNotNull(handler.handleAudioRequest("https://appassets.androidplatform.net/audio?url=$query"))
+                val body = response.data.bufferedReader().use { it.readText() }
+                val candidates = Json.parseToJsonElement(body).jsonObject.getValue("audioSources").jsonArray
+                assertEquals(term, 1, candidates.size)
+                val url = candidates.single().jsonObject.getValue("url").jsonPrimitive.content
+                val bytes = runBlocking { readAnkiAudioBytes(url, repository::loadAudio) { error("Unexpected remote audio URL") } }
+                assertArrayEquals(audio, bytes)
+            }
+        } finally {
+            runBlocking { repository.deleteDatabase() }
+        }
+    }
+
     @Test
     fun readsFrameworkDatabaseAfterCallerClosesDescriptorWithoutWritingFiles() = withFixture { file ->
         val source = "話者𠮷"
@@ -93,7 +135,7 @@ class LocalAudioNativeDeviceTest {
         }
     }
 
-    private fun withFixture(test: (File) -> Unit) {
+    private fun withFixture(seedExtraRows: (SQLiteDatabase) -> Unit = {}, test: (File) -> Unit) {
         val cache = InstrumentationRegistry.getInstrumentation().targetContext.cacheDir
         val directory = Files.createTempDirectory(cache.toPath(), "local-audio-native-").toFile()
         try {
@@ -117,6 +159,7 @@ class LocalAudioNativeDeviceTest {
                 """.trimIndent())
                 database.execSQL("INSERT INTO android(file, source, data) VALUES (?, ?, ?)", arrayOf("𠮷野.opus", "話者𠮷", fixtureAudio()))
                 database.execSQL("INSERT INTO android(file, source, data) VALUES (?, ?, ?)", arrayOf("𠮷野.opus", "別の話者", byteArrayOf(2)))
+                seedExtraRows(database)
             }
             test(file)
         } finally {

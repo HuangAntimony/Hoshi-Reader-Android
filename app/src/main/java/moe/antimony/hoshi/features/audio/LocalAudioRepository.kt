@@ -228,7 +228,12 @@ class LocalAudioRepository internal constructor(
         val normalized = LocalAudioResolver.katakanaToHiragana(reading)
         val config = queryConfig(active)
         if (config.sourceOrder.all { it in config.disabledSources }) return@locked null
-        LocalAudioResolver.resolve(term, normalized, database(active).queryEntries(term, normalized), config.sourceOrder, config.disabledSources)
+        val database = database(active)
+        findWithLowercaseFallback(term) { queryTerm ->
+            LocalAudioResolver.resolve(
+                queryTerm, normalized, database.queryEntries(queryTerm, normalized), config.sourceOrder, config.disabledSources,
+            )
+        }
     }
 
     suspend fun findAudioCandidates(term: String, reading: String): List<LocalAudioCandidate> = locked {
@@ -236,10 +241,19 @@ class LocalAudioRepository internal constructor(
         val normalized = LocalAudioResolver.katakanaToHiragana(reading)
         val config = queryConfig(active)
         if (config.sourceOrder.all { it in config.disabledSources }) return@locked emptyList()
-        LocalAudioResolver.resolveCandidates(
-            term, normalized, database(active).queryEntries(term, normalized), config.sourceOrder, config.disabledSources,
-            generation = active.generation,
-        )
+        val database = database(active)
+        findWithLowercaseFallback(term) { queryTerm ->
+            LocalAudioResolver.resolveCandidates(
+                queryTerm, normalized, database.queryEntries(queryTerm, normalized), config.sourceOrder, config.disabledSources,
+                generation = active.generation,
+            ).takeIf { it.isNotEmpty() }
+        }.orEmpty()
+    }
+
+    private inline fun <T : Any> findWithLowercaseFallback(term: String, find: (String) -> T?): T? {
+        find(term)?.let { return it }
+        if (term.isEmpty() || term[0] !in 'A'..'Z') return null
+        return find(term.lowercase())
     }
 
     suspend fun loadAudio(file: LocalAudioFile): ByteArray? = locked {

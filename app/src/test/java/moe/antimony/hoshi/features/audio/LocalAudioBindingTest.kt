@@ -82,6 +82,52 @@ class LocalAudioBindingTest {
         assertEquals("second", f.repository.loadAudio(LocalAudioFile("nhk16", "clip.mp3"))!!.decodeToString())
     }
 
+    @Test fun capitalizedTermsRetryWithTheEntireTermLowercased() = runBlocking {
+        val f = Fixture()
+        val hello = LocalAudioEntry("nhk16", "hello", null, "hello.mp3")
+        f.access.entries = listOf(hello)
+        val binding = f.repository.importDatabase("content://audio/one", LocalAudioImportMode.Link)
+
+        for (term in listOf("Hello", "HELLO")) {
+            val candidate = f.repository.findAudioCandidates(term, "ハロー").single()
+            assertEquals(LocalAudioFile("nhk16", "hello.mp3", binding.generation), LocalAudioResolver.parseAudioUrl(candidate.url))
+        }
+        assertEquals(hello, f.repository.findAudio("HELLO", ""))
+        assertEquals(
+            listOf("Hello" to "はろー", "hello" to "はろー", "HELLO" to "はろー", "hello" to "はろー", "HELLO" to "", "hello" to ""),
+            f.access.entryQueries,
+        )
+    }
+
+    @Test fun lowercaseFallbackOnlyRunsWhenOriginalCandidatesAreUnusable() = runBlocking {
+        val f = Fixture()
+        f.access.entries = listOf(
+            LocalAudioEntry("forvo", "Polish", null, "Polish.mp3"),
+            LocalAudioEntry("nhk16", "Polish", null, "Polish.wav"),
+            LocalAudioEntry("nhk16", "polish", null, "polish.mp3"),
+        )
+        f.repository.importDatabase("content://audio/one", LocalAudioImportMode.Link)
+
+        val exact = f.repository.findAudioCandidates("Polish", "").single()
+        assertEquals("Polish.mp3", LocalAudioResolver.parseAudioUrl(exact.url)?.file)
+        assertEquals(listOf("Polish" to ""), f.access.entryQueries)
+
+        f.repository.updateSourceEnabled("forvo", false)
+        val fallback = f.repository.findAudioCandidates("Polish", "").single()
+        assertEquals("polish.mp3", LocalAudioResolver.parseAudioUrl(fallback.url)?.file)
+        assertEquals(listOf("Polish" to "", "Polish" to "", "polish" to ""), f.access.entryQueries)
+    }
+
+    @Test fun japaneseAndLowercaseTermsOnlyQueryOnce() = runBlocking {
+        val f = Fixture()
+        f.repository.importDatabase("content://audio/one", LocalAudioImportMode.Link)
+
+        assertEquals(1, f.repository.findAudioCandidates("食べた", "タベル").size)
+        assertTrue(f.repository.findAudioCandidates("見つからない", "").isEmpty())
+        assertTrue(f.repository.findAudioCandidates("hello", "").isEmpty())
+        assertEquals(listOf("食べた" to "たべる", "見つからない" to "", "hello" to ""), f.access.entryQueries)
+    }
+
     @Test fun unlinkNeverDeletesOriginalOrResurrectsRetainedPrivateCopy() = runBlocking {
         val f = Fixture()
         f.repository.importDatabase("content://audio/one", LocalAudioImportMode.Copy)
@@ -169,6 +215,8 @@ class LocalAudioBindingTest {
         val grants = mutableSetOf<String>()
         val acquired = mutableListOf<String>()
         val released = mutableListOf<String>()
+        var entries = listOf(LocalAudioEntry("nhk16", "食べる", "たべる", "clip.mp3"))
+        val entryQueries = mutableListOf<Pair<String, String>>()
         var streamOpens = 0
         var databaseOpens = 0
         var declaredSize: Long? = null
@@ -185,7 +233,10 @@ class LocalAudioBindingTest {
             return object : LocalAudioDatabaseSession {
                 override val sizeBytes = content.length.toLong()
                 override val fingerprint = content
-                override fun queryEntries(term: String, reading: String) = listOf(LocalAudioEntry("nhk16", "食べる", "たべる", "clip.mp3"))
+                override fun queryEntries(term: String, reading: String): List<LocalAudioEntry> {
+                    entryQueries += term to reading
+                    return entries.filter { it.expression == term || (reading.isNotBlank() && it.reading == reading) }
+                }
                 override fun querySources() = listOf("nhk16", "forvo")
                 override fun loadAudio(source: String, file: String) = content.toByteArray()
                 override fun close() = Unit
