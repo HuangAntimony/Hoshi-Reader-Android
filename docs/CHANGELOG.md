@@ -7,84 +7,44 @@ Release notes before v1.3.0 are in [CHANGELOG_ARCHIVE.md](CHANGELOG_ARCHIVE.md).
 
 ### Added
 
-- Choose pages, character/word counts or no counts in the reader, with book and chapter page progress retained during chapter changes, counts cached across app restarts and shown while chapters load, page positions in contents and accurate text positions after leading image pages in search results and highlights, whole-page turns and counts with accurate boundaries around trailing punctuation, and faster initial counts for books using custom fonts that yield to chapter loading and reading interactions.
-
-- Choose whether to copy a local word-audio database into the app or link to its existing location without duplicating it, with source ordering and enable/disable controls, and import available again when a linked file cannot be read.
-
-- Create Chinese and Korean profiles with language-specific fonts, automatic book-profile selection, and lookup in the reader and dictionary popups, including Korean deinflection and Chinese pinyin grouping.
-
-- Switch the app between English, Simplified Chinese and the system language on Android 8–12 as well as newer versions, with the chosen language also used for newly generated notifications and background messages.
-- Use the bookshelf’s Mark menu to reset books to unread, including their reading position and statistics, or mark cloud books as read when cached book information is available.
-- Choose AnkiDroid or kuma3 Anki as the card-making client, including deck and note-type fetching, media export, duplicate checks, note browsing and synchronization.
-
-- Optionally show a sentence replay button beside the reader’s bottom playback controls to restart the current Sasayaki or TTS sentence and continue playback.
-- Optionally exit the reader with a single Back action without first revealing its controls, using a new Behavior setting that is off by default.
-- Revisit the last 100 full-text queries from the Dictionary tab and external lookups, with tap-to-search, individual deletion and clearing, without recording in-book lookups or subsequent character and word selections.
-
-- Sync books, reading progress, highlights, shelves, statistics and audiobook playback with Hoshi on iOS through Google Drive, including devices without Google Play Services, with less startup delay for large bookshelves, exponential retry during network outages and partial transfer failures without repeated automatic error reports or losing the Google Drive connection when token refresh is temporarily blocked, and preserved library associations with safe on-demand downloads when reconnecting to the same cloud library, without replaying part of the current audiobook cue, losing newly created highlights when local state is synced, leaving deleted books as blank cloud entries or interrupting the bookshelf and progress display during batch imports; upload transcription matches when transcription finishes or stops, while keeping live subtitle updates without repeatedly uploading temporary versions.
-- Download cloud books on demand, choose local-only or cloud-wide deletion, resume interrupted uploads across app restarts, start newly queued downloads even as a prior sync finishes, retry failed book checks and transfers after network timeouts without stalling healthy uploads or publication, stop transfers and explain cloud-book failures during Google Drive authorization recovery, clear stale errors when the connection recovers and resume sync after interrupted reauthorization, and track total bytes, effective speed and estimated time separately for uploads and downloads, with separate checking and syncing cues, book covers, waiting sizes including eligible archived covers, and interrupted progress with errors for failed on-demand downloads in a grouped queue that preserves your scroll position and uses a full-page E-ink layout, plus adaptive upload chunks, configurable transfer concurrency (default 8) and accurate Android storage reporting for new and existing book downloads.
-- Read books aloud with device, online or self-hosted TTS voices whose catalog language matches the active Japanese, English, Chinese or Korean profile, with selections remembered per language and service and native Microsoft voice names where provided (with shorter Edge voice names and Edge TTS access restored after Microsoft's service update), background playback with book covers and the current sentence in system media controls, adjustable speed, direct previews in the voice list, separate narration/dialogue voices, independently replayable dialogue paired within each paragraph using Japanese, curly and straight double quotes, optional short-clause splitting for finer seeking and smoother continuous speech across sentences and chapters with parallel online prefetch and recovery from temporary synthesis failures; skip empty audio from successful HTTP synthesis responses without interrupting reading or blocking preview and Anki audio export; skip image holds by turning pages manually without interrupting speech or immediately returning to the narration page, and disable image holds with auto-scroll in the background too; leave TTS reading and open another book without prolonged loading.
-- Customize TTS pronunciation with book-specific or global replacements, optional regular expressions and ruby readings, without changing book text.
-- Export audiobook or TTS sentence audio to AnkiDroid and AnkiConnect with the optional `{sentence-audio}` field, let submitted reader cards finish after closing the lookup popup, and keep stalled word-audio downloads from blocking other cards.
-- Optionally disable a term's Anki button after successful mining until the popup is reopened.
-- View, copy or export recent runtime errors alongside Java and native crash records, decoded native stacks, separate process-exit history and build information in Diagnostics, including Google Drive authorization status and network context when reconnection is required, and optionally enable WebView debugging in release builds without restarting the app.
-- Install the latest development preview from About.
-- Add LINE Seed JP to the recommended reader fonts.
+- Read books aloud using device, online, or self-hosted text-to-speech with voice previews, separate narration and dialogue voices, custom pronunciation per book or across your library, and sentence audio export to Anki via `{sentence-audio}`.
+- Sync your library and reading activity with Hoshi on iOS through Google Drive and download books on demand, even on devices without Google Play Services.
+- Show reading progress in pages for the current chapter and the whole book.
+- Use dedicated Chinese and Korean profiles with automatic profile switching by book language, pinyin grouping for Chinese, and lookup of inflected Korean words.
+- App language switching now works on Android 8–12.
+- Mark books as read from the bookshelf, or choose **Mark Unread** to reset a book’s reading position and statistics.
+- Use kuma3 Anki to create cards.
+- Enable **Exit Reader on First Back** to leave the reader with one Back action.
+- Revisit or delete up to 100 recent dictionary searches, including lookups from other apps.
+- Use a local word-audio database from its original location to save storage.
+- View and export recent errors and crash reports from Diagnostics.
 
 ### Changed
 
-- Create Anki cards with only the dictionary media their fields use, and reuse book covers already stored in AnkiConnect.
-
-- Put Transcription first in audiobook matching and select it by default for books without a match, with clearer explanations of each preset’s effect on transcription time and device load.
-
-- Show the current matched Sasayaki sentence alongside the book cover in system media controls, including during background playback and after seeking.
-
-- Reduce repeated work when selecting text and searching dictionaries, while refreshing lookup sessions after profile switches and partially completed dictionary imports.
-
-- Use the new dictionary index for imports, replace installed dictionaries of the same type and title when reimporting their ZIPs, and automatically migrate existing indexes when their dictionaries are first opened.
-
-- Remove automatic layout corrections for publisher paragraph containers, blank spacers and image margins.
-
-- Replace visual novel mode with iOS-style paragraph mode and settings controls, including centered passages and continuation pages even around hanging spaces and ruby annotations, sentence limits, text reveal with synchronized ruby and gaiji that continues through TTS/Sasayaki following without freezing, smoother page turns in chapters with many narration cues, reliable E-ink switching with saved highlights and narration following after layout-mode changes or resuming from unmatched pages, optional blank-tap advance without skipping text animation, automatic statistics start on page turns and Sasayaki playback bounded to the current page even after cue navigation, with its setting grouped under Paragraph Mode, while migrating existing settings.
-
-- Skip Sasayaki and TTS image holds for images referenced three or more times in a book’s main text, while retaining holds for images used once or twice.
-
-- Make Statistics charts easier to read with a one-hour minimum scale and compact previous/next period buttons alongside swipe navigation, with stable single-line period titles and duration/comparison rows when paging.
-- Label the selected-text menu entry “Hoshi Lookup” (“Hoshi 查词” in Simplified Chinese) to make dictionary lookup easier to identify.
-- Simplify About into compact groups for updates, project links, support and storage cleanup.
-- Edit individual reading sessions in Statistics, with deletions preserved across sync and reading sessions split at the configured daily reset time so each day's reading counts toward its own totals and goals.
-- Replace BIZ UDPGothic with BIZ UDGothic in the recommended fonts.
+- Replace Visual Novel Mode with Paragraph Mode, which centers text and offers animated text reveal, sentence limits, and tap-to-advance.
+- Use an optional sentence replay button and see the current sentence and book cover in system media controls for audiobook and text-to-speech playback.
+- Improve Japanese audiobook transcription with more accurate matching for repeated passages and resumable model downloads.
+- Browse Statistics with previous and next buttons and see the current period update automatically as the date changes.
+- Edit individual reading sessions in Statistics and count reading time on the correct day when a session crosses your daily reset.
+- Reimport a dictionary ZIP to replace the installed dictionary with the same title and type.
+- Preserve more of the original EPUB layout, including blank space and image margins.
+- Recommend LINE Seed JP and replace BIZ UDPGothic with BIZ UDGothic.
+- Find updates more easily in About, including the option to install the latest development preview.
 
 ### Fixed
 
-- Play local word audio for capitalized terms when the recording is listed under the lowercase spelling ([#177](https://github.com/HuangAntimony/Hoshi-Reader-Android/issues/177)).
-- Keep the Custom CSS editor above the keyboard and keep the tapped line in view when editing starts ([#126](https://github.com/HuangAntimony/Hoshi-Reader-Android/issues/126)).
-- Show “Less than 1 min left” when audiobook transcription is estimated to finish in under a minute.
-- Hide the status bar while viewing a fullscreen image from the page or image gallery and keep the image controls in place.
-- Keep Statistics on the latest week, month or year when the date rolls over, preserve historical browsing, and return to the current period when the daily reset time changes.
-- Keep lookup popup controls visible when a book's stylesheet hides buttons.
-- Open books with large tables of contents faster and keep page turns responsive while reading statistics are running.
-- Keep reduced-motion scrolling and swipe dismissal working in lookup popups when WebView retains a touch on the reader page.
-- Refresh a book's recent-reading order and progress promptly when returning to the bookshelf, including quick switches between books, and reduce loading delays for large libraries.
-- Prevent intermittent bookshelf sorting errors after successful EPUB imports, and distinguish refresh failures from import failures.
-- Prevent book styles from shrinking the reading area in paginated and continuous modes.
-- Keep book assignments intact by correctly detecting duplicate shelf names during creation and renaming.
-- Reduce chapter loading and page-counting delays in books with long chapters, large stylesheets, custom fonts and extensive ruby annotations, and avoid an extra pause just after a chapter appears.
-- Restore missing illustration chapters and gallery images in EPUBs with XHTML fallbacks, and recover bitmap covers from simple SVG wrappers or alternative declared covers when the preferred cover is broken on import or opening existing books.
-- Keep word lookups and sentence context within the tapped dictionary list item instead of joining neighboring definitions.
-- Keep the full query visible and tappable in the Dictionary tab even when its beginning has no dictionary match.
-- Start reading statistics reliably when Sasayaki turns pages automatically, including after statistics finish loading or autostart settings change, without treating subpixel adjustments on the same page as page turns.
-- Restore continuous reading without clipped text, furigana or position drift, and keep full-width lookup popups independent of reader padding.
-- Keep the selection menu and handles usable after dragging across paragraphs or ruby, without unexpected page turns or selection flicker.
-- Create, recolor and remove highlights when selections touch ruby annotations.
-- Show saved settings immediately when their controls appear, avoiding a flash of defaults.
-- Keep names containing middle dots intact during lookup and prevent old Dictionary audio from replaying when opening a book.
-- Recognize more Japanese inflections written with emphatic small っ and avoid false matches across katakana word boundaries.
-- Preserve lookup access to dictionaries excluded from aggregate Anki fields, and handle selected-definition fallbacks correctly.
-- Keep audio-source menus inside scaled lookup popups.
-- Show useful error details when operations fail.
-- Improve update checks when mirrors return invalid responses, and limit automatic retries and repeated error reports during network outages and GitHub rate limits.
-- Improve Japanese audiobook transcription with Nakuru on 64-bit and 32-bit ARM, resumable component downloads and live cue updates, preserving earlier matches when opening text repeats later during transcription or realignment; remove retired model files while preserving book data.
+- Play local word audio for capitalized terms when the recording uses the lowercase spelling ([#177](https://github.com/HuangAntimony/Hoshi-Reader-Android/issues/177)).
+- Keep the line you tap in the Custom CSS editor visible when the keyboard opens ([#126](https://github.com/HuangAntimony/Hoshi-Reader-Android/issues/126)).
+- Open books with long chapters or large tables of contents faster and keep page turns responsive.
+- Refresh progress and recent reading order promptly when you return to the bookshelf.
+- Prevent duplicate shelf names from disrupting book assignments.
+- Restore missing illustrations and covers in more EPUBs.
+- Hide the status bar when viewing an illustration fullscreen.
+- Fix clipped text and position drift in continuous reading.
+- Keep selection controls usable across paragraphs and fix highlighting around furigana.
+- Keep lookup buttons visible and audio menus inside the popup.
+- Recognize more Japanese inflections and keep names with middle dots intact in lookups.
+- Avoid repeated error messages when automatic update checks fail.
 
 ## [v1.4.0] - 2026-09-24
 
