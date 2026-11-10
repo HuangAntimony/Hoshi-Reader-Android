@@ -5,6 +5,8 @@ Release notes before v1.3.0 are in [CHANGELOG_ARCHIVE.md](CHANGELOG_ARCHIVE.md).
 
 ## [Unreleased]
 
+## [v1.5.0] - 2026-11-10
+
 ### Added
 
 - Read books aloud using device, online, or self-hosted text-to-speech with voice previews, separate narration and dialogue voices, custom pronunciation per book or across your library, and sentence audio export to Anki via `{sentence-audio}`.
