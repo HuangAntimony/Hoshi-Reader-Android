@@ -5,6 +5,7 @@ import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
+import androidx.work.ListenableWorker.Result
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
@@ -21,6 +22,8 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.ui.ErrorDiagnosticEvents
 import moe.antimony.hoshi.ui.UiText
@@ -109,18 +112,24 @@ internal class UpdateCheckWorker @AssistedInject constructor(
             throw error
         }
         if (!enabled) return Result.success()
-        return updateCheckWorkerResult {
+        return updateCheckWorkerResult(runAttemptCount) {
             updateCheckService.check(notifyAvailable = true)
         }
     }
 }
 
-internal suspend fun updateCheckWorkerResult(check: suspend () -> Unit): androidx.work.ListenableWorker.Result =
+internal suspend fun updateCheckWorkerResult(runAttemptCount: Int, check: suspend () -> Unit): Result =
     try {
         check()
-        androidx.work.ListenableWorker.Result.success()
-    } catch (error: Throwable) {
-        if (error is CancellationException) throw error
-        ErrorDiagnosticEvents.buffer.record(UiText.Resource(R.string.about_update_check_failed), error)
-        androidx.work.ListenableWorker.Result.retry()
+        Result.success()
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (error: Exception) {
+        currentCoroutineContext().ensureActive()
+        if (runAttemptCount == 0 && error is GitHubReleaseException && error.failure == GitHubApiFailure.Transient) {
+            Result.retry()
+        } else {
+            ErrorDiagnosticEvents.buffer.record(UiText.Resource(R.string.about_update_check_failed), error)
+            Result.failure()
+        }
     }

@@ -201,6 +201,13 @@ internal object UrlConnectionGitHubHttpClient : GitHubHttpClient {
         connection.readTimeout = 15_000
         return connection.use {
             val code = it.responseCode
+            val hasRateLimitHeader = !it.getHeaderField("Retry-After").isNullOrBlank() ||
+                it.getHeaderField("X-RateLimit-Remaining")?.trim() == "0"
+            val failure = when {
+                code == 429 || (code == 403 && hasRateLimitHeader) -> GitHubApiFailure.RateLimited
+                code in 500..599 -> GitHubApiFailure.Transient
+                else -> GitHubApiFailure.Other
+            }
             val details = buildString {
                 append("HTTP $code\n${it.url}")
                 listOf(
@@ -214,13 +221,19 @@ internal object UrlConnectionGitHubHttpClient : GitHubHttpClient {
                 val stream = if (code in 200..299) it.inputStream else it.errorStream
                 stream?.bufferedReader()?.use { reader -> reader.readText() }.orEmpty()
             } catch (error: IOException) {
-                throw GitHubReleaseException(details, error)
+                val readFailure = if (code in 200..299) GitHubApiFailure.Transient else failure
+                throw GitHubReleaseException(details, error, readFailure)
             }
             val mediaType = it.contentType?.substringBefore(';')?.trim().orEmpty()
             val isJson = mediaType.equals("application/json", ignoreCase = true) ||
                 (mediaType.startsWith("application/", ignoreCase = true) && mediaType.endsWith("+json", ignoreCase = true))
             if (code !in 200..299 || !isJson) {
-                throw GitHubReleaseException(listOf(details, body).filter { value -> value.isNotBlank() }.joinToString("\n\n"))
+                val rateLimitMessage = code == 403 && (body.contains("rate limit exceeded", ignoreCase = true) ||
+                    body.contains("secondary rate limit", ignoreCase = true))
+                throw GitHubReleaseException(
+                    listOf(details, body).filter { value -> value.isNotBlank() }.joinToString("\n\n"),
+                    failure = if (rateLimitMessage) GitHubApiFailure.RateLimited else failure,
+                )
             }
             body
         }
@@ -238,7 +251,13 @@ internal val DefaultDownloadMirrorPrefixes = listOf(
     "https://fastgit.cc/",
 )
 
-internal class GitHubReleaseException(message: String, cause: Throwable? = null) : RuntimeException(message, cause)
+internal enum class GitHubApiFailure { RateLimited, Transient, Other }
+
+internal class GitHubReleaseException(
+    message: String,
+    cause: Throwable? = null,
+    val failure: GitHubApiFailure = GitHubApiFailure.Other,
+) : RuntimeException(message, cause)
 
 internal object GitHubReleaseJson {
     private val json = Json { ignoreUnknownKeys = true }
@@ -297,7 +316,24 @@ internal fun <T> readGitHubApi(
             failures += candidate to error
         }
     }
-    if (failures.size == 1) throw GitHubReleaseException(failures.single().first, failures.single().second)
-    throw GitHubReleaseException(failures.joinToString("\n\n") { (source, error) -> "$source\n${error.diagnosticMessage()}" })
-        .apply { failures.forEach { (_, error) -> addSuppressed(error) } }
+    val failureKinds = failures.map { (_, error) ->
+        when (error) {
+            is GitHubReleaseException -> error.failure
+            is IOException -> GitHubApiFailure.Transient
+            else -> GitHubApiFailure.Other
+        }
+    }
+    val failure = when {
+        GitHubApiFailure.RateLimited in failureKinds -> GitHubApiFailure.RateLimited
+        GitHubApiFailure.Transient in failureKinds -> GitHubApiFailure.Transient
+        else -> GitHubApiFailure.Other
+    }
+    if (failures.size == 1) {
+        val (source, error) = failures.single()
+        throw GitHubReleaseException(source, error, failure)
+    }
+    throw GitHubReleaseException(
+        failures.joinToString("\n\n") { (source, error) -> "$source\n${error.diagnosticMessage()}" },
+        failure = failure,
+    ).apply { failures.forEach { (_, error) -> addSuppressed(error) } }
 }

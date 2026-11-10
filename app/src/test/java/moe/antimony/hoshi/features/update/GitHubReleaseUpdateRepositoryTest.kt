@@ -25,10 +25,11 @@ class GitHubReleaseUpdateRepositoryTest {
                 override fun get(url: String, headers: Map<String, String>): String = throw failure
             },
         )
-        val result = runCatching { repository.latestRelease() }
-        assertSame(failure, result.exceptionOrNull()?.cause)
-        assertEquals("TLS certificate expired", result.exceptionOrNull()?.cause?.cause?.message)
-        assertTrue(result.exceptionOrNull()?.message.orEmpty().contains(GitHubReleaseUpdateRepository.LatestReleaseUrl))
+        val error = runCatching { repository.latestRelease() }.exceptionOrNull() as GitHubReleaseException
+        assertEquals(GitHubApiFailure.Transient, error.failure)
+        assertSame(failure, error.cause)
+        assertEquals("TLS certificate expired", error.cause?.cause?.message)
+        assertTrue(error.message.orEmpty().contains(GitHubReleaseUpdateRepository.LatestReleaseUrl))
     }
 
     @Test
@@ -94,11 +95,73 @@ class GitHubReleaseUpdateRepositoryTest {
             val repository = GitHubReleaseUpdateRepository(latestReleaseUrl = url,
                 apiMirrorPrefixes = emptyList(), httpClient = UrlConnectionGitHubHttpClient)
 
-            val failure = requireNotNull(runCatching { repository.latestRelease() }.exceptionOrNull())
+            val failure = runCatching { repository.latestRelease() }.exceptionOrNull() as GitHubReleaseException
+            assertEquals(GitHubApiFailure.RateLimited, failure.failure)
             val text = failure.stackTraceToString()
             listOf(url, "HTTP 403", "Content-Type: application/json", "Retry-After: 60",
                 "X-RateLimit-Remaining: 0", "X-RateLimit-Reset: 1792200000", body)
                 .forEach { assertTrue("Missing $it in $text", text.contains(it)) }
+        }
+    }
+
+    @Test
+    fun rateLimitTakesPriorityWhenAllApiSourcesFail() = runBlocking {
+        MockWebServer().use { server ->
+            val repository = GitHubReleaseUpdateRepository(
+                latestReleaseUrl = server.url("/releases/latest").toString(),
+                apiMirrorPrefixes = listOf(server.url("/mirror/").toString()),
+                httpClient = UrlConnectionGitHubHttpClient,
+            )
+            val mirrorFailures = listOf(403 to GitHubApiFailure.RateLimited, 503 to GitHubApiFailure.Transient)
+            for ((mirrorStatus, mirrorFailure) in mirrorFailures) {
+                server.enqueue(MockResponse().setResponseCode(403).setHeader("X-RateLimit-Remaining", "0"))
+                server.enqueue(MockResponse().setResponseCode(mirrorStatus)
+                    .setBody(if (mirrorStatus == 403) "API rate limit exceeded" else "Service unavailable"))
+
+                val error = runCatching { repository.latestRelease() }.exceptionOrNull() as GitHubReleaseException
+
+                assertEquals(GitHubApiFailure.RateLimited, error.failure)
+                val sources = error.suppressed.filterIsInstance<GitHubReleaseException>()
+                assertEquals(listOf(GitHubApiFailure.RateLimited, mirrorFailure), sources.map { it.failure })
+                assertTrue(sources.last().message.orEmpty().contains("HTTP $mirrorStatus"))
+            }
+            assertEquals(4, server.requestCount)
+        }
+    }
+
+    @Test
+    fun tooManyRequestsIsRateLimitedAndPlainForbiddenIsNot() = runBlocking {
+        MockWebServer().use { server ->
+            val repository = GitHubReleaseUpdateRepository(
+                latestReleaseUrl = server.url("/releases/latest").toString(),
+                apiMirrorPrefixes = emptyList(),
+                httpClient = UrlConnectionGitHubHttpClient,
+            )
+            val responses = listOf(429 to GitHubApiFailure.RateLimited, 403 to GitHubApiFailure.Other)
+            for ((status, expected) in responses) {
+                server.enqueue(MockResponse().setResponseCode(status).setHeader("X-RateLimit-Remaining", "42"))
+
+                val error = runCatching { repository.latestRelease() }.exceptionOrNull() as GitHubReleaseException
+
+                assertEquals(expected, error.failure)
+            }
+        }
+    }
+
+    @Test
+    fun mirrorCanSucceedWhenPrimaryApiIsRateLimited() = runBlocking {
+        MockWebServer().use { server ->
+            server.enqueue(MockResponse().setResponseCode(429))
+            server.enqueue(MockResponse().setHeader("Content-Type", "application/json")
+                .setBody("""{"tag_name":"v1.4.0","html_url":"https://github.com/example/reader/releases/tag/v1.4.0"}"""))
+            val repository = GitHubReleaseUpdateRepository(
+                latestReleaseUrl = server.url("/releases/latest").toString(),
+                apiMirrorPrefixes = listOf(server.url("/mirror/").toString()),
+                httpClient = UrlConnectionGitHubHttpClient,
+            )
+
+            assertEquals("v1.4.0", repository.latestRelease().tagName)
+            assertEquals(2, server.requestCount)
         }
     }
 
@@ -112,11 +175,32 @@ class GitHubReleaseUpdateRepositoryTest {
             val repository = GitHubReleaseUpdateRepository(latestReleaseUrl = url,
                 apiMirrorPrefixes = emptyList(), httpClient = UrlConnectionGitHubHttpClient)
 
-            val failure = requireNotNull(runCatching { repository.latestRelease() }.exceptionOrNull())
+            val failure = runCatching { repository.latestRelease() }.exceptionOrNull() as GitHubReleaseException
+            assertEquals(GitHubApiFailure.Other, failure.failure)
             val text = failure.stackTraceToString()
             listOf(url, server.url("/").toString(), "HTTP 200", "Content-Type: text/html; charset=utf-8", body)
                 .forEach { assertTrue("Missing $it in $text", text.contains(it)) }
             assertTrue("HTML must be rejected before the release JSON parser", !text.contains("JsonDecodingException"))
+        }
+    }
+
+    @Test
+    fun successfulStatusWithBrokenResponseStreamIsTransient() = runBlocking {
+        MockWebServer().use { server ->
+            server.enqueue(MockResponse().setHeader("Content-Type", "application/json")
+                .setBody("invalid chunk length\r\n").removeHeader("Content-Length")
+                .setHeader("Transfer-Encoding", "chunked"))
+            val repository = GitHubReleaseUpdateRepository(
+                latestReleaseUrl = server.url("/releases/latest").toString(),
+                apiMirrorPrefixes = emptyList(),
+                httpClient = UrlConnectionGitHubHttpClient,
+            )
+
+            val error = runCatching { repository.latestRelease() }.exceptionOrNull() as GitHubReleaseException
+
+            assertEquals(GitHubApiFailure.Transient, error.failure)
+            assertTrue(error.cause?.message.orEmpty().contains("HTTP 200"))
+            assertTrue(error.cause?.cause is IOException)
         }
     }
 
