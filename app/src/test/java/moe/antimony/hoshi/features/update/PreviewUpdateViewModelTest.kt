@@ -3,6 +3,7 @@ package moe.antimony.hoshi.features.update
 import androidx.lifecycle.viewModelScope
 import java.io.File
 import java.io.IOException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,10 +27,17 @@ class PreviewUpdateViewModelTest {
         var downloads = 0
         var failure: Throwable? = null
         var readyFailure: Throwable? = null
-        var readyGate: kotlinx.coroutines.CompletableDeferred<Unit>? = null
+        var readyGate: CompletableDeferred<Unit>? = null
+        var downloadGate: CompletableDeferred<Unit>? = null
         override suspend fun latest(): PreviewLookup { failure?.let { throw it }; return PreviewLookup.Found(build) }
         override suspend fun refresh() = Unit
-        override suspend fun download(build: PreviewBuild) { downloads++; records.value = record(UpdateDownloadRecordStatus.Downloading) }
+        override suspend fun download(build: PreviewBuild): Long {
+            downloads++
+            val started = record(UpdateDownloadRecordStatus.Downloading)
+            records.value = started
+            downloadGate?.await()
+            return requireNotNull(started.downloadId)
+        }
         override suspend fun readyFile(record: UpdateDownloadRecord): File {
             readyGate?.await()
             readyFailure?.let { throw it }
@@ -80,20 +88,83 @@ class PreviewUpdateViewModelTest {
         model.installDownloaded(); runCurrent()
         assertEquals(File("preview.apk"), model.takeInstallRequest())
     }
+    @Test fun restoredFailureAndMissingApkDiscoveredOnEntryStayInDownloadState() = testModel("") { model, fake ->
+        val failed = fake.record(UpdateDownloadRecordStatus.Failed).copy(failureDetails = "/previews/preview.apk")
+        fake.records.value = failed
+        model.setForeground(true); runCurrent()
+        assertEquals(failed, model.state.value.download)
+        assertNull(model.state.value.error)
+
+        fake.records.value = fake.record(UpdateDownloadRecordStatus.Downloaded); runCurrent()
+        fake.records.value = failed; runCurrent()
+        assertEquals(failed, model.state.value.download)
+        assertNull(model.state.value.error)
+        model.check(); runCurrent()
+        assertEquals(build, model.state.value.pendingBuild)
+    }
+    @Test fun onlyTheConfirmedDownloadIdCanReportFailureInTheForeground() = testModel("") { model, fake ->
+        model.setForeground(true); runCurrent()
+        model.check(); runCurrent(); model.confirmDownload(); runCurrent()
+
+        val failed = fake.record(UpdateDownloadRecordStatus.Failed).copy(failureDetails = "Network failure")
+        fake.records.value = failed.copy(downloadId = 2); runCurrent()
+        assertNull(model.state.value.error)
+
+        fake.records.value = failed; runCurrent()
+        val error = model.state.value.error!!.resolve({ _, _ -> "Failed" }, { _, _, _ -> "" })
+        assertTrue(error.contains("Network failure"))
+        model.dismissError()
+        fake.records.value = failed.copy(failureDetails = "Another emission"); runCurrent()
+        assertNull(model.state.value.error)
+    }
+    @Test fun failureObservedBeforeEnqueueReturnsStillReportsTheConfirmedDownload() = testModel("") { model, fake ->
+        val gate = CompletableDeferred<Unit>()
+        fake.downloadGate = gate
+        model.setForeground(true); runCurrent()
+        model.check(); runCurrent(); model.confirmDownload(); runCurrent()
+        fake.records.value = fake.record(UpdateDownloadRecordStatus.Failed); runCurrent()
+        assertNull(model.state.value.error)
+
+        gate.complete(Unit); runCurrent()
+        assertNotNull(model.state.value.error)
+    }
+    @Test fun downloadFailureAfterLeavingForegroundDoesNotReplayOnReturn() = testModel("") { model, fake ->
+        model.setForeground(true); runCurrent()
+        model.check(); runCurrent(); model.confirmDownload(); runCurrent()
+        model.setForeground(false)
+        fake.records.value = fake.record(UpdateDownloadRecordStatus.Failed); runCurrent()
+        model.setForeground(true); runCurrent()
+        assertNull(model.state.value.error)
+    }
     @Test fun leavingDuringValidationCannotAutoInstallAfterReturning() = testModel("") { model, fake ->
         model.setForeground(true); runCurrent(); model.check(); runCurrent(); model.confirmDownload(); runCurrent()
-        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val gate = CompletableDeferred<Unit>()
         fake.readyGate = gate
         fake.records.value = fake.record(UpdateDownloadRecordStatus.Downloaded); runCurrent()
         model.setForeground(false); model.setForeground(true)
         gate.complete(Unit); runCurrent()
         assertNull(model.takeInstallRequest())
     }
+    @Test fun validationFailureAfterLeavingForegroundOnlyRecordsDiagnostics() = testModel("") { model, fake ->
+        ErrorDiagnosticEvents.buffer.drain()
+        val gate = CompletableDeferred<Unit>()
+        val failure = IOException("Preview APK was removed")
+        fake.readyGate = gate
+        fake.readyFailure = failure
+        model.setForeground(true); runCurrent(); model.check(); runCurrent(); model.confirmDownload(); runCurrent()
+        fake.records.value = fake.record(UpdateDownloadRecordStatus.Downloaded); runCurrent()
+        model.setForeground(false); model.setForeground(true)
+        gate.complete(Unit); runCurrent()
+
+        assertNull(model.state.value.error)
+        assertNull(model.takeInstallRequest())
+        assertSame(failure, ErrorDiagnosticEvents.buffer.drain().single().error)
+    }
     @Test fun installationValidationBlocksAnotherDownloadAndRejectsChangedIdentity() = testModel("") { model, fake ->
         model.setForeground(true); runCurrent()
         fake.records.value = fake.record(UpdateDownloadRecordStatus.Downloaded); runCurrent()
         model.check(); runCurrent()
-        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val gate = CompletableDeferred<Unit>()
         fake.readyGate = gate
         model.installDownloaded(); runCurrent()
         assertTrue(model.state.value.preparingInstall)

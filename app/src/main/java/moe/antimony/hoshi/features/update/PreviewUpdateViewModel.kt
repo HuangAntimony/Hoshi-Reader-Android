@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import moe.antimony.hoshi.BuildConfig
 import moe.antimony.hoshi.R
+import moe.antimony.hoshi.ui.ErrorDiagnosticEvents
 import moe.antimony.hoshi.ui.UiText
 import moe.antimony.hoshi.ui.withErrorDetails
 
@@ -39,7 +40,7 @@ internal class PreviewUpdateViewModel internal constructor(
     val state = mutableState.asStateFlow()
     private var foreground = false
     private var foregroundGeneration = 0L
-    private var autoInstallSha: String? = null
+    private var foregroundDownloadId: Long? = null
     private var observer: Job? = null
 
     init { observeDownloads() }
@@ -52,18 +53,7 @@ internal class PreviewUpdateViewModel internal constructor(
                 operations.records.collect { record ->
                     val visible = record?.takeUnless { shouldDeletePreviewApk(it, currentCommitSha) }
                     mutableState.update { it.copy(loaded = true, loading = false, download = visible) }
-                    if (visible?.status == UpdateDownloadRecordStatus.Failed) {
-                        autoInstallSha = null
-                        mutableState.update { it.copy(error = UiText.Joined(listOf(
-                            UiText.Resource(R.string.preview_download_failed),
-                            UiText.Literal(visible.failureDetails.orEmpty()),
-                        ))) }
-                    }
-                    if (visible != null && foreground && autoInstallSha != null && autoInstallSha == visible.previewCommitSha &&
-                        visible.status == UpdateDownloadRecordStatus.Downloaded) {
-                        autoInstallSha = null
-                        requestInstall(visible)
-                    }
+                    handleForegroundDownload(visible)
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -74,11 +64,30 @@ internal class PreviewUpdateViewModel internal constructor(
         }
     }
 
+    private fun handleForegroundDownload(record: UpdateDownloadRecord?) {
+        val downloadId = foregroundDownloadId ?: return
+        if (record?.downloadId != downloadId) return
+        when (record.status) {
+            UpdateDownloadRecordStatus.Failed -> {
+                foregroundDownloadId = null
+                mutableState.update { it.copy(error = UiText.Joined(listOf(
+                    UiText.Resource(R.string.preview_download_failed),
+                    UiText.Literal(record.failureDetails.orEmpty()),
+                ))) }
+            }
+            UpdateDownloadRecordStatus.Downloaded -> {
+                foregroundDownloadId = null
+                requestInstall(record)
+            }
+            else -> Unit
+        }
+    }
+
     fun setForeground(active: Boolean) {
         foreground = active
         if (!active) {
             foregroundGeneration++
-            autoInstallSha = null
+            foregroundDownloadId = null
             mutableState.update { it.copy(installRequest = null) }
         } else {
             viewModelScope.launch {
@@ -120,25 +129,20 @@ internal class PreviewUpdateViewModel internal constructor(
         val build = state.value.pendingBuild ?: return
         if (state.value.preparingInstall || state.value.installRequest != null || state.value.busy) return
         mutableState.update { it.copy(pendingBuild = null, busy = true, message = null, error = null) }
-        autoInstallSha = build.commitSha.takeIf { foreground }
+        foregroundDownloadId = null
+        val generation = foregroundGeneration.takeIf { foreground }
         viewModelScope.launch {
             try {
-                operations.download(build)
-                // Already downloaded files need no new store emission.
-                state.value.download?.takeIf {
-                    it.previewCommitSha == build.commitSha && it.status == UpdateDownloadRecordStatus.Downloaded
-                }?.let {
-                    if (foreground && autoInstallSha == build.commitSha) {
-                        autoInstallSha = null
-                        requestInstall(it)
-                    }
+                val downloadId = operations.download(build)
+                if (generation == foregroundGeneration) {
+                    foregroundDownloadId = downloadId
+                    // The record can arrive before enqueue returns, or already be downloaded.
+                    handleForegroundDownload(state.value.download)
                 }
             } catch (cancelled: CancellationException) {
-                autoInstallSha = null
                 throw cancelled
             } catch (error: Exception) {
-                autoInstallSha = null
-                fail(R.string.preview_download_failed, error)
+                reportDownloadError(error, generation)
             } finally {
                 mutableState.update { it.copy(busy = false) }
             }
@@ -162,7 +166,7 @@ internal class PreviewUpdateViewModel internal constructor(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                fail(R.string.preview_download_failed, error)
+                reportDownloadError(error, generation)
             } finally {
                 mutableState.update { it.copy(preparingInstall = false) }
             }
@@ -177,6 +181,14 @@ internal class PreviewUpdateViewModel internal constructor(
 
     fun reportInstallMessage(message: String) { mutableState.update { it.copy(error = UiText.Literal(message)) } }
     fun dismissError() { mutableState.update { it.copy(error = null) } }
+
+    private fun reportDownloadError(error: Throwable, generation: Long?) {
+        if (foreground && generation == foregroundGeneration) {
+            fail(R.string.preview_download_failed, error)
+        } else {
+            ErrorDiagnosticEvents.buffer.record(UiText.Resource(R.string.preview_download_failed), error)
+        }
+    }
 
     private fun fail(resource: Int, error: Throwable) {
         mutableState.update { it.copy(error = UiText.Resource(resource).withErrorDetails(error)) }

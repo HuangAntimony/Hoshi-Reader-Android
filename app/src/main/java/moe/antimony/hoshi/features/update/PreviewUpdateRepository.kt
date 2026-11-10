@@ -39,7 +39,7 @@ internal interface PreviewUpdateOperations {
     val records: Flow<UpdateDownloadRecord?>
     suspend fun latest(): PreviewLookup
     suspend fun refresh()
-    suspend fun download(build: PreviewBuild)
+    suspend fun download(build: PreviewBuild): Long
     suspend fun readyFile(record: UpdateDownloadRecord): File
 }
 
@@ -61,7 +61,6 @@ internal class PreviewUpdateRepository @Inject constructor(
     }
     override suspend fun download(build: PreviewBuild) = withContext(Dispatchers.IO) {
         manager.enqueue(build.apk)
-        Unit
     }
     override suspend fun readyFile(record: UpdateDownloadRecord): File = withContext(Dispatchers.IO) {
         check(record.status == UpdateDownloadRecordStatus.Downloaded) { "Preview download is not complete" }

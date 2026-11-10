@@ -14,7 +14,6 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.CancellationException
 import moe.antimony.hoshi.R
-import moe.antimony.hoshi.ui.ErrorDetailsText
 import moe.antimony.hoshi.ui.HoshiAlertDialog
 import moe.antimony.hoshi.ui.HoshiButton
 import moe.antimony.hoshi.ui.asString
@@ -65,12 +64,7 @@ internal fun PreviewUpdateEffects(model: PreviewUpdateViewModel) {
         )
     }
     state.error?.let { error ->
-        HoshiAlertDialog(
-            onDismissRequest = model::dismissError,
-            title = { Text(stringResource(R.string.dialog_error_title)) },
-            text = { ErrorDetailsText(error.asString()) },
-            confirmButton = { TextButton(onClick = model::dismissError) { Text(stringResource(R.string.action_ok)) } },
-        )
+        AboutErrorDialog(error.asString(), model::dismissError)
     }
 }
 

@@ -5,6 +5,10 @@ Release notes before v1.3.0 are in [CHANGELOG_ARCHIVE.md](CHANGELOG_ARCHIVE.md).
 
 ## [Unreleased]
 
+### Fixed
+
+- Show manual update check errors in a dialog without expanding the About update section, and stop reopening dialogs for old preview download failures.
+
 ## [v1.5.0] - 2026-11-10
 
 ### Added

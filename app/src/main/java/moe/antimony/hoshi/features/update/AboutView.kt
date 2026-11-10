@@ -206,9 +206,8 @@ fun AboutScreen(
                                     },
                                     onFailure = { error ->
                                         if (error is CancellationException) throw error
-                                        AboutUpdateCheckState.Error(
-                                            resources.getString(R.string.about_update_check_failed).withErrorDetails(error),
-                                        )
+                                        actionsModel.reportError(R.string.about_update_check_failed, error)
+                                        AboutUpdateCheckState.Idle
                                     },
                                 )
                             }

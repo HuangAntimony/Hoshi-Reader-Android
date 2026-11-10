@@ -45,11 +45,18 @@ internal fun rememberAboutLinkOpener(model: AboutActionsViewModel): (String) -> 
 internal fun AboutActionErrors(model: AboutActionsViewModel) {
     val state by model.state.collectAsStateWithLifecycle()
     state.error?.let { error ->
-        HoshiAlertDialog(onDismissRequest = model::dismissError,
-            title = { Text(stringResource(R.string.dialog_error_title)) },
-            text = { ErrorDetailsText(error.asString()) },
-            confirmButton = { TextButton(onClick = model::dismissError) { Text(stringResource(R.string.action_ok)) } })
+        AboutErrorDialog(error.asString(), model::dismissError)
     }
+}
+
+@Composable
+internal fun AboutErrorDialog(message: String, onDismiss: () -> Unit) {
+    HoshiAlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.dialog_error_title)) },
+        text = { ErrorDetailsText(message) },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_ok)) } },
+    )
 }
 
 @Composable
