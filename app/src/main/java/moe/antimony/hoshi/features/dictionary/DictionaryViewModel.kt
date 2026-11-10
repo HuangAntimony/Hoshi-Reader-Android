@@ -102,20 +102,16 @@ internal class AndroidDictionaryViewModelRepository @Inject constructor(
     ): DictionaryImportBatchResult =
         mutationCoordinator.runExclusive(DictionaryMutationOperation.Import) {
             val lowRamImport = settingsRepository.settings.first().lowRamDictionaryImport
-            var importedCount = 0
-            try {
-                runDictionaryImportBatch(items, onProgress = { item ->
-                    report(DictionaryUpdateProgress(DictionaryUpdateStage.Importing, item.displayName))
-                    onProgress(item)
-                }) { item ->
-                    importedCount += dictionaryRepository.importDictionary(
-                        contentResolver = contentResolver,
-                        uri = requireNotNull(item.uri),
-                        lowRamImport = lowRamImport,
-                    )
-                }
-            } finally {
-                if (importedCount > 0) markDictionariesChanged()
+            runDictionaryImportBatch(items, onProgress = { item ->
+                report(DictionaryUpdateProgress(DictionaryUpdateStage.Importing, item.displayName))
+                onProgress(item)
+            }) { item ->
+                dictionaryRepository.importDictionary(
+                    contentResolver = contentResolver,
+                    uri = requireNotNull(item.uri),
+                    lowRamImport = lowRamImport,
+                    onDictionariesChanged = { markDictionariesChanged() },
+                )
             }
         } ?: DictionaryImportBatchResult(imported = emptyList(), failed = emptyList())
 

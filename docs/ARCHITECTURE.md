@@ -259,6 +259,8 @@ Validation guidance and failure injection methods are in
 - Dictionaries are global under `Dictionaries/`; profile config/settings live
   under `Profiles/<profileId>/`. Enabled dictionary membership is independent
   of Anki categories: `exclude` removes aggregate Anki definitions, not lookup.
+  Manual ZIP imports replace the installed directory matching the detected type
+  and title in place, retaining its directory name for profile bindings.
 - `DictionaryLookupQueryService` atomically replaces the active native session.
   Import, term/Kanji query, deinflection, frequency, pitch, styles and media are
   owned by `third_party/hoshidicts-kotlin-bridge`; keep the parent's Kotlin ABI
@@ -593,9 +595,11 @@ and copying an asset snapshot creates independent template caches.
   ready; dictionary mutations rebuild it and profile identity changes invalidate it.
   `DictionaryRepository` captures one profile and its dictionary configuration for
   each rebuild, publishes that same identity with the ready session, and retries if
-  the active profile changes during initialization. Each committed recommended
-  import invalidates readiness and notifies the mutation coordinator, including when
-  a later download or configuration write fails. Rebuild failures leave readiness
+  the active profile changes during initialization. Committed manual and recommended
+  imports invalidate readiness and notify the mutation coordinator, including after
+  a later import step or configuration write fails. Manual directory commits share
+  the repository's lock with lookup rebuilds and media reads, which reopen the
+  installed media path. Rebuild failures leave readiness
   invalid so the next query retries; unchanged queries reuse the existing session.
   `DictionaryLookupQueryService` caches dictionary styles with the committed session
   under the same query lock. Failed rebuilds preserve the previous session and styles.

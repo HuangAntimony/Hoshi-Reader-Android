@@ -58,24 +58,24 @@ internal class DictionaryImportDataSource(
         contentResolver: ContentResolver,
         uri: Uri,
         importRootDirectory: File,
-        typeDirectories: Map<DictionaryType, File>,
-        lowRamImport: Boolean = false,
-        shouldSkip: (DictionaryType, DictionaryIndex) -> Boolean = { _, _ -> false },
-    ): Map<DictionaryType, List<ImportedDictionary>> {
+        lowRamImport: Boolean,
+        resolveTarget: (DictionaryType, ImportedDictionary) -> File,
+        publish: (commit: () -> Boolean) -> Unit,
+    ) {
         contentResolver.validateImportFile(uri, ImportFileType.DictionaryArchive)
-        return contentResolver.openInputStream(uri).use { input ->
+        contentResolver.openInputStream(uri).use { input ->
             if (input == null) throw DictionaryImportException(DictionaryImportFailureKind.FileAccess)
-            importDictionaryByDetectedTypes(input, importRootDirectory, typeDirectories, lowRamImport, shouldSkip)
+            importDictionaryByDetectedTypes(input, importRootDirectory, lowRamImport, resolveTarget, publish)
         }
     }
 
     fun importDictionaryByDetectedTypes(
         input: InputStream,
         importRootDirectory: File,
-        typeDirectories: Map<DictionaryType, File>,
-        lowRamImport: Boolean = false,
-        shouldSkip: (DictionaryType, DictionaryIndex) -> Boolean = { _, _ -> false },
-    ): Map<DictionaryType, List<ImportedDictionary>> {
+        lowRamImport: Boolean,
+        resolveTarget: (DictionaryType, ImportedDictionary) -> File,
+        publish: (commit: () -> Boolean) -> Unit,
+    ) {
         importRootDirectory.mkdirs()
         val importId = UUID.randomUUID()
         val tempZip = importRootDirectory.resolve(".dictionary-import-$importId.zip")
@@ -89,7 +89,7 @@ internal class DictionaryImportDataSource(
             if (!result.success) throw DictionaryImportException.fromNative(result.error)
             val targetTypes = result.detectedTypes()
             if (targetTypes.isEmpty()) throw DictionaryImportException(DictionaryImportFailureKind.UnsupportedContents)
-            return commitStagedDictionariesByType(stagingRoot, typeDirectories, targetTypes, shouldSkip)
+            commitStagedDictionariesByType(stagingRoot, targetTypes, resolveTarget, publish)
         } finally {
             tempZip.delete()
             stagingRoot.deleteRecursively()
@@ -147,30 +147,29 @@ internal class DictionaryImportDataSource(
 
     private fun commitStagedDictionariesByType(
         stagingRoot: File,
-        typeDirectories: Map<DictionaryType, File>,
         targetTypes: Set<DictionaryType>,
-        shouldSkip: (DictionaryType, DictionaryIndex) -> Boolean,
-    ): Map<DictionaryType, List<ImportedDictionary>> {
+        resolveTarget: (DictionaryType, ImportedDictionary) -> File,
+        publish: (commit: () -> Boolean) -> Unit,
+    ) {
         val stagedDictionaries = stagingRoot.listFiles()?.filter(File::isDirectory).orEmpty()
         if (stagedDictionaries.isEmpty()) throw DictionaryImportException(DictionaryImportFailureKind.UnsupportedContents)
-        return targetTypes.associateWith { type ->
-            val typeDirectory = requireNotNull(typeDirectories[type]) { "Missing ${type.directoryName} dictionary directory." }
-            typeDirectory.mkdirs()
-            stagedDictionaries.mapNotNull { stagedDictionary ->
-                val imported = ImportedDictionary(
-                    fileName = stagedDictionary.name,
-                    index = readDictionaryIndexFile(stagedDictionary.resolve("index.json")),
-                )
-                if (shouldSkip(type, imported.index)) {
-                    null
-                } else {
-                    val copyRoot = typeDirectory.resolve(".${stagedDictionary.name}-copy-${UUID.randomUUID()}")
-                    copyDirectory(stagedDictionary.toPath(), copyRoot.toPath())
-                    commitStagedDictionary(copyRoot, typeDirectory.resolve(stagedDictionary.name))
-                    imported
+        stagedDictionaries.forEach { stagedDictionary ->
+            val imported = ImportedDictionary(
+                fileName = stagedDictionary.name,
+                index = readDictionaryIndexFile(stagedDictionary.resolve("index.json")),
+            )
+            targetTypes.forEach { type ->
+                val copyRoot = stagingRoot.resolve(".dictionary-copy-${UUID.randomUUID()}")
+                copyDirectory(stagedDictionary.toPath(), copyRoot.toPath())
+                // The repository coordinates publication with lookup and records new directories.
+                publish {
+                    val target = resolveTarget(type, imported)
+                    val isNew = !target.exists()
+                    commitStagedDictionary(copyRoot, target)
+                    isNew
                 }
             }
-        }.filterValues { it.isNotEmpty() }
+        }
     }
 
     private fun readDictionaryIndexFile(indexFile: File): DictionaryIndex =
@@ -178,7 +177,7 @@ internal class DictionaryImportDataSource(
 
     private fun commitStagedDictionary(stagedDictionary: File, target: File) {
         val replacementBackup = target.takeIf(File::exists)?.let { existing ->
-            requireNotNull(target.parentFile).resolve(".${target.name}-replace-${UUID.randomUUID()}")
+            requireNotNull(target.parentFile).resolve(".dictionary-replace-${UUID.randomUUID()}")
                 .also { backup -> moveReplacing(existing, backup) }
         }
         try {

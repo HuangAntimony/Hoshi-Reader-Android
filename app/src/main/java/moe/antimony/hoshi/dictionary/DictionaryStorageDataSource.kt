@@ -1,6 +1,8 @@
 package moe.antimony.hoshi.dictionary
 
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.LinkOption
 import javax.inject.Inject
 import kotlinx.serialization.json.Json
 import moe.antimony.hoshi.di.FilesDir
@@ -169,6 +171,23 @@ internal class DictionaryStorageDataSource(
         loadDictionaries(type).any { dictionary ->
             dictionary.index.title == index.title
         }
+
+    fun manualImportTarget(type: DictionaryType, imported: ImportedDictionary): File {
+        val target = typeDirectory(type).resolve(imported.fileName)
+        val installed = storedDictionaries(type)
+        val atTarget = installed.firstOrNull { it.path == target }
+        if (atTarget?.index?.title == imported.index.title) return target
+
+        val matching = installed.filter { it.index.title == imported.index.title }.minByOrNull { it.path.name }
+        if (matching != null) return matching.path
+        if (Files.exists(target.toPath(), LinkOption.NOFOLLOW_LINKS)) {
+            throw DictionaryImportException(
+                DictionaryImportFailureKind.WriteFiles,
+                "Dictionary directory ${target.name} does not have a matching index title",
+            )
+        }
+        return target
+    }
 
     fun enabledDictionaryPaths(profileId: String): Map<DictionaryType, List<File>> {
         val config = loadConfig(configFile(profileId))

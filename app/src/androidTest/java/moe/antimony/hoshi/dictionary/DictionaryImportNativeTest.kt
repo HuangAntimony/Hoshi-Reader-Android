@@ -1,5 +1,6 @@
 package moe.antimony.hoshi.dictionary
 
+import android.net.Uri
 import androidx.test.platform.app.InstrumentationRegistry
 import de.manhhao.hoshi.HoshiDicts
 import java.io.File
@@ -12,6 +13,41 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class DictionaryImportNativeTest {
+    @Test
+    fun manualReimportReplacesAnInstalledV3DirectoryWithQueryableV5() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val root = File(context.cacheDir, "reimport-test-${UUID.randomUUID()}").apply { mkdirs() }
+        val storage = DictionaryStorageDataSource(root)
+        val bridge = HoshiDictionaryNativeBridge()
+        val repository = DictionaryRepository(root, storage, DictionaryImportDataSource(bridge), DictionaryLookupQueryService(bridge))
+        try {
+            val index = """{"title":"再インポート","revision":"1","format":3}"""
+            val installed = storage.typeDirectory(DictionaryType.Term).resolve("再インポート").apply { mkdirs() }
+            installed.resolve("index.json").writeText(index)
+            installed.resolve(".hoshidicts_3").writeText("")
+            installed.resolve("hash.table").writeText("old index")
+            val archive = root.resolve("reimport.zip")
+            ZipOutputStream(archive.outputStream()).use { output ->
+                output.putNextEntry(ZipEntry("index.json"))
+                output.write(index.toByteArray())
+                output.closeEntry()
+                output.putNextEntry(ZipEntry("term_bank_1.json"))
+                output.write("""[["食べる","たべる","","v1",0,["eat"],1,""]]""".toByteArray())
+                output.closeEntry()
+            }
+
+            assertEquals(1, repository.importDictionary(context.contentResolver, Uri.fromFile(archive)))
+
+            assertTrue(installed.resolve(".hoshidicts_5").isFile)
+            assertTrue(installed.resolve("phf.table").isFile)
+            assertFalse(installed.resolve(".hoshidicts_3").exists())
+            assertFalse(installed.resolve("hash.table").exists())
+            assertEquals("食べる", repository.lookup("食べる").first().term.expression)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
     @Test
     fun nativeFailuresExposeDetailsIncludingUnicodePaths() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext

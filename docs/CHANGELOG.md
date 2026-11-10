@@ -41,7 +41,7 @@ Release notes before v1.3.0 are in [CHANGELOG_ARCHIVE.md](CHANGELOG_ARCHIVE.md).
 
 - Reduce repeated work when selecting text and searching dictionaries, while refreshing lookup sessions after profile switches and partially completed dictionary imports.
 
-- Use the new dictionary index for imports and automatically migrate existing indexes when their dictionaries are first opened.
+- Use the new dictionary index for imports, replace installed dictionaries of the same type and title when reimporting their ZIPs, and automatically migrate existing indexes when their dictionaries are first opened.
 
 - Remove automatic layout corrections for publisher paragraph containers, blank spacers and image margins.
 

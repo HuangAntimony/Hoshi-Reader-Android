@@ -53,34 +53,61 @@ internal class DictionaryRepository @Inject constructor(
     fun updatableDictionaries(): List<DictionaryUpdateCandidate> =
         storage.updatableDictionaries()
 
-    fun importDictionary(contentResolver: ContentResolver, uri: Uri, lowRamImport: Boolean = false): Int {
-        val imported = importDataSource.importDictionaryByDetectedTypes(
+    fun importDictionary(
+        contentResolver: ContentResolver,
+        uri: Uri,
+        lowRamImport: Boolean = false,
+        onDictionariesChanged: () -> Unit = {},
+    ): Int = importManualDictionary(onDictionariesChanged) { publish ->
+        importDataSource.importDictionaryByDetectedTypes(
             contentResolver = contentResolver,
             uri = uri,
             importRootDirectory = storage.importRootDirectory(),
-            typeDirectories = typeDirectories(),
             lowRamImport = lowRamImport,
-            shouldSkip = { type, index -> storage.hasDictionaryWithIndex(type, index) },
-        ).values.sumOf { it.size }
-        if (imported > 0) {
-            storage.saveConfigFromStorage()
-            rebuildLookupQuery()
-        }
-        return imported
+            resolveTarget = storage::manualImportTarget,
+            publish = publish,
+        )
     }
 
-    fun importDictionary(input: InputStream, lowRamImport: Boolean = false): Int {
-        val imported = importDataSource.importDictionaryByDetectedTypes(
+    fun importDictionary(input: InputStream, lowRamImport: Boolean = false): Int = importManualDictionary({}) { publish ->
+        importDataSource.importDictionaryByDetectedTypes(
             input = input,
             importRootDirectory = storage.importRootDirectory(),
-            typeDirectories = typeDirectories(),
             lowRamImport = lowRamImport,
-            shouldSkip = { type, index -> storage.hasDictionaryWithIndex(type, index) },
-        ).values.sumOf { it.size }
-        if (imported > 0) {
-            storage.saveConfigFromStorage()
-            rebuildLookupQuery()
+            resolveTarget = storage::manualImportTarget,
+            publish = publish,
+        )
+    }
+
+    private fun importManualDictionary(
+        onDictionariesChanged: () -> Unit,
+        performImport: (publish: (commit: () -> Boolean) -> Unit) -> Unit,
+    ): Int {
+        var imported = 0
+        var addedDictionary = false
+        val importResult = runCatching {
+            performImport { commit ->
+                synchronized(lookupQueryLock) {
+                    if (commit()) addedDictionary = true
+                    lookupQueryProfile = null
+                    imported++
+                }
+            }
         }
+        if (imported > 0) {
+            val refreshResult = runCatching {
+                synchronized(lookupQueryLock) {
+                    if (addedDictionary) storage.saveConfigFromStorage()
+                    rebuildLookupQueryLocked(profileRepository.state.value.effectiveProfile)
+                }
+            }
+            onDictionariesChanged()
+            refreshResult.exceptionOrNull()?.let { refreshFailure ->
+                val importFailure = importResult.exceptionOrNull() ?: throw refreshFailure
+                importFailure.addSuppressed(refreshFailure)
+            }
+        }
+        importResult.getOrThrow()
         return imported
     }
 
@@ -268,10 +295,11 @@ internal class DictionaryRepository @Inject constructor(
         return lookupQueryService.getStyles()
     }
 
-    fun dictionaryMedia(dictionary: String, path: String): ByteArray? {
-        ensureLookupQueryReady()
-        return lookupQueryService.getMediaFile(dictionary, path)
-    }
+    fun dictionaryMedia(dictionary: String, path: String): ByteArray? =
+        synchronized(lookupQueryLock) {
+            ensureLookupQueryReady()
+            lookupQueryService.getMediaFile(dictionary, path)
+        }
 
     private fun rebuildLookupQueryLocked(profile: HoshiProfile) {
         lookupQueryProfile = null
@@ -285,7 +313,4 @@ internal class DictionaryRepository @Inject constructor(
         )
         lookupQueryProfile = profile
     }
-
-    private fun typeDirectories(): Map<DictionaryType, File> =
-        DictionaryType.entries.associateWith { type -> storage.typeDirectory(type) }
 }
