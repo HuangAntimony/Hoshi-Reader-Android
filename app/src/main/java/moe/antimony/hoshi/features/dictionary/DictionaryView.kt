@@ -28,10 +28,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Row
@@ -40,6 +42,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.clearText
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -89,7 +93,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -117,6 +120,7 @@ import moe.antimony.hoshi.importing.importDisplayName
 import moe.antimony.hoshi.ui.HoshiBlockingProgressOverlay
 import moe.antimony.hoshi.ui.asString
 import moe.antimony.hoshi.ui.hoshiTextFieldCursorBrush
+import moe.antimony.hoshi.ui.rememberSyncedTextFieldState
 import kotlin.math.roundToInt
 
 
@@ -1371,7 +1375,7 @@ private fun CollapsedDictionariesView(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DictionaryCustomCssView(
+internal fun DictionaryCustomCssView(
     settings: DictionarySettings,
     termDictionaries: List<DictionaryInfo>,
     fontManager: ReaderFontManager,
@@ -1385,23 +1389,12 @@ private fun DictionaryCustomCssView(
     var fontMenuExpanded by remember { mutableStateOf(false) }
     var selectorMenuExpanded by remember { mutableStateOf(false) }
     var customCssResetState by remember { mutableStateOf(DictionaryCustomCssResetState()) }
-    var cssFieldValue by remember {
-        mutableStateOf(
-            TextFieldValue(
-                text = settings.customCSS,
-                selection = TextRange(settings.customCSS.length),
-            ),
-        )
-    }
-
-    LaunchedEffect(settings.customCSS) {
-        if (settings.customCSS != cssFieldValue.text) {
-            cssFieldValue = TextFieldValue(
-                text = settings.customCSS,
-                selection = TextRange(settings.customCSS.length),
-            )
-        }
-    }
+    val cssScrollState = rememberScrollState()
+    val cssFieldState = rememberSyncedTextFieldState(
+        value = settings.customCSS,
+        onValueChange = { css -> onSettingsChange { it.copy(customCSS = css) } },
+        scrollState = cssScrollState,
+    )
 
     fun dispatchCustomCssReset(action: DictionaryCustomCssResetAction) {
         val nextState = dictionaryCustomCssResetStateAfter(customCssResetState, action)
@@ -1409,9 +1402,7 @@ private fun DictionaryCustomCssView(
         if (!nextState.shouldClearCss) return
 
         customCssResetState = nextState.copy(shouldClearCss = false)
-        val clearedValue = TextFieldValue(text = "", selection = TextRange.Zero)
-        cssFieldValue = clearedValue
-        onSettingsChange { it.copy(customCSS = clearedValue.text) }
+        cssFieldState.clearText()
     }
 
     if (customCssResetState.isConfirmationVisible) {
@@ -1442,12 +1433,6 @@ private fun DictionaryCustomCssView(
         )
     }
 
-    fun insertCssText(text: String) {
-        val nextValue = insertCustomCssText(cssFieldValue, text)
-        cssFieldValue = nextValue
-        onSettingsChange { it.copy(customCSS = nextValue.text) }
-    }
-
     SettingsDetailScaffold(
         state = SettingsLoadState.Loaded(settings),
         title = stringResource(R.string.dictionary_custom_css),
@@ -1469,6 +1454,8 @@ private fun DictionaryCustomCssView(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .consumeWindowInsets(innerPadding)
+                .imePadding()
                 .padding(16.dp),
             shape = RoundedCornerShape(18.dp),
             color = hoshiSurfaces.group,
@@ -1502,7 +1489,7 @@ private fun DictionaryCustomCssView(
                                     text = { Text(fontName) },
                                     onClick = {
                                         fontMenuExpanded = false
-                                        insertCssText(
+                                        cssFieldState.insertCustomCssText(
                                             fontFamilyCssDeclaration(fontManager.cssFontName(fontName)),
                                         )
                                     },
@@ -1533,7 +1520,7 @@ private fun DictionaryCustomCssView(
                                     text = { Text(title) },
                                     onClick = {
                                         selectorMenuExpanded = false
-                                        insertCssText(dictionarySelectorCssSnippet(title))
+                                        cssFieldState.insertCustomCssText(dictionarySelectorCssSnippet(title))
                                     },
                                 )
                             }
@@ -1542,11 +1529,8 @@ private fun DictionaryCustomCssView(
                 }
                 HorizontalDivider(color = colorScheme.outlineVariant)
                 BasicTextField(
-                    value = cssFieldValue,
-                    onValueChange = { value ->
-                        cssFieldValue = value
-                        onSettingsChange { it.copy(customCSS = value.text) }
-                    },
+                    state = cssFieldState,
+                    scrollState = cssScrollState,
                     textStyle = MaterialTheme.typography.bodyLarge.copy(color = colorScheme.onSurface),
                     cursorBrush = hoshiTextFieldCursorBrush(colorScheme.onSurface),
                     modifier = Modifier
@@ -1558,18 +1542,12 @@ private fun DictionaryCustomCssView(
     }
 }
 
-internal fun insertCustomCssText(
-    value: TextFieldValue,
-    insertedText: String,
-): TextFieldValue {
-    val start = value.selection.min.coerceIn(0, value.text.length)
-    val end = value.selection.max.coerceIn(start, value.text.length)
-    val nextText = buildString {
-        append(value.text.substring(0, start))
-        append(insertedText)
-        append(value.text.substring(end))
+internal fun TextFieldState.insertCustomCssText(insertedText: String) {
+    edit {
+        val start = selection.min
+        replace(start, selection.max, insertedText)
+        selection = TextRange(start + insertedText.length)
     }
-    return TextFieldValue(nextText, selection = TextRange(start + insertedText.length))
 }
 
 internal fun dictionarySelectorCssSnippet(dictionaryTitle: String): String =

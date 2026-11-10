@@ -1,7 +1,7 @@
 package moe.antimony.hoshi.features.dictionary
 
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.ui.text.TextRange
-import androidx.compose.ui.text.input.TextFieldValue
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -21,14 +21,14 @@ class DictionaryCustomCssEditorTest {
 
     @Test
     fun cssInsertionReplacesCurrentSelectionAndMovesCursorAfterInsertedText() {
-        val current = TextFieldValue(
-            text = "body { color: red; }",
-            selection = TextRange(7, 18),
+        val state = TextFieldState(
+            initialText = "body { color: red; }",
+            initialSelection = TextRange(7, 18),
         )
 
-        val inserted = insertCustomCssText(current, "font-family: \"Klee\" !important;")
+        state.insertCustomCssText("font-family: \"Klee\" !important;")
 
-        assertEquals("body { font-family: \"Klee\" !important; }", inserted.text)
-        assertEquals(TextRange(38), inserted.selection)
+        assertEquals("body { font-family: \"Klee\" !important; }", state.text.toString())
+        assertEquals(TextRange(38), state.selection)
     }
 }

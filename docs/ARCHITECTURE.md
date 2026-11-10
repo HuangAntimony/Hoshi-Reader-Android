@@ -109,6 +109,9 @@ Names without an extension are searchable types, not necessarily filenames.
 
 ### UI and localization contracts
 
+- The edge-to-edge `MainActivity` requests `adjustResize` for keyboard insets.
+  Settings content that resizes for the keyboard applies `imePadding()` after
+  consuming any scaffold padding it already applied.
 - App-authored visible text uses resources in both `values/strings.xml` and
   `values-zh-rCN/strings.xml`, following [TRANSLATING.md](TRANSLATING.md).
   Compose uses `stringResource`/`pluralStringResource`;

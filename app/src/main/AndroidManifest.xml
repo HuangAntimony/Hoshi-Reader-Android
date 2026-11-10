@@ -86,7 +86,8 @@
             android:exported="true"
             android:label="${appLabel}"
             android:launchMode="singleTop"
-            android:theme="@style/Theme.HoshiReader">
+            android:theme="@style/Theme.HoshiReader"
+            android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
