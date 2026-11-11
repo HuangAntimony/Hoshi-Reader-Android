@@ -38,4 +38,18 @@ class ReaderTextFilterTest {
         assertEquals("𠮟猫犬A", filtered)
         assertEquals(4, filtered.codePointCount(0, filtered.length))
     }
+
+    @Test
+    fun paragraphTextIgnoresSourceLineBreaksInsideMarkup() {
+        // Ruby written across source lines (as in some publishers' EPUBs) is one word, not three lines.
+        val html = "<body><p>彼は<ruby>\r\n<rb>完</rb>\r\n <rt>かん</rt>\r\n <rb>膚</rb>\r\n <rt>ぷ</rt>\r\n</ruby>なきまでに。</p>\n" +
+            "<p>次<br/>の行。</p></body>"
+
+        val lines = html.visibleReaderText(preserveParagraphs = true).split('\n')
+            .map { line -> line.filterNot(Char::isWhitespace) }
+            .filter(String::isNotEmpty)
+
+        assertEquals(listOf("彼は完膚なきまでに。", "次", "の行。"), lines)
+        assertEquals("彼は完膚なきまでに。次の行。", html.visibleReaderText().filterNot(Char::isWhitespace))
+    }
 }
