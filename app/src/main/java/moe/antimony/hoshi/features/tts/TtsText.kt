@@ -157,9 +157,8 @@ object TtsText {
                     var cursor = from
                     fun count(a: Int, b: Int) = matchable[b] - matchable[a]
                     while (cursor < until) {
-                        val point = chapterText.codePointAt(cursor)
-                        val next = cursor + Character.charCount(point)
-                        if (point <= Char.MAX_VALUE.code && point.toChar() in "、,，─；;") {
+                        val next = clausePunctuationEnd(chapterText, cursor, until)
+                        if (next > cursor) {
                             val cut = trailingEnd(next, until)
                             if (safe(cut) && count(fragment, next) >= 2 && count(cut, until) >= 2 &&
                                 chapterText.substring(next, cut).none { it in "。！？!?" }) {
@@ -167,13 +166,23 @@ object TtsText {
                                 fragment = cut
                             }
                             cursor = cut
-                        } else cursor = next
+                        } else cursor += Character.charCount(chapterText.codePointAt(cursor))
                     }
                 }
             }
             splitQuotes(sentence.copy(roles = TtsDialogue.slice(roles, start, end)), cuts.map { it - start })
         }
         return TtsChapterText(sentences, imageBefore)
+    }
+
+    private fun clausePunctuationEnd(text: String, start: Int, limit: Int): Int {
+        val mark = text[start]
+        if (mark in "、,，─；;") return start + 1
+        if (mark !in "…‥⋯—―.．") return start
+        // Consume the whole run at a new boundary. A single dot may be part of a number.
+        var end = start + 1
+        while (end < limit && text[end] == mark) end++
+        return if (mark in ".．" && end - start < 3) start else end
     }
 
     private fun splitQuotes(sentence: TtsSentence, cuts: List<Int>): List<TtsSentence> {

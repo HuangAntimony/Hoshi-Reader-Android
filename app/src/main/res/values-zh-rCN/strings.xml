@@ -1010,7 +1010,7 @@
     <string name="tts_dialogue_sample_ko" comment="Korean dialogue sample; keep in Korean.">그녀는 창문을 열었다. “오늘은 날씨가 좋네요.” 그녀가 미소를 지으며 말했다.</string>
     <string name="tts_profile_language">音色语言：%1$s</string>
     <string name="tts_split_clauses">短句细分</string>
-    <string name="tts_split_clauses_hint">在逗号、分号及分句横线处细分，便于停顿、跳转和重播。</string>
+    <string name="tts_split_clauses_hint">在逗号、分号、省略号和分句横线处细分，便于停顿、跳转和重播。</string>
     <string name="tts_sample">こんにちは。日本語の読み上げを始めます。</string>
     <string name="tts_dialogue_routing">区分旁白与对白</string>
     <string name="tts_narration_voice">旁白音色</string>
