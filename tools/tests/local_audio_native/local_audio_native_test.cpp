@@ -86,6 +86,8 @@ void createFixture(const std::filesystem::path& path, const char* journal = "PRA
         "INSERT INTO entries VALUES ('辞典😀','猫𠮷','ねこ','猫.MP3',NULL);"
         "INSERT INTO entries VALUES ('辞典😀','猫','ねこ','猫.ogg','音声😀');"
         "INSERT INTO entries VALUES ('alt','猫𠮷',NULL,'alt.OPUS','');"
+        "INSERT INTO entries VALUES ('alt','他','ほか','unsupported.aac','');"
+        "INSERT INTO entries VALUES ('辞典😀','他',NULL,'other.mp3','');"
         "INSERT INTO entries VALUES ('excluded','他',NULL,'unsupported.aac','');"
         "INSERT INTO entries VALUES ('nul','before'||char(0)||'after',NULL,'empty.mp3','');"
         "INSERT INTO android VALUES ('辞典😀','猫.MP3',randomblob(24000));"
@@ -150,7 +152,10 @@ void testQueries(const std::filesystem::path& fixture) {
     });
     check(hits == 3, "embedded NUL bound to SQLite");
     std::vector<std::string> sources;
-    database->querySources([&](std::string_view source) { sources.emplace_back(source); });
+    database->querySources([&](std::string_view source, bool hasReading) {
+        check(hasReading == (source == "辞典😀"), "supported source reading coverage");
+        sources.emplace_back(source);
+    });
     std::sort(sources.begin(), sources.end());
     check(sources == std::vector<std::string>{"alt", "nul", "辞典😀"}, "distinct supported sources");
     check(database->loadAudio("辞典😀", "猫.MP3", [&](std::span<const std::byte> audio) {
@@ -255,7 +260,7 @@ void testMutation(const std::filesystem::path& fixture) {
             "reject stat change even when pages are cached");
     database = Database::open(file.fd, 0, -1);
     check(unlink(fixture.c_str()) == 0, "unlink fixture");
-    rejects([&] { database->querySources([](std::string_view) {}); },
+    rejects([&] { database->querySources([](std::string_view, bool) {}); },
             "reject deleted source even though the owned descriptor is still readable");
 }
 
@@ -316,12 +321,14 @@ void benchmark(const std::filesystem::path& path) {
     std::cout << "Host SQLite " << sqlite3_libversion() << ", database bytes=" << database->sizeBytes()
               << ", FD session open=" << elapsedMicros(started) << "us\n";
     std::vector<std::string> fdSources;
-    database->querySources([&](std::string_view source) { fdSources.emplace_back(source); });
+    database->querySources([&](std::string_view source, bool) { fdSources.emplace_back(source); });
     Statement sources(stock, "SELECT DISTINCT source FROM entries "
                              "WHERE lower(file) LIKE '%.mp3' OR lower(file) LIKE '%.opus' OR lower(file) LIKE '%.ogg'");
     std::vector<std::string> stockSources;
     int step;
     while ((step = sqlite3_step(sources.stmt)) == SQLITE_ROW) stockSources.push_back(*column(sources.stmt, 0));
+    std::sort(stockSources.begin(), stockSources.end());
+    std::sort(fdSources.begin(), fdSources.end());
     check(step == SQLITE_DONE && stockSources == fdSources, "corpus source parity");
     std::vector<double> fdLookup, stockLookup, fdLoad, stockLoad;
     unsigned audioFound = 0;

@@ -91,11 +91,13 @@ class LocalAudioRepository internal constructor(
         try {
             acquired = access.takeReadPermission(uri)
             candidate = access.openDocument(uri)
+            val sources = candidate.querySources()
             val binding = LocalAudioBinding(
                 generation = generation, displayName = name, sizeBytes = candidate.sizeBytes,
                 uri = uri, fingerprint = candidate.fingerprint,
                 ownsGrant = acquired || (old.active?.uri == uri && old.active.ownsGrant),
-                sources = LocalAudioSourceConfig.defaultFor(candidate.querySources().toSet()),
+                sources = LocalAudioSourceConfig.defaultFor(sources.keys),
+                sourcesWithoutReadings = sources.filterValues { !it }.keys,
             )
             currentCoroutineContext().ensureActive()
             val retained = old.active?.takeIf { it.uri == null } ?: old.retainedPrivate
@@ -147,10 +149,12 @@ class LocalAudioRepository internal constructor(
             }
             if (expected != null && copied != expected) throw IOException("Incomplete audio database copy: copied $copied of $expected bytes.")
             val binding = access.openPrivate(staging).use { database ->
+                val sources = database.querySources()
                 LocalAudioBinding(
                     generation = generation, displayName = name, sizeBytes = database.sizeBytes,
                     privateFileName = destination.name, fingerprint = database.fingerprint,
-                    sources = LocalAudioSourceConfig.defaultFor(database.querySources().toSet()),
+                    sources = LocalAudioSourceConfig.defaultFor(sources.keys),
+                    sourcesWithoutReadings = sources.filterValues { !it }.keys,
                 )
             }
             currentCoroutineContext().ensureActive()
@@ -201,11 +205,10 @@ class LocalAudioRepository internal constructor(
         // Settings refresh reopens the document so revoked grants/removal are visible promptly.
         if (active.uri != null) closeSession()
         val database = database(active)
-        if (!reset && active.sources.sourceOrder.isNotEmpty()) return@locked active.sources
-        val available = database.querySources().toSet()
-        val config = if (reset) LocalAudioSourceConfig.defaultFor(available) else active.sources.repair(available)
-        updateBinding(active.copy(sources = config, fingerprint = database.fingerprint))
-        config
+        if (!reset && (active.sources.sourceOrder.isNotEmpty() || active.sourcesWithoutReadings != null)) {
+            return@locked active.sources
+        }
+        return@locked refreshSources(active, database, reset).sources
     }
 
     suspend fun updateSourceOrder(sourceOrder: List<String>): LocalAudioSourceConfig = locked {
@@ -226,12 +229,14 @@ class LocalAudioRepository internal constructor(
     suspend fun findAudio(term: String, reading: String): LocalAudioEntry? = locked {
         val active = readState().active ?: return@locked null
         val normalized = LocalAudioResolver.katakanaToHiragana(reading)
-        val config = queryConfig(active)
+        val binding = lookupBinding(active)
+        val config = binding.sources
         if (config.sourceOrder.all { it in config.disabledSources }) return@locked null
         val database = database(active)
         findWithLowercaseFallback(term) { queryTerm ->
             LocalAudioResolver.resolve(
                 queryTerm, normalized, database.queryEntries(queryTerm, normalized), config.sourceOrder, config.disabledSources,
+                sourcesWithoutReadings = checkNotNull(binding.sourcesWithoutReadings),
             )
         }
     }
@@ -239,13 +244,15 @@ class LocalAudioRepository internal constructor(
     suspend fun findAudioCandidates(term: String, reading: String): List<LocalAudioCandidate> = locked {
         val active = readState().active ?: return@locked emptyList()
         val normalized = LocalAudioResolver.katakanaToHiragana(reading)
-        val config = queryConfig(active)
+        val binding = lookupBinding(active)
+        val config = binding.sources
         if (config.sourceOrder.all { it in config.disabledSources }) return@locked emptyList()
         val database = database(active)
         findWithLowercaseFallback(term) { queryTerm ->
             LocalAudioResolver.resolveCandidates(
                 queryTerm, normalized, database.queryEntries(queryTerm, normalized), config.sourceOrder, config.disabledSources,
                 generation = active.generation,
+                sourcesWithoutReadings = checkNotNull(binding.sourcesWithoutReadings),
             ).takeIf { it.isNotEmpty() }
         }.orEmpty()
     }
@@ -262,11 +269,27 @@ class LocalAudioRepository internal constructor(
         database(active).loadAudio(file.source, file.file)
     }
 
-    private fun queryConfig(binding: LocalAudioBinding): LocalAudioSourceConfig {
-        if (binding.sources.sourceOrder.isNotEmpty()) return binding.sources
-        val config = binding.sources.repair(database(binding).querySources().toSet())
-        updateBinding(binding.copy(sources = config))
-        return config
+    private fun lookupBinding(binding: LocalAudioBinding): LocalAudioBinding {
+        if (binding.sourcesWithoutReadings != null) return binding
+        return refreshSources(binding, database(binding), reset = false)
+    }
+
+    private fun refreshSources(
+        binding: LocalAudioBinding,
+        database: LocalAudioDatabaseSession,
+        reset: Boolean,
+    ): LocalAudioBinding {
+        val sources = database.querySources()
+        val config = when {
+            reset -> LocalAudioSourceConfig.defaultFor(sources.keys)
+            binding.sources.sourceOrder.isEmpty() -> binding.sources.repair(sources.keys)
+            else -> binding.sources
+        }
+        return binding.copy(
+            sources = config,
+            sourcesWithoutReadings = sources.filterValues { !it }.keys,
+            fingerprint = database.fingerprint,
+        ).also(::updateBinding)
     }
 
     private fun database(binding: LocalAudioBinding): LocalAudioDatabaseSession {

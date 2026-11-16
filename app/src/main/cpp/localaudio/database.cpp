@@ -4,6 +4,7 @@
 #include <cstring>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 #include <utility>
 
 namespace hoshi::local_audio {
@@ -17,7 +18,7 @@ constexpr char entriesByExpression[] =
 constexpr char entriesByExpressionOrReading[] =
     "SELECT source,expression,reading,file,display FROM main.entries WHERE expression = ? OR reading = ?";
 constexpr char sourcesQuery[] =
-    "SELECT DISTINCT source FROM main.entries "
+    "SELECT DISTINCT source COLLATE BINARY, reading IS NOT NULL FROM main.entries "
     "WHERE lower(file) LIKE '%.mp3' OR lower(file) LIKE '%.opus' OR lower(file) LIKE '%.ogg'";
 constexpr char audioQuery[] = "SELECT data FROM main.android WHERE source = ? AND file = ? LIMIT 1";
 
@@ -148,12 +149,19 @@ void Database::queryEntries(std::string_view term, std::optional<std::string_vie
     impl_->source.verifyUnchanged();
 }
 
-void Database::querySources(const std::function<void(std::string_view)>& accept) {
+void Database::querySources(const std::function<void(std::string_view, bool)>& accept) {
     impl_->startQuery();
     sqlite3_stmt* query = impl_->sources.get();
     const ResetStatement reset(query);
-    while (impl_->step(query)) accept(impl_->requiredText(query, 0));
+    std::unordered_map<std::string, bool> sources;
+    while (impl_->step(query)) {
+        const auto source = impl_->requiredText(query, 0);
+        const bool hasReading = sqlite3_column_int(query, 1) != 0;
+        auto& sourceHasReading = sources[std::string(source)];
+        sourceHasReading |= hasReading;
+    }
     impl_->source.verifyUnchanged();
+    for (const auto& [source, hasReading] : sources) accept(source, hasReading);
 }
 
 bool Database::loadAudio(std::string_view source, std::string_view file,

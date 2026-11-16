@@ -25,7 +25,7 @@ internal class LocalAudioNativeDatabase private constructor(
         }
 
     @Synchronized
-    fun querySources(): List<String> =
+    fun querySources(): Map<String, Boolean> =
         LocalAudioNativeBridge.querySources(requireHandle())
 
     @Synchronized
@@ -72,7 +72,7 @@ private object LocalAudioNativeBridge {
     external fun open(fd: Int, offset: Long, length: Long): Long
     external fun sizeBytes(handle: Long): Long
     external fun queryEntries(handle: Long, term: ByteArray, reading: ByteArray?): List<Array<String?>>
-    external fun querySources(handle: Long): List<String>
+    external fun querySources(handle: Long): Map<String, Boolean>
     external fun loadAudio(handle: Long, source: ByteArray, file: ByteArray): ByteArray?
     external fun statistics(handle: Long): LongArray
     external fun close(handle: Long)

@@ -185,10 +185,16 @@ Java_moe_antimony_hoshi_features_audio_LocalAudioNativeBridge_querySources(
     JNIEnv* env, jobject, jlong handle) {
     return call<jobject>(env, [&] {
         const Utf8Strings strings(env);
-        JavaList sources(env);
-        database(handle)->querySources([&](std::string_view source) {
-            const LocalRef value(env, strings.create(source));
-            sources.add(value.get());
+        const LocalRef mapType(env, env->FindClass("java/util/HashMap"));
+        const auto put = method(env, mapType.get(), "put", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
+        LocalRef sources(env, env->NewObject(mapType.get(), method(env, mapType.get(), "<init>", "()V")));
+        const LocalRef booleanType(env, env->FindClass("java/lang/Boolean"));
+        const auto valueOf = env->GetStaticMethodID(booleanType.get(), "valueOf", "(Z)Ljava/lang/Boolean;");
+        checkJava(env);
+        database(handle)->querySources([&](std::string_view source, bool hasReading) {
+            const LocalRef key(env, strings.create(source));
+            const LocalRef value(env, env->CallStaticObjectMethod(booleanType.get(), valueOf, static_cast<jboolean>(hasReading)));
+            const LocalRef previous(env, env->CallObjectMethod(sources.get(), put, key.get(), value.get()));
         });
         return sources.release();
     });

@@ -81,7 +81,7 @@ class LocalAudioNativeDeviceTest {
             assertEquals(4, rows.size)
             assertEquals(2, rows.count { it.expression == "𠮷野" && it.reading == "よしの" })
             assertEquals(listOf(LocalAudioEntry(source, "食べる", null, "食べる.MP3")), database.queryEntries("食べる", ""))
-            assertEquals(setOf(source, "別の話者"), database.querySources().toSet())
+            assertEquals(mapOf(source to true, "別の話者" to true), database.querySources())
             assertArrayEquals(fixtureAudio(), database.loadAudio(source, "𠮷野.opus"))
             assertArrayEquals(byteArrayOf(2), database.loadAudio("別の話者", "𠮷野.opus"))
             assertNull(database.loadAudio("別の話者", "欠損.opus"))

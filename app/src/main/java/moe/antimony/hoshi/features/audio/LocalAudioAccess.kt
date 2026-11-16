@@ -18,7 +18,8 @@ internal interface LocalAudioDatabaseSession : Closeable {
     val sizeBytes: Long
     val fingerprint: String
     fun queryEntries(term: String, reading: String): List<LocalAudioEntry>
-    fun querySources(): List<String>
+    /** Reports whether each supported source has any non-NULL reading. */
+    fun querySources(): Map<String, Boolean>
     fun loadAudio(source: String, file: String): ByteArray?
 }
 

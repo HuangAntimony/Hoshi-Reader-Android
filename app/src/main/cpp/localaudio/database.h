@@ -36,7 +36,7 @@ public:
     Statistics statistics() const;
     void queryEntries(std::string_view term, std::optional<std::string_view> reading,
                       const std::function<void(const Entry&)>& accept);
-    void querySources(const std::function<void(std::string_view)>& accept);
+    void querySources(const std::function<void(std::string_view, bool hasReading)>& accept);
     bool loadAudio(std::string_view source, std::string_view file,
                    const std::function<void(std::span<const std::byte>)>& accept);
 

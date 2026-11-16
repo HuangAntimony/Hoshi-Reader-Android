@@ -20,6 +20,7 @@ internal data class LocalAudioBinding(
     val fingerprint: String = "",
     val ownsGrant: Boolean = false,
     val sources: LocalAudioSourceConfig = LocalAudioSourceConfig(),
+    val sourcesWithoutReadings: Set<String>? = null,
 ) {
     fun info() = LocalAudioDatabaseInfo(displayName, sizeBytes, uri != null, generation)
 }

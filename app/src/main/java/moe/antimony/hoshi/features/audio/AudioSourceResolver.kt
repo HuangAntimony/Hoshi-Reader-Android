@@ -49,28 +49,33 @@ object LocalAudioResolver {
         term: String,
         reading: String,
         rows: List<LocalAudioEntry>,
-        sourceOrder: List<String> = LocalAudioSourceOrder.defaultOrder(rows.map { it.source }),
+        sourceOrder: List<String> = emptyList(),
         disabledSources: Set<String> = emptySet(),
-    ): LocalAudioEntry? = rankedEntries(term, reading, rows, sourceOrder, disabledSources).firstOrNull()
+        sourcesWithoutReadings: Set<String> = emptySet(),
+    ): LocalAudioEntry? = rankedEntries(term, reading, rows, sourceOrder, disabledSources, sourcesWithoutReadings)
+        .firstOrNull()?.entry
 
     fun resolveCandidates(
         term: String,
         reading: String,
         rows: List<LocalAudioEntry>,
-        sourceOrder: List<String> = LocalAudioSourceOrder.defaultOrder(rows.map { it.source }),
+        sourceOrder: List<String> = emptyList(),
         disabledSources: Set<String> = emptySet(),
         generation: String? = null,
-    ): List<LocalAudioCandidate> {
-        val normalizedReading = katakanaToHiragana(reading)
-        return rankedEntries(term, normalizedReading, rows, sourceOrder, disabledSources)
-            .map { entry ->
+        sourcesWithoutReadings: Set<String> = emptySet(),
+    ): List<LocalAudioCandidate> =
+        rankedEntries(term, reading, rows, sourceOrder, disabledSources, sourcesWithoutReadings)
+            .map { (entry, match) ->
                 LocalAudioCandidate(
-                    name = entry.candidateName(term, normalizedReading),
+                    name = entry.candidateName(match),
                     url = audioUrl(entry.source, entry.file, generation),
                 )
             }
             .distinctBy(LocalAudioCandidate::url)
-    }
+
+    private enum class Match { Exact, Reading, Expression }
+
+    private data class MatchedEntry(val entry: LocalAudioEntry, val match: Match)
 
     private fun rankedEntries(
         term: String,
@@ -78,22 +83,32 @@ object LocalAudioResolver {
         rows: List<LocalAudioEntry>,
         sourceOrder: List<String>,
         disabledSources: Set<String>,
-    ): List<LocalAudioEntry> {
-        val normalizedReading = katakanaToHiragana(reading)
-        val sourceRank = sourceOrder.withIndex().associate { it.value to it.index }
+        sourcesWithoutReadings: Set<String>,
+    ): List<MatchedEntry> {
+        val targetReading = katakanaToHiragana(reading).takeUnless(String::isBlank)
+        val unlistedSources = rows.map { it.source }.toSet() - sourceOrder.toSet()
+        val rankedSources = sourceOrder + LocalAudioSourceOrder.defaultOrder(unlistedSources)
+        val sourceRank = rankedSources.withIndex().associate { it.value to it.index }
         return rows
             .asSequence()
             .filterNot { it.source in disabledSources }
-            .filter { it.expression == term || (!it.reading.isNullOrBlank() && it.reading == normalizedReading) }
             .filter { isSupportedAudioFile(it.file) }
+            .mapNotNull { entry ->
+                val expressionMatches = entry.expression == term
+                val readingMatches = targetReading != null && entry.reading == targetReading
+                val match = when {
+                    expressionMatches && (targetReading == null || readingMatches ||
+                        (entry.reading == null && entry.source in sourcesWithoutReadings)) -> Match.Exact
+                    readingMatches -> Match.Reading
+                    expressionMatches -> Match.Expression
+                    else -> return@mapNotNull null
+                }
+                MatchedEntry(entry, match)
+            }
             .sortedWith(
-                compareBy<LocalAudioEntry> {
-                    it.localAudioMatchRank(term, normalizedReading)
-                }.thenBy {
-                    sourceRank[it.source] ?: Int.MAX_VALUE
-                }.thenBy {
-                    it.reading.orEmpty()
-                },
+                compareBy<MatchedEntry> { it.match }
+                    .thenBy { sourceRank[it.entry.source] ?: Int.MAX_VALUE }
+                    .thenBy { it.entry.reading.orEmpty() },
             )
             .toList()
     }
@@ -128,29 +143,17 @@ object LocalAudioResolver {
             else -> "application/octet-stream"
         }
 
-    private fun LocalAudioEntry.localAudioMatchRank(term: String, normalizedReading: String): Int {
-        val readingMatches = normalizedReading.isNotBlank() && reading == normalizedReading
-        val expressionMatches = expression == term
-        return when {
-            normalizedReading.isBlank() && expressionMatches -> 0
-            expressionMatches && (reading == null || readingMatches) -> 0
-            readingMatches -> 1
-            expressionMatches -> 2
-            else -> 3
-        }
-    }
-
-    private fun LocalAudioEntry.candidateName(term: String, normalizedReading: String): String {
+    private fun LocalAudioEntry.candidateName(match: Match): String {
         val template = sourceDisplayNames[source]
         val sourceName = when {
             template == null -> source
             "%s" in template -> template.replace("%s", display)
             else -> template
         }
-        val matchDescription = when (localAudioMatchRank(term, normalizedReading)) {
-            1 -> " ($expression)"
-            2 -> " (${reading.orEmpty()})"
-            else -> ""
+        val matchDescription = when (match) {
+            Match.Exact -> ""
+            Match.Reading -> " ($expression)"
+            Match.Expression -> reading?.let { " ($it)" }.orEmpty()
         }
         return sourceName.trim() + matchDescription
     }

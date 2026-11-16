@@ -294,6 +294,10 @@ Validation guidance and failure injection methods are in
   reclaims only abandoned generated files, preserving active/retained references.
   Candidate URLs carry a binding generation so stale popups cannot read a newly
   selected database. External bindings restored without URI grants need reselection.
+  The source scan records which sources have no non-NULL readings among supported
+  audio entries. The repository persists that set with the binding and fills it
+  on first lookup for older bindings. Only those sources can rank a spelling-only
+  match alongside an exact spelling and reading match.
 - `LocalAudioNativeDatabase`/`app/src/main/cpp/localaudio` own bundled SQLite and a
   read-only FD VFS: duplicate the provider FD, honor its offset/length, use 64-bit
   positioned reads, retain four prepared queries and an approximately 4 MiB page

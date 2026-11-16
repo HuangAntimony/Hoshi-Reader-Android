@@ -82,6 +82,40 @@ class LocalAudioBindingTest {
         assertEquals("second", f.repository.loadAudio(LocalAudioFile("nhk16", "clip.mp3"))!!.decodeToString())
     }
 
+    @Test fun priorityForMissingReadingsUsesTheWholeSource() = runBlocking {
+        val f = Fixture()
+        val nhkUnknown = LocalAudioEntry("nhk16", "一重", null, "nhk.mp3")
+        val jpodExact = LocalAudioEntry("jpod", "一重", "ひとえ", "jpod.mp3")
+        val forvoUnknown = LocalAudioEntry("forvo", "一重", null, "forvo.mp3")
+        f.access.entries = listOf(
+            nhkUnknown, jpodExact, forvoUnknown,
+            LocalAudioEntry("nhk16", "食べる", "たべる", "unrelated.mp3"),
+        )
+        f.repository.importDatabase("content://audio/one", LocalAudioImportMode.Link)
+        f.repository.updateSourceOrder(listOf("nhk16", "forvo", "jpod"))
+
+        assertEquals(forvoUnknown, f.restarted().findAudio("一重", "ひとえ"))
+        assertEquals(1, f.access.sourceQueries)
+    }
+
+    @Test fun oldBindingScansSourcesOnceAndKeepsConfiguredOrder() = runBlocking {
+        val f = Fixture()
+        val legacy = f.root.resolve(AudioSettings.LocalAudioPath)
+        requireNotNull(legacy.parentFile).mkdirs()
+        legacy.writeText("first")
+        f.root.resolve(AudioSettings.LocalAudioSourceConfigPath).writeText("""{"sourceOrder":["forvo","nhk16"]}""")
+        f.access.entries = listOf(
+            LocalAudioEntry("nhk16", "一重", "ひとえ", "nhk.mp3"),
+            LocalAudioEntry("forvo", "一重", null, "forvo.mp3"),
+        )
+
+        repeat(2) {
+            val candidates = f.restarted().findAudioCandidates("一重", "ひとえ")
+            assertEquals("forvo.mp3", LocalAudioResolver.parseAudioUrl(candidates.first().url)?.file)
+        }
+        assertEquals(1, f.access.sourceQueries)
+    }
+
     @Test fun capitalizedTermsRetryWithTheEntireTermLowercased() = runBlocking {
         val f = Fixture()
         val hello = LocalAudioEntry("nhk16", "hello", null, "hello.mp3")
@@ -219,6 +253,7 @@ class LocalAudioBindingTest {
         val entryQueries = mutableListOf<Pair<String, String>>()
         var streamOpens = 0
         var databaseOpens = 0
+        var sourceQueries = 0
         var declaredSize: Long? = null
         override fun validateDocument(uri: String) = "android.db"
         override fun documentSize(uri: String) = declaredSize ?: documents.getValue(uri).length.toLong()
@@ -237,7 +272,12 @@ class LocalAudioBindingTest {
                     entryQueries += term to reading
                     return entries.filter { it.expression == term || (reading.isNotBlank() && it.reading == reading) }
                 }
-                override fun querySources() = listOf("nhk16", "forvo")
+                override fun querySources(): Map<String, Boolean> {
+                    sourceQueries++
+                    return (listOf("nhk16", "forvo") + entries.map { it.source }).associateWith { source ->
+                        entries.any { it.source == source && it.reading != null && LocalAudioResolver.isSupportedAudioFile(it.file) }
+                    }
+                }
                 override fun loadAudio(source: String, file: String) = content.toByteArray()
                 override fun close() = Unit
             }
