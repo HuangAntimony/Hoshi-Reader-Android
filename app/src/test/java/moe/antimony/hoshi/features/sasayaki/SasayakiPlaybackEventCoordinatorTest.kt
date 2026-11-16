@@ -100,6 +100,8 @@ class SasayakiPlaybackEventCoordinatorTest {
 
     private object NoopPlaybackRepository : SasayakiPlaybackRepository {
         override suspend fun load() = null
+        override suspend fun saveVolumeGainDb(value: Int) = Unit
+
         override suspend fun save(playback: moe.antimony.hoshi.epub.SasayakiPlaybackData) = Unit
     }
 }

@@ -214,6 +214,10 @@ class SasayakiPlaybackLifecycleControllerTest {
             events += "engine-pause"
         }
 
+        override val volumeGainError = null
+
+        override fun setVolumeGainDb(gainDb: Int) = Unit
+
         override fun setRate(rate: Float) {
             events += "engine-rate:$rate"
         }

@@ -192,9 +192,12 @@ fun ReaderWebView(
     }
     var sasayakiPlaybackData by remember(bookRoot) { mutableStateOf<SasayakiPlaybackData?>(null) }
     var isSasayakiPlaybackLoaded by remember(bookRoot) { mutableStateOf(bookRoot == null) }
-    LaunchedEffect(bookRoot, bookRepository) {
+    val sasayakiPlaybackRepository = remember(bookRoot, bookRepository) {
+        bookRoot?.let { BookSasayakiPlaybackRepository(it, bookRepository) }
+    }
+    LaunchedEffect(bookRoot, sasayakiPlaybackRepository) {
         isSasayakiPlaybackLoaded = bookRoot == null
-        sasayakiPlaybackData = bookRoot?.let { bookRepository.loadSasayakiPlayback(it) }
+        sasayakiPlaybackData = sasayakiPlaybackRepository?.load()
         isSasayakiPlaybackLoaded = true
     }
     val sasayakiAudioRepository = remember(bookRoot) { bookRoot?.let(::SasayakiAudioRepository) }
@@ -1711,11 +1714,11 @@ fun ReaderWebView(
     LaunchedEffect(bookRoot, isSasayakiMatchLoaded, isSasayakiPlaybackLoaded, sasayakiPlaybackData) {
         cancelReaderAutoPage()
         sasayakiPlayer?.release()
-        sasayakiPlayer = if (bookRoot != null && isSasayakiMatchLoaded && isSasayakiPlaybackLoaded) {
+        sasayakiPlayer = if (bookRoot != null && sasayakiPlaybackRepository != null && isSasayakiMatchLoaded && isSasayakiPlaybackLoaded) {
             SasayakiPlayer(
                 bookId = bookId,
                 bookRoot = bookRoot,
-                playbackRepository = BookSasayakiPlaybackRepository(bookRoot, bookRepository),
+                playbackRepository = sasayakiPlaybackRepository,
                 bookTitle = book.title,
                 bookCoverFile = sasayakiCoverFile,
                 matchData = sasayakiMatchData,

@@ -111,6 +111,8 @@ class ReaderSentenceRestartTest {
             controller = SasayakiPlaybackController(
                 context, root, object : SasayakiPlaybackRepository {
                     override suspend fun load(): SasayakiPlaybackData? = null
+                    override suspend fun saveVolumeGainDb(value: Int) = Unit
+
                     override suspend fun save(playback: SasayakiPlaybackData) = Unit
                 }, "Fixture", null,
                 SasayakiMatchData(listOf(

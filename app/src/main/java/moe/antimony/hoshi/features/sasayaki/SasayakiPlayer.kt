@@ -68,6 +68,7 @@ class SasayakiPlayer private constructor(
     val hasMatch: Boolean get() = controller.hasMatch
     val delay: Double get() = controller.delay
     val rate: Float get() = controller.rate
+    val volumeGainError: UiText? get() = controller.volumeGainError
     val audioStorageSummary: String get() = controller.audioStorageSummary
 
     suspend fun flushSaves() = controller.flushSaves()
@@ -78,9 +79,17 @@ class SasayakiPlayer private constructor(
         controller.setDelay(value)
     }
 
+    fun saveDelay() = controller.saveDelay()
+
     fun setRate(value: Float) {
         controller.setRate(value)
     }
+
+    fun saveRate() = controller.saveRate()
+
+    fun setVolumeGainDb(value: Int) = controller.setVolumeGainDb(value)
+
+    fun saveVolumeGain() = controller.saveVolumeGain()
 
     fun importAudio(audioUri: Uri, copiedAudioFileName: String? = null) {
         controller.importAudio(audioUri = audioUri, copiedAudioFileName = copiedAudioFileName)

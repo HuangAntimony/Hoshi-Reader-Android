@@ -47,7 +47,7 @@ internal fun TtsSynthesisControls(settings: TtsSettings, voice: TtsVoiceInfo?, o
     TtsParameterSlider(R.string.tts_synthesis_volume, options.volume,
         if (source == TtsOnlineSource.GoogleCloud) -96f..16f else -100f..100f,
         if (source == TtsOnlineSource.GoogleCloud) 111 else 199,
-        { stringResource(if (source == TtsOnlineSource.GoogleCloud) R.string.tts_decibels else R.string.tts_relative_percent, it.roundToInt()) },
+        { stringResource(if (source == TtsOnlineSource.GoogleCloud) R.string.audio_decibels_signed else R.string.tts_relative_percent, it.roundToInt()) },
     ) { value -> update { current -> current.copy(volume = value) } }
 
     if (source.usesAzureRest) {

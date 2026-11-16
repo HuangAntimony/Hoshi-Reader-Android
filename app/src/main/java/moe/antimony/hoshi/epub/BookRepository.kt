@@ -29,6 +29,9 @@ import kotlinx.serialization.builtins.nullable
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
 import moe.antimony.hoshi.features.sync.Timestamped
 import moe.antimony.hoshi.features.sync.SyncFormat
 import moe.antimony.hoshi.features.sync.appleDateMilliseconds
@@ -372,10 +375,20 @@ class BookRepository private constructor(
     override suspend fun saveSasayakiPlayback(bookRoot: File, playback: SasayakiPlaybackData) = storageLock.withLock {
         val stored = loadSasayakiPlayback(bookRoot)
         val changed = stored?.lastPosition != playback.lastPosition || stored.delay != playback.delay || stored.rate != playback.rate
-        sidecarDataSource.saveSasayakiPlayback(bookRoot, playback.copy(modified = if (changed) System.currentTimeMillis() else stored.modified))
+        sidecarDataSource.saveSasayakiPlayback(
+            bookRoot,
+            playback.copy(
+                modified = if (changed) System.currentTimeMillis() else stored.modified,
+                // Progress snapshots can predate an independently saved volume change.
+                volumeGainDb = stored?.volumeGainDb ?: 0,
+            ),
+        )
         if (changed) onBookChange?.invoke(bookRoot.name.syncKey(), null)
         Unit
     }
+
+    internal suspend fun saveSasayakiVolumeGain(bookRoot: File, gainDb: Int) =
+        sidecarDataSource.saveSasayakiVolumeGain(bookRoot, gainDb)
 
     suspend fun applySasayakiPlayback(bookRoot: File, playback: SasayakiPlaybackData) =
         sidecarDataSource.saveSasayakiPlayback(bookRoot, playback)
@@ -965,6 +978,24 @@ class BookSidecarDataSource(
 
     suspend fun saveSasayakiPlayback(bookRoot: File, playback: SasayakiPlaybackData) {
         saveJson(bookRoot, SASAYAKI_PLAYBACK_FILE_NAME, SasayakiPlaybackData.serializer(), playback)
+    }
+
+    // Take the lock before dispatching I/O so completed slider gestures save in order.
+    suspend fun saveSasayakiVolumeGain(bookRoot: File, gainDb: Int) = storageLock.withLock {
+        withContext(ioDispatcher) {
+            check(bookRoot.isDirectory) { "Audiobook book directory is unavailable" }
+            val file = bookRoot.resolve(SASAYAKI_PLAYBACK_FILE_NAME)
+            val contents = if (file.exists()) {
+                json.parseToJsonElement(file.readText()).jsonObject
+            } else {
+                JsonObject(mapOf("lastPosition" to JsonPrimitive(0.0)))
+            }
+            val gain = JsonPrimitive(gainDb)
+            if (gain != contents["volumeGainDb"]) {
+                val updated = JsonObject(contents + ("volumeGainDb" to gain))
+                writeBookJson(file, json.encodeToString(JsonObject.serializer(), updated))
+            }
+        }
     }
 
     suspend fun loadShelfList(booksRoot: File): Map<String, Timestamped<Int?>> = locked {

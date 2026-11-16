@@ -704,6 +704,11 @@
     <string name="sasayaki_copy_audiobook_to_storage_help">Keep a private copy instead of linking to the selected external media file</string>
     <string name="sasayaki_delay">Delay</string>
     <string name="sasayaki_speed" comment="Sasayaki setting label, intentionally matching the statistics speed metric noun.">Speed</string>
+    <string name="sasayaki_volume_gain">Volume adjustment</string>
+    <string name="audio_decibels_signed" comment="Signed audio gain used for audiobook playback and TTS synthesis.">%1$+d dB</string>
+    <string name="sasayaki_volume_gain_zero">0 dB</string>
+    <string name="sasayaki_volume_boost_failed">Couldn’t boost audiobook volume. Playing at the original volume.</string>
+    <string name="sasayaki_volume_gain_save_failed">Couldn’t save the audiobook volume adjustment.</string>
     <string name="sasayaki_reader_controls">Reader Controls</string>
     <string name="sasayaki_show_bottom_playback_controls">Pin Playback Controls to Safe Area</string>
     <string name="sasayaki_show_bottom_playback_controls_help">Show rewind, play or pause, and fast-forward controls in the bottom safe area.</string>
@@ -1057,7 +1062,6 @@
     <string name="tts_sentence_pause_hint" comment="TTS synthesis parameter">Hoshi waits between sentences during continuous reading. This delay is not included in exported audio.</string>
     <string name="tts_synthesis_volume" comment="TTS synthesis parameter">Synthesis volume</string>
     <string name="tts_milliseconds" comment="TTS synthesis parameter">%1$d ms</string>
-    <string name="tts_decibels" comment="TTS synthesis parameter">%1$+d dB</string>
     <string name="tts_relative_percent" comment="TTS synthesis parameter">%1$+d%%</string>
     <string name="tts_speaking_style" comment="TTS synthesis parameter">Speaking style</string>
     <string name="tts_style_degree" comment="TTS synthesis parameter">Style intensity</string>

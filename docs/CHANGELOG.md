@@ -5,6 +5,10 @@ Release notes before v1.3.0 are in [CHANGELOG_ARCHIVE.md](CHANGELOG_ARCHIVE.md).
 
 ## [Unreleased]
 
+### Added
+
+- Boost or reduce playback volume for individual audiobooks. ([#181](https://github.com/HuangAntimony/Hoshi-Reader-Android/issues/181))
+
 ### Fixed
 
 - Show manual update check errors in a dialog without expanding the About update section, and stop reopening dialogs for old preview download failures.

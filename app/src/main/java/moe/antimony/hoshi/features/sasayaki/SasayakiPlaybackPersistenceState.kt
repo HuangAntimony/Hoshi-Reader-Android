@@ -14,6 +14,10 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import moe.antimony.hoshi.R
+import moe.antimony.hoshi.epub.SasayakiVolumeGainRange
+import moe.antimony.hoshi.ui.UiText
+import moe.antimony.hoshi.ui.withErrorDetails
 
 class SasayakiPlaybackPersistenceState(
     private val playbackRepository: SasayakiPlaybackRepository,
@@ -21,8 +25,11 @@ class SasayakiPlaybackPersistenceState(
     initialPlayback: SasayakiPlaybackData?,
     private val persistenceScope: CoroutineScope,
     private val persistenceDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val onVolumeGainChanged: (Int) -> Unit = {},
 ) {
-    var playback by mutableStateOf(initialPlayback ?: SasayakiPlaybackData(lastPosition = 0.0))
+    var playback by mutableStateOf(initialPlayback?.let {
+        it.copy(volumeGainDb = it.volumeGainDb.coerceIn(SasayakiVolumeGainRange))
+    } ?: SasayakiPlaybackData(lastPosition = 0.0))
         private set
 
     private var saveJob: Job? = null
@@ -30,27 +37,58 @@ class SasayakiPlaybackPersistenceState(
     private var pendingSave: SasayakiPlaybackData? = null
     private var saveWorkerRunning = false
 
-    val delay: Double get() = playback.delay
-    val rate: Float get() = playback.rate
+    private var confirmedVolumeGainDb = playback.volumeGainDb
+    var volumeGainSaveError by mutableStateOf<UiText?>(null)
+        private set
+    private var volumeGainSaveJob: Job? = null
+
     val audioStorageSummary: String
         get() = audioSourceRepository.storageSummary(playback)
 
     suspend fun flush() {
         saveJob?.join()
+        volumeGainSaveJob?.join()
     }
 
     fun applySyncedPlayback(value: SasayakiPlaybackData) {
-        playback = value
+        playback = value.copy(volumeGainDb = playback.volumeGainDb)
     }
 
     fun setDelay(value: Double) {
+        if (value == playback.delay) return
         playback = playback.copy(delay = value)
         save()
     }
 
     fun setRate(value: Float) {
+        if (value == playback.rate) return
         playback = playback.copy(rate = value)
         save()
+    }
+
+    fun setVolumeGainDb(value: Int) {
+        val gain = value.coerceIn(SasayakiVolumeGainRange)
+        if (gain == playback.volumeGainDb) return
+        volumeGainSaveError = null
+        playback = playback.copy(volumeGainDb = gain)
+        onVolumeGainChanged(gain)
+    }
+
+    fun saveVolumeGain() {
+        val gain = playback.volumeGainDb
+        volumeGainSaveError = null
+        volumeGainSaveJob = persistenceScope.launch(start = CoroutineStart.UNDISPATCHED) {
+            try {
+                playbackRepository.saveVolumeGainDb(gain)
+                confirmedVolumeGainDb = gain
+            } catch (error: Exception) {
+                val message = UiText.Resource(R.string.sasayaki_volume_gain_save_failed).withErrorDetails(error)
+                if (playback.volumeGainDb == gain) {
+                    setVolumeGainDb(confirmedVolumeGainDb)
+                    volumeGainSaveError = message
+                }
+            }
+        }
     }
 
     fun importAudio(audioUri: Uri, copiedAudioFileName: String?) {

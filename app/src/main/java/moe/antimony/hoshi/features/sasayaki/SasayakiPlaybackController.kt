@@ -8,6 +8,9 @@ import android.content.Context
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import moe.antimony.hoshi.ui.UiText
@@ -25,12 +28,17 @@ internal interface SasayakiPlaybackControllerContract {
     val hasMatch: Boolean
     val delay: Double
     val rate: Float
+    val volumeGainError: UiText?
     val audioStorageSummary: String
 
     suspend fun flushSaves()
     fun applySyncedPlayback(value: SasayakiPlaybackData)
     fun setDelay(value: Double)
+    fun saveDelay()
     fun setRate(value: Float)
+    fun saveRate()
+    fun setVolumeGainDb(value: Int)
+    fun saveVolumeGain()
     fun importAudio(audioUri: Uri, copiedAudioFileName: String?)
     fun clearAudio()
     fun togglePlayback()
@@ -84,6 +92,7 @@ internal class SasayakiPlaybackController(
         initialPlayback = initialPlayback,
         persistenceScope = persistenceScope,
         persistenceDispatcher = persistenceDispatcher,
+        onVolumeGainChanged = ::applyVolumeGain,
     )
     private val handler = if (tickScheduler == null) Handler(Looper.getMainLooper()) else null
     private val cueNavigation = SasayakiCueNavigationController(matchData)
@@ -147,6 +156,9 @@ internal class SasayakiPlaybackController(
     private var autoPageHoldResumePending = false
     private var hasCues = matchData?.matches?.isNotEmpty() == true
     private var mediaSentence: String? = null
+    // Progress saves use the playback snapshot, so keep slider previews out of it.
+    private var delayPreview by mutableStateOf<Double?>(null)
+    private var ratePreview by mutableStateOf<Float?>(null)
 
     override val playback: SasayakiPlaybackData get() = playbackPersistence.playback
     override val currentTime: Double get() = playbackState.currentTime
@@ -161,8 +173,10 @@ internal class SasayakiPlaybackController(
     override var readerSkipButtonAction: SasayakiReaderSkipButtonAction = SasayakiReaderSkipButtonAction.Cue
     override val hasAudio: Boolean get() = audioAvailability.hasAudio
     override val hasMatch: Boolean get() = matchData != null
-    override val delay: Double get() = playback.delay
-    override val rate: Float get() = playback.rate
+    override val delay: Double get() = delayPreview ?: playback.delay
+    override val rate: Float get() = ratePreview ?: playback.rate
+    override val volumeGainError: UiText?
+        get() = playbackPersistence.volumeGainSaveError ?: playbackLifecycle.volumeGainError
     override val audioStorageSummary: String
         get() = playbackPersistence.audioStorageSummary
 
@@ -181,18 +195,38 @@ internal class SasayakiPlaybackController(
         playbackPersistence.applySyncedPlayback(value)
         playbackState.applySyncedPosition(value.lastPosition)
         updateMediaSentence(currentTime)
-        playbackLifecycle.setRate(value.rate)
+        playbackLifecycle.setRate(rate)
         playbackLifecycle.beginSeek(value.lastPosition, startPlayback = isPlaying, updateCue = false, savePosition = false, displayCue = null)
     }
 
     override fun setDelay(value: Double) {
-        playbackPersistence.setDelay(value)
+        delayPreview = value
         updateCue(currentTime)
     }
 
+    override fun saveDelay() {
+        playbackPersistence.setDelay(delay)
+        delayPreview = null
+    }
+
     override fun setRate(value: Float) {
-        playbackPersistence.setRate(value)
+        ratePreview = value
         playbackLifecycle.setRate(value)
+    }
+
+    override fun saveRate() {
+        playbackPersistence.setRate(rate)
+        ratePreview = null
+    }
+
+    override fun setVolumeGainDb(value: Int) {
+        if (!released && hasAudio) playbackPersistence.setVolumeGainDb(value)
+    }
+
+    override fun saveVolumeGain() = playbackPersistence.saveVolumeGain()
+
+    private fun applyVolumeGain(value: Int) {
+        playbackLifecycle.setVolumeGainDb(value)
     }
 
     override fun importAudio(audioUri: Uri, copiedAudioFileName: String?) {
@@ -493,16 +527,10 @@ internal class SasayakiPlaybackController(
     private fun withPreparedPlayback(runPreparedCommand: () -> Boolean): Boolean =
         deferredPlaybackCommand.run(
             hasPreparedEngine = playbackLifecycle.hasEngine,
-            requestPlaybackEnvironment = { onReady ->
-                onPlaybackStartRequested {
-                    if (restoreAudio()) {
-                        onReady()
-                    } else {
-                        deferredPlaybackCommand.cancel()
-                    }
-                }
+            requestPlaybackEnvironment = onPlaybackStartRequested,
+            runPreparedCommand = {
+                (playbackLifecycle.hasEngine || restoreAudio()) && runPreparedCommand()
             },
-            runPreparedCommand = runPreparedCommand,
         )
 
     private fun handleSeekComplete() {
@@ -538,6 +566,7 @@ internal class SasayakiPlaybackController(
                 ),
             )
         }.onFailure(::handleAudioRestoreFailure).getOrNull() ?: return false
+        applyVolumeGain(playback.volumeGainDb)
         handleAudioPrepared(durationMs = result.durationMs, currentTime = currentTime)
         return true
     }
@@ -660,7 +689,7 @@ internal class SasayakiPlaybackController(
 }
 
 internal class SasayakiDeferredPlaybackCommand {
-    private var pending = false
+    private var pending: Any? = null
 
     fun run(
         hasPreparedEngine: Boolean,
@@ -668,20 +697,21 @@ internal class SasayakiDeferredPlaybackCommand {
         runPreparedCommand: () -> Boolean,
     ): Boolean {
         if (hasPreparedEngine) {
-            pending = false
+            cancel()
             return runPreparedCommand()
         }
-        if (pending) return false
-        pending = true
+        if (pending != null) return false
+        val request = Any()
+        pending = request
         requestPlaybackEnvironment {
-            if (!pending) return@requestPlaybackEnvironment
-            pending = false
+            if (pending !== request) return@requestPlaybackEnvironment
+            pending = null
             runPreparedCommand()
         }
         return false
     }
 
     fun cancel() {
-        pending = false
+        pending = null
     }
 }

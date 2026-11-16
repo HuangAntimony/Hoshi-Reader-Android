@@ -3,6 +3,7 @@ package moe.antimony.hoshi.features.sasayaki
 import moe.antimony.hoshi.epub.SasayakiMatch
 
 import android.os.Handler
+import moe.antimony.hoshi.ui.UiText
 
 interface SasayakiTickScheduler {
     fun postTick()
@@ -30,6 +31,8 @@ class SasayakiPlaybackLifecycleController(
     private var engine: SasayakiPlaybackEngine? = null
     val hasEngine: Boolean
         get() = engine != null
+    val volumeGainError: UiText?
+        get() = engine?.volumeGainError
 
     fun attachEngine(engine: SasayakiPlaybackEngine) {
         this.engine = engine
@@ -37,6 +40,10 @@ class SasayakiPlaybackLifecycleController(
 
     fun setRate(rate: Float) {
         engine?.setRate(rate)
+    }
+
+    fun setVolumeGainDb(gainDb: Int) {
+        engine?.setVolumeGainDb(gainDb)
     }
 
     fun start(

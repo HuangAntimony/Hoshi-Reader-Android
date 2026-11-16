@@ -38,6 +38,8 @@ class SasayakiPagePlaybackDeviceTest {
         val cues = mutableListOf<String>()
         val repository = object : SasayakiPlaybackRepository {
             override suspend fun load(): SasayakiPlaybackData? = null
+            override suspend fun saveVolumeGainDb(value: Int) = Unit
+
             override suspend fun save(playback: SasayakiPlaybackData) = Unit
         }
         try {

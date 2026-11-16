@@ -45,7 +45,9 @@ class SasayakiPlayerFacadeTest {
         val player = playerFor(controller)
 
         player.setDelay(0.5)
+        player.saveDelay()
         player.setRate(1.5f)
+        player.saveRate()
         player.clearAudio()
         player.togglePlayback()
         player.pausePlayback()
@@ -65,7 +67,9 @@ class SasayakiPlayerFacadeTest {
         assertEquals(
             listOf(
                 "setDelay:0.5",
+                "saveDelay",
                 "setRate:1.5",
+                "saveRate",
                 "clearAudio",
                 "togglePlayback",
                 "pausePlayback:true",
@@ -129,6 +133,8 @@ class SasayakiPlayerFacadeTest {
     private object NoOpPlaybackRepository : SasayakiPlaybackRepository {
         override suspend fun load(): SasayakiPlaybackData? = null
 
+        override suspend fun saveVolumeGainDb(value: Int) = Unit
+
         override suspend fun save(playback: SasayakiPlaybackData) = Unit
     }
 
@@ -168,6 +174,7 @@ class SasayakiPlayerFacadeTest {
         override val hasMatch = true
         override val delay = 0.35
         override val rate = 1.25f
+        override val volumeGainError = null
         override val audioStorageSummary = "content URI"
         val commands = mutableListOf<String>()
         override suspend fun flushSaves() = Unit
@@ -177,8 +184,19 @@ class SasayakiPlayerFacadeTest {
             commands += "setDelay:$value"
         }
 
+        override fun saveDelay() {
+            commands += "saveDelay"
+        }
+
+        override fun setVolumeGainDb(value: Int) = Unit
+        override fun saveVolumeGain() = Unit
+
         override fun setRate(value: Float) {
             commands += "setRate:$value"
+        }
+
+        override fun saveRate() {
+            commands += "saveRate"
         }
 
         override fun importAudio(audioUri: android.net.Uri, copiedAudioFileName: String?) {

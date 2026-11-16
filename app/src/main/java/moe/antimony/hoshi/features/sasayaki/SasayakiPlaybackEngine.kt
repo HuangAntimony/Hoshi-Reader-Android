@@ -1,6 +1,11 @@
 package moe.antimony.hoshi.features.sasayaki
 
+import android.content.Context
 import android.net.Uri
+import androidx.annotation.OptIn
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -8,8 +13,12 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import java.io.File
+import moe.antimony.hoshi.R
+import moe.antimony.hoshi.ui.UiText
+import moe.antimony.hoshi.ui.withErrorDetails
 
 sealed interface SasayakiPlaybackSource {
     data class ExternalUri(val uri: Uri) : SasayakiPlaybackSource
@@ -19,10 +28,12 @@ sealed interface SasayakiPlaybackSource {
 interface SasayakiPlaybackEngine {
     val durationMs: Int
     val currentPositionMs: Int
+    val volumeGainError: UiText?
 
     fun start(rate: Float)
     fun pause()
     fun setRate(rate: Float)
+    fun setVolumeGainDb(gainDb: Int)
     fun seekTo(positionMs: Int)
     fun release()
 }
@@ -31,6 +42,7 @@ internal interface Media3SasayakiPlayerHandle {
     val player: Player
     val durationMs: Int
     val currentPositionMs: Int
+    val volumeGainError: UiText?
 
     fun setAudioAttributes(audioAttributes: AudioAttributes, handleAudioFocus: Boolean)
     fun setMediaItem(mediaItem: MediaItem)
@@ -39,6 +51,7 @@ internal interface Media3SasayakiPlayerHandle {
     fun prepare()
     fun seekTo(positionMs: Long)
     fun setRate(rate: Float)
+    fun setVolumeGainDb(gainDb: Int)
     fun play()
     fun pause()
     fun stop()
@@ -46,9 +59,33 @@ internal interface Media3SasayakiPlayerHandle {
     fun release()
 }
 
+@OptIn(UnstableApi::class)
 internal class ExoPlayerSasayakiPlayerHandle(
     private val exoPlayer: ExoPlayer,
 ) : Media3SasayakiPlayerHandle {
+    override var volumeGainError by mutableStateOf<UiText?>(null)
+        private set
+
+    private val volumeGain = SasayakiVolumeGainOutput(
+        setPlayerVolume = exoPlayer::setVolume,
+        createEffect = ::AndroidSasayakiLoudnessEffect,
+        onError = { error ->
+            volumeGainError = error?.let {
+                UiText.Resource(R.string.sasayaki_volume_boost_failed).withErrorDetails(it)
+            }
+        },
+    )
+    private val audioSessionListener = object : Player.Listener {
+        override fun onAudioSessionIdChanged(audioSessionId: Int) {
+            volumeGain.setAudioSessionId(audioSessionId)
+        }
+    }
+
+    init {
+        exoPlayer.addListener(audioSessionListener)
+        volumeGain.setAudioSessionId(exoPlayer.audioSessionId)
+    }
+
     override val player: Player
         get() = exoPlayer
     override val durationMs: Int
@@ -84,6 +121,10 @@ internal class ExoPlayerSasayakiPlayerHandle(
         exoPlayer.playbackParameters = playbackParameters(rate)
     }
 
+    override fun setVolumeGainDb(gainDb: Int) {
+        volumeGain.setGainDb(gainDb)
+    }
+
     override fun play() {
         exoPlayer.play()
     }
@@ -101,7 +142,14 @@ internal class ExoPlayerSasayakiPlayerHandle(
     }
 
     override fun release() {
+        exoPlayer.removeListener(audioSessionListener)
+        setVolumeGainDb(0)
         exoPlayer.release()
+    }
+
+    companion object {
+        fun createServicePlayer(context: Context): ExoPlayerSasayakiPlayerHandle =
+            ExoPlayerSasayakiPlayerHandle(ExoPlayer.Builder(context).setWakeMode(C.WAKE_MODE_LOCAL).build())
     }
 }
 
@@ -124,6 +172,9 @@ class Media3SasayakiPlaybackEngine private constructor(
     override val currentPositionMs: Int
         get() = player.currentPositionMs
 
+    override val volumeGainError: UiText?
+        get() = player.volumeGainError
+
     override fun start(rate: Float) {
         player.setRate(rate)
         player.play()
@@ -135,6 +186,10 @@ class Media3SasayakiPlaybackEngine private constructor(
 
     override fun setRate(rate: Float) {
         player.setRate(rate)
+    }
+
+    override fun setVolumeGainDb(gainDb: Int) {
+        player.setVolumeGainDb(gainDb)
     }
 
     override fun seekTo(positionMs: Int) {

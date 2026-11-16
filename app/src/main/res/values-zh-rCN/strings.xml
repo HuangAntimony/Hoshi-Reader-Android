@@ -702,6 +702,11 @@
     <string name="sasayaki_copy_audiobook_to_storage_help">保留私有副本，而不是链接到所选外部媒体文件</string>
     <string name="sasayaki_delay">延迟</string>
     <string name="sasayaki_speed" comment="Sasayaki setting label, intentionally matching the statistics speed metric noun.">速度</string>
+    <string name="sasayaki_volume_gain">音量调节</string>
+    <string name="audio_decibels_signed" comment="Signed audio gain used for audiobook playback and TTS synthesis.">%1$+d dB</string>
+    <string name="sasayaki_volume_gain_zero">0 dB</string>
+    <string name="sasayaki_volume_boost_failed">无法增强有声书音量，已按原始音量播放。</string>
+    <string name="sasayaki_volume_gain_save_failed">无法保存有声书的音量调节。</string>
     <string name="sasayaki_reader_controls">阅读器控制</string>
     <string name="sasayaki_show_bottom_playback_controls">固定播放控制到底部安全区</string>
     <string name="sasayaki_show_bottom_playback_controls_help">在底部安全区显示后退、播放或暂停和快进控制。</string>
@@ -1054,7 +1059,6 @@
     <string name="tts_sentence_pause_hint" comment="TTS synthesis parameter">连续朗读时由 Hoshi 在两句间等待，此时长不会加入导出的音频。</string>
     <string name="tts_synthesis_volume" comment="TTS synthesis parameter">合成音量</string>
     <string name="tts_milliseconds" comment="TTS synthesis parameter">%1$d 毫秒</string>
-    <string name="tts_decibels" comment="TTS synthesis parameter">%1$+d dB</string>
     <string name="tts_relative_percent" comment="TTS synthesis parameter">%1$+d%%</string>
     <string name="tts_speaking_style" comment="TTS synthesis parameter">语气</string>
     <string name="tts_style_degree" comment="TTS synthesis parameter">语气强度</string>

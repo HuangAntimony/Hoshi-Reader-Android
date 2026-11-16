@@ -90,6 +90,10 @@ class SasayakiPlaybackCommandCoordinatorTest {
 
         override fun start(rate: Float) = Unit
         override fun pause() = Unit
+        override val volumeGainError = null
+
+        override fun setVolumeGainDb(gainDb: Int) = Unit
+
         override fun setRate(rate: Float) = Unit
         override fun seekTo(positionMs: Int) = Unit
         override fun release() = Unit

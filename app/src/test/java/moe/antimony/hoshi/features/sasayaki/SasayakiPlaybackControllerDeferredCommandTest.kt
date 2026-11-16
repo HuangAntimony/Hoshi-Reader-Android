@@ -16,6 +16,74 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
 class SasayakiPlaybackControllerDeferredCommandTest {
+    @Test fun previewsDelayAndRateUntilTheirSlidersFinish() {
+        val saved = mutableListOf<SasayakiPlaybackData>()
+        val sentences = mutableListOf<String?>()
+        val harness = controllerHarness(
+            matchData = SasayakiMatchData(
+                listOf(
+                    SasayakiMatch("first", 3.0, 4.0, "first", 0, 0, 5),
+                    SasayakiMatch("second", 4.0, 5.0, "second", 0, 5, 6),
+                ),
+                0,
+            ),
+            initialPosition = 4.2,
+            onMediaSentenceChanged = { sentences += it },
+            playbackRepository = object : SasayakiPlaybackRepository {
+                override suspend fun load(): SasayakiPlaybackData? = null
+                override suspend fun saveVolumeGainDb(value: Int) = Unit
+                override suspend fun save(playback: SasayakiPlaybackData) {
+                    saved += playback
+                }
+            },
+        )
+        val controller = harness.controller
+        controller.togglePlayback()
+        assertEquals("second", sentences.last())
+        val writesBeforeDrag = saved.size
+
+        controller.setDelay(0.25)
+        controller.setDelay(0.5)
+        controller.setRate(1.25f)
+        controller.setRate(1.5f)
+
+        assertEquals("first", sentences.last())
+        assertEquals(0.5, controller.delay, 0.0)
+        assertEquals(1.5f, controller.rate)
+        assertEquals(listOf("rate:1.25", "rate:1.5"), harness.engine.events.takeLast(2))
+        assertEquals(writesBeforeDrag, saved.size)
+
+        harness.engine.reportPosition(5_000, 30_000)
+        val progress = saved.last()
+        assertEquals(writesBeforeDrag + 1, saved.size)
+        assertEquals(5.0, progress.lastPosition, 0.0)
+        assertEquals(0.0, progress.delay, 0.0)
+        assertEquals(1f, progress.rate)
+
+        controller.saveDelay()
+        controller.saveRate()
+        assertEquals(
+            listOf(progress.copy(delay = 0.5), progress.copy(delay = 0.5, rate = 1.5f)),
+            saved.drop(writesBeforeDrag + 1),
+        )
+        assertEquals(0.5, controller.delay, 0.0)
+        assertEquals(1.5f, controller.rate)
+    }
+
+    @Test fun lateServiceReadinessDoesNotRestoreReleasedBookOrItsGain() {
+        var serviceReady: (() -> Unit)? = null
+        val harness = controllerHarness(
+            initialGainDb = 6,
+            onPlaybackStartRequested = { serviceReady = it },
+        )
+        harness.controller.togglePlayback()
+        harness.controller.release()
+        requireNotNull(serviceReady).invoke()
+
+        assertFalse(harness.preparer.prepared)
+        assertTrue(harness.engine.events.isEmpty())
+    }
+
     @Test fun audioFailureClearsTheMediaSentence() {
         val sentences = mutableListOf<String?>()
         val harness = controllerHarness(
@@ -665,6 +733,9 @@ class SasayakiPlaybackControllerDeferredCommandTest {
         onCue: (SasayakiMatch, Boolean, SasayakiCueRevealSource) -> Unit = { _, _, _ -> },
         onClearCue: () -> Unit = {},
         onMediaSentenceChanged: (String?) -> Unit = {},
+        initialGainDb: Int = 0,
+        onPlaybackStartRequested: (() -> Unit) -> Unit = { it() },
+        playbackRepository: SasayakiPlaybackRepository = NoOpPlaybackRepository,
     ): ControllerHarness {
         val bookRoot = temporaryFolder.newFolder()
         val audioFile = bookRoot.resolve("Sasayaki/sasayaki_audio.m4b").also { file ->
@@ -676,13 +747,14 @@ class SasayakiPlaybackControllerDeferredCommandTest {
         val controller = SasayakiPlaybackController(
             context = FakeContext(temporaryFolder.newFolder()),
             bookRoot = bookRoot,
-            playbackRepository = NoOpPlaybackRepository,
+            playbackRepository = playbackRepository,
             bookTitle = "Book",
             bookCoverFile = null,
             matchData = matchData,
             initialPlayback = SasayakiPlaybackData(
                 lastPosition = initialPosition,
                 audioFileName = audioFile.name,
+                volumeGainDb = initialGainDb,
             ),
             persistenceScope = CoroutineScope(Dispatchers.Unconfined),
             persistenceDispatcher = Dispatchers.Unconfined,
@@ -690,7 +762,7 @@ class SasayakiPlaybackControllerDeferredCommandTest {
             onCue = onCue,
             onClearCue = onClearCue,
             playbackPreparer = preparer,
-            onPlaybackStartRequested = { onReady -> onReady() },
+            onPlaybackStartRequested = onPlaybackStartRequested,
             restoreAudioOnCreate = false,
             tickScheduler = NoOpTickScheduler,
             onMediaSentenceChanged = onMediaSentenceChanged,
@@ -714,6 +786,8 @@ class SasayakiPlaybackControllerDeferredCommandTest {
 
     private object NoOpPlaybackRepository : SasayakiPlaybackRepository {
         override suspend fun load(): SasayakiPlaybackData? = null
+
+        override suspend fun saveVolumeGainDb(value: Int) = Unit
 
         override suspend fun save(playback: SasayakiPlaybackData) = Unit
     }
@@ -765,6 +839,10 @@ class SasayakiPlaybackControllerDeferredCommandTest {
         override fun pause() {
             events += "pause"
         }
+
+        override val volumeGainError = null
+
+        override fun setVolumeGainDb(gainDb: Int) = Unit
 
         override fun setRate(rate: Float) {
             events += "rate:$rate"

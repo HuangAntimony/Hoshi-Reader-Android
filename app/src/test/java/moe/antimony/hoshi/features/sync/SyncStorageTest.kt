@@ -304,6 +304,10 @@ class SyncStorageTest {
         repository.saveSasayakiPlayback(root, SasayakiPlaybackData(12.4, audioUri = "content://audio", audioFileName = "local.m4b"))
         storage.prepareLibrary()
         val snapshot = storage.loadBook("book-a")!!
+        repository.saveSasayakiVolumeGain(root, -6)
+        assertEquals(snapshot.audiobook, storage.loadBook("book-a")!!.audiobook)
+        val stalePlayback = repository.loadSasayakiPlayback(root)!!.copy(volumeGainDb = 0)
+        repository.saveSasayakiPlayback(root, stalePlayback)
         val playbackChanges = mutableListOf<Boolean>()
         storage.applyReaderState = { _, _, _, changed, _ -> playbackChanges += changed }
 
@@ -318,6 +322,7 @@ class SyncStorageTest {
         assertEquals(1.5f, applied.rate)
         assertEquals("content://audio", applied.audioUri)
         assertEquals("local.m4b", applied.audioFileName)
+        assertEquals(-6, applied.volumeGainDb)
     }
 
     @Test fun localShelvesAndSessionEditsMarkPending() = runBlocking {

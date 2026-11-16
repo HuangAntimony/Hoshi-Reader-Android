@@ -8,11 +8,9 @@ import android.os.Handler
 import android.os.Looper
 import moe.antimony.hoshi.ui.appLanguageContext
 import androidx.annotation.OptIn
-import androidx.media3.common.C
 import androidx.media3.common.ForwardingPlayer
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.CommandButton
 import androidx.media3.session.MediaController
 import androidx.media3.session.MediaSession
@@ -93,11 +91,7 @@ internal class SasayakiPlaybackServiceRuntime @Inject constructor(
     fun createServiceSession(serviceContext: Context): MediaSession {
         session?.let { return it }
 
-        val createdPlayer = ExoPlayerSasayakiPlayerHandle(
-            ExoPlayer.Builder(serviceContext)
-                .setWakeMode(C.WAKE_MODE_LOCAL)
-                .build(),
-        ).apply {
+        val createdPlayer = ExoPlayerSasayakiPlayerHandle.createServicePlayer(serviceContext).apply {
             setAudioAttributes(sasayakiMedia3AudioAttributes(), true)
         }
         val mediaButtons = sasayakiServiceMediaButtons(appContext)

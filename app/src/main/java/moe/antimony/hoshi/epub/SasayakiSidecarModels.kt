@@ -45,4 +45,7 @@ data class SasayakiPlaybackData(
     val audioUri: String? = null,
     val audioFileName: String? = null,
     val modified: Long? = null,
+    val volumeGainDb: Int = 0,
 )
+
+internal val SasayakiVolumeGainRange = -12..12

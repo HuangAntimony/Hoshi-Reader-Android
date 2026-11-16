@@ -1,64 +1,61 @@
 package moe.antimony.hoshi.features.sasayaki
 
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
+import moe.antimony.hoshi.epub.BookRepository
 import moe.antimony.hoshi.epub.SasayakiPlaybackData
-import moe.antimony.hoshi.epub.SasayakiMatchData
-
-import kotlinx.coroutines.runBlocking
-import moe.antimony.hoshi.epub.SasayakiSidecarRepository
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
-import java.io.File
+import org.junit.rules.TemporaryFolder
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class SasayakiPlaybackRepositoryTest {
+    @get:Rule
+    val temporaryFolder = TemporaryFolder()
+
     @Test
-    fun bookPlaybackRepositoryDelegatesLoadAndSaveToBookSidecar() = runBlocking {
-        val root = File("book-root")
-        val saved = SasayakiPlaybackData(
-            lastPosition = 24.5,
-            delay = -0.1,
-            rate = 1.2f,
-            audioUri = "content://audio/book.m4b",
-        )
-        val sidecar = FakeSasayakiSidecarRepository(saved)
-        val repository = BookSasayakiPlaybackRepository(root, sidecar)
+    fun gainOnlyWritePreservesFieldsFromOtherPlatforms() = runTest {
+        val files = temporaryFolder.newFolder()
+        val book = files.resolve("book").apply { mkdirs() }
+        val repository = BookSasayakiPlaybackRepository(book, BookRepository(files, Dispatchers.Unconfined))
+        val original = Json.parseToJsonElement(
+            """{"lastPosition":24.5,"audioBookmark":"dGVzdA==","audioUri":"content://local/audio","modified":1234}""",
+        ).jsonObject
+        val sidecar = book.resolve("sasayaki_playback.json").apply { writeText(original.toString()) }
 
-        assertEquals(saved, repository.load())
+        repository.saveVolumeGainDb(6)
 
-        val next = saved.copy(
-            lastPosition = 42.0,
-            audioUri = null,
-            audioFileName = "sasayaki_audio.m4b",
-        )
-        repository.save(next)
-
-        assertSame(root, sidecar.loadedRoot)
-        assertSame(root, sidecar.savedRoot)
-        assertEquals(next, sidecar.savedPlayback)
+        assertEquals(original + ("volumeGainDb" to JsonPrimitive(6)), Json.parseToJsonElement(sidecar.readText()).jsonObject)
     }
 
-    private class FakeSasayakiSidecarRepository(
-        private val playback: SasayakiPlaybackData?,
-    ) : SasayakiSidecarRepository {
-        var loadedRoot: File? = null
-            private set
-        var savedRoot: File? = null
-            private set
-        var savedPlayback: SasayakiPlaybackData? = null
-            private set
+    @Test
+    fun reopenLoadsSavedGainWhileBookmarkSaveIsStillPending() = runTest {
+        val files = temporaryFolder.newFolder()
+        val root = files.resolve("book").apply { mkdirs() }
+        val books = BookRepository(files, Dispatchers.Unconfined)
+        val repository = BookSasayakiPlaybackRepository(root, books)
+        repository.save(SasayakiPlaybackData(lastPosition = 24.5))
+        repository.saveVolumeGainDb(-6)
+        val finishBookmarkSave = CompletableDeferred<Unit>()
+        val bookmarkSave = launch { finishBookmarkSave.await() }
+        books.trackReaderSave(root, bookmarkSave)
+        val reopen = async { BookSasayakiPlaybackRepository(root, books).load() }
+        runCurrent()
 
-        override suspend fun loadSasayakiMatch(bookRoot: File): SasayakiMatchData? = null
-
-        override suspend fun saveSasayakiMatch(bookRoot: File, match: SasayakiMatchData) = Unit
-
-        override suspend fun loadSasayakiPlayback(bookRoot: File): SasayakiPlaybackData? {
-            loadedRoot = bookRoot
-            return playback
-        }
-
-        override suspend fun saveSasayakiPlayback(bookRoot: File, playback: SasayakiPlaybackData) {
-            savedRoot = bookRoot
-            savedPlayback = playback
-        }
+        assertTrue(reopen.isCompleted)
+        finishBookmarkSave.complete(Unit)
+        val playback = requireNotNull(reopen.await())
+        assertEquals(-6, playback.volumeGainDb)
+        assertEquals(24.5, playback.lastPosition, 0.0)
     }
 }

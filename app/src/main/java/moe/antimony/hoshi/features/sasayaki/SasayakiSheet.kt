@@ -72,12 +72,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import java.io.File
 import java.util.Locale
+import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import moe.antimony.hoshi.R
 import moe.antimony.hoshi.epub.SasayakiMatchData
 import moe.antimony.hoshi.epub.SasayakiPlaybackData
+import moe.antimony.hoshi.epub.SasayakiVolumeGainRange
 import moe.antimony.hoshi.features.reader.ReaderSheetSwitchRow
 import moe.antimony.hoshi.features.reader.ReaderSheetCard
 import moe.antimony.hoshi.features.reader.ReaderSheetTabs
@@ -790,6 +792,7 @@ private fun SasayakiSettingsTab(
             range = -4f..4f,
             steps = 159,
             onValueChange = { player.setDelay(it.toDouble()) },
+            onValueChangeFinished = player::saveDelay,
         )
         ReaderSheetSliderRow(
             label = stringResource(R.string.sasayaki_speed),
@@ -798,7 +801,25 @@ private fun SasayakiSettingsTab(
             range = SasayakiSpeedSliderRange,
             steps = SasayakiSpeedSliderSteps,
             onValueChange = { player.setRate(it) },
+            onValueChangeFinished = player::saveRate,
         )
+        if (player.hasAudio) {
+            val gain = player.playback.volumeGainDb
+            ReaderSheetSliderRow(
+                label = stringResource(R.string.sasayaki_volume_gain),
+                valueText = if (gain == 0) {
+                    stringResource(R.string.sasayaki_volume_gain_zero)
+                } else {
+                    stringResource(R.string.audio_decibels_signed, gain)
+                },
+                value = gain.toFloat(),
+                range = SasayakiVolumeGainRange.first.toFloat()..SasayakiVolumeGainRange.last.toFloat(),
+                steps = SasayakiVolumeGainRange.last - SasayakiVolumeGainRange.first - 1,
+                onValueChange = { player.setVolumeGainDb(it.roundToInt()) },
+                onValueChangeFinished = player::saveVolumeGain,
+            )
+            player.volumeGainError?.let { SasayakiErrorMessage(message = it.asString()) }
+        }
         SharedReaderPlaybackSettings(
             settings, onSettingsChange, onColorRowClick,
             includeAudiobookControls = true,

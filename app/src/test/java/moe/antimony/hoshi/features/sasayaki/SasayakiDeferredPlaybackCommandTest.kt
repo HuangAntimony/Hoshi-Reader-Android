@@ -82,6 +82,22 @@ class SasayakiDeferredPlaybackCommandTest {
     }
 
     @Test
+    fun canceledReadinessCallbackCannotConsumeTheNextRequest() {
+        val gate = SasayakiDeferredPlaybackCommand()
+        val callbacks = mutableListOf<() -> Unit>()
+        val played = mutableListOf<String>()
+
+        gate.run(false, callbacks::add) { played.add("old") }
+        gate.cancel()
+        gate.run(false, callbacks::add) { played.add("new") }
+
+        callbacks.first().invoke()
+        assertTrue(played.isEmpty())
+        callbacks.last().invoke()
+        assertEquals(listOf("new"), played)
+    }
+
+    @Test
     fun preparedEngineRunsCommandImmediately() {
         val gate = SasayakiDeferredPlaybackCommand()
         val events = mutableListOf<String>()

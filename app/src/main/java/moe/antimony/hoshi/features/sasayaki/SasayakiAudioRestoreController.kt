@@ -72,6 +72,7 @@ internal class ServiceOwnedSasayakiPlaybackPreparer(
 
     private fun releaseServiceOwnedPlayer(player: Media3SasayakiPlayerHandle) {
         player.stop()
+        player.setVolumeGainDb(0)
         player.clearMediaItems()
     }
 }
