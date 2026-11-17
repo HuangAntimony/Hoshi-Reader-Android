@@ -82,7 +82,7 @@ internal class SasayakiPlaybackServiceRuntime @Inject constructor(
     private var artworkRequest = 0L
     private var artworkSourceJob: Job? = null
     private val artwork = ReadingMediaArtwork(appScope, artworkRepository::load, ::updateMediaMetadata)
-    private var activeController: SasayakiPlaybackControllerContract? = null
+    private var activeController: SasayakiPlaybackController? = null
     private var foregroundPlaybackRequested = false
     private val readerAttachment = SasayakiReaderAttachment()
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -237,8 +237,12 @@ internal class SasayakiPlaybackServiceRuntime @Inject constructor(
 
     fun release() {
         setForegroundPlaybackRequested(false)
-        releaseActiveController()
-        readerAttachment.detach()
+        // A paused service can be destroyed while the same Reader still holds its controller.
+        if (readerAttachment.isAttached) {
+            activeController?.onPlaybackServiceStopped()
+        } else {
+            releaseActiveController()
+        }
         releasePlaybackServiceConnection()
         session?.release()
         session = null
@@ -265,8 +269,9 @@ internal class SasayakiPlaybackServiceRuntime @Inject constructor(
     }
 
     internal fun releasePlaybackServiceConnection() {
-        playbackServiceConnection?.let(MediaController::releaseFuture)
+        val connection = playbackServiceConnection
         playbackServiceConnection = null
+        connection?.let(MediaController::releaseFuture)
     }
 
     private fun setForegroundPlaybackRequested(requested: Boolean) {
@@ -277,6 +282,7 @@ internal class SasayakiPlaybackServiceRuntime @Inject constructor(
         val serviceConnection = ensurePlaybackServiceConnection()
         serviceConnection.addListener(
             {
+                if (playbackServiceConnection !== serviceConnection) return@addListener
                 runCatching { Futures.getDone(serviceConnection) }.getOrNull() ?: return@addListener
                 onReady()
             },

@@ -7,6 +7,9 @@ internal class SasayakiReaderAttachment {
     private var onCue: ((SasayakiMatch, Boolean, SasayakiCueRevealSource) -> Unit)? = null
     private var onClearCue: (() -> Unit)? = null
 
+    val isAttached: Boolean
+        get() = onCue != null
+
     fun attach(
         getCurrentChapterIndex: () -> Int,
         onCue: (SasayakiMatch, Boolean, SasayakiCueRevealSource) -> Unit,

@@ -223,7 +223,7 @@ class Media3SasayakiPlaybackEngine private constructor(
     }
 
     private fun completePendingSeek(token: Int) {
-        if (token != pendingSeekToken || token <= completedSeekToken) return
+        if (listener == null || token != pendingSeekToken || token <= completedSeekToken) return
         completedSeekToken = token
         onSeekComplete()
     }

@@ -470,9 +470,16 @@ internal class SasayakiPlaybackController(
     override fun release() {
         released = true
         clearPageRange()
-        clearAutoPageHoldResume()
-        deferredPlaybackCommand.cancel()
         teardownPlayer(clearCue = true)
+    }
+
+    internal fun onPlaybackServiceStopped() {
+        val shouldSavePosition = hasAudio && playbackLifecycle.hasEngine
+        releasePlaybackEngine()
+        if (shouldSavePosition && currentTime != playback.lastPosition) {
+            playbackPersistence.savePosition(currentTime)
+        }
+        cueDisplayActionDispatcher.apply(cueDisplay.clear())
     }
 
     private fun clearAutoPageHoldResume() {
@@ -524,14 +531,16 @@ internal class SasayakiPlaybackController(
         return started
     }
 
-    private fun withPreparedPlayback(runPreparedCommand: () -> Boolean): Boolean =
-        deferredPlaybackCommand.run(
+    private fun withPreparedPlayback(runPreparedCommand: () -> Boolean): Boolean {
+        if (released) return false
+        return deferredPlaybackCommand.run(
             hasPreparedEngine = playbackLifecycle.hasEngine,
             requestPlaybackEnvironment = onPlaybackStartRequested,
             runPreparedCommand = {
                 (playbackLifecycle.hasEngine || restoreAudio()) && runPreparedCommand()
             },
         )
+    }
 
     private fun handleSeekComplete() {
         val pageSeek = pendingPageSeek
@@ -661,11 +670,15 @@ internal class SasayakiPlaybackController(
         updateCue(returnPosition)
     }
 
-    private fun teardownPlayer(clearCue: Boolean) {
-        deferredPlaybackCommand.cancel()
-        onForegroundPlaybackRequestedChanged(false)
+    private fun releasePlaybackEngine() {
+        playbackState.cancelPendingSeek()
         pausePlayback(restoreTemporaryPosition = true)
+        playbackState.clearStopPlaybackTime()
         playbackLifecycle.releaseEngine()
+    }
+
+    private fun teardownPlayer(clearCue: Boolean) {
+        releasePlaybackEngine()
         audioAvailability.markAudioUnavailable()
         updateMediaSentence(currentTime)
         if (clearCue) cueDisplayActionDispatcher.apply(cueDisplay.clear())
