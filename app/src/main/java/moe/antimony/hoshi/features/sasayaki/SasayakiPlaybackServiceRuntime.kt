@@ -342,6 +342,8 @@ private class SasayakiPlaybackServiceSessionCallback(
             .add(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)
             .add(Player.COMMAND_SEEK_BACK)
             .add(Player.COMMAND_SEEK_FORWARD)
+            .add(Player.COMMAND_SEEK_TO_PREVIOUS)
+            .add(Player.COMMAND_SEEK_TO_NEXT)
             .add(Player.COMMAND_GET_CURRENT_MEDIA_ITEM)
             .add(Player.COMMAND_GET_TIMELINE)
             .add(Player.COMMAND_GET_METADATA)
@@ -388,12 +390,50 @@ private class SasayakiServiceSessionPlayer(
         onSkipToNext()
     }
 
+    override fun seekToPrevious() {
+        onSkipToPrevious()
+    }
+
+    override fun seekToNext() {
+        onSkipToNext()
+    }
+
+    override fun seekToPreviousMediaItem() {
+        onSkipToPrevious()
+    }
+
+    override fun seekToNextMediaItem() {
+        onSkipToNext()
+    }
+
     override fun seekTo(positionMs: Long) {
         onSeekTo(positionMs)
     }
 
     override fun seekTo(mediaItemIndex: Int, positionMs: Long) {
         onSeekTo(positionMs)
+    }
+
+    override fun isCommandAvailable(command: Int): Boolean {
+        return when (command) {
+            COMMAND_SEEK_BACK,
+            COMMAND_SEEK_FORWARD,
+            COMMAND_SEEK_TO_PREVIOUS,
+            COMMAND_SEEK_TO_NEXT,
+            COMMAND_PLAY_PAUSE,
+            COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM -> true
+            else -> super.isCommandAvailable(command)
+        }
+    }
+
+    override fun getAvailableCommands(): Player.Commands {
+        return super.availableCommands
+            .buildUpon()
+            .add(COMMAND_SEEK_BACK)
+            .add(COMMAND_SEEK_FORWARD)
+            .add(COMMAND_SEEK_TO_PREVIOUS)
+            .add(COMMAND_SEEK_TO_NEXT)
+            .build()
     }
 }
 
