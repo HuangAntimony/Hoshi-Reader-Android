@@ -68,7 +68,7 @@ data class EpubTocItem(
 data class EpubResource(
     val mediaType: String,
     private val bytes: ByteArray? = null,
-    private val file: File? = null,
+    internal val file: File? = null,
 ) {
     fun readBytes(): ByteArray? = bytes ?: file?.takeIf { it.isFile }?.readBytes()
 
@@ -242,8 +242,12 @@ private fun extractPackedEpubFresh(epubFile: File, extractedRoot: File) {
 
 private fun EpubBook.hasMissingChapterFiles(): Boolean {
     val root = rootDirectory ?: return false
-    return chapters.any { chapter ->
-        !root.resolve(chapter.href.normalizeResourceHref()).isFile
+    if (chapters.any { chapter -> !root.resolve(chapter.href.normalizeResourceHref()).isFile }) {
+        return true
+    }
+    return resources.values.any { resource ->
+        val file = resource.file ?: return@any false
+        !file.isFile
     }
 }
 
