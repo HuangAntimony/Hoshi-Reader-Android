@@ -2108,6 +2108,20 @@ for (const vertical of [true, false]) {
         assert.equal(reader.isAtChapterBoundary('forward'), true);
     });
 
+    test(`continuous ${vertical ? 'vertical' : 'horizontal'} chapter boundaries respect tolerance near extent`, () => {
+        const body = new TestElement('body');
+        body.scrollWidth = vertical ? 1_480 : 480;
+        body.scrollHeight = vertical ? 800 : 1_800;
+        const { reader } = loadReader(body, readerContinuousUrl, {
+            writingMode: vertical ? 'vertical-rl' : 'horizontal-tb',
+        });
+        const extent = vertical ? body.scrollWidth - body.clientWidth : body.scrollHeight - body.clientHeight;
+        const tolerance = vertical ? 5 : 1;
+        body.scrollLeft = vertical ? -(extent - tolerance + 1) : 0;
+        body.scrollTop = vertical ? 0 : extent - tolerance + 1;
+        assert.equal(reader.isAtChapterBoundary('forward'), true);
+    });
+
     test(`continuous progress measures the inset ${vertical ? 'right' : 'top'} content edge`, () => {
         const body = new TestElement('body');
         body.rect = vertical ? testRect(0, 800, 48, 432) : testRect(80, 720, 0, 480);

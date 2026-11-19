@@ -27,7 +27,8 @@ __HOSHI_READER_MEDIA_SEMANTICS_SCRIPT__
     var vertical = this.isVertical();
     var position = vertical ? -root.scrollLeft : root.scrollTop;
     var extent = vertical ? root.scrollWidth - root.clientWidth : root.scrollHeight - root.clientHeight;
-    return direction === 'forward' ? position >= extent - 1 : position <= 1;
+    var tolerance = vertical ? 5 : 1;
+    return direction === 'forward' ? position >= extent - tolerance : position <= tolerance;
   },
   readerCssVariable: function(name) {
     return window.getComputedStyle(document.documentElement).getPropertyValue(name).trim();
