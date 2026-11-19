@@ -2,6 +2,7 @@ package moe.antimony.hoshi.epub
 
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -726,6 +727,26 @@ class EpubBookParserTest {
                 """.trimIndent(),
             )
         }
+    }
+
+    @Test
+    fun parsesPackedEpubFreshIfExtractedResourceOrImageIsEvicted() {
+        val archive = tempFolder.newFile("eviction-packed.epub")
+        val cacheRoot = tempFolder.newFolder("eviction-cache")
+        writeMinimalEpubArchive(archive, title = "Eviction Packed Book")
+
+        val first = parser().parsePacked(archive, cacheRoot)
+        val imageFile = requireNotNull(first.rootDirectory).resolve("OPS/images/cover.jpg")
+        assertTrue(imageFile.isFile)
+
+        // Simulate OS cache eviction by deleting the image file from the extracted cache directory
+        assertTrue(imageFile.delete())
+        assertFalse(imageFile.isFile)
+
+        // Re-parsing should detect the missing resource and re-extract the EPUB archive fresh
+        val second = parser().parsePacked(archive, cacheRoot)
+        val restoredImageFile = requireNotNull(second.rootDirectory).resolve("OPS/images/cover.jpg")
+        assertTrue(restoredImageFile.isFile)
     }
 
     private fun ZipOutputStream.writeTextEntry(path: String, value: String) {
