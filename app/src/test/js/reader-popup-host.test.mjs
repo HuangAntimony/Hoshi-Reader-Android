@@ -571,6 +571,24 @@ test('reader highlight updates can omit initial entry without replacing iframe c
     );
 });
 
+test('the iframe gets one reveal notification when both content and highlight are ready', () => {
+    const scene = popupHost();
+    const popups = [rootPopupPayload()];
+    scene.host.renderStack({ popups, rootHighlight: { popupId: 'root', pending: true } });
+    const iframe = scene.document.getElementById('hoshi-reader-popup-layer').querySelector('.hoshi-reader-popup-iframe');
+    const messages = [];
+    iframe.contentWindow.postMessage = message => messages.push(message);
+    iframe.dispatchEvent('load');
+    const reveals = () => messages.filter(message => message.type === 'popupRevealed').map(message => message.popupId);
+
+    scene.dispatchMessage({ source: 'hoshi-popup-iframe', name: 'contentReady', popupId: 'root' });
+    assert.deepEqual(reveals(), []);
+
+    scene.host.renderStack({ popups, rootHighlight: { popupId: 'root', pending: false } });
+    scene.dispatchMessage({ source: 'hoshi-popup-iframe', name: 'contentReady', popupId: 'root' });
+    assert.deepEqual(reveals(), ['root']);
+});
+
 test('non e-ink root lookup highlight keeps the filled selection rectangle', () => {
     const highlights = renderRootHighlight({
         popupId: 'root',

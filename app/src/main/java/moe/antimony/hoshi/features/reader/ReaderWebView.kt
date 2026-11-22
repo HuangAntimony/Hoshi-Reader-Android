@@ -331,8 +331,13 @@ fun ReaderWebView(
     }
     val chapterCuesReady = !paragraphMode || (isSasayakiMatchLoaded &&
         (!prepareParagraphTtsCues || paragraphTtsCuesJson != null))
-    val chapterCuesJson = if (prepareParagraphTtsCues) paragraphTtsCuesJson else
-        ReaderSasayakiCues.chapterCuesJson(sasayakiMatchData, cueChapterIndex)
+    val chapterCuesJson = if (prepareParagraphTtsCues) {
+        paragraphTtsCuesJson
+    } else {
+        remember(sasayakiMatchData, cueChapterIndex) {
+            ReaderSasayakiCues.chapterCuesJson(sasayakiMatchData, cueChapterIndex)
+        }
+    }
     val lookupPopups = stateHolder.lookupPopups
     var readerPopupHistories by remember { mutableStateOf<Map<String, ReaderPopupHistoryCounts>>(emptyMap()) }
     var rootSelectionHighlight by remember { mutableStateOf<ReaderRootSelectionHighlight?>(null) }
@@ -387,7 +392,9 @@ fun ReaderWebView(
     val readerPopupIframeUrl = remember(readerPopupIframeDocument) {
         readerLookupPopupIframeUrl(readerPopupIframeDocument.hashCode())
     }
-    LaunchedEffect(webView, readerPopupIframeUrl) {
+    val readerPageRestoring = stateHolder.isWebViewRestoring
+    LaunchedEffect(webView, readerPopupIframeUrl, readerPageRestoring) {
+        if (readerPageRestoring) return@LaunchedEffect
         webView?.evaluateJavascript(
             """
                 (function() {

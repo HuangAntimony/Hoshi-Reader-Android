@@ -319,6 +319,12 @@ internal object LookupPopupHtml {
                                 window.hoshiSelection?.clearSelection();
                                 return;
                             }
+                            if (message.type === 'popupRevealed') {
+                                if (event.source === window.parent && message.popupId === window.popupId) {
+                                    window.hoshiPopupRevealed?.();
+                                }
+                                return;
+                            }
                             if (message.type === 'resetPopup') {
                                 window.popupId = null;
                                 closeOverlay();
@@ -340,11 +346,11 @@ internal object LookupPopupHtml {
                                     }
                                 }
                                 if (window.replacePopupResults) {
-                                    window.replacePopupResults(window.entryCount, initialEntries, message.sourceText, message.sourceSentenceOffset);
+                                    window.replacePopupResults(window.entryCount, initialEntries, message.sourceText, message.sourceSentenceOffset, true);
                                 } else {
                                     window.lookupEntries = initialEntries;
                                     window.hoshiPopupObserveContentReady?.();
-                                    window.renderPopup();
+                                    window.renderPopup(true);
                                 }
                                 requestAnimationFrame(window.hoshiPostPopupScrollState);
                                 return;

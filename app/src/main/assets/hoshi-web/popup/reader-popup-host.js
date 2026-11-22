@@ -191,6 +191,7 @@
     }
 
     function setContentReady(record, ready) {
+        if (!ready) record.revealNotified = false;
         record.contentReady = ready;
         record.shell.dataset.contentReady = String(ready);
         syncRootReveal();
@@ -199,6 +200,10 @@
     function setRevealReady(record, ready) {
         record.revealReady = ready;
         record.shell.dataset.revealReady = String(ready);
+        if (ready && record.contentReady && record.payload && !record.revealNotified) {
+            record.revealNotified = true;
+            record.iframe.contentWindow?.postMessage({ type: 'popupRevealed', popupId: record.payload.id }, ORIGIN);
+        }
     }
 
     function resetIframe(record) {
