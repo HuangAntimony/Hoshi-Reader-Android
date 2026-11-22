@@ -6,12 +6,10 @@ import android.content.Context
 import android.content.Intent
 import android.os.Handler
 import android.os.Looper
-import moe.antimony.hoshi.ui.appLanguageContext
 import androidx.annotation.OptIn
-import androidx.media3.common.ForwardingPlayer
+import androidx.media3.common.ForwardingSimpleBasePlayer
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.session.CommandButton
 import androidx.media3.session.MediaController
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
@@ -31,7 +29,6 @@ import moe.antimony.hoshi.features.playback.readingMediaMetadata
 import moe.antimony.hoshi.di.ApplicationScope
 import moe.antimony.hoshi.di.IoDispatcher
 import moe.antimony.hoshi.MainActivity
-import moe.antimony.hoshi.R
 import moe.antimony.hoshi.epub.SasayakiMatch
 import moe.antimony.hoshi.epub.SasayakiMatchData
 import moe.antimony.hoshi.epub.SasayakiPlaybackData
@@ -94,7 +91,6 @@ internal class SasayakiPlaybackServiceRuntime @Inject constructor(
         val createdPlayer = ExoPlayerSasayakiPlayerHandle.createServicePlayer(serviceContext).apply {
             setAudioAttributes(sasayakiMedia3AudioAttributes(), true)
         }
-        val mediaButtons = sasayakiServiceMediaButtons(appContext)
         val sessionPlayer = SasayakiServiceSessionPlayer(
             player = createdPlayer.player,
             onPlay = ::playFromSession,
@@ -105,9 +101,8 @@ internal class SasayakiPlaybackServiceRuntime @Inject constructor(
         )
         val createdSession = MediaSession.Builder(serviceContext, sessionPlayer)
             .setId(SasayakiPlaybackService.SessionId)
-            .setMediaButtonPreferences(mediaButtons)
             .setSessionActivity(sasayakiPlaybackReturnPendingIntent(appContext, activeBookId))
-            .setCallback(SasayakiPlaybackServiceSessionCallback(appContext))
+            .setCallback(SasayakiPlaybackServiceSessionCallback)
             .build()
 
         player = createdPlayer
@@ -336,9 +331,7 @@ internal class SasayakiPlaybackServiceRuntime @Inject constructor(
 }
 
 @OptIn(UnstableApi::class)
-private class SasayakiPlaybackServiceSessionCallback(
-    private val context: Context,
-) : MediaSession.Callback {
+private object SasayakiPlaybackServiceSessionCallback : MediaSession.Callback {
     override fun onConnect(
         session: MediaSession,
         controller: MediaSession.ControllerInfo,
@@ -348,6 +341,8 @@ private class SasayakiPlaybackServiceSessionCallback(
             .add(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)
             .add(Player.COMMAND_SEEK_BACK)
             .add(Player.COMMAND_SEEK_FORWARD)
+            .add(Player.COMMAND_SEEK_TO_PREVIOUS)
+            .add(Player.COMMAND_SEEK_TO_NEXT)
             .add(Player.COMMAND_GET_CURRENT_MEDIA_ITEM)
             .add(Player.COMMAND_GET_TIMELINE)
             .add(Player.COMMAND_GET_METADATA)
@@ -356,7 +351,6 @@ private class SasayakiPlaybackServiceSessionCallback(
             .build()
         return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
             .setAvailablePlayerCommands(playerCommands)
-            .setMediaButtonPreferences(sasayakiServiceMediaButtons(context))
             .build()
     }
 }
@@ -369,73 +363,34 @@ private class SasayakiServiceSessionPlayer(
     private val onSkipToPrevious: () -> Unit,
     private val onSkipToNext: () -> Unit,
     private val onSeekTo: (Long) -> Unit,
-) : ForwardingPlayer(player) {
-    override fun play() {
-        onPlay()
-    }
-
-    override fun pause() {
-        onPause()
-    }
-
-    override fun setPlayWhenReady(playWhenReady: Boolean) {
-        if (playWhenReady) {
-            play()
-        } else {
-            pause()
-        }
-    }
-
-    override fun seekBack() {
-        onSkipToPrevious()
-    }
-
-    override fun seekForward() {
-        onSkipToNext()
-    }
-
-    override fun seekTo(positionMs: Long) {
-        onSeekTo(positionMs)
-    }
-
-    override fun seekTo(mediaItemIndex: Int, positionMs: Long) {
-        onSeekTo(positionMs)
-    }
-}
-
-internal data class SasayakiServiceMediaButtonSpec(
-    val icon: Int,
-    val displayNameResId: Int,
-    val slot: Int,
-    val playerCommand: Int,
-)
-
-@OptIn(UnstableApi::class)
-internal fun sasayakiServiceMediaButtonSpecs(): List<SasayakiServiceMediaButtonSpec> =
-    listOf(
-        SasayakiServiceMediaButtonSpec(
-            icon = CommandButton.ICON_REWIND,
-            displayNameResId = R.string.sasayaki_rewind,
-            slot = CommandButton.SLOT_BACK,
-            playerCommand = Player.COMMAND_SEEK_BACK,
-        ),
-        SasayakiServiceMediaButtonSpec(
-            icon = CommandButton.ICON_FAST_FORWARD,
-            displayNameResId = R.string.sasayaki_fast_forward,
-            slot = CommandButton.SLOT_FORWARD,
-            playerCommand = Player.COMMAND_SEEK_FORWARD,
-        ),
-    )
-
-@OptIn(UnstableApi::class)
-internal fun sasayakiServiceMediaButtons(context: Context): List<CommandButton> {
-    val languageContext = context.appLanguageContext()
-    return sasayakiServiceMediaButtonSpecs().map { spec ->
-        CommandButton.Builder(spec.icon)
-            .setDisplayName(languageContext.getString(spec.displayNameResId))
-            .setPlayerCommand(spec.playerCommand)
-            .setSlots(spec.slot)
+) : ForwardingSimpleBasePlayer(player) {
+    override fun getState(): State {
+        val state = super.getState()
+        // The audiobook can skip within its single Media3 item.
+        val commands = state.availableCommands.buildUpon()
+            .add(Player.COMMAND_SEEK_TO_PREVIOUS)
+            .add(Player.COMMAND_SEEK_TO_NEXT)
             .build()
+        return state.buildUpon().setAvailableCommands(commands).build()
+    }
+
+    override fun handleSetPlayWhenReady(playWhenReady: Boolean): ListenableFuture<*> {
+        if (playWhenReady) {
+            onPlay()
+        } else {
+            onPause()
+        }
+        return Futures.immediateVoidFuture()
+    }
+
+    override fun handleSeek(mediaItemIndex: Int, positionMs: Long, seekCommand: Int): ListenableFuture<*> {
+        when (seekCommand) {
+            Player.COMMAND_SEEK_BACK, Player.COMMAND_SEEK_TO_PREVIOUS -> onSkipToPrevious()
+            Player.COMMAND_SEEK_FORWARD, Player.COMMAND_SEEK_TO_NEXT -> onSkipToNext()
+            Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM, Player.COMMAND_SEEK_TO_MEDIA_ITEM -> onSeekTo(positionMs)
+            else -> return super.handleSeek(mediaItemIndex, positionMs, seekCommand)
+        }
+        return Futures.immediateVoidFuture()
     }
 }
 

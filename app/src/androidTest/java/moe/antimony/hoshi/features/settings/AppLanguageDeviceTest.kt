@@ -17,7 +17,7 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.filters.SdkSuppress
 import moe.antimony.hoshi.R
-import moe.antimony.hoshi.features.sasayaki.sasayakiServiceMediaButtons
+import moe.antimony.hoshi.features.sasayaki.sasayakiPlaybackNotificationActionSpecs
 import moe.antimony.hoshi.ui.UiText
 import moe.antimony.hoshi.ui.resolve
 import org.junit.Assert.assertEquals
@@ -67,7 +67,10 @@ class AppLanguageDeviceTest {
                 compose.waitForIdle()
                 scenario.onActivity { assertSame("Selecting the current language must not recreate the host.", chineseHost, it) }
                 assertEquals("正在下载更新", UiText.Resource(R.string.update_downloading_notification).resolve(context))
-                assertEquals(listOf("有声书后退", "有声书快进"), sasayakiServiceMediaButtons(context).map { it.displayName.toString() })
+                val playbackLabels = sasayakiPlaybackNotificationActionSpecs(isPlaying = false).map { action ->
+                    UiText.Resource(action.titleResId).resolve(context)
+                }
+                assertEquals(listOf("有声书后退", "播放有声书", "有声书快进"), playbackLabels)
 
                 scenario.onActivity { setAppLanguageMode(AppLanguageMode.English) }
                 waitForLanguage("Language")
