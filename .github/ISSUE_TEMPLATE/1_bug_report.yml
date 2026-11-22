@@ -40,27 +40,32 @@ body:
     attributes:
       label: Diagnostic log
       description: >-
-        If the app crashed, open Hoshi Reader Android's Settings page, go to
-        Diagnostics, download the diagnostic log, and upload the .txt file here.
+        If the app crashed or showed an error, go to Settings → Diagnostics,
+        select Save Diagnostics, and attach the exported .txt file here.
       placeholder: Drag and drop the .txt diagnostic log here.
     validations:
       required: false
-  - type: input
-    id: app-version
-    attributes:
-      label: Hoshi Reader Android version
-      placeholder: e.g. 1.1.3 or debug build from commit abc1234
-    validations:
-      required: true
   - type: dropdown
     id: installation-source
     attributes:
       label: Installation source
       description: Make sure you have updated to the latest available version.
       options:
-        - GitHub Releases APK
+        - Stable version (GitHub Releases APK)
+        - Preview version (GitHub Releases APK)
         - Self-built/debug build
         - Other
+    validations:
+      required: true
+  - type: input
+    id: app-version
+    attributes:
+      label: Hoshi Reader Android version or build commit
+      description: >-
+        For a Preview version, enter the commit SHA shown as Build commit in
+        the app's About screen. For other builds, enter the app version or the
+        commit SHA if you built the APK yourself.
+      placeholder: e.g. 1.1.3 or abc1234
     validations:
       required: true
   - type: input
