@@ -188,7 +188,7 @@ class DictionarySearchViewModelTest {
     }
 
     @Test
-    fun clearingAndEditingQueryPreservesRenderedSearchWithoutRunningLookup() {
+    fun clearingQueryResetsRenderedSearchWithoutRunningLookup() {
         val repository = FakeDictionarySearchRepository(
             lookupResults = listOf(lookupResult("猫")),
             dictionaryStyles = mapOf("JMdict" to ".entry {}"),
@@ -199,16 +199,22 @@ class DictionarySearchViewModelTest {
         viewModel.recordLookupRedirected(2)
         viewModel.navigateBack()
         viewModel.setPopups(listOf(popup("child")))
-        val previous = viewModel.uiState.value
         val ensureReadyCount = repository.ensureReadyCount
 
-        for (query in listOf("", "", "犬")) {
-            viewModel.updateQuery(query)
+        viewModel.updateQuery("")
 
-            assertEquals(previous.copy(query = query), viewModel.uiState.value)
-            assertEquals(listOf("猫:16:16"), repository.lookupCalls)
-            assertEquals(ensureReadyCount, repository.ensureReadyCount)
-        }
+        assertEquals("", viewModel.uiState.value.query)
+        assertEquals("", viewModel.uiState.value.lastQuery)
+        assertFalse(viewModel.uiState.value.hasSearched)
+        assertTrue(viewModel.uiState.value.showLookupHistory)
+        assertEquals(emptyList<LookupPopupItem>(), viewModel.uiState.value.popups)
+        assertEquals(listOf("猫:16:16"), repository.lookupCalls)
+        assertEquals(ensureReadyCount, repository.ensureReadyCount)
+
+        viewModel.updateQuery("犬")
+        assertEquals("犬", viewModel.uiState.value.query)
+        assertFalse(viewModel.uiState.value.showLookupHistory)
+        assertEquals(listOf("猫:16:16"), repository.lookupCalls)
     }
 
     @Test
@@ -539,7 +545,7 @@ class DictionarySearchViewModelTest {
     }
 
     @Test
-    fun clearingOnlyInputKeepsResultsNavigationAndHistoryHidden() {
+    fun clearingOnlyInputReturnsToHistoryWithoutDeletingPersistentHistory() {
         val repository = FakeDictionarySearchRepository(lookupResults = listOf(lookupResult("猫")))
         val viewModel = viewModel(repository)
         viewModel.applyExternalLookup("猫のいる文章。")
@@ -547,8 +553,11 @@ class DictionarySearchViewModelTest {
         viewModel.recordLookupRedirected(1)
         val before = viewModel.uiState.value
         viewModel.updateQuery("")
-        assertEquals(before.copy(query = ""), viewModel.uiState.value)
-        assertFalse(viewModel.uiState.value.showLookupHistory)
+        assertEquals("", viewModel.uiState.value.query)
+        assertEquals("", viewModel.uiState.value.lastQuery)
+        assertTrue(viewModel.uiState.value.showLookupHistory)
+        assertTrue(viewModel.uiState.value.popups.isEmpty())
+        assertTrue(before.popups.isNotEmpty())
         assertEquals(listOf("猫のいる文章。"), viewModel.historyState.value.entries)
     }
 
@@ -595,15 +604,14 @@ class DictionarySearchViewModelTest {
         assertTrue(viewModel.uiState.value.hasLookupContent)
         assertEquals(styles, viewModel.uiState.value.dictionaryStyles)
         viewModel.updateQuery("")
-        assertTrue(viewModel.uiState.value.hasLookupContent)
-        assertFalse(viewModel.uiState.value.showLookupHistory)
-        repository.lookupResults = listOf(lookupResult("猫"))
-        viewModel.lookupRootRedirect("猫がいる。")
-        assertEquals("猫", viewModel.uiState.value.results.single().matched)
-        assertEquals("──今、猫がいる。", viewModel.uiState.value.lastQuery)
-        assertEquals(4, viewModel.rootMiningContext().sentenceOffset)
-        assertEquals(styles, viewModel.uiState.value.dictionaryStyles)
+        assertFalse(viewModel.uiState.value.hasLookupContent)
+        assertTrue(viewModel.uiState.value.showLookupHistory)
         assertEquals(listOf("──今、猫がいる。"), viewModel.historyState.value.entries)
+        repository.lookupResults = listOf(lookupResult("猫"))
+        viewModel.applyExternalLookup("猫がいる。")
+        assertEquals("猫", viewModel.uiState.value.results.single().matched)
+        assertEquals("猫がいる。", viewModel.uiState.value.lastQuery)
+        assertEquals(styles, viewModel.uiState.value.dictionaryStyles)
         viewModel.resetSearch()
         assertFalse(viewModel.uiState.value.hasLookupContent)
         repository.error = IllegalStateException("query failed")

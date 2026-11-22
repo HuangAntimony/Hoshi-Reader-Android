@@ -175,8 +175,8 @@ class DictionarySearchUnmatchedSourceTest {
                 assertEquals(4, viewModel.uiState.value.sentenceOffset)
                 assertEquals(listOf(sourceText), history.state.value.entries)
                 viewModel.updateQuery("")
-                assertTrue(viewModel.uiState.value.hasLookupContent)
-                assertFalse(viewModel.uiState.value.showLookupHistory)
+                assertFalse(viewModel.uiState.value.hasLookupContent)
+                assertTrue(viewModel.uiState.value.showLookupHistory)
             }
             for (nextSource in listOf("──別の文章。", "──もう一つ。")) {
                 composeRule.runOnIdle { viewModel.applyExternalLookup(nextSource) }

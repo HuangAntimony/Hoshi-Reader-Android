@@ -20,6 +20,7 @@ Release notes before v1.3.0 are in [CHANGELOG_ARCHIVE.md](CHANGELOG_ARCHIVE.md).
 - Use TTS short-clause splitting to pause, skip and replay at ellipses and more dash variants.
 - Prefer local recordings that match the dictionary reading while honoring source priority for sources that provide no readings.
 - Resume audiobooks with sentence underlines and automatic page turns when returning to an open reader after Android stops playback in the background.
+- Return to dictionary search history when clearing the query or pressing Back after a lookup.
 
 ## [v1.5.0] - 2026-11-10
 

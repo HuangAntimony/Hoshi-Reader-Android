@@ -7,6 +7,7 @@ import android.annotation.SuppressLint
 import android.view.MotionEvent
 import android.webkit.WebView
 import moe.antimony.hoshi.ui.theme.HoshiWebView
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -321,6 +322,15 @@ internal fun DictionarySearchView(
         searchViewModel.updateQuery("")
         suppressAutomaticFocus = false
         requestSearchFocus()
+    }
+    BackHandler(enabled = isActive && !uiState.showLookupHistory) {
+        searchViewModel.resetSearch()
+        childHistories = emptyMap()
+        rootIframeAtTop = true
+        pullDistancePx = 0f
+        suppressAutomaticFocus = true
+        focusManager.clearFocus(force = true)
+        keyboardController?.hide()
     }
     LifecycleResumeEffect(iframeHostWebView) {
         iframeHostWebView?.onResume()
