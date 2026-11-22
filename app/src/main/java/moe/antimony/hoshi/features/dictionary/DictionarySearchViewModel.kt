@@ -140,7 +140,11 @@ internal class DictionarySearchViewModel : ViewModel {
     }
 
     fun updateQuery(query: String) {
-        _uiState.update { it.copy(query = query) }
+        if (query.isBlank()) {
+            resetSearch()
+        } else {
+            _uiState.update { it.copy(query = query) }
+        }
     }
 
     fun resetSearch() {

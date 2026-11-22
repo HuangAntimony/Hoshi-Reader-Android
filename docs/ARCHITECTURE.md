@@ -606,9 +606,10 @@ and copying an asset snapshot creates independent template caches.
   uploads and note creation. Optional synchronization runs after release.
 - `DictionarySearchSession` retains search/popup navigation history across tabs.
   Successful book opening resets it before book-profile activation; failed opening
-  leaves it. Clearing the Dictionary input preserves displayed lookup content and
-  popup navigation; it does not reset the search session. Dictionary and external
-  lookup retain tappable source text even when a successful query has no matches.
+  leaves it. Clearing the Dictionary input or pressing Back resets displayed lookup
+  content and popup navigation, returning to lookup history; persistent history is
+  preserved. Dictionary and external lookup retain tappable source text even when a
+  successful query has no matches.
 - Ordinary Dictionary/Process Text queries ensure the existing native session is
   ready; dictionary mutations rebuild it and profile identity changes invalidate it.
   `DictionaryRepository` captures one profile and its dictionary configuration for
