@@ -11,6 +11,7 @@ Release notes before v1.3.0 are in [CHANGELOG_ARCHIVE.md](CHANGELOG_ARCHIVE.md).
 
 ### Fixed
 
+- Use Bluetooth headset and car controls to skip backward and forward in audiobooks with your chosen Skip Action. ([#186](https://github.com/HuangAntimony/Hoshi-Reader-Android/issues/186))
 - Show manual update check errors in a dialog without expanding the About update section, and stop reopening dialogs for old preview download failures.
 - Use TTS short-clause splitting to pause, skip and replay at ellipses and more dash variants.
 - Prefer local recordings that match the dictionary reading while honoring source priority for sources that provide no readings.
