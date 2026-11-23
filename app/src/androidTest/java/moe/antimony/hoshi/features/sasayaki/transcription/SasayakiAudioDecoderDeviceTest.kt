@@ -5,6 +5,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import java.io.File
 import java.io.IOException
+import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.math.*
@@ -97,6 +98,48 @@ class SasayakiAudioDecoderDeviceTest {
         }
     }
 
+    @Test fun invalidLeadingAacPacketKeepsAbsoluteClock() = withUneditedAacTone { file ->
+        val clean = decode(file)
+        corruptAacPacket(file, offset = 44, size = 159)
+
+        val recovered = decode(file)
+        assertEquals(clean.size, recovered.size)
+        // The lost 1024-sample frame at 44.1 kHz covers about 23 ms. Allow
+        // for the resampling filter at the edge of the silence.
+        assertTrue(recovered.take(320).all { it == 0f })
+        assertArrayEquals(clean.copyOfRange(1600, clean.size), recovered.copyOfRange(1600, recovered.size), .005f)
+
+        for (from in listOf(.5, 1.001)) {
+            val start = ceil(from * 16_000 - 1e-8).toInt()
+            assertArrayEquals(recovered.copyOfRange(start, recovered.size), decode(file, from), .005f)
+        }
+    }
+
+    @Test fun invalidLaterAacPacketStillFails() = withUneditedAacTone { file ->
+        corruptAacPacket(file, offset = 203, size = 205)
+        val failure = assertThrows(IOException::class.java) { decode(file) }
+        assertTrue(failure.message.orEmpty().startsWith("Submit audio packet:"))
+    }
+
+    @Test fun invalidAacPacketAtZeroAfterSeekStillFailsWhenPrimingPrecedesIt() {
+        withAudioAsset("tone.m4a") { file ->
+            // The edit list makes this the second packet even though its PTS
+            // is zero. Resuming at 1.001 s seeks past the priming packet.
+            corruptAacPacket(file, offset = 203, size = 205)
+            val failure = assertThrows(IOException::class.java) { decode(file, from = 1.001) }
+            assertTrue(failure.message.orEmpty().startsWith("Submit audio packet:"))
+        }
+    }
+
+    @Test fun invalidLeadingAacPacketWithoutDecodableAudioStillFails() {
+        withAudioAsset("one-aac-packet.m4a") { file ->
+            assertTrue(decode(file).isNotEmpty())
+            corruptAacPacket(file, offset = 44, size = 159)
+            val failure = assertThrows(IOException::class.java) { decode(file) }
+            assertTrue(failure.message.orEmpty().startsWith("Submit audio packet:"))
+        }
+    }
+
     @Test fun decodingAndDurationUseTheSameFirstAudioTrack() = kotlinx.coroutines.runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val file = File.createTempFile("audio-tracks-", ".m4a", cache)
@@ -138,6 +181,37 @@ class SasayakiAudioDecoderDeviceTest {
                 samples
             } finally { NativeSasayakiAudio.close(handle) }
         }
+
+    private fun withUneditedAacTone(block: (File) -> Unit) = withAudioAsset("tone.m4a") { file ->
+        // Hide the fixture's edit list so its first AAC packet starts at
+        // timestamp zero, as in the affected M4B.
+        RandomAccessFile(file, "rw").use { audio ->
+            val editListTypeOffset = 18_628L
+            audio.seek(editListTypeOffset)
+            assertEquals(0x656c7374, audio.readInt()) // "elst"
+            audio.seek(editListTypeOffset)
+            audio.writeBytes("free")
+        }
+        block(file)
+    }
+
+    private fun corruptAacPacket(file: File, offset: Long, size: Int) {
+        RandomAccessFile(file, "rw").use { audio ->
+            audio.seek(offset)
+            audio.write(ByteArray(size))
+        }
+    }
+
+    private fun withAudioAsset(name: String, block: (File) -> Unit) {
+        val file = File.createTempFile("audio-packets-", ".m4a", cache)
+        try {
+            val assets = InstrumentationRegistry.getInstrumentation().context.assets
+            assets.open("transcription/$name").use { input ->
+                file.outputStream().use { input.copyTo(it) }
+            }
+            block(file)
+        } finally { file.delete() }
+    }
 
     private fun withWave(block: (File) -> Unit) {
         val file = File.createTempFile("audio-filter-", ".wav", cache)

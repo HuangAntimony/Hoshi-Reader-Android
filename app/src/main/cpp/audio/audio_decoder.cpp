@@ -3,6 +3,7 @@ extern "C" {
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
 #include <libswresample/swresample.h>
+#include <libavutil/avstring.h>
 #include <libavutil/opt.h>
 }
 #include <algorithm>
@@ -31,6 +32,7 @@ struct Decoder {
     int fd = -1;
     int64_t offset = 0, length = -1, position = 0;
     bool seekable = false, draining = false, finished = false, initialized = false;
+    bool canSkipLeadingPacket = false, skippedLeadingPacket = false;
     AVFormatContext* format = nullptr;
     AVIOContext* io = nullptr;
     AVCodecContext* codec = nullptr;
@@ -41,6 +43,7 @@ struct Decoder {
     int streamIndex = -1;
     int inputRate = 0, inputChannels = 0, inputFormat = -1;
     int64_t expectedInput = 0, outputCursor = 0, wanted = 0, timelineOrigin = 0;
+    int64_t leadingPacketPosition = -1;
     std::vector<float> pending;
     size_t consumed = 0;
 
@@ -129,11 +132,18 @@ struct Decoder {
         codec->pkt_timebase = stream->time_base;
         codec->thread_count = 1;
         check(avcodec_open2(codec, implementation, nullptr), "Open audio decoder");
+        canSkipLeadingPacket = codec->codec_id == AV_CODEC_ID_AAC && av_match_name("mov", format->iformat->name);
         packet = av_packet_alloc(); frame = av_frame_alloc();
         if (!packet || !frame) throw std::bad_alloc();
         wanted = static_cast<int64_t>(std::ceil(from * rate - 1e-8));
         // Decode preroll for AAC overlap, MP3 bit reservoirs and Opus seek convergence.
         if (from > 1.0 && seekable) {
+            if (canSkipLeadingPacket) {
+                // Seeking to PTS zero may land after an AAC priming packet.
+                const auto* first = avformat_index_get_entry(stream, 0);
+                leadingPacketPosition = first ? first->pos : -1;
+                canSkipLeadingPacket = leadingPacketPosition >= 0;
+            }
             int64_t target = av_rescale_q(static_cast<int64_t>((from - 1.0) * 1000000), AV_TIME_BASE_Q, stream->time_base) + timelineOrigin;
             check(avformat_seek_file(format, streamIndex, INT64_MIN, target, target, AVSEEK_FLAG_BACKWARD), "Seek audio");
             avcodec_flush_buffers(codec);
@@ -209,6 +219,7 @@ struct Decoder {
             int result = avcodec_receive_frame(codec, frame);
             if (result >= 0) { processFrame(); return; }
             if (result == AVERROR_EOF) {
+                if (skippedLeadingPacket && !initialized) check(AVERROR_INVALIDDATA, "Submit audio packet");
                 if (initialized) convert(nullptr, 0);
                 finished = true;
                 return;
@@ -224,7 +235,18 @@ struct Decoder {
                 check(avcodec_send_packet(codec, nullptr), "Finish audio decoder");
             } else {
                 check(result, "Read audio packet");
-                check(avcodec_send_packet(codec, packet), "Submit audio packet");
+                result = avcodec_send_packet(codec, packet);
+                if (canSkipLeadingPacket) {
+                    canSkipLeadingPacket = false;
+                    // Some M4B files point their first audio sample at chapter text.
+                    // Initialize from the next frame's PTS to preserve the gap.
+                    if (result == AVERROR_INVALIDDATA && packet->pts == 0 &&
+                        (leadingPacketPosition < 0 || packet->pos == leadingPacketPosition)) {
+                        skippedLeadingPacket = true;
+                        continue;
+                    }
+                }
+                check(result, "Submit audio packet");
             }
         }
     }

@@ -1,28 +1,28 @@
 {
-  "sourceSha256": "cd56aa55db022e2f9a83a9bdd8a116f608a6e42881d20e544617f1f1183b9841",
+  "sourceSha256": "0358d9ef8bd3f7b30d56227902c849465308eb2ed4838077fe63229368449dc7",
   "files": {
     "arm64-v8a": [
       {
-        "name": "arm64-v8a-bcba1179691755c57d2087a79b8460ced808204bee6de4d5dd3efe0180ec1e67-libhoshiaudio_jni.so",
-        "bytes": 1858400,
-        "sha256": "bcba1179691755c57d2087a79b8460ced808204bee6de4d5dd3efe0180ec1e67",
-        "url": "https://github.com/HuangAntimony/Hoshi-Reader-Android/releases/download/transcription-audio-9bc5d3cccf53cb56/arm64-v8a-bcba1179691755c57d2087a79b8460ced808204bee6de4d5dd3efe0180ec1e67-libhoshiaudio_jni.so"
+        "name": "arm64-v8a-ef1d1d4317d34780a3984f0155f428cccfec5c05ad11002d726130427dbb38d7-libhoshiaudio_jni.so",
+        "bytes": 1858736,
+        "sha256": "ef1d1d4317d34780a3984f0155f428cccfec5c05ad11002d726130427dbb38d7",
+        "url": "https://github.com/HuangAntimony/Hoshi-Reader-Android/releases/download/transcription-audio-2fc66bba9e005bef/arm64-v8a-ef1d1d4317d34780a3984f0155f428cccfec5c05ad11002d726130427dbb38d7-libhoshiaudio_jni.so"
       }
     ],
     "armeabi-v7a": [
       {
-        "name": "armeabi-v7a-468298321d31e88d97a39b0540c4cf41bd1e482c402e84084aa5e3a0279eaa06-libhoshiaudio_jni.so",
-        "bytes": 1555652,
-        "sha256": "468298321d31e88d97a39b0540c4cf41bd1e482c402e84084aa5e3a0279eaa06",
-        "url": "https://github.com/HuangAntimony/Hoshi-Reader-Android/releases/download/transcription-audio-9bc5d3cccf53cb56/armeabi-v7a-468298321d31e88d97a39b0540c4cf41bd1e482c402e84084aa5e3a0279eaa06-libhoshiaudio_jni.so"
+        "name": "armeabi-v7a-beaf2e9159ef28d105cbf1844cb819ef1017cfdae0d392a15739a3d01fc0e94a-libhoshiaudio_jni.so",
+        "bytes": 1555940,
+        "sha256": "beaf2e9159ef28d105cbf1844cb819ef1017cfdae0d392a15739a3d01fc0e94a",
+        "url": "https://github.com/HuangAntimony/Hoshi-Reader-Android/releases/download/transcription-audio-2fc66bba9e005bef/armeabi-v7a-beaf2e9159ef28d105cbf1844cb819ef1017cfdae0d392a15739a3d01fc0e94a-libhoshiaudio_jni.so"
       }
     ],
     "x86_64": [
       {
-        "name": "x86_64-4edea584f2c9323102fa24383264136e95b4585d1d08fa76468e7a107c7adf52-libhoshiaudio_jni.so",
-        "bytes": 1926616,
-        "sha256": "4edea584f2c9323102fa24383264136e95b4585d1d08fa76468e7a107c7adf52",
-        "url": "https://github.com/HuangAntimony/Hoshi-Reader-Android/releases/download/transcription-audio-9bc5d3cccf53cb56/x86_64-4edea584f2c9323102fa24383264136e95b4585d1d08fa76468e7a107c7adf52-libhoshiaudio_jni.so"
+        "name": "x86_64-ebd032ff9b67a84de18b0e6b95f0dcaa1a040c323d2cc08227a03edbe6c374c5-libhoshiaudio_jni.so",
+        "bytes": 1926952,
+        "sha256": "ebd032ff9b67a84de18b0e6b95f0dcaa1a040c323d2cc08227a03edbe6c374c5",
+        "url": "https://github.com/HuangAntimony/Hoshi-Reader-Android/releases/download/transcription-audio-2fc66bba9e005bef/x86_64-ebd032ff9b67a84de18b0e6b95f0dcaa1a040c323d2cc08227a03edbe6c374c5-libhoshiaudio_jni.so"
       }
     ]
   }

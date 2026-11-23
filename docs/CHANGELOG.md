@@ -22,6 +22,7 @@ Release notes before v1.3.0 are in [CHANGELOG_ARCHIVE.md](CHANGELOG_ARCHIVE.md).
 - With **Split into short clauses** enabled, text-to-speech also splits at ellipses and long dashes.
 - When a word has multiple pronunciations, local audio lookup prefers recordings that match the dictionary reading and still honors the priority of sources that list only spellings.
 - If Android stops audiobook playback in the background, you can resume in the open book with sentence underlining and automatic page turns working again.
+- Transcription can start on M4B audiobooks with a damaged first audio frame, keeping subtitles in sync with the narration. ([#183](https://github.com/HuangAntimony/Hoshi-Reader-Android/issues/183))
 
 ## [v1.5.0] - 2026-11-10
 
