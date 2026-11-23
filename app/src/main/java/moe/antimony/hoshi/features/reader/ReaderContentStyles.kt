@@ -210,8 +210,7 @@ internal object ReaderContentStyles {
             ReaderViewMode.Continuous -> {
                 val horizontalInset = generatedLayout.viewportHorizontalPaddingRatio * 100
                 val verticalInset = generatedLayout.viewportVerticalPaddingRatio * 100
-                // Keep the gesture with the body at the ends of the book so it can stretch and reverse.
-                val overscrollBehavior = if (settings.verticalWriting) "contain auto" else "auto contain"
+                val overscrollBehavior = if (settings.verticalWriting) "none auto" else "auto none"
                 """
                 html, body {
                     max-width: none !important;

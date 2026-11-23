@@ -403,7 +403,7 @@ class ReaderSettingsTest {
         assertEquals("fixed !important", body["position"])
         assertEquals("auto !important", body["overflow-x"])
         assertEquals("hidden !important", body["overflow-y"])
-        assertEquals("contain auto !important", body["overscroll-behavior"])
+        assertEquals("none auto !important", body["overscroll-behavior"])
         assertEquals("var(--hoshi-continuous-height, 100.0vh) !important", body["height"])
         assertEquals("hidden !important", root["overflow"])
         assertFalse(body.containsKey("column-width"))
@@ -411,12 +411,12 @@ class ReaderSettingsTest {
     }
 
     @Test
-    fun horizontalContinuousReaderContainsOverscrollOnTheVerticalAxis() {
+    fun horizontalContinuousReaderDisablesOverscrollOnTheVerticalAxis() {
         val css = ReaderContentStyles.styleTag(
             ReaderSettings(viewMode = ReaderViewMode.Continuous, verticalWriting = false),
         )
 
-        assertEquals("auto contain !important", cssDeclarationsForSelector(css, "body")["overscroll-behavior"])
+        assertEquals("auto none !important", cssDeclarationsForSelector(css, "body")["overscroll-behavior"])
     }
 
     @Test
