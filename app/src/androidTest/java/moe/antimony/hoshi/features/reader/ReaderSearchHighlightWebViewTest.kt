@@ -43,6 +43,7 @@ class ReaderSearchHighlightWebViewTest {
             for (paragraph in listOf(false, true)) for (mode in ReaderViewMode.entries.filter { !paragraph || it == ReaderViewMode.Paginated }) for (vertical in listOf(false, true)) {
                 val description = "$mode paragraph=$paragraph vertical=$vertical"
                 val settings = ReaderSettings(viewMode = mode, paragraphMode = paragraph, verticalWriting = vertical, textAnimation = false)
+                val body = readerFixtureBody(mode, "<p>前「𠮟 、<ruby>猫<rt>ねこ</rt></ruby>。」後</p>")
                 val loaded = CountDownLatch(1)
                 val styles = ReaderContentStyles.styleTag(settings = settings, readerCssTemplate = assets.readerCss)
                 val script = ReaderPaginationScripts.shellScript(settings = settings, assets = assets)
@@ -54,8 +55,7 @@ class ReaderSearchHighlightWebViewTest {
                         override fun onPageFinished(view: WebView, url: String) { loaded.countDown() }
                     }
                     webView.loadDataWithBaseURL(null,
-                        "<!doctype html><html><head><script>window.HoshiReaderRestore={postMessage:()=>window.testRestored=true};</script>$styles<style>$viewport</style>$script</head>" +
-                            "<body><p>前「𠮟 、<ruby>猫<rt>ねこ</rt></ruby>。」後</p></body></html>",
+                        "<!doctype html><html><head><script>window.HoshiReaderRestore={postMessage:()=>window.testRestored=true};</script>$styles<style>$viewport</style>$script</head>$body</html>",
                         "text/html", "utf-8", null)
                 }
                 assertTrue(description, loaded.await(15, TimeUnit.SECONDS))
@@ -67,7 +67,7 @@ class ReaderSearchHighlightWebViewTest {
                 val baseline = bluePixelCount()
                 val result = JSONObject(evaluate(webView, """
                     (() => {
-                        window.hoshiHighlights.showSearchHighlight(1, 2);
+                        window.hoshiHighlights.showSearchHighlight(1, 2, 0);
                         const ranges = Array.from(CSS.highlights.get('hoshi-search') || []);
                         return { text: ranges.map(r => r.toString()).join(''),
                             saved: window.hoshiHighlights.highlights.size };
@@ -75,14 +75,18 @@ class ReaderSearchHighlightWebViewTest {
                 """.trimIndent()))
                 assertEquals(description, "𠮟 、猫", result.getString("text"))
                 assertEquals(description, 0, result.getInt("saved"))
+                val saved = """[{"id":"saved","color":"yellow","offset":2,"text":"𠮟 、猫"}]"""
+                val highlights = if (mode == ReaderViewMode.Continuous) """{"0":$saved}""" else saved
                 val afterRemoval = JSONObject(evaluate(webView, """
                     (() => {
                         const h = window.hoshiHighlights;
-                        h.applyHighlights([{id:'saved', color:'yellow', offset:2, text:'𠮟 、猫'}]);
+                        h.applyHighlights($highlights);
+                        const marked = Array.from(document.querySelectorAll('.hoshi-highlight'), node => node.textContent).join('');
                         h.removeHighlight('saved');
-                        return {text: Array.from(CSS.highlights.get('hoshi-search') || [], r => r.toString()).join('')};
+                        return {marked, text: Array.from(CSS.highlights.get('hoshi-search') || [], r => r.toString()).join('')};
                     })()
                 """.trimIndent()))
+                assertEquals(description, "𠮟 、猫", afterRemoval.getString("marked"))
                 assertEquals("$description after persistent highlight removal", "𠮟 、猫", afterRemoval.getString("text"))
                 composeRule.waitUntil("$description blue paint", 10_000) { bluePixelCount() > baseline + 100 }
                 val afterWrapping = JSONObject(evaluate(webView, """
@@ -98,7 +102,7 @@ class ReaderSearchHighlightWebViewTest {
                         h.createHighlight('yellow', 'created');
                         const created = Array.from(CSS.highlights.get('hoshi-search') || [], r => r.toString()).join('');
                         h.removeHighlight('created');
-                        window.hoshiReader.applySasayakiCues([{id:'cue', start:1, length:2}]);
+                        window.hoshiReader.applySasayakiCues([{id:'cue', chapterIndex:0, start:1, length:2}]);
                         return {created, passive: Array.from(CSS.highlights.get('hoshi-search') || [], r => r.toString()).join('')};
                     })()
                 """.trimIndent()))

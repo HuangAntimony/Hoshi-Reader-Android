@@ -6,6 +6,12 @@ import moe.antimony.hoshi.features.tts.TtsSentence
 internal enum class ReaderTtsPresentation { None, Highlight, Follow }
 internal enum class ReaderTtsPresentationSource { Playback, DocumentRestore, Foreground }
 
+internal fun readerTtsChapterNeedsCues(
+    playback: TtsPlaybackState,
+    chapterIndex: Int,
+    paragraphMode: Boolean,
+): Boolean = playback.started && (paragraphMode || playback.sentence?.chapter == chapterIndex)
+
 internal fun readerTtsPresentation(
     playback: TtsPlaybackState,
     sentence: TtsSentence,

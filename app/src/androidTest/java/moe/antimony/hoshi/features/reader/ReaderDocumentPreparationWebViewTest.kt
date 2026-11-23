@@ -66,7 +66,7 @@ class ReaderDocumentPreparationWebViewTest {
                 // Keep this picture on page zero without relying on publisher-margin normalization.
                 val body = if (picture) "<p style='margin:0'><img src='$image'/></p>" else
                     "<p>「<ruby>読書<rt>どくしょ</rt></ruby>の時間です。本文を読みます。」</p>".repeat(160)
-                val html = """<html xmlns="http://www.w3.org/1999/xhtml" style="display: block !important"><head><meta name="viewport" content="width=1600"/><title>Fixture</title></head><body>$body</body></html>"""
+                val html = """<html xmlns="http://www.w3.org/1999/xhtml" style="display: block !important"><head><meta name="viewport" content="width=1600"/><title>Fixture</title></head>${readerFixtureBody(mode, body)}</html>"""
                 val loaded = CountDownLatch(1)
                 instrumentation.runOnMainSync {
                     webView.webViewClient = object : WebViewClient() {
@@ -74,7 +74,8 @@ class ReaderDocumentPreparationWebViewTest {
                             WebResourceResponse(if (vertical) "application/xhtml+xml" else "text/html", "UTF-8", html.byteInputStream())
                         override fun onPageFinished(view: WebView, url: String) { loaded.countDown() }
                     }
-                    webView.loadUrl("https://appassets.androidplatform.net/epub/$mode-$vertical-$picture.xhtml")
+                    webView.loadUrl(if (mode == ReaderViewMode.Continuous) READER_BOOK_URL
+                        else "https://appassets.androidplatform.net/epub/$mode-$vertical-$picture.xhtml")
                 }
                 assertTrue("$label load", loaded.await(15, TimeUnit.SECONDS))
                 val before = JSONObject(evaluate(webView, """

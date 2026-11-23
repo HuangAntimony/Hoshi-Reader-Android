@@ -9,6 +9,10 @@ internal data class ReaderInternalLinkTarget(
     val fragment: String?,
 )
 
+internal fun isExternalReaderWebLink(scheme: String?, host: String?): Boolean =
+    (scheme.equals("http", true) || scheme.equals("https", true)) &&
+        !host.isNullOrBlank() && !host.equals("appassets.androidplatform.net", true)
+
 internal fun EpubBook.resolveInternalReaderLink(url: String): ReaderInternalLinkTarget? {
     val uri = runCatching { URI(url) }.getOrNull() ?: return null
     val scheme = uri.scheme?.lowercase() ?: return null

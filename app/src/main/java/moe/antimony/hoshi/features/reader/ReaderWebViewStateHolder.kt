@@ -5,10 +5,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.IntSize
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import moe.antimony.hoshi.features.dictionary.LookupPopupItem
 import moe.antimony.hoshi.features.sasayaki.SasayakiSheetTab
+
+private const val AppearancePreviewDelayMs = 250L
 
 internal data class ReaderSearchHighlight(val chapterIndex: Int, val offset: Int, val length: Int)
 
@@ -79,16 +82,18 @@ internal class ReaderWebViewStateHolder(
     val sasayakiLookupPause = ReaderLookupPauseState()
     val ttsLookupPause = ReaderLookupPauseState()
 
-    fun syncSettings(settings: ReaderSettings) {
+    suspend fun syncSettings(settings: ReaderSettings) {
         val shouldReloadContent = effectiveSettings.readerContentReloadKey() != settings.readerContentReloadKey()
+        val safeAreaChanged = effectiveSettings.topSafeAreaDp != settings.topSafeAreaDp ||
+            effectiveSettings.bottomSafeAreaDp != settings.bottomSafeAreaDp
+        if (showAppearance && (shouldReloadContent || safeAreaChanged)) {
+            // The settings effect cancels this wait on the next edit and flushes on sheet dismissal.
+            delay(AppearancePreviewDelayMs)
+        }
         effectiveSettings = settings
         if (shouldReloadContent) {
             prepareReloadAtDisplayedPosition()
         }
-    }
-
-    fun applySettings(settings: ReaderSettings) {
-        syncSettings(settings)
     }
 
     fun showReaderMenu() {
@@ -220,13 +225,11 @@ internal class ReaderWebViewStateHolder(
         return readerPosition.displayedPosition
     }
 
-    fun recordContinuousScrollProgress(progress: Double, restoreEpoch: Int): ReaderChapterPosition? {
+    fun recordContinuousScrollProgress(position: ReaderChapterPosition, restoreEpoch: Int): ReaderChapterPosition? {
         if (isWebViewRestoring || restoreEpoch != webViewRestoreEpoch) return null
-        return recordDisplayedProgress(progress)
+        readerPosition = readerPosition.copy(displayedPosition = position)
+        return position
     }
-
-    fun recordContinuousScrollDisplayProgress(progress: Double, restoreEpoch: Int): ReaderChapterPosition? =
-        recordContinuousScrollProgress(progress, restoreEpoch)
 
     fun canAcceptReaderNavigationInput(): Boolean =
         !isWebViewRestoring
@@ -331,12 +334,12 @@ internal class ReaderWebViewStateHolder(
     }
 
     fun goToNextChapter(lastIndex: Int): ReaderChapterPosition? {
-        val next = readerPosition.loadPosition.nextOrNull(lastIndex) ?: return null
+        val next = readerPosition.displayedPosition.nextOrNull(lastIndex) ?: return null
         return jumpTo(next)
     }
 
     fun goToPreviousChapter(): ReaderChapterPosition? {
-        val previous = readerPosition.loadPosition.previousOrNull() ?: return null
+        val previous = readerPosition.displayedPosition.previousOrNull() ?: return null
         return jumpTo(previous)
     }
 

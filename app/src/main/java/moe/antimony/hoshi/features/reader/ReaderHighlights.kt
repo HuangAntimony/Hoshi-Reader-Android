@@ -24,7 +24,55 @@ internal object ReaderHighlights {
             if (it.id == result.id) it.copy(color = color) else it
         }
         is ReaderHighlightResult.Removed -> highlights.filterNot { it.id == result.id }
-        is ReaderHighlightCreationResult -> highlights
+        is ReaderHighlightCreationResult, is ReaderHighlightResult.Batch -> highlights
+    }
+
+    fun applySelection(
+        highlights: List<ReaderHighlight>,
+        result: ReaderHighlightResult,
+        color: HighlightColor,
+        id: String,
+        book: EpubBook,
+        fallbackChapter: Int,
+        createdAt: Double,
+    ): List<ReaderHighlight> {
+        var edited = highlights
+        val changes = if (result is ReaderHighlightResult.Batch) result.changes else listOf(result)
+        for (change in changes) {
+            if (change is ReaderHighlightCreationResult) {
+                val chapter = book.chapters.getOrNull(change.chapterIndex ?: fallbackChapter) ?: return highlights
+                val info = book.bookInfo.chapterInfo[chapter.href] ?: return highlights
+                edited = edited + ReaderHighlight(
+                    id = change.id ?: id,
+                    // A trailing punctuation or space can start after the last counted character.
+                    // Raw offset selects the text; the navigation character identifies its source chapter.
+                    character = info.currentTotal + change.start.coerceAtMost((info.chapterCount - 1).coerceAtLeast(0)),
+                    offset = change.offset,
+                    text = change.text,
+                    textFurigana = change.textFurigana,
+                    color = color,
+                    createdAt = createdAt,
+                )
+            } else {
+                edited = applyEdit(edited, change, color)
+            }
+        }
+        return edited
+    }
+
+    fun bookHighlightsJson(highlights: List<ReaderHighlight>, book: EpubBook): String? {
+        if (highlights.isEmpty()) return null
+        val sorted = highlights.sortedBy { it.character }
+        val grouped = mutableMapOf<Int, List<ReaderHighlight>>()
+        var cursor = 0
+        for ((index, chapter) in book.chapters.withIndex()) {
+            val range = chapterRange(book.bookInfo, chapter) ?: continue
+            while (cursor < sorted.size && sorted[cursor].character < range.start) cursor++
+            val first = cursor
+            while (cursor < sorted.size && sorted[cursor].character < range.end) cursor++
+            if (cursor > first) grouped[index] = sorted.subList(first, cursor)
+        }
+        return json.encodeToString(grouped)
     }
 
     fun chapterHighlightsJson(
@@ -122,10 +170,16 @@ internal data class ReaderHighlightCreationResult(
     val offset: Int,
     val text: String,
     val textFurigana: String? = null,
+    val id: String? = null,
+    val chapterIndex: Int? = null,
 ) : ReaderHighlightResult
 
 @Serializable
 internal sealed interface ReaderHighlightResult {
+    @Serializable
+    @SerialName("batch")
+    data class Batch(val changes: List<ReaderHighlightResult>) : ReaderHighlightResult
+
     @Serializable
     @SerialName("recolored")
     data class Recolored(val id: String) : ReaderHighlightResult
@@ -140,10 +194,21 @@ internal sealed interface ReaderHighlightResult {
             classDiscriminator = "action"
         }
 
+        private val ReaderHighlightCreationResult.isValid: Boolean
+            get() = start >= 0 && offset >= 0 && text.isNotEmpty() && (chapterIndex == null || chapterIndex >= 0)
+
         fun fromWebViewResult(result: String?): ReaderHighlightResult? = runCatching {
             json.decodeFromString<ReaderHighlightResult>(result ?: return null).takeIf {
                 when (it) {
-                    is ReaderHighlightCreationResult -> it.start >= 0 && it.offset >= 0 && it.text.isNotEmpty()
+                    is Batch -> it.changes.isNotEmpty() && it.changes.all { change ->
+                        when (change) {
+                            is ReaderHighlightCreationResult -> change.isValid && change.chapterIndex != null && !change.id.isNullOrBlank()
+                            is Removed -> change.id.isNotBlank()
+                            is Recolored -> change.id.isNotBlank()
+                            is Batch -> false
+                        }
+                    }
+                    is ReaderHighlightCreationResult -> it.isValid
                     is Recolored -> it.id.isNotBlank()
                     is Removed -> it.id.isNotBlank()
                 }

@@ -3,13 +3,16 @@ __HOSHI_READER_TEXT_SEMANTICS_SCRIPT__
 __HOSHI_READER_DOM_TEXT_SCRIPT__
 __HOSHI_READER_MEDIA_SEMANTICS_SCRIPT__
 
- window.hoshiReader = {
-   cueWrappers: new Map(),
-   cueSourceRanges: new Map(),
-   cueGeometryRanges: new Map(),
+window.hoshiReader = {
+  cueWrappers: new Map(),
+  cueSourceRanges: new Map(),
+  cueGeometryRanges: new Map(),
   activeCueId: null,
-  nodeStartOffsets: new WeakMap(),
-  nodeStartRawOffsets: new WeakMap(),
+  restoreToken: __HOSHI_RESTORE_TOKEN_LITERAL__,
+  activeChapterIndex: __HOSHI_INITIAL_CHAPTER_INDEX__,
+  chapterIndexes: new WeakMap(),
+  nodeStartOffsets: { get(node) { return window.hoshiReader.indexForNode(node)?.offsets.get(node); } },
+  nodeStartRawOffsets: { get(node) { return window.hoshiReader.indexForNode(node)?.rawOffsets.get(node); } },
   isVertical: function() {
     return window.getComputedStyle(document.body).writingMode === "vertical-rl";
   },
@@ -22,12 +25,47 @@ __HOSHI_READER_MEDIA_SEMANTICS_SCRIPT__
   scrollTo: function(position) {
     document.body.scrollTo(position);
   },
-  isAtChapterBoundary: function(direction) {
-    var root = document.body;
+  configureViewport: function(horizontalInsetRatio, verticalInsetRatio, verticalBlockRatio, verticalGapRatio,
+                              imageWidthRatio, imageWidthReductionPx, imageHeightRatio) {
+    var width = window.innerWidth;
+    var height = window.innerHeight;
+    var contentWidth = width * (1 - 2 * horizontalInsetRatio);
+    var contentHeight = height * (1 - 2 * verticalInsetRatio);
+    var style = document.documentElement.style;
+    style.setProperty('--page-width', width + 'px');
+    style.setProperty('--page-height', height + 'px');
+    style.setProperty('--hoshi-continuous-left', (width * horizontalInsetRatio) + 'px');
+    style.setProperty('--hoshi-continuous-top', (height * verticalInsetRatio) + 'px');
+    style.setProperty('--hoshi-continuous-width', contentWidth + 'px');
+    style.setProperty('--hoshi-continuous-height', contentHeight + 'px');
+    style.setProperty('--hoshi-vertical-padding-block', (contentHeight * verticalBlockRatio) + 'px');
+    style.setProperty('--hoshi-vertical-padding-gap', (contentHeight * verticalGapRatio) + 'px');
+    style.setProperty('--hoshi-reader-visible-height', contentHeight + 'px');
+    style.setProperty('--hoshi-image-max-width', Math.max(1, Math.floor(contentWidth * imageWidthRatio) - imageWidthReductionPx) + 'px');
+    style.setProperty('--hoshi-image-max-height', Math.max(1, Math.floor(contentHeight * imageHeightRatio)) + 'px');
+  },
+  chapterRoot: function(index = this.activeChapterIndex) {
+    return this.chapters[index];
+  },
+  chapterForNode: function(node) {
+    return node.parentElement?.closest('[data-hoshi-chapter]');
+  },
+  // Chapter roots are in spine order. Read their live geometry so late layout
+  // changes (ruby, images, details, fonts) need no scroll probes or cached bounds.
+  visibleChapterIndex: function() {
+    var chapters = this.chapters;
     var vertical = this.isVertical();
-    var position = vertical ? -root.scrollLeft : root.scrollTop;
-    var extent = vertical ? root.scrollWidth - root.clientWidth : root.scrollHeight - root.clientHeight;
-    return direction === 'forward' ? position >= extent - 1 : position <= 1;
+    var viewport = this.contentViewport();
+    var low = 0;
+    var high = chapters.length - 1;
+    while (low < high) {
+      var mid = (low + high) >>> 1;
+      var rect = chapters[mid].getBoundingClientRect();
+      var before = vertical ? rect.left >= viewport.right - 0.5 : rect.bottom <= viewport.top + 0.5;
+      if (before) low = mid + 1;
+      else high = mid;
+    }
+    return low;
   },
   readerCssVariable: function(name) {
     return window.getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -79,19 +117,19 @@ __HOSHI_READER_MEDIA_SEMANTICS_SCRIPT__
     }
     return fallbackOffset;
   },
-   notifyRestoreComplete: function() {
-     if (window.HoshiReaderRestore && window.HoshiReaderRestore.postMessage) {
-       window.HoshiReaderRestore.postMessage(__HOSHI_RESTORE_TOKEN_LITERAL__);
-     }
-   },
-  scrollToChapterStart: function() {
+  notifyRestoreComplete: function(token = this.restoreToken) {
+    if (token !== this.restoreToken) return;
+    this.progressRestored = true;
+    this.savedScrollOffset = this.sasayakiScrollPosition();
+    window.HoshiReaderRestore?.postMessage?.(token);
+  },
+  scrollToChapterStart: function(root) {
     window.scrollTo(0, 0);
     document.documentElement.scrollTop = 0;
     document.documentElement.scrollLeft = 0;
-    this.scrollTo({ left: 0, top: 0, behavior: 'instant' });
+    root.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'instant' });
   },
-  createWalker: function(rootNode) {
-    var root = rootNode || document.body;
+  createWalker: function(root = this.chapterRoot()) {
     return document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
       acceptNode: (n) => this.isFurigana(n) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT
     });
@@ -100,91 +138,73 @@ __HOSHI_READER_MEDIA_SEMANTICS_SCRIPT__
     var rect = target.getClientRects()[0];
     return rect || target.getBoundingClientRect();
   },
-  buildNodeOffsets: function() {
+  indexForNode: function(node) {
+    var root = this.chapterForNode(node);
+    return root && this.ensureChapterIndex(root);
+  },
+  ensureChapterIndex: function(root) {
+    return this.chapterIndexes.get(root) || this.indexChapter(root);
+  },
+  indexChapter: function(root) {
     var offsets = new WeakMap();
     var rawOffsets = new WeakMap();
-    var walker = this.createWalker();
+    var entries = [];
+    var walker = this.createWalker(root);
     var count = 0;
     var rawCount = 0;
     var node;
     while (node = walker.nextNode()) {
       offsets.set(node, count);
       rawOffsets.set(node, rawCount);
-      count += this.countChars(node.textContent);
+      var length = this.countChars(node.textContent);
+      if (length) entries.push({ node, start: count, length });
+      count += length;
       rawCount += this.countRawChars(node.textContent);
     }
-    this.nodeStartOffsets = offsets;
-    this.nodeStartRawOffsets = rawOffsets;
+    var index = { offsets, rawOffsets, entries, count };
+    this.chapterIndexes.set(root, index);
+    return index;
+  },
+  buildNodeOffsets: function(root = this.chapterRoot()) {
+    this.indexChapter(root);
     // Wrapping/unwrapping moves text nodes and invalidates live CSS Ranges.
     if (window.hoshiHighlights?.searchRange) window.hoshiHighlights.refreshSearchHighlight();
   },
-  countCharsBeforeViewport: function(node, vertical) {
-    var text = node.textContent || '';
-    var totalChars = this.countChars(text);
-    if (totalChars <= 0) return 0;
-    var range = document.createRange();
-    range.selectNodeContents(node);
-    var rects = range.getClientRects();
-    if (!rects.length) return 0;
-    var minStart = Infinity;
-    var maxEnd = -Infinity;
-    for (var i = 0; i < rects.length; i++) {
-      var rect = rects[i];
-      if (rect.width <= 0 || rect.height <= 0) continue;
-      var start = vertical ? rect.left : rect.top;
-      var end = vertical ? rect.right : rect.bottom;
-      minStart = Math.min(minStart, start);
-      maxEnd = Math.max(maxEnd, end);
-    }
-    var viewport = this.contentViewport();
-    if (vertical) {
-      if (minStart >= viewport.right) return totalChars;
-      if (maxEnd <= viewport.right || minStart === Infinity) return 0;
-    } else {
-      if (maxEnd <= viewport.top) return totalChars;
-      if (minStart >= viewport.top || minStart === Infinity) return 0;
-    }
-    var offsets = [];
-    var prefixCounts = [0];
-    var count = 0;
-    var offset = 0;
-    while (offset < text.length) {
-      offsets.push(offset);
-      var char = String.fromCodePoint(text.codePointAt(offset));
-      offset += char.length;
-      if (this.isMatchableChar(char)) count += 1;
-      prefixCounts.push(count);
-    }
+  countCharsBeforeViewport: function(entry, rect, vertical, range, viewport) {
+    if (vertical ? rect.left >= viewport.right : rect.bottom <= viewport.top) return entry.length;
+    if (vertical ? rect.right <= viewport.right : rect.top >= viewport.top) return 0;
+    var node = entry.node;
+    var text = node.textContent;
     var low = 0;
-    var high = offsets.length - 1;
-    var firstVisible = offsets.length;
-    while (low <= high) {
-      var mid = Math.floor((low + high) / 2);
-      if (this.isTextOffsetBeforeViewport(node, offsets[mid], text, vertical)) {
-        low = mid + 1;
+    var high = text.length;
+    while (low < high) {
+      var mid = (low + high) >>> 1;
+      // DOM Range offsets are UTF-16. Keep each probe on a code-point boundary.
+      if (mid > low && text.charCodeAt(mid) >= 0xDC00 && text.charCodeAt(mid) <= 0xDFFF &&
+          text.codePointAt(mid - 1) > 0xFFFF) mid--;
+      if (this.isTextOffsetBeforeViewport(node, mid, text, vertical, range, viewport)) {
+        low = mid + (text.codePointAt(mid) > 0xFFFF ? 2 : 1);
       } else {
-        firstVisible = mid;
-        high = mid - 1;
+        high = mid;
       }
     }
-    return prefixCounts[firstVisible];
+    return this.countChars(text.slice(0, low));
   },
-  isTextOffsetBeforeViewport: function(node, offset, text, vertical) {
+  isTextOffsetBeforeViewport: function(node, offset, text, vertical, range, viewport) {
     var char = String.fromCodePoint(text.codePointAt(offset));
     if (!char) return false;
-    var range = document.createRange();
     range.setStart(node, offset);
     range.setEnd(node, offset + char.length);
     var rect = this.getRect(range);
     if (!rect || rect.width <= 0 || rect.height <= 0) return false;
     // Font/ruby metric boxes can overlap adjacent lines by a fraction of a pixel.
     // A clipped sliver must not become the saved first line on every reopen.
-    var viewport = this.contentViewport();
     return vertical ? (rect.left + rect.right) / 2 >= viewport.right : (rect.top + rect.bottom) / 2 <= viewport.top;
   },
   restoreLineEdge: function(targetNode, targetRect, vertical) {
     var scope = targetNode.parentElement;
-    while (scope && scope !== document.body) {
+    var root = this.chapterRoot();
+    while (scope && scope !== root) {
       var display = window.getComputedStyle(scope).display || '';
       if (/^(block|flow-root|list-item|table.*|flex|grid)$/.test(display)) break;
       scope = scope.parentElement;
@@ -198,7 +218,7 @@ __HOSHI_READER_MEDIA_SEMANTICS_SCRIPT__
         ? Math.abs((rect.left + rect.right) - (targetRect.left + targetRect.right)) < Math.min(rect.width, targetRect.width)
         : Math.abs((rect.top + rect.bottom) - (targetRect.top + targetRect.bottom)) < Math.min(rect.height, targetRect.height);
     };
-    var walker = document.createTreeWalker(scope || document.body, NodeFilter.SHOW_TEXT);
+    var walker = document.createTreeWalker(scope || root, NodeFilter.SHOW_TEXT);
     var range = document.createRange();
     var node;
     while (node = walker.nextNode()) {
@@ -304,29 +324,21 @@ __HOSHI_READER_SASAYAKI_SCRIPT__
       ? rect.left >= viewport.left && rect.right <= viewport.right
       : rect.top >= viewport.top && rect.bottom <= viewport.bottom;
   },
-  sasayakiCueScrollTarget: function(cue) {
-    var rect = this.sasayakiCueRect(cue);
-    if (!rect) return null;
-    return this.sasayakiScrollTargetForRect(rect);
-  },
   sasayakiMediaScrollForElement: function(element) {
     var rect = element.getBoundingClientRect();
     if (!rect || rect.width <= 0 || rect.height <= 0) return null;
     return this.sasayakiScrollTargetForRect(rect);
   },
   sasayakiMediaStopsBeforeCue: function(cue) {
+    this.selectSasayakiChapter(cue);
     var targetRect = this.sasayakiCueRect(cue);
     if (!targetRect || this.sasayakiCueRectIsVisible(targetRect)) return [];
     var targetScroll = this.sasayakiScrollTargetForRect(targetRect);
     if (targetScroll === null || targetScroll === undefined) return [];
-    return this.sasayakiMediaStopsBetween(this.sasayakiScrollPosition(), targetScroll, true, false);
-  },
-  sasayakiMediaStopsToChapterEnd: function() {
-    var root = document.body;
-    var endScroll = this.isVertical()
-      ? -Math.max(0, root.scrollWidth - root.clientWidth)
-      : Math.max(0, root.scrollHeight - root.clientHeight);
-    return this.sasayakiMediaStopsBetween(this.sasayakiScrollPosition(), endScroll, true, true);
+    var visible = this.visibleChapterIndex();
+    var target = Number(this.sasayakiRoot.dataset.hoshiChapter);
+    var roots = this.chapters.slice(Math.min(visible, target), Math.max(visible, target) + 1);
+    return this.sasayakiMediaStopsBetween(this.sasayakiScrollPosition(), targetScroll, true, false, roots);
   },
   showSasayakiMediaStop: function(stop) {
     window.hoshiHighlights?.clearSearchHighlight?.();
@@ -337,9 +349,10 @@ __HOSHI_READER_SASAYAKI_SCRIPT__
       top: this.isVertical() ? 0 : scroll,
       behavior: 'instant'
     });
-    return this.calculateProgress();
+    return this.postScrollPosition(false);
   },
   highlightSasayakiCue: function(cue, reveal) {
+    this.selectSasayakiChapter(cue);
     if (reveal) window.hoshiHighlights?.clearSearchHighlight?.();
     this.clearSasayakiCue();
     var cueId = typeof cue === 'string' ? cue : cue.id;
@@ -353,7 +366,7 @@ __HOSHI_READER_SASAYAKI_SCRIPT__
       this.renderSasayakiOverlay();
       var self = this;
       requestAnimationFrame(function() { self.renderSasayakiOverlay(); });
-      if (didScroll) return this.calculateProgress();
+      if (didScroll) return this.postScrollPosition(false);
       return null;
     }
     var targets = this.sasayakiInlineTargetsForCue(cueId);
@@ -366,7 +379,7 @@ __HOSHI_READER_SASAYAKI_SCRIPT__
     this.applyInlineSasayakiCue(cueId);
     var scrollTarget = targets[0];
     if (reveal && scrollTarget && this.scrollToTarget(scrollTarget)) {
-      return this.calculateProgress();
+      return this.postScrollPosition(false);
     }
     return null;
   },
@@ -396,103 +409,160 @@ __HOSHI_READER_SASAYAKI_SCRIPT__
   stabilizeRubyAdjacentTextNodes: function(root) {
     this.domText().stabilizeRubyAdjacentTextNodes(this, root);
   },
-  calculateProgress: function() {
+  // Locate the first text run crossing the leading viewport edge. A cached
+  // chapter-local index supplies the prefix count; one Range serves every probe.
+  calculateProgress: function(chapterIndex = this.visibleChapterIndex()) {
+    var root = this.chapterRoot(chapterIndex);
+    var index = this.ensureChapterIndex(root);
     var vertical = this.isVertical();
-    var walker = this.createWalker();
-    var totalChars = 0;
-    var exploredChars = 0;
-    var node;
-    while (node = walker.nextNode()) {
-      var nodeLen = this.countChars(node.textContent);
-      totalChars += nodeLen;
-      if (nodeLen > 0) exploredChars += this.countCharsBeforeViewport(node, vertical);
+    var viewport = this.contentViewport();
+    if (!index.count) {
+      var rect = root.getBoundingClientRect();
+      var distance = vertical ? rect.right - viewport.right : viewport.top - rect.top;
+      return Math.max(0, Math.min(1, distance / (vertical ? rect.width : rect.height) || 0));
     }
-    return totalChars > 0 ? exploredChars / totalChars : 0;
-  },
-  restoreProgress: async function(progress) {
-    await document.fonts.ready;
-    if (progress <= 0) {
-      this.scrollToChapterStart();
-      requestAnimationFrame(() => {
-        this.scrollToChapterStart();
-        this.notifyRestoreComplete();
-      });
-      return;
-    }
-    var walker = this.createWalker();
-    var totalChars = 0;
-    var node;
-    while (node = walker.nextNode()) {
-      totalChars += this.countChars(node.textContent);
-    }
-    if (totalChars <= 0) {
-      this.notifyRestoreComplete();
-      return;
-    }
-    var targetCharCount = Math.ceil(totalChars * progress);
-    var runningSum = 0;
-    var targetNode = null;
-    var targetOffset = 0;
-    var lastTargetNode = null;
-    walker = this.createWalker();
-    while (node = walker.nextNode()) {
-      var nodeLen = this.countChars(node.textContent);
-      if (nodeLen > 0) lastTargetNode = node;
-      if ((runningSum + nodeLen) > targetCharCount) {
-        targetNode = node;
-        targetOffset = this.textOffsetForCharCount(node, Math.max(0, targetCharCount - runningSum));
-        break;
+    var range = document.createRange();
+    var entries = index.entries;
+    var low = 0;
+    var high = entries.length;
+    var candidate = null;
+    var counted = 0;
+    while (low < high) {
+      var mid = (low + high) >>> 1;
+      var probe = mid;
+      // Hidden publisher nodes have offsets but no visual position.
+      while (probe < high) {
+        range.selectNodeContents(entries[probe].node);
+        var rect = range.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) break;
+        probe++;
       }
-      runningSum += nodeLen;
-    }
-    if (!targetNode) targetNode = lastTargetNode;
-    if (targetNode) {
-      if (progress >= 0.999999 && targetNode.parentElement) {
-        targetNode.parentElement.scrollIntoView({
-          block: 'end',
-          inline: 'nearest',
-          behavior: 'instant'
-        });
+      if (probe === high) {
+        high = mid;
+        continue;
+      }
+      var entry = entries[probe];
+      var before = this.countCharsBeforeViewport(entry, rect, vertical, range, viewport);
+      if (before === entry.length) {
+        counted = entry.start + before;
+        low = probe + 1;
+      } else if (before === 0) {
+        candidate = entry;
+        high = mid;
       } else {
-        var range = document.createRange();
-        var targetText = targetNode.textContent || '';
-        var targetChar = String.fromCodePoint(targetText.codePointAt(targetOffset));
-        range.setStart(targetNode, targetOffset);
-        range.setEnd(targetNode, Math.min(targetText.length, targetOffset + Math.max(1, targetChar.length)));
-        // An inline marker aligns its own baseline box, clipping half the text line.
-        // Use the existing glyph geometry without changing the chapter's layout.
-        var rect = this.getRect(range);
-        var vertical = this.isVertical();
-        var edge = this.restoreLineEdge(targetNode, rect, vertical);
-        var viewport = this.contentViewport();
-        this.scrollBy({
-          left: vertical ? edge - viewport.right : 0,
-          top: vertical ? 0 : edge - viewport.top,
-          behavior: 'instant'
-        });
+        return (entry.start + before) / index.count;
       }
     }
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => this.notifyRestoreComplete());
-    });
+    if (candidate) counted = candidate.start;
+    return counted / index.count;
   },
-  jumpToFragment: async function(fragment) {
-    await document.fonts.ready;
-    var rawFragment = (fragment || '').trim();
-    var target = rawFragment && (document.getElementById(rawFragment) || document.getElementsByName(rawFragment)[0]);
-    if (!target) {
-      this.notifyRestoreComplete();
-      return false;
+  visiblePosition: function() {
+    var chapterIndex = this.visibleChapterIndex();
+    this.activeChapterIndex = chapterIndex;
+    return { chapterIndex, progress: this.calculateProgress(chapterIndex) };
+  },
+  positionOnExit: function() {
+    return this.progressRestored && this.sasayakiScrollPosition() !== this.savedScrollOffset
+      ? this.visiblePosition() : null;
+  },
+  postScrollPosition: function(settled) {
+    var position = this.visiblePosition();
+    if (this.progressRestored) {
+      if (settled) this.savedScrollOffset = this.sasayakiScrollPosition();
+      window.HoshiReaderScroll?.postProgress?.(this.restoreToken, position.chapterIndex, position.progress, settled);
     }
-    target.scrollIntoView();
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => this.notifyRestoreComplete());
-    });
-    return true;
+    return position.progress;
+  },
+  cancelScrollReports: function() {
+    clearTimeout(this.scrollProgressTimer);
+    clearTimeout(this.scrollSettledTimer);
+    this.scrollProgressTimer = null;
+  },
+  scheduleScrollProgress: function() {
+    if (!this.progressRestored) return;
+    if (this.scrollProgressTimer == null) {
+      this.scrollProgressTimer = setTimeout(() => {
+        this.scrollProgressTimer = null;
+        this.postScrollPosition(false);
+      }, 80);
+    }
+    clearTimeout(this.scrollSettledTimer);
+    this.scrollSettledTimer = setTimeout(() => {
+      this.cancelScrollReports();
+      this.postScrollPosition(true);
+    }, 180);
+  },
+  alignProgress: function(root, progress) {
+    if (!(progress > 0)) {
+      this.scrollToChapterStart(root);
+      return;
+    }
+    var index = this.ensureChapterIndex(root);
+    var vertical = this.isVertical();
+    if (!index.count) {
+      this.scrollToChapterStart(root);
+      var rect = root.getBoundingClientRect();
+      // Keep the leading edge inside this section even at its final bookmark.
+      var size = vertical ? rect.width : rect.height;
+      var distance = Math.min(size * progress, Math.max(0, size - 1));
+      this.scrollBy({ left: vertical ? -distance : 0, top: vertical ? 0 : distance, behavior: 'instant' });
+      return;
+    }
+    var target = Math.min(index.count - 1, Math.ceil(index.count * progress));
+    var entries = index.entries;
+    var low = 0;
+    var high = entries.length - 1;
+    while (low < high) {
+      var mid = (low + high) >>> 1;
+      if (entries[mid].start + entries[mid].length <= target) low = mid + 1;
+      else high = mid;
+    }
+    var entry = entries[low];
+    var node = entry.node;
+    if (progress >= 1 && node.parentElement) {
+      node.parentElement.scrollIntoView({ block: 'end', inline: 'nearest', behavior: 'instant' });
+      if (this.visibleChapterIndex() !== this.activeChapterIndex) this.scrollToChapterStart(root);
+      return;
+    }
+    var offset = this.textOffsetForCharCount(node, target - entry.start);
+    var range = document.createRange();
+    range.setStart(node, offset);
+    range.setEnd(node, offset + String.fromCodePoint(node.textContent.codePointAt(offset)).length);
+    var edge = this.restoreLineEdge(node, this.getRect(range), vertical);
+    var viewport = this.contentViewport();
+    this.scrollBy({ left: vertical ? edge - viewport.right : 0,
+      top: vertical ? 0 : edge - viewport.top, behavior: 'instant' });
+  },
+  jumpToChapter: async function(chapterIndex, progress, fragment, token = this.restoreToken) {
+    var root = this.chapterRoot(chapterIndex);
+    if (!root) return false;
+    this.restoreToken = token;
+    if (window.hoshiSelection) window.hoshiSelection.options.nativeSelectionToken = token;
+    this.progressRestored = false;
+    this.cancelScrollReports();
+    this.activeChapterIndex = chapterIndex;
+    var generation = this.restoreGeneration = (this.restoreGeneration || 0) + 1;
+    await document.fonts.ready;
+    if (generation !== this.restoreGeneration) return false;
+    var target = fragment && Array.from(root.querySelectorAll('[data-hoshi-id], [id], [name]'))
+      .find(element => element.dataset.hoshiId === fragment || element.id === fragment || element.getAttribute('name') === fragment);
+    if (target) target.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'instant' });
+    else this.alignProgress(root, progress);
+    window.hoshiReaderMediaSemantics.observeBookImagesAtReadingPosition();
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (generation === this.restoreGeneration) this.notifyRestoreComplete(token);
+    }));
+    return !fragment || !!target;
+  },
+  restoreProgress: function(progress) {
+    return this.jumpToChapter(this.activeChapterIndex, progress, null);
+  },
+  jumpToFragment: function(fragment) {
+    return this.jumpToChapter(this.activeChapterIndex, 0, fragment);
   },
   paginateWithProgress: function(direction) {
     var result = this.paginate(direction);
-    return result === 'scrolled' ? this.calculateProgress() : result;
+    return result === 'scrolled' ? this.postScrollPosition(false) : result;
   },
   paginate: function(direction) {
     window.hoshiHighlights?.clearSearchHighlight?.();
@@ -514,41 +584,37 @@ window.hoshiReader.initialize = function() {
   if (window.hoshiReader.didInitialize) return;
   window.hoshiReader.didInitialize = true;
   window.hoshiReaderViewport.ensureDeviceViewport();
-  document.body.addEventListener('scroll', function() {
-    window.HoshiReaderScroll?.postMessage(__HOSHI_RESTORE_TOKEN_LITERAL__);
+  var reader = this;
+  reader.chapters = Array.from(document.querySelectorAll('body > [data-hoshi-chapter]'));
+  document.body.addEventListener('scroll', () => {
+    reader.scheduleScrollProgress();
+    if (reader.activeCueId && reader.isEInkMode()) reader.renderSasayakiOverlay();
+  }, { passive: true });
+  window.addEventListener('pagehide', () => {
+    reader.cancelScrollReports();
+    reader.postScrollPosition(true);
   });
-  var style = document.documentElement.style;
-  style.setProperty('--page-width', window.innerWidth + 'px');
-  style.setProperty('--page-height', window.innerHeight + 'px');
-  style.setProperty('--hoshi-continuous-left', (window.innerWidth * __HOSHI_CONTINUOUS_HORIZONTAL_PADDING_RATIO__) + 'px');
-  style.setProperty('--hoshi-continuous-top', (window.innerHeight * __HOSHI_CONTINUOUS_VERTICAL_PADDING_RATIO__) + 'px');
-  style.setProperty('--hoshi-continuous-width', (window.innerWidth * (1 - 2 * __HOSHI_CONTINUOUS_HORIZONTAL_PADDING_RATIO__)) + 'px');
-  style.setProperty('--hoshi-continuous-height', (window.innerHeight * (1 - 2 * __HOSHI_CONTINUOUS_VERTICAL_PADDING_RATIO__)) + 'px');
+  var selectedFontReady = window.hoshiReaderViewport.preloadBodyFont();
   var imageReferencesReady = window.hoshiReaderMediaSemantics.loadImageReferenceCounts();
-  var images = Array.from(document.querySelectorAll('img'));
-  var imageSetupPromise = window.hoshiReaderMediaSemantics.setupReaderImages(document, {
+  window.hoshiReaderMediaSemantics.setupReaderImages(document, {
     blurImages: __HOSHI_BLUR_IMAGES__,
+    liveBlur: true,
     imageBridge: window.HoshiReaderImage,
-    waitForImages: true
+    waitForImages: false
   });
   window.hoshiReader.normalizeRubyTextNodes();
   window.hoshiReader.stabilizeRubyAdjacentTextNodes();
-  window.hoshiReaderDocumentPreparation?.resume();
-  var viewport = window.hoshiReader.contentViewport();
-  document.documentElement.style.setProperty('--hoshi-vertical-padding-block', (viewport.height * __HOSHI_VERTICAL_PADDING_BLOCK_RATIO__) + 'px');
-  document.documentElement.style.setProperty('--hoshi-vertical-padding-gap', (viewport.height * __HOSHI_VERTICAL_PADDING_GAP_RATIO__) + 'px');
-  document.documentElement.style.setProperty('--hoshi-continuous-height', viewport.height + 'px');
-  document.documentElement.style.setProperty('--hoshi-reader-visible-height', viewport.height + 'px');
-  document.documentElement.style.setProperty('--hoshi-image-max-width', Math.max(1, Math.floor(viewport.width * __HOSHI_IMAGE_WIDTH_VIEWPORT_RATIO__) - __HOSHI_IMAGE_WIDTH_REDUCTION_PX__) + 'px');
-  document.documentElement.style.setProperty('--hoshi-image-max-height', Math.max(1, Math.floor(viewport.height * __HOSHI_IMAGE_HEIGHT_VIEWPORT_RATIO__)) + 'px');
-  Promise.all([
-    Promise.resolve(document.fonts && document.fonts.ready),
-    imageSetupPromise
-  ]).then(function() {
-    if (!images.length) return;
-    return new Promise(function(resolve) { setTimeout(resolve, 50); });
-  }).then(function() {
-    window.hoshiReader.buildNodeOffsets();
+  __HOSHI_CONFIGURE_CONTINUOUS_VIEWPORT__;
+  Promise.resolve(selectedFontReady).then(function() {
+    window.hoshiReaderDocumentPreparation?.resume();
+    return document.fonts.ready;
+  }).then(async function() {
+    var installHighlights = __HOSHI_INITIAL_HIGHLIGHTS__;
+    if (installHighlights) {
+      await imageReferencesReady;
+      installHighlights();
+    }
+    reader.buildNodeOffsets();
     return imageReferencesReady;
   }).then(function() {
     __HOSHI_RESTORE_SCRIPTS__

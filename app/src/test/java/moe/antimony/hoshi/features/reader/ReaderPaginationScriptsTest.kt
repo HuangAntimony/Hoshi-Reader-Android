@@ -13,12 +13,12 @@ class ReaderPaginationScriptsTest {
         for (mode in ReaderViewMode.entries) {
             val settings = ReaderSettings(viewMode = mode)
             val noCues = ReaderPaginationScripts.shellScript(settings = settings)
-            assertFalse(noCues.contains("window.hoshiReader.applySasayakiCues([]);"))
+            assertFalse(noCues.contains("window.hoshiReader.applySasayakiCues([]"))
             val explicitClear = ReaderPaginationScripts.shellScript(settings = settings, sasayakiCuesJson = "[]")
-            assertTrue(explicitClear.contains("window.hoshiReader.applySasayakiCues([]);"))
+            assertTrue(explicitClear.contains("window.hoshiReader.applySasayakiCues([], false);"))
             val cues = "[{\"id\":\"cue\",\"start\":0,\"length\":2}]"
             val narration = ReaderPaginationScripts.shellScript(settings = settings, sasayakiCuesJson = cues)
-            assertTrue(narration.contains("window.hoshiReader.applySasayakiCues($cues);"))
+            assertTrue(narration.contains("window.hoshiReader.applySasayakiCues($cues, false);"))
         }
     }
 

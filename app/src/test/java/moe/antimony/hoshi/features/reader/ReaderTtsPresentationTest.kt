@@ -3,11 +3,26 @@ package moe.antimony.hoshi.features.reader
 import moe.antimony.hoshi.features.tts.TtsPlaybackState
 import moe.antimony.hoshi.features.tts.TtsSentence
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ReaderTtsPresentationTest {
     private val sentence = TtsSentence(1, 30, 4, "次です。")
     private val paused = TtsPlaybackState(bookId = "book", sentences = listOf(sentence), started = true)
+
+    @Test fun regularChaptersOnlyPrepareCuesForThePlaybackPosition() {
+        assertTrue(readerTtsChapterNeedsCues(paused, chapterIndex = 1, paragraphMode = false))
+        assertFalse(readerTtsChapterNeedsCues(paused, chapterIndex = 2, paragraphMode = false))
+        assertFalse(readerTtsChapterNeedsCues(paused.copy(playing = true), chapterIndex = 2, paragraphMode = false))
+        val next = paused.copy(sentences = listOf(sentence.copy(chapter = 2)), playing = true)
+        assertTrue(readerTtsChapterNeedsCues(next, chapterIndex = 2, paragraphMode = false))
+    }
+
+    @Test fun paragraphChapterRequestsCuesBeforeRevealEvenWhenPlaybackIsElsewhere() {
+        assertTrue(readerTtsChapterNeedsCues(paused, chapterIndex = 2, paragraphMode = true))
+        assertFalse(readerTtsChapterNeedsCues(paused.copy(started = false), chapterIndex = 2, paragraphMode = true))
+    }
 
     @Test fun pausedChapterRestoreDoesNotReturnToTheNarrationChapter() {
         assertEquals(ReaderTtsPresentation.None, readerTtsPresentation(paused, sentence, 2, autoScroll = true))

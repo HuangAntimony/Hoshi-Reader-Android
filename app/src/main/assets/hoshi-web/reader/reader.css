@@ -24,6 +24,12 @@ img.block-img {
     -webkit-column-break-inside: avoid !important;
     object-fit: contain !important;
 }
+img.block-img[data-hoshi-sized-art] {
+    width: min(var(--hoshi-art-width), var(--hoshi-image-max-width, __HOSHI_IMAGE_MAX_WIDTH_FALLBACK__),
+        calc(var(--hoshi-image-max-height, __HOSHI_IMAGE_MAX_HEIGHT_FALLBACK__) * var(--hoshi-art-ratio))) !important;
+    height: min(var(--hoshi-art-height), var(--hoshi-image-max-height, __HOSHI_IMAGE_MAX_HEIGHT_FALLBACK__),
+        calc(var(--hoshi-image-max-width, __HOSHI_IMAGE_MAX_WIDTH_FALLBACK__) / var(--hoshi-art-ratio))) !important;
+}
 img[class*="gaiji" i],
 img.hoshi-text-color-image {
     filter: url("#hoshi-gaiji-text-color-filter") !important;

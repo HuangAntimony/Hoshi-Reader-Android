@@ -70,7 +70,7 @@ internal class SasayakiPlaybackController(
     private var matchData: SasayakiMatchData?,
     initialPlayback: SasayakiPlaybackData?,
     persistenceScope: CoroutineScope,
-    private val getCurrentChapterIndex: () -> Int,
+    private val getCurrentChapterIndex: () -> Int?,
     onCue: (SasayakiMatch, Boolean, SasayakiCueRevealSource) -> Unit,
     onClearCue: () -> Unit,
     playbackPreparer: SasayakiPlaybackPreparer,

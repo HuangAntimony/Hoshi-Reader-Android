@@ -1,7 +1,5 @@
 package moe.antimony.hoshi.features.reader
 
-import android.os.SystemClock
-import android.view.MotionEvent
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.layout.fillMaxSize
@@ -44,6 +42,7 @@ class ReaderContinuousPopupViewportWebViewTest {
                 val label = "$mode vertical=$vertical padding=$padding"
                 val settings = ReaderSettings(viewMode = mode, verticalWriting = vertical,
                     horizontalPadding = padding, verticalPadding = padding, popupFullWidth = true)
+                val body = readerFixtureBody(mode, "<p><ruby>読書<rt>どくしょ</rt></ruby>の時間です。前後の文章を読みます。</p>".repeat(100))
                 val loaded = CountDownLatch(1)
                 instrumentation.runOnMainSync {
                     val styles = ReaderContentStyles.styleTag(settings = settings, readerCssTemplate = assets.readerCss)
@@ -55,7 +54,7 @@ class ReaderContinuousPopupViewportWebViewTest {
                         <!doctype html><html><head>
                         <script>window.HoshiReaderRestore={postMessage:()=>window.testRestored=true};
                         window.testScrollTokens=[]; window.testPopupMessages=[];
-                        window.HoshiReaderScroll={postMessage:token=>testScrollTokens.push(token)};
+                        window.HoshiReaderScroll={postProgress:token=>testScrollTokens.push(token)};
                         window.HoshiTextSelection={postMessage:value=>window.testLookupSelection=JSON.parse(value)};
                         window.HoshiReaderPopup={postMessage:value=>testPopupMessages.push(JSON.parse(value))};</script>
                         $styles$script
@@ -63,9 +62,7 @@ class ReaderContinuousPopupViewportWebViewTest {
                         ${assets.languageAssets.selectionJapaneseJs}
                         ${assets.selectionJs}
                         hoshiSelection.configure({bridge:'android-reader',scaleRects:false,rubyAwareRects:true});
-                        $popupHost</script></head><body>
-                        ${(1..100).joinToString("") { "<p><ruby>読書<rt>どくしょ</rt></ruby>の時間です。前後の文章を読みます。</p>" }}
-                        </body></html>
+                        $popupHost</script></head>$body</html>
                     """.trimIndent(), "text/html", "utf-8", null)
                 }
                 assertTrue(label, loaded.await(15, TimeUnit.SECONDS))
@@ -175,79 +172,30 @@ class ReaderContinuousPopupViewportWebViewTest {
                     webView = it
                     it.settings.javaScriptEnabled = true
                     it.prepareForDocument("current")
-                    it.onContinuousScroll = { events++ }
+                    it.onContinuousScroll = { _, _ -> events++ }
                     it.loadData("<html><body>fixture</body></html>", "text/html", "utf-8")
                 }
             })
         }
         composeRule.waitForIdle()
         try {
-            evaluate(webView, "HoshiReaderScroll.postMessage('old'); HoshiReaderScroll.postMessage('current'); true")
+            evaluate(webView, "HoshiReaderScroll.postProgress('old', 1, .25, false); HoshiReaderScroll.postProgress('current', 2, .5, false); true")
             composeRule.waitUntil(3000) { events == 1 }
             instrumentation.runOnMainSync { webView.prepareForDocument("next") }
-            evaluate(webView, "HoshiReaderScroll.postMessage('current'); HoshiReaderScroll.postMessage('next'); true")
-            composeRule.waitUntil(3000) { events == 2 }
+            evaluate(webView, """
+                HoshiReaderScroll.postProgress('current', 3, 0.2, true);
+                HoshiReaderScroll.postProgress('next', 4, 0.4, false);
+                HoshiReaderScroll.postProgress('next', 4, 0.5, true);
+                true
+            """.trimIndent())
+            composeRule.waitUntil(3000) { events == 3 }
             instrumentation.runOnMainSync {
-                ReaderContinuousScrollBridge(webView).postMessage("next")
+                ReaderContinuousScrollBridge(webView).postProgress("next", 4, 0.5, true)
                 webView.releaseForDestroy()
             }
             instrumentation.waitForIdleSync()
-            assertEquals(2, events)
+            assertEquals(3, events)
         } finally { instrumentation.runOnMainSync { webView.destroy() } }
-    }
-
-    @Test
-    fun chapterBoundaryRepliesExpireAfterAnotherGestureOrDocument() {
-        lateinit var webView: HoshiReaderWebView
-        var chapters = 0
-        composeRule.setContent {
-            AndroidView(modifier = Modifier.fillMaxSize(), factory = { context ->
-                HoshiReaderWebView(context).also {
-                    webView = it
-                    it.settings.javaScriptEnabled = true
-                    it.prepareForDocument("current")
-                    it.loadData("<html><body><script>window.hoshiReader={isAtChapterBoundary:()=>true};</script></body></html>",
-                        "text/html", "utf-8")
-                }
-            })
-        }
-        composeRule.waitForIdle()
-        composeRule.waitUntil(3000) { evaluate(webView, "Boolean(window.hoshiReader)") == "true" }
-        val listener = ContinuousScrollTouchListener(ReaderSettings(verticalWriting = true, chapterSwipeDistance = 1),
-            shouldIgnoreReaderGesture = { false }, onTap = { _, _ -> }, onScrollGesture = {},
-            onNextChapter = { chapters++; true }, onPreviousChapter = { chapters--; true })
-        fun touch(action: Int, x: Float) {
-            val now = SystemClock.uptimeMillis()
-            val event = MotionEvent.obtain(now, now, action, x, 100f, 0)
-            listener.onTouch(webView, event)
-            event.recycle()
-        }
-        try {
-            instrumentation.runOnMainSync {
-                webView.bindReaderTouchListener("fixture") { listener }
-                touch(MotionEvent.ACTION_DOWN, 0f)
-                touch(MotionEvent.ACTION_UP, 300f)
-                webView.prepareForDocument("next")
-            }
-            evaluate(webView, "true")
-            assertEquals("Old document cannot turn a chapter", 0, chapters)
-            instrumentation.runOnMainSync {
-                touch(MotionEvent.ACTION_DOWN, 0f)
-                touch(MotionEvent.ACTION_UP, 300f)
-                touch(MotionEvent.ACTION_DOWN, 0f)
-            }
-            evaluate(webView, "true")
-            assertEquals("A newer gesture cancels the queued turn", 0, chapters)
-            instrumentation.runOnMainSync {
-                touch(MotionEvent.ACTION_CANCEL, 0f)
-                touch(MotionEvent.ACTION_DOWN, 0f)
-                webView.bindReaderTouchListener("fixture") { error("Recomposition must retain the gesture listener") }
-                touch(MotionEvent.ACTION_UP, 300f)
-            }
-            composeRule.waitUntil(3000) { chapters == 1 }
-        } finally {
-            instrumentation.runOnMainSync { webView.releaseForDestroy(); webView.destroy() }
-        }
     }
 
     private fun evaluate(webView: WebView, source: String): String {

@@ -11,15 +11,17 @@ Release notes before v1.3.0 are in [CHANGELOG_ARCHIVE.md](CHANGELOG_ARCHIVE.md).
 
 ### Changed
 
-- Show dictionary definitions sooner after tapping a word, including the first lookup in each chapter.
+- In continuous mode, you can scroll through the whole book and select text across chapter boundaries. ([#110](https://github.com/HuangAntimony/Hoshi-Reader-Android/issues/110), [#185](https://github.com/HuangAntimony/Hoshi-Reader-Android/issues/185))
+- Drag a slider to set the font size or page margins, or use + and − to adjust them one step at a time.
+- When you tap a word in the reader, the first dictionary definition appears while the rest of the entry loads.
 
 ### Fixed
 
-- Use Bluetooth headset and car controls to skip backward and forward in audiobooks with your chosen Skip Action. ([#186](https://github.com/HuangAntimony/Hoshi-Reader-Android/issues/186))
-- Show manual update check errors in a dialog without expanding the About update section, and stop reopening dialogs for old preview download failures.
-- Use TTS short-clause splitting to pause, skip and replay at ellipses and more dash variants.
-- Prefer local recordings that match the dictionary reading while honoring source priority for sources that provide no readings.
-- Resume audiobooks with sentence underlines and automatic page turns when returning to an open reader after Android stops playback in the background.
+- The previous and next buttons on Bluetooth headsets and car controls now follow your audiobook **Skip Action** setting. ([#186](https://github.com/HuangAntimony/Hoshi-Reader-Android/issues/186))
+- About now shows a dialog when a manual update check fails and no longer repeats old preview download errors when you return.
+- With **Split into short clauses** enabled, text-to-speech also splits at ellipses and long dashes.
+- When a word has multiple pronunciations, local audio lookup prefers recordings that match the dictionary reading and still honors the priority of sources that list only spellings.
+- If Android stops audiobook playback in the background, you can resume in the open book with sentence underlining and automatic page turns working again.
 
 ## [v1.5.0] - 2026-11-10
 

@@ -22,13 +22,23 @@ internal enum class ReaderNavigationResult {
 
 internal object ReaderPaginationScripts {
     fun showSearchHighlightInvocation(highlight: ReaderSearchHighlight): String =
-        "window.hoshiHighlights.showSearchHighlight(${highlight.offset}, ${highlight.length})"
+        "window.hoshiHighlights.showSearchHighlight(${highlight.offset}, ${highlight.length}, ${highlight.chapterIndex})"
 
     fun clearSearchHighlightInvocation(): String =
         "if (window.hoshiHighlights) window.hoshiHighlights.clearSearchHighlight()"
 
     fun paginateInvocation(direction: ReaderNavigationDirection): String =
         "window.hoshiReader.paginateWithProgress('${direction.jsValue}')"
+
+    fun configureContinuousViewportInvocation(settings: ReaderSettings): String {
+        val layout = ReaderGeneratedLayout.from(settings)
+        val arguments = listOf(
+            layout.viewportHorizontalPaddingRatio, layout.viewportVerticalPaddingRatio,
+            settings.verticalPadding / 200.0, settings.verticalPadding / 100.0,
+            layout.imageWidthViewportRatio, layout.imageWidthReductionPx, layout.imageHeightViewportRatio,
+        )
+        return "window.hoshiReader.configureViewport(${arguments.joinToString()})"
+    }
 
     fun progressInvocation(): String =
         "window.hoshiReader.calculateProgress()"
@@ -93,6 +103,7 @@ internal object ReaderPaginationScripts {
         restoreToken: String,
         assets: ReaderWebAssets? = null,
         measurementOnly: Boolean = false,
+        initialChapterIndex: Int = 0,
     ): String {
         val initialRestoreScript = initialFragment?.let { fragment ->
             "window.hoshiReader.jumpToFragment(${fragment.javaScriptStringLiteral()});"
@@ -104,21 +115,20 @@ internal object ReaderPaginationScripts {
         }
         val restoreScripts = if (measurementOnly) {
             "window.hoshiReader.calculatePageStartsForMeasurement().then(starts => window.HoshiReaderPages.postMessage(${restoreToken.javaScriptStringLiteral()}, JSON.stringify(starts)));"
-        } else readerRestoreScripts(
-            sasayakiCuesJson = sasayakiCuesJson,
-            highlightsJson = highlightsJson,
-            initialRestoreScript = initialRestoreScript,
-        )
+        } else initialRestoreScript
+        val initialHighlights = if (measurementOnly) {
+            "null"
+        } else readerInitialHighlightsScript(sasayakiCuesJson, highlightsJson)
         val generatedLayout = ReaderGeneratedLayout.from(settings)
         val body = template.render(mapOf(
+            "__HOSHI_INITIAL_CHAPTER_INDEX__" to initialChapterIndex.toString(),
             "__HOSHI_RESTORE_TOKEN_LITERAL__" to restoreToken.javaScriptStringLiteral(),
             "__HOSHI_PARAGRAPH_ENABLED__" to settings.paragraphMode.toString(),
             "__HOSHI_PARAGRAPH_MAX_SENTENCES__" to settings.maxSentencesPerPage.coerceIn(0, 10).toString(),
             "__HOSHI_PARAGRAPH_SPLIT_DIALOGUE__" to settings.splitDialogue.toString(),
             "__HOSHI_PARAGRAPH_TEXT_ANIMATION__" to settings.textAnimation.toString(),
             "__HOSHI_PARAGRAPH_TEXT_SPEED__" to settings.textSpeed.coerceParagraphTextSpeed().toString(),
-            "__HOSHI_CONTINUOUS_HORIZONTAL_PADDING_RATIO__" to generatedLayout.viewportHorizontalPaddingRatio.toString(),
-            "__HOSHI_CONTINUOUS_VERTICAL_PADDING_RATIO__" to generatedLayout.viewportVerticalPaddingRatio.toString(),
+            "__HOSHI_CONFIGURE_CONTINUOUS_VIEWPORT__" to configureContinuousViewportInvocation(settings),
             "__HOSHI_VERTICAL_PADDING_BLOCK_RATIO__" to (settings.verticalPadding / 200.0).toString(),
             "__HOSHI_VERTICAL_PADDING_GAP_RATIO__" to (settings.verticalPadding / 100.0).toString(),
             "__HOSHI_IMAGE_WIDTH_VIEWPORT_RATIO__" to generatedLayout.imageWidthViewportRatio.toString(),
@@ -127,6 +137,7 @@ internal object ReaderPaginationScripts {
             "__HOSHI_TRAILING_SPACER_HEIGHT_LITERAL__" to settings.trailingSpacerHeightCss.javaScriptSingleQuotedStringLiteral(),
             "__HOSHI_TRAILING_SPACER_WIDTH_LITERAL__" to settings.trailingSpacerWidthCss.javaScriptSingleQuotedStringLiteral(),
             "__HOSHI_BLUR_IMAGES__" to settings.blurImages.toString(),
+            "__HOSHI_INITIAL_HIGHLIGHTS__" to initialHighlights,
             "__HOSHI_RESTORE_SCRIPTS__" to restoreScripts,
         ))
         return "<script>\n" + (if (measurementOnly) "window.hoshiReaderMeasurement = true;\n" else "") + "$body\n</script>"
@@ -200,15 +211,16 @@ private object SourceTreeReaderPaginationAssets {
     }
 }
 
-private fun readerRestoreScripts(
+private fun readerInitialHighlightsScript(
     sasayakiCuesJson: String?,
     highlightsJson: String?,
-    initialRestoreScript: String,
-): String = listOfNotNull(
-    highlightsJson?.let { "window.hoshiHighlights.applyHighlights($it);" },
-    sasayakiCuesJson?.let { "window.hoshiReader.applySasayakiCues($it);" },
-    initialRestoreScript,
-).joinToString(separator = "\n")
+): String {
+    if (sasayakiCuesJson == null && highlightsJson == null) return "null"
+    return listOfNotNull(
+        highlightsJson?.let { "window.hoshiHighlights.applyHighlights($it, false);" },
+        sasayakiCuesJson?.let { "window.hoshiReader.applySasayakiCues($it, false);" },
+    ).joinToString(separator = "\n", prefix = "function() {\n", postfix = "\n}")
+}
 
 private fun String.javaScriptStringLiteral(): String =
     buildString(length + 2) {
@@ -243,4 +255,4 @@ private fun String.javaScriptSingleQuotedStringLiteral(): String =
     }
 
 private fun SasayakiCueRange.toJavaScriptObjectLiteral(): String =
-    "{id:${id.javaScriptStringLiteral()},start:$start,length:$length}"
+    "{id:${id.javaScriptStringLiteral()},start:$start,length:$length${chapterIndex?.let { ",chapterIndex:$it" }.orEmpty()}}"

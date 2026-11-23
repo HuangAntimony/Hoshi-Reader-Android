@@ -88,17 +88,6 @@ window.hoshiReader = {
     var rect = target.getClientRects()[0];
     return rect || target.getBoundingClientRect();
   },
-  preloadBodyFont: function() {
-    if (!document.fonts?.load) return null;
-    var style = window.getComputedStyle(document.body);
-    var family = style.getPropertyValue('--hoshi-preload-face').trim();
-    if (!family) return null;
-    // Start the selected face while document-start preparation still hides the
-    // root. Load only the reader-owned family: the body's entire fallback list
-    // can request publisher faces that no character in this chapter needs.
-    return document.fonts.load(`${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${family}`)
-      .catch(() => {}); // An unavailable face still uses its CSS fallback.
-  },
   buildNodeOffsets: function() {
     var offsets = new WeakMap();
     var rawOffsets = new WeakMap();
@@ -872,7 +861,7 @@ window.hoshiReader.initialize = function() {
     imageBridge: window.HoshiReaderImage,
     waitForImages: true
   });
-  var selectedFontReady = this.preloadBodyFont();
+  var selectedFontReady = window.hoshiReaderViewport.preloadBodyFont();
   var spacer = document.createElement('div');
   spacer.style.height = __HOSHI_TRAILING_SPACER_HEIGHT_LITERAL__;
   spacer.style.width = __HOSHI_TRAILING_SPACER_WIDTH_LITERAL__;
@@ -903,6 +892,11 @@ window.hoshiReader.initialize = function() {
       if (window.hoshiReaderMeasurement) await window.hoshiReader.measurementYield();
       if (window.hoshiParagraph.enabled) {
         window.hoshiParagraph.fragmentBlocks();
+      }
+      var installHighlights = __HOSHI_INITIAL_HIGHLIGHTS__;
+      if (installHighlights) {
+        await imageReferencesReady;
+        installHighlights();
       }
       window.hoshiReader.buildNodeOffsets();
       return imageReferencesReady;

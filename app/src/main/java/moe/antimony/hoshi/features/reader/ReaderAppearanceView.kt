@@ -62,6 +62,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -83,6 +85,7 @@ import moe.antimony.hoshi.ui.asString
 import moe.antimony.hoshi.ui.theme.LocalHoshiEInkMode
 import java.util.Locale
 import kotlin.math.round
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -366,12 +369,11 @@ private fun ReaderAppearanceContent(
                         onClick = { fontImporter.launch(ImportFileType.ReaderFont.mimeTypes) },
                     )
                     AppearanceDivider(palette)
-                    StepperRow(
+                    IntegerSliderRow(
                         label = stringResource(R.string.reader_appearance_font_size),
-                        value = settings.fontSize.toString(),
-                        onDecrease = { onSettingsChange { current -> current.copy(fontSize = (current.fontSize - 1).coerceAtLeast(10)) } },
-                        onIncrease = { onSettingsChange { current -> current.copy(fontSize = (current.fontSize + 1).coerceAtMost(60)) } },
-                        palette = palette,
+                        value = settings.fontSize,
+                        range = 10..60,
+                        onChange = { update -> onSettingsChange { it.copy(fontSize = update(it.fontSize)) } },
                     )
                     AppearanceDivider(palette)
                     val furiganaLabels = FuriganaMode.entries.map { stringResource(it.labelResId) }
@@ -409,21 +411,6 @@ private fun ReaderAppearanceContent(
                         },
                         palette = palette,
                     )
-                    if (settings.viewMode == ReaderViewMode.Continuous) {
-                        AppearanceDivider(palette)
-                        SliderRow(
-                            label = stringResource(R.string.reader_appearance_chapter_swipe_distance),
-                            value = settings.chapterSwipeDistance.toString(),
-                            sliderValue = settings.chapterSwipeDistance.toFloat(),
-                            valueRange = 10f..60f,
-                            steps = 9,
-                            onValueChange = { value ->
-                                onSettingsChange { current ->
-                                    current.copy(chapterSwipeDistance = (round(value / 5) * 5).toInt())
-                                }
-                            },
-                        )
-                    }
                     if (settings.viewMode == ReaderViewMode.Paginated) {
                         AppearanceDivider(palette)
                         SwitchRow(
@@ -500,20 +487,20 @@ private fun ReaderAppearanceContent(
                         )
                     }
                     AppearanceDivider(palette)
-                    StepperRow(
+                    IntegerSliderRow(
                         label = stringResource(R.string.reader_appearance_horizontal_padding),
-                        value = "${settings.horizontalPadding}%",
-                        onDecrease = { onSettingsChange { current -> current.copy(horizontalPadding = (current.horizontalPadding - 1).coerceAtLeast(0)) } },
-                        onIncrease = { onSettingsChange { current -> current.copy(horizontalPadding = (current.horizontalPadding + 1).coerceAtMost(50)) } },
-                        palette = palette,
+                        value = settings.horizontalPadding,
+                        range = 0..50,
+                        suffix = "%",
+                        onChange = { update -> onSettingsChange { it.copy(horizontalPadding = update(it.horizontalPadding)) } },
                     )
                     AppearanceDivider(palette)
-                    StepperRow(
+                    IntegerSliderRow(
                         label = stringResource(R.string.reader_appearance_vertical_padding),
-                        value = "${settings.verticalPadding}%",
-                        onDecrease = { onSettingsChange { current -> current.copy(verticalPadding = (current.verticalPadding - 1).coerceAtLeast(0)) } },
-                        onIncrease = { onSettingsChange { current -> current.copy(verticalPadding = (current.verticalPadding + 1).coerceAtMost(50)) } },
-                        palette = palette,
+                        value = settings.verticalPadding,
+                        range = 0..50,
+                        suffix = "%",
+                        onChange = { update -> onSettingsChange { it.copy(verticalPadding = update(it.verticalPadding)) } },
                     )
                     AppearanceDivider(palette)
                     SliderRow(
@@ -1446,71 +1433,51 @@ private fun SliderRow(
             onValueChange = onValueChange,
             valueRange = valueRange,
             steps = steps,
+            colors = readerSliderColorsWithoutTicks(),
         )
     }
 }
 
 @Composable
-private fun StepperRow(
+private fun IntegerSliderRow(
     label: String,
-    value: String,
-    onDecrease: () -> Unit,
-    onIncrease: () -> Unit,
-    palette: AppearancePalette,
+    value: Int,
+    range: IntRange,
+    suffix: String = "",
+    onChange: ((Int) -> Int) -> Unit,
 ) {
+    var dragValue by remember { mutableStateOf<Int?>(null) }
+    val shown = dragValue ?: value
     val metrics = readerSheetDensityMetrics()
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 14.dp, vertical = metrics.appearanceRowVerticalPaddingDp.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = label,
-            modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.bodyLarge,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(value, style = MaterialTheme.typography.bodyLarge)
-            Surface(
-                shape = RoundedCornerShape(18.dp),
-                color = palette.stepperContainer,
-                border = hoshiContainerBorder(),
-                contentColor = palette.onGroup,
+    Column(Modifier.padding(horizontal = 14.dp, vertical = metrics.appearanceSliderVerticalPaddingDp.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+            Text("$shown$suffix", style = MaterialTheme.typography.bodyLarge)
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(
+                onClick = { onChange { (it - 1).coerceIn(range) } },
+                enabled = shown > range.first,
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(
-                        onClick = onDecrease,
-                        modifier = Modifier.size(metrics.stepperButtonSizeDp.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Remove,
-                            contentDescription = stringResource(R.string.action_decrease),
-                            modifier = Modifier.size(metrics.stepperIconSizeDp.dp),
-                        )
-                    }
-                    Box(
-                        modifier = Modifier
-                            .size(width = 1.dp, height = 28.dp)
-                            .background(palette.stepperDivider),
-                    )
-                    IconButton(
-                        onClick = onIncrease,
-                        modifier = Modifier.size(metrics.stepperButtonSizeDp.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Add,
-                            contentDescription = stringResource(R.string.action_increase),
-                            modifier = Modifier.size(metrics.stepperIconSizeDp.dp),
-                        )
-                    }
-                }
+                Icon(Icons.Rounded.Remove, stringResource(R.string.action_decrease))
+            }
+            Slider(
+                value = shown.coerceIn(range).toFloat(),
+                onValueChange = { dragValue = it.roundToInt() },
+                onValueChangeFinished = {
+                    dragValue?.let { selected -> if (selected != value) onChange { selected } }
+                    dragValue = null
+                },
+                modifier = Modifier.weight(1f).semantics { contentDescription = label },
+                valueRange = range.first.toFloat()..range.last.toFloat(),
+                steps = range.last - range.first - 1,
+                colors = readerSliderColorsWithoutTicks(),
+            )
+            IconButton(
+                onClick = { onChange { (it + 1).coerceIn(range) } },
+                enabled = shown < range.last,
+            ) {
+                Icon(Icons.Rounded.Add, stringResource(R.string.action_increase))
             }
         }
     }
@@ -1535,8 +1502,6 @@ private data class AppearancePalette(
     val segmentSelected: Color,
     val segmentSelectedContent: Color,
     val segmentUnselectedContent: Color,
-    val stepperContainer: Color,
-    val stepperDivider: Color,
 )
 
 @Composable
@@ -1561,8 +1526,6 @@ private fun appearancePalette(): AppearancePalette {
         segmentSelected = segmentedControlColors.selected,
         segmentSelectedContent = segmentedControlColors.selectedContent,
         segmentUnselectedContent = segmentedControlColors.unselectedContent,
-        stepperContainer = hoshiSurfaces.nested,
-        stepperDivider = colorScheme.outline,
     )
 }
 

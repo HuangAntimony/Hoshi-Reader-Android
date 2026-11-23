@@ -338,7 +338,7 @@ window.hoshiSelection = {
 
     findParagraph(node) {
         let el = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
-        return el?.closest('p, li, .glossary-content, .expr-tag') || null;
+        return el?.closest('p, li, .glossary-content, .expr-tag') || this.chapterForNode(node);
     },
 
     createWalker(rootNode) {
@@ -654,6 +654,7 @@ window.hoshiSelection = {
             text,
             sentence: sentenceContext.sentence,
             rect: this.getSelectionRect(rectX, rectY),
+            chapterIndex: this.chapterIndex(hit.node),
             normalizedOffset,
             sentenceOffset: sentenceContext.sentenceOffset
         });
@@ -835,6 +836,15 @@ window.hoshiSelection = {
         });
     },
 
+    chapterForNode(node) {
+        return window.hoshiReader?.chapterForNode?.(node) ?? null;
+    },
+
+    chapterIndex(node) {
+        const section = this.chapterForNode(node);
+        return section ? Number(section.dataset.hoshiChapter) : null;
+    },
+
     getNormalizedOffset(targetNode, offset) {
         let count = window.hoshiReader.nodeStartOffsets.get(targetNode) ?? 0;
         const text = targetNode.textContent;
@@ -998,6 +1008,7 @@ window.hoshiSelection = {
             text: segments.map(({ node, start, end }) => node.textContent.slice(start, end)).join(''),
             sentence: context.sentence,
             sentenceOffset: context.sentenceOffset,
+            chapterIndex: this.chapterIndex(hit.node),
             normalizedOffset: this.getNormalizedOffset(hit.node, hit.offset),
             rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
         };

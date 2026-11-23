@@ -46,13 +46,14 @@ class ReaderNativeHighlightWebViewTest {
                     webView.webViewClient = object : WebViewClient() {
                         override fun onPageFinished(view: WebView, url: String) { loaded.countDown() }
                     }
+                    val body = readerFixtureBody(mode, "<p>前。<ruby>瑞<rp>(</rp><rt><span>みず</span></rt><rp>)</rp>々<rt>みず</rt></ruby>しさ😀です。</p>")
                     webView.loadDataWithBaseURL(null, """
                         <!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
                         <script>window.HoshiReaderRestore={postMessage:()=>window.testRestored=true};</script>
                         $styles<style>$viewport</style>$script
                         <script>${assets.languageAssets.languageJapaneseJs}
                         ${assets.languageAssets.selectionJapaneseJs}
-                        ${assets.selectionJs}</script></head><body><p>前。<ruby>瑞<rp>(</rp><rt><span>みず</span></rt><rp>)</rp>々<rt>みず</rt></ruby>しさ😀です。</p></body></html>
+                        ${assets.selectionJs}</script></head>$body</html>
                     """.trimIndent(), "text/html", "utf-8", null)
                 }
                 assertTrue(loaded.await(15, TimeUnit.SECONDS))
@@ -112,6 +113,7 @@ class ReaderNativeHighlightWebViewTest {
                         assertTrue("$description creates a highlight", !response.isNull("created"))
                         val created = response.getJSONObject("created")
                         assertEquals(description, "created", created.getString("action"))
+                        if (mode == ReaderViewMode.Continuous) assertEquals(description, 0, created.getInt("chapterIndex"))
                         assertEquals(description, text, created.getString("text"))
                         assertEquals(description, rawOffset, created.getInt("offset"))
                         assertEquals(description, rawOffset - 1, created.getInt("start"))

@@ -73,7 +73,7 @@ class ReaderViewportWebViewTest {
                     webView.loadDataWithBaseURL(null,
                         "<!doctype html><html><head><meta name='viewport' content='width=device-width,initial-scale=1'/>" +
                             "<style>$publisherCss</style><script>window.HoshiReaderRestore={postMessage:()=>window.testRestored=true};</script>" +
-                            "$styles<style>$viewport</style>$script</head><body>$body</body></html>",
+                            "$styles<style>$viewport</style>$script</head>${readerFixtureBody(mode, body)}</html>",
                         "text/html", "utf-8", null)
                 }
                 assertTrue("$label loaded", loaded.await(15, TimeUnit.SECONDS))
@@ -244,13 +244,14 @@ class ReaderViewportWebViewTest {
                 val sentence = "<span>「</span><ruby>読書<rt>どくしょ</rt></ruby>" +
                     listOf("の", "時間", "です。", "𠮟", "가", "ㄱㆎ", "漢字", "を", "読み", "ます。", "」")
                         .joinToString("") { "<span>$it</span>" }
+                val publisher = "<style>hoshi-body { line-height: 1.95; letter-spacing: .12em; text-align: justify; }</style>"
                 val body = "<p>${sentence.repeat(80)}<span>文</span><ruby id='anchor'>目印<rt>めじるし</rt></ruby>${sentence.repeat(80)}</p>"
                 instrumentation.runOnMainSync {
                     webView.webViewClient = object : WebViewClient() {
                         override fun onPageFinished(view: WebView, url: String) { loaded.countDown() }
                     }
                     webView.loadDataWithBaseURL(null,
-                        "<!doctype html><html><head><script>window.HoshiReaderRestore={postMessage:()=>window.testRestored=true};</script>$styles$script</head><body>$body</body></html>",
+                        "<!doctype html><html><head><script>window.HoshiReaderRestore={postMessage:()=>window.testRestored=true};</script>$publisher$styles$script</head>${readerFixtureBody(settings.viewMode, body)}</html>",
                         "text/html", "utf-8", null)
                 }
                 assertTrue(label, loaded.await(15, TimeUnit.SECONDS))
@@ -266,11 +267,13 @@ class ReaderViewportWebViewTest {
                         r.scrollBy({left: r.isVertical() ? right - viewport.right : 0,
                             top: r.isVertical() ? 0 : top - viewport.top, behavior: 'instant'});
                         window.testProgress = r.calculateProgress();
-                        const style = getComputedStyle(document.body);
-                        return {position: r.isVertical() ? document.body.scrollLeft : document.body.scrollTop, progress: window.testProgress,
+                        const style = getComputedStyle(document.querySelector('p'));
+                        return {alignment: style.textAlign, spacing: style.letterSpacing, position: r.isVertical() ? document.body.scrollLeft : document.body.scrollTop, progress: window.testProgress,
                             fontSize: parseFloat(style.fontSize), lineHeight: parseFloat(style.lineHeight)};
                     })()
                 """.trimIndent()))
+                assertEquals("$label alignment", "start", before.getString("alignment"))
+                assertEquals("$label letter spacing", "normal", before.getString("spacing"))
                 assertTrue("$label middle of chapter", before.getDouble("progress") in 0.2..0.8)
                 assertEquals("$label font size", font.toDouble(), before.getDouble("fontSize"), 0.01)
                 assertEquals("$label line height", font * lineHeight, before.getDouble("lineHeight"), 0.01)

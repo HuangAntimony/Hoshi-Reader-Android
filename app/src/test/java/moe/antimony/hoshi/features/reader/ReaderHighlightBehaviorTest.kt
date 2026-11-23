@@ -11,6 +11,25 @@ import org.junit.Test
 
 class ReaderHighlightBehaviorTest {
     @Test
+    fun crossChapterSelectionBecomesOneListOfCompatibleSidecarRecords() {
+        val result = requireNotNull(ReaderHighlightResult.fromWebViewResult(
+            """{"action":"batch","changes":[
+                {"action":"created","chapterIndex":0,"id":"first","start":10,"offset":10,"text":"。"},
+                {"action":"created","chapterIndex":1,"id":"next","start":0,"offset":0,"text":"犬","textFurigana":"犬(いぬ)"}
+            ]}""",
+        ))
+        val book = readerBook()
+        val records = ReaderHighlights.applySelection(emptyList(), result, HighlightColor.Pink, "first", book, 1, 55.0)
+        assertEquals(listOf(9, 10), records.map { it.character })
+        assertEquals(listOf(10, 0), records.map { it.offset })
+        assertEquals(listOf("first", "next"), records.map { it.id })
+        assertEquals("犬(いぬ)", records.last().textFurigana)
+        assertEquals(listOf(55.0, 55.0), records.map { it.createdAt })
+        val grouped = Json.decodeFromString<Map<Int, List<ReaderHighlight>>>(requireNotNull(ReaderHighlights.bookHighlightsJson(records, book)))
+        assertEquals(mapOf(0 to records.take(1), 1 to records.takeLast(1)), grouped)
+    }
+
+    @Test
     fun chapterHighlightsSerializesOnlyCurrentChapterHighlightsSortedByCharacter() {
         val book = readerBook()
         val highlights = listOf(

@@ -419,7 +419,6 @@
     <string name="reader_appearance_mode" comment="Reader appearance setting label, intentionally matching dictionary mode.">Mode</string>
     <string name="reader_appearance_paginated">Paginated</string>
     <string name="reader_appearance_continuous">Continuous</string>
-    <string name="reader_appearance_chapter_swipe_distance">Chapter Swipe Distance</string>
     <string name="reader_appearance_page_swipe_threshold">Page Swipe Threshold</string>
     <string name="reader_appearance_page_swipe_threshold_value">%1$d px</string>
     <string name="reader_appearance_page_swipe_disabled" comment="Paginated Reader swipe-threshold value; intentionally matches other off labels.">Off</string>

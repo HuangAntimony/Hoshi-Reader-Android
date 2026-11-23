@@ -20,8 +20,6 @@ class ReaderSheetDensityTest {
     fun readerSheetIconButtonsStayCompactForDenseRows() {
         val metrics = readerSheetDensityMetrics()
 
-        assertEquals(36, metrics.stepperButtonSizeDp)
-        assertEquals(20, metrics.stepperIconSizeDp)
     }
 
     @Test

@@ -1196,3 +1196,26 @@ for (const language of ['zh', 'ko']) {
         assert.equal(scanTextFromOffset('reading 字', 0, { language }, true), 'reading');
     });
 }
+
+test('whole-book lookup uses the tapped section for source offset, scan and sentence context', () => {
+    const { document, selection, textNode, window } = loadSelection('東京');
+    const section = { dataset: { hoshiChapter: '3' } };
+    textNode.parentElement = { closest: selector => selector === '[data-hoshi-chapter]' ? section : null };
+    const previous = { nodeType: 3, textContent: '大阪' };
+    const next = { nodeType: 3, textContent: '京都' };
+    document.createTreeWalker = root => treeWalker(root === section ? [textNode] : [previous, textNode, next]);
+    document.pointElement = hitElement([]);
+    window.hoshiReader = {
+        chapterForNode: node => node.parentElement.closest('[data-hoshi-chapter]'), activeChapterIndex: 2,
+        nodeStartOffsets: new WeakMap([[textNode, 0]]), isMatchableChar: () => true,
+    };
+    selection.getCharacterAtPoint = () => ({ node: textNode, offset: 1 });
+    selection.clearSelection = () => {};
+    selection.getSelectionRect = () => ({ x: 0, y: 0, width: 1, height: 1 });
+    let payload;
+    selection.postTextSelected = data => { payload = data; };
+    assert.equal(selection.selectText(1, 1, 80), '京');
+    assert.equal(payload.sentence, '東京');
+    assert.equal(payload.chapterIndex, 3);
+    assert.equal(payload.normalizedOffset, 1);
+});

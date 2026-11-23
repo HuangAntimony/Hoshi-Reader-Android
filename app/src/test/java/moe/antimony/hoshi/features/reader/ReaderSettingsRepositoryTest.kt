@@ -353,7 +353,6 @@ class ReaderSettingsRepositoryTest {
             assertFalse(settings.showStatisticsToggle)
             assertFalse(settings.showReadingSpeed)
             assertFalse(settings.showReadingTime)
-            assertEquals(20, settings.chapterSwipeDistance)
             assertEquals(72, settings.pageSwipeThresholdPx)
             assertEquals(5, settings.horizontalPadding)
             assertEquals(0, settings.verticalPadding)
@@ -478,7 +477,6 @@ class ReaderSettingsRepositoryTest {
                 selectedFont = ReaderFontManager.defaultMinchoFont,
                 fontSize = 29,
                 viewMode = ReaderViewMode.Continuous,
-                chapterSwipeDistance = 120,
                 pageSwipeThresholdPx = 500,
                 topSafeAreaDp = 100,
                 bottomSafeAreaDp = 100,
@@ -508,7 +506,6 @@ class ReaderSettingsRepositoryTest {
             assertEquals(29, migrated.fontSize)
             assertEquals(ReaderViewMode.Continuous, migrated.viewMode)
             assertTrue(migrated.continuousMode)
-            assertEquals(60, migrated.chapterSwipeDistance)
             assertEquals(360, migrated.pageSwipeThresholdPx)
             assertEquals(72, migrated.topSafeAreaDp)
             assertEquals(72, migrated.bottomSafeAreaDp)
@@ -563,7 +560,6 @@ class ReaderSettingsRepositoryTest {
                     showStatisticsToggle = true,
                     showReadingSpeed = true,
                     showReadingTime = true,
-                    chapterSwipeDistance = 35,
                     pageSwipeThresholdPx = 108,
                     horizontalPadding = 12,
                     verticalPadding = 6,
@@ -629,7 +625,6 @@ class ReaderSettingsRepositoryTest {
             assertTrue(saved.showStatisticsToggle)
             assertTrue(saved.showReadingSpeed)
             assertTrue(saved.showReadingTime)
-            assertEquals(35, saved.chapterSwipeDistance)
             assertEquals(108, saved.pageSwipeThresholdPx)
             assertEquals(12, saved.horizontalPadding)
             assertEquals(6, saved.verticalPadding)
@@ -849,6 +844,7 @@ class ReaderSettingsRepositoryTest {
                 this[intPreferencesKey("visualNovelRevealSpeed")] = 0
                 this[booleanPreferencesKey("visualNovelClickAdvance")] = true
                 this[booleanPreferencesKey("paragraphClickAdvance")] = false
+                this[intPreferencesKey("chapterSwipeDistance")] = 20
             }
             val settings = repository.settings.first()
             assertEquals(ReaderViewMode.Paginated, settings.viewMode)

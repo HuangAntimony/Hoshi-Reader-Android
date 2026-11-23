@@ -5,7 +5,7 @@
   // publisher content before the reader has installed its viewport/styles and
   // prepared the ruby/paragraph DOM.
   var path = global.location.pathname;
-  if (global.top !== global || !(path.startsWith('/epub/') ||
+  if (global.top !== global || !(path === '/reader-book/index.html' || path.startsWith('/epub/') ||
       /^\/reader-pages\/[a-f0-9-]{36}\/epub\//.test(path))) return;
   if (global.hoshiReaderDocumentPreparation) return;
 

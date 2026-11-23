@@ -1,5 +1,6 @@
 package moe.antimony.hoshi.features.reader
 
+import kotlinx.coroutines.test.runTest
 import moe.antimony.hoshi.epub.BookInfo
 import moe.antimony.hoshi.epub.EpubBook
 import moe.antimony.hoshi.epub.EpubChapter
@@ -36,7 +37,7 @@ class ReaderPageIndexTest {
         assertEquals(8, index.progress(ReaderChapterPosition(2, 0.0), 1, ReaderTocRange(100, 200)).current)
     }
 
-    @Test fun knownPageProgressStaysVisibleDuringChapterRestore() {
+    @Test fun knownPageProgressStaysVisibleDuringChapterRestore() = runTest {
         val index = requireNotNull(ReaderPageIndex.create(book,
             listOf(listOf(0, 40, 80), listOf(0, 0), listOf(0, 50))))
         val settings = ReaderSettings(progressCount = ReaderProgressCount.Pages)

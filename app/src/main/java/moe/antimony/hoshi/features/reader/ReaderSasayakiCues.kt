@@ -13,7 +13,7 @@ internal object ReaderSasayakiCues {
     }
 
     fun ttsCue(sentence: TtsSentence): SasayakiCueRange =
-        SasayakiCueRange("tts-${sentence.chapter}-${sentence.start}", sentence.start, sentence.length)
+        SasayakiCueRange("tts-${sentence.chapter}-${sentence.start}", sentence.start, sentence.length, sentence.chapter)
 
     fun ttsChapterCuesJson(sentences: List<TtsSentence>): String =
         json.encodeToString(ListSerializer(SasayakiCueRange.serializer()), sentences.map(::ttsCue))
@@ -27,6 +27,7 @@ internal object ReaderSasayakiCues {
             ?.map { match ->
                 SasayakiCueRange(
                     id = match.id,
+                    chapterIndex = match.chapterIndex,
                     start = match.start,
                     length = match.length,
                 )

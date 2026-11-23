@@ -21,6 +21,7 @@ data class EpubBook(
     val rootDirectory: File? = null,
     val bookInfo: BookInfo = buildBookInfo(chapters),
     val author: String? = null,
+    internal val packedExtractionKey: String? = null,
 ) {
     internal val imageReferenceCounts: Map<String, Int> by lazy { countImageReferences() }
     // Directory boundaries belong to this immutable book snapshot, not a page or timer tick.
@@ -121,7 +122,9 @@ class EpubBookParser internal constructor(
             check(!book.hasMissingChapterFiles()) {
                 "Packed EPUB extraction is missing reader chapter resources."
             }
-            book
+            // Rebuilding a missing extraction also replaces its container descriptor.
+            val extractionTime = extractedRoot.resolve("META-INF/container.xml").lastModified()
+            book.copy(packedExtractionKey = "${epubFile.absolutePath}\u0000${extractedRoot.path}\u0000$extractionTime")
         }.onFailure {
             extractedRoot.deleteRecursively()
         }.getOrThrow()

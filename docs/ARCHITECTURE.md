@@ -353,9 +353,9 @@ and copying an asset snapshot creates independent template caches.
 | `reader-text-semantics.js` | Normalization, raw/matchable counts and character predicate, Sasayaki punctuation ownership and search range semantics | Paginated (including paragraph) and continuous |
 | `reader-dom-text.js` | Live DOM ruby normalization, selected body-text slices and Sasayaki structural boundaries | Paginated/continuous normalization; selection and Sasayaki adapters across modes |
 | `reader-media-semantics.js` | Image/gaiji setup, SVG ratio, blur/tint, tap bridge, scoped loading, asynchronous image-reference counts and image-hold eligibility | Paginated (including paragraph) and continuous |
-| `reader-document-preparation.js` | Defer initial publisher layout until reader viewport/styles and ruby/paragraph DOM are prepared | Chapter WebView document-start hook; all modes resume before content geometry, with explicit paginated font preloading before resume |
+| `reader-document-preparation.js` | Defer initial publisher layout until reader viewport/styles and ruby/paragraph DOM are prepared | Chapter WebView document-start hook; all modes resume before content geometry, with selected reader fonts preloaded in both modes |
 | `reader-paginated.js` | Columns, snapping, page metrics, page-start measurement, current page and restore | Paginated |
-| `reader-continuous.js` | Inset body scrolling, viewport bounds and scroll restore | Continuous |
+| `reader-continuous.js` | Book scrolling, visible section, chapter-local text indexes and position restore | Continuous |
 | `reader-paragraph.js` | iOS paragraph splitting/centering, cross-column fragments, Range reveal and current-page cue IDs | Paginated when paragraph mode is enabled |
 | `reader-sasayaki.js`, `highlights.js` | Live-DOM cue presentation and persistent/search highlight operations | Both modes |
 
@@ -385,24 +385,59 @@ and copying an asset snapshot creates independent template caches.
 - `ReaderContentStyles` owns root viewport sizing in both modes, clearing
   publisher `max-width`/`max-height` on `html` and `body` while retaining
   descendant size limits and the continuous body's reader-configured insets.
+- Continuous mode loads one book-scoped document at `/reader-book/index.html`.
+  `ReaderBookDocument` assembles the spine with a section per chapter and
+  `ReaderBookStyles` scopes publisher styles and resolves EPUB resources.
+  For packed EPUBs, `ReaderBookDocumentCache` reuses this HTML and CSS together
+  across opens in a bounded, app-private disk cache keyed by extraction revision,
+  title and generator version. Bump the version when generated content or its
+  sanitization changes. Reading appearance is applied by the WebView after load.
+  Chapter text indexes start at the original body so stored raw offsets remain
+  valid in every mode. Known illustration dimensions reserve the final fitted
+  width and height, so the reader can restore its position while images load.
+  SVG illustrations begin observing viewport proximity at the restored position.
+  The inset body owns native scrolling in both writing directions. Chapter
+  crossings, jumps and same-direction layout changes reuse this document. Changing
+  writing direction reloads it for direction-specific ruby preparation and indexing.
+  User-activated external HTTP(S) links open through Android's browser handler.
+- The continuous runtime locates the leading visible section by its live bounds,
+  then uses that section's text index for character progress. Scroll reports
+  carry the document token, chapter index and local progress. Live reports drive
+  the footer and statistics. Settled reports save the bookmark, and explicit exit
+  reads the visible position before disposing the reader.
+- Native selections can span sections in the same WebView. Lookup offsets
+  belong to the selected node's chapter. A cross-chapter highlight produces
+  one chapter-local record per selected chapter in a single repository write.
+  Each record retains its own ID for editing and sync.
 - Raw code-point offsets, normalized matchable offsets and DOM UTF-16 positions
   are different coordinate systems. Convert through the live DOM text index.
 - Reader initialization starts image-reference counts alongside image setup and
   DOM preparation. Ruby normalization and paragraph sentence/block preparation run
   before document preparation resumes display, avoiding layout of the unprepared
-  chapter. Paginated documents preload only the explicit reader-owned font face
-  while hidden, overlapping DOM preparation; publisher/fallback font lists are
-  not proactively loaded. Then await fonts/images before measuring cross-column fragments and
-  building character indexes; image counts must settle before cues/highlights and
+  chapter. Continuous documents set their viewport and illustration dimensions
+  from the window size while hidden, before any whole-book layout. Both modes
+  preload the selected reader-owned font face during DOM preparation. Paginated
+  documents await font and image readiness before measuring cross-column fragments
+  and building character indexes. Image counts must settle before cues/highlights and
   position restore so media holds use the correct counts. Unknown counts preserve
   ordinary holds. No counts request blocks structural DOM preparation.
-  A fresh document installs narration cues only when an explicit cue payload is
-  supplied; an absent payload already has empty runtime state and must not trigger
-  a second text-index build. Explicit empty payloads still perform cue clearing.
+  A fresh paginated document restores saved highlights, installs any supplied narration
+  cues and builds the text index once on the resulting DOM. With neither
+  payload, indexing can proceed while image-reference counts are still pending.
+  In-place cue updates rebuild the index only when they change inline wrappers.
   `ReaderChapterWebView` records the setup's document token, cue payload (empty
   when absent) and segmentation version. Cue delivery after accepted restore
   reuses that snapshot; changed content or versions still install normally, and
   document replacement/close invalidates pending installation callbacks.
+  Once TTS starts, paragraph mode prepares cues for each loaded chapter before
+  reveal. Continuous mode prepares narration for the playback chapter independently
+  of the visible section. Ordinary pagination prepares cues when playback has a
+  sentence in that chapter, so browsing ahead of the playback position can
+  restore the chapter directly. A prepared batch stays available while that
+  chapter is loaded, even if the playback position moves. The batch is keyed by
+  chapter and segmentation and installed before presenting the target sentence.
+  Repeated requests during installation share its completion and subsequent
+  sentences reuse the prepared targets.
 - Paragraph mode extends the ordinary paginated DOM: split only inside paragraphs,
   center blocks and mark cross-column fragments. Vertical
   Android pagination uses Y/page-height; horizontal pagination uses X/page-width.
@@ -450,11 +485,9 @@ and copying an asset snapshot creates independent template caches.
   existing reveal: its Range remains on the original page, so following to another
   page shows that destination's text in full. Automatic cross-chapter restores
   still animate. Paragraph Sasayaki cues must be
-  loaded before document setup. TTS chapter cues are prepared only after this
-  reading session has actually started TTS, then installed before following or
-  restoring the next document; enabling the TTS preference alone adds no work.
-  Both reuse the existing inline highlighter with chapter targets installed before
-  reveal. Paragraph following never lazily wraps missing cues. Cue-source changes
+  loaded before document setup. Both narration sources reuse the existing inline
+  highlighter with chapter targets installed before reveal. Paragraph following
+  never lazily wraps missing cues. Cue-source changes
   finish the old reveal before replacing nodes; ordinary cue changes do not.
   Explicit Reader exit flushes progress/statistics, then marks its WebView closing
   before cancelling presentation and stopping playback. A closing WebView rejects
@@ -571,13 +604,16 @@ and copying an asset snapshot creates independent template caches.
   including background and cross-chapter barriers. Unknown counts preserve holds.
 - `ReaderWebViewStateHolder` owns document/restore generations. Stale bridge
   callbacks cannot alter a replacement document. Renderer recovery preserves
-  the latest accepted position and rebuilds WebView-local state.
+  the latest accepted position and rebuilds WebView-local state. The appearance sheet
+  updates its controls on each edit. Layout previews use the latest settings after
+  taps settle, or immediately on dismissal, before starting a document restore.
+  Font-size and margin sliders keep the value local during a drag and commit it on release.
 - Reader navigation callbacks passed through Compose use lambdas when invoking
   local functions that capture changing values. Local function references can
   compare equal despite different captures, leaving `rememberUpdatedState` with
   a pre-load null statistics tracker or outdated settings.
 - `HoshiReaderWebView` installs one document-start preparation script when supported
-  and removes it on release. It only defers top-level `/epub/` documents at the
+  and removes it on release. It defers book and chapter reader documents at the
   appassets origin, preserving the publisher's inline display property. Mode
   initialization resumes layout before measuring content geometry;
   the existing restore/visual-state gate still controls visibility. Unsupported
@@ -585,7 +621,8 @@ and copying an asset snapshot creates independent template caches.
 - DOM selection state owns the navigation lock. `blocked` is distinct from a
   chapter-boundary `limit` result.
 - Reader, Dictionary and Process Text use the same iframe popup host and native
-  service bridge. Reader preloads the idle iframe once each chapter is restored.
+  service bridge. After reader restore, the popup host preloads the idle iframe
+  for the current popup URL and reuses it across continuous chapter boundaries.
   The host signals the iframe once content and selection geometry allow it to
   show. Initial glossary rendering yields at that point so the first dictionary
   can paint before the remaining sections are built. `popup.js`'s

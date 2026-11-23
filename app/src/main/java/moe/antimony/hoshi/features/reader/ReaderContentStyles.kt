@@ -210,6 +210,8 @@ internal object ReaderContentStyles {
             ReaderViewMode.Continuous -> {
                 val horizontalInset = generatedLayout.viewportHorizontalPaddingRatio * 100
                 val verticalInset = generatedLayout.viewportVerticalPaddingRatio * 100
+                // Keep the gesture with the body at the ends of the book so it can stretch and reverse.
+                val overscrollBehavior = if (settings.verticalWriting) "contain auto" else "auto contain"
                 """
                 html, body {
                     max-width: none !important;
@@ -235,7 +237,9 @@ internal object ReaderContentStyles {
                     min-height: 0 !important;
                     overflow-x: ${if (settings.verticalWriting) "auto" else "hidden"} !important;
                     overflow-y: ${if (settings.verticalWriting) "hidden" else "auto"} !important;
+                    overscroll-behavior: $overscrollBehavior !important;
                     scrollbar-width: none;
+                    --hoshi-preload-face: ${if (fontFaceCss.isNotEmpty()) fontFaceFamily else ""};
                     $bodyFontFamilyCss
                     $bodyFontVariantCss
                     font-size: ${settings.fontSize}px !important;
@@ -246,6 +250,26 @@ internal object ReaderContentStyles {
                     padding-bottom: ${generatedLayout.continuousBodyBottomPaddingCss} !important;
                     $gridCss
                     text-orientation: mixed;
+                }
+                body > section[data-hoshi-chapter]:last-of-type { min-block-size: 100%; }
+                [data-hoshi-chapter] > hoshi-html, [data-hoshi-chapter] > hoshi-html > hoshi-body {
+                    display: block !important;
+                    position: static !important;
+                    overflow: visible !important;
+                    width: auto !important;
+                    height: auto !important;
+                    max-width: none !important;
+                    max-height: none !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                    background: transparent !important;
+                    color: inherit !important;
+                    font-size: inherit !important;
+                    $textSpacingCss
+                    $gridCss
+                    $bodyFontFamilyCss
+                    $bodyFontVariantCss
+                    writing-mode: inherit !important;
                 }
                 body::-webkit-scrollbar {
                     display: none;

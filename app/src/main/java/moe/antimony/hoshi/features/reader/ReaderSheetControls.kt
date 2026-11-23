@@ -49,6 +49,12 @@ internal fun ReaderSheetTabs(labels: List<String>, selectedIndex: Int, onSelecte
 }
 
 @Composable
+internal fun readerSliderColorsWithoutTicks() = SliderDefaults.colors(
+    activeTickColor = Color.Transparent,
+    inactiveTickColor = Color.Transparent,
+)
+
+@Composable
 internal fun ReaderSheetSliderRow(
     label: String,
     valueText: String,
@@ -67,8 +73,7 @@ internal fun ReaderSheetSliderRow(
         }
         Slider(value = value, onValueChange = onValueChange, valueRange = range, steps = steps,
             onValueChangeFinished = onValueChangeFinished,
-            colors = if (showTicks) SliderDefaults.colors() else SliderDefaults.colors(
-                activeTickColor = Color.Transparent, inactiveTickColor = Color.Transparent))
+            colors = if (showTicks) SliderDefaults.colors() else readerSliderColorsWithoutTicks())
     }
 }
 

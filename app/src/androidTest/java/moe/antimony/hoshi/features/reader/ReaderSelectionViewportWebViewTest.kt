@@ -17,8 +17,16 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import java.io.File
+import java.util.UUID
+import kotlinx.coroutines.runBlocking
+import moe.antimony.hoshi.epub.BookSidecarDataSource
+import moe.antimony.hoshi.epub.EpubBook
+import moe.antimony.hoshi.epub.EpubChapter
+import moe.antimony.hoshi.epub.HighlightColor
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -624,25 +632,24 @@ class ReaderSelectionViewportWebViewTest {
                     horizontalPadding = 30, verticalPadding = 30, fontSize = 27)
                 val assets = ReaderWebAssets.load(instrumentation.targetContext)
                 val loaded = CountDownLatch(1)
-                var chapters = 0
                 instrumentation.runOnMainSync {
                     webView.prepareForDocument("continuous-$vertical")
-                    val listener = ContinuousScrollTouchListener(settings,
+                    val listener = ContinuousScrollTouchListener(
                         shouldIgnoreReaderGesture = { webView.isNativeSelectionActive() },
-                        onTap = { _, _ -> }, onScrollGesture = {},
-                        onNextChapter = { chapters++; true }, onPreviousChapter = { chapters--; true })
+                        onTap = { _, _ -> }, onScrollGesture = {})
                     webView.bindReaderTouchListener(settings) { listener }
                     webView.webViewClient = object : WebViewClient() {
                         override fun onPageFinished(view: WebView, url: String) { loaded.countDown() }
                     }
                     val styles = ReaderContentStyles.styleTag(settings = settings, readerCssTemplate = assets.readerCss)
                     val script = ReaderPaginationScripts.shellScript(settings = settings, assets = assets)
+                    val body = readerFixtureBody(settings.viewMode, "<p>${"読書の時間です。文章を読み続けます。".repeat(600)}</p>")
                     webView.loadDataWithBaseURL(null, """
                         <!doctype html><html><head>$styles$script
                         <script>window.HoshiReaderRestore={postMessage:()=>window.testRestored=true};
                         ${assets.selectionJs}
                         hoshiSelection.configure({bridge:'android-reader',nativeSelectionToken:'continuous-$vertical'});
-                        </script></head><body><p>${"読書の時間です。文章を読み続けます。".repeat(600)}</p></body></html>
+                        </script></head>$body</html>
                     """.trimIndent(), "text/html", "utf-8", null)
                 }
                 assertTrue(loaded.await(15, TimeUnit.SECONDS))
@@ -680,7 +687,6 @@ class ReaderSelectionViewportWebViewTest {
                 val after = evaluate(webView, "hoshiReader.sasayakiScrollPosition()").toDouble()
                 assertTrue("Native handle scrolls the continuous body: vertical=$vertical before=$before after=$after", kotlin.math.abs(after - before) > 1)
                 assertTrue("Native selection survives scrolling", evaluate(webView, "!getSelection().isCollapsed && getSelection().toString().length>0").toBoolean())
-                assertEquals("Handle drag never changes chapter", 0, chapters)
                 assertEquals("Window stays still", "0", evaluate(webView, "Math.abs(scrollX)+Math.abs(scrollY)"))
                 val menu = JSONObject(evaluate(webView, "hoshiSelection.nativeSelectionMenuRect()"))
                 assertTrue("Menu remains inside the body", menu.getDouble("left") >= bounds.getDouble("left") - 1 &&
@@ -690,6 +696,145 @@ class ReaderSelectionViewportWebViewTest {
                 composeRule.waitUntil(3000) { !webView.nativeSelectionState.value }
             }
         } finally { destroyFixture(webView) }
+    }
+
+    @Test
+    fun continuousNativeHandleCopiesAndHighlightsAcrossChapterBoundary() {
+        val webView = createWebView()
+        val clipboard = instrumentation.targetContext.getSystemService(android.content.ClipboardManager::class.java)
+        var previousClip: android.content.ClipData? = null
+        var copied = false
+        val bookRoot = File(instrumentation.targetContext.cacheDir, "selection-${UUID.randomUUID()}")
+        try {
+            for (vertical in listOf(false, true)) {
+                val settings = ReaderSettings(viewMode = ReaderViewMode.Continuous, verticalWriting = vertical, fontSize = 24)
+                val assets = ReaderWebAssets.load(instrumentation.targetContext)
+                lateinit var document: String
+                val token = "whole-book-selection-$vertical"
+                val loaded = CountDownLatch(1)
+                val location = IntArray(2)
+                var density = 1f
+                instrumentation.runOnMainSync {
+                    if (!copied) previousClip = clipboard.primaryClip
+                    density = webView.resources.displayMetrics.density
+                    webView.getLocationOnScreen(location)
+                    webView.prepareForDocument(token)
+                    webView.webViewClient = object : WebViewClient() {
+                        override fun onPageFinished(view: WebView, url: String) { loaded.countDown() }
+                    }
+                    val styles = ReaderContentStyles.styleTag(settings = settings, readerCssTemplate = assets.readerCss)
+                    val viewport = readerViewportCssLayout(settings,
+                        (webView.width / density).toInt(), (webView.height / density).toInt()).cssVariables()
+                    val script = ReaderPaginationScripts.shellScript(settings = settings, assets = assets)
+                    document = """
+                        <!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
+                        $styles<style>$viewport section{padding-block:12px}</style>$script
+                        <script>window.HoshiReaderRestore={postMessage:()=>window.testRestored=true};
+                        ${assets.selectionJs}
+                        hoshiSelection.configure({bridge:'android-reader',nativeSelectionToken:'$token'});</script></head>
+                        <body><section data-hoshi-chapter="0"><p id="start">朝の日差しを浴びた。</p></section><section data-hoshi-chapter="1"><p id="end">午後の街を歩いた。</p></section></body></html>
+                    """.trimIndent()
+                    webView.loadDataWithBaseURL(READER_BOOK_URL, document, "text/html", "utf-8", null)
+                    webView.requestFocus()
+                }
+                assertTrue(loaded.await(15, TimeUnit.SECONDS))
+                composeRule.waitUntil(15_000) { evaluate(webView, "Boolean(window.testRestored)") == "true" }
+                fun rect(id: String, offset: Int) = JSONObject(evaluate(webView, """
+                    (()=>{const n=document.getElementById('$id').firstChild,r=document.createRange();
+                    r.setStart(n,$offset);r.setEnd(n,${offset + 1});return r.getBoundingClientRect().toJSON();})()
+                """.trimIndent()))
+                fun x(css: Double) = location[0] + css.toFloat() * density
+                fun y(css: Double) = location[1] + css.toFloat() * density
+                val from = rect("start", 3)
+                val to = rect("end", 4)
+                gesture(x(from.getDouble("x") + from.getDouble("width") / 2),
+                    y(from.getDouble("y") + from.getDouble("height") / 2), duration = 900)
+                composeRule.waitUntil(3000) { webView.nativeSelectionState.value }
+                val handle = JSONObject(evaluate(webView, """
+                    [...getSelection().getRangeAt(0).getClientRects()].filter(r=>r.width&&r.height).at(-1).toJSON()
+                """.trimIndent()))
+                gesture(x(if (vertical) handle.getDouble("left") + 6 else handle.getDouble("right") + 6),
+                    y(handle.getDouble("bottom") + 10),
+                    x(if (vertical) to.getDouble("left") + 6 else to.getDouble("right") + 6),
+                    y(to.getDouble("bottom") + 10), duration = 850)
+                val selected = JSONObject(evaluate(webView, """
+                    (()=>{const s=getSelection(),r=s.getRangeAt(0);
+                    return {first:r.startContainer.parentElement.closest('section').dataset.hoshiChapter,
+                        last:r.endContainer.parentElement.closest('section').dataset.hoshiChapter,
+                        text:s.toString(),saved:hoshiHighlights.prepareHighlightSelection()};})()
+                """.trimIndent()))
+                assertEquals("Start of native selection", "0", selected.getString("first"))
+                assertEquals("Dragged endpoint, vertical=$vertical", "1", selected.getString("last"))
+                assertTrue(selected.getBoolean("saved"))
+                instrumentation.runOnMainSync {
+                    copied = true
+                    clipboard.setPrimaryClip(android.content.ClipData.newPlainText("selection fixture", token))
+                    for (action in listOf(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.ACTION_UP)) {
+                        webView.dispatchKeyEvent(android.view.KeyEvent(0, 0, action,
+                            android.view.KeyEvent.KEYCODE_C, 0, android.view.KeyEvent.META_CTRL_ON))
+                    }
+                }
+                val expected = selected.getString("text").filterNot(Char::isWhitespace)
+                composeRule.waitUntil("Native Copy includes both chapters", 3000) {
+                    var actual: String? = null
+                    instrumentation.runOnMainSync {
+                        actual = clipboard.primaryClip?.getItemAt(0)?.text?.toString()?.filterNot(Char::isWhitespace)
+                    }
+                    actual == expected
+                }
+                val response = evaluate(webView, "hoshiHighlights.createHighlight('yellow','first')")
+                val changes = JSONObject(response).getJSONArray("changes")
+                assertEquals(2, changes.length())
+                assertEquals(0, changes.getJSONObject(0).getInt("chapterIndex"))
+                assertEquals(1, changes.getJSONObject(1).getInt("chapterIndex"))
+                assertEquals(0, changes.getJSONObject(1).getInt("offset"))
+                assertEquals(expected, changes.getJSONObject(0).getString("text") + changes.getJSONObject(1).getString("text"))
+                val chapters = listOf("朝の日差しを浴びた。", "午後の街を歩いた。").mapIndexed { i, text ->
+                    EpubChapter("ch$i", "ch$i.xhtml", "application/xhtml+xml", "<p>$text</p>")
+                }
+                val book = EpubBook("Selection fixture", chapters = chapters)
+                val sidecar = BookSidecarDataSource()
+                val root = bookRoot.resolve(vertical.toString())
+                val records = ReaderHighlights.applySelection(emptyList(),
+                    requireNotNull(ReaderHighlightResult.fromWebViewResult(response)), HighlightColor.Yellow,
+                    "first", book, 0, 1.0)
+                runBlocking { sidecar.saveHighlights(root, records) }
+
+                val reopened = CountDownLatch(1)
+                instrumentation.runOnMainSync {
+                    webView.webViewClient = object : WebViewClient() {
+                        override fun onPageFinished(view: WebView, url: String) { reopened.countDown() }
+                    }
+                    webView.loadDataWithBaseURL(READER_BOOK_URL, document, "text/html", "utf-8", null)
+                }
+                assertTrue(reopened.await(15, TimeUnit.SECONDS))
+                composeRule.waitUntil(15_000) { evaluate(webView, "Boolean(window.testRestored)") == "true" }
+                val saved = runBlocking { sidecar.loadHighlights(root) }
+                val groups = requireNotNull(ReaderHighlights.bookHighlightsJson(saved, book))
+                evaluate(webView, "hoshiHighlights.applyHighlights($groups);true")
+                assertEquals(expected, JSONArray(evaluate(webView,
+                    "[...document.querySelectorAll('section')].map(s=>s.querySelector('.hoshi-highlight').textContent)"))
+                    .let { it.getString(0) + it.getString(1) })
+                var edited = saved
+                for ((record, color) in saved.sortedBy { it.character }.zip(listOf(HighlightColor.Blue, HighlightColor.Yellow))) {
+                    val change = evaluate(webView, "hoshiHighlights.updateHighlight(${JSONObject.quote(record.id)},'${color.name.lowercase()}')")
+                    edited = ReaderHighlights.applyEdit(edited, requireNotNull(ReaderHighlightResult.fromWebViewResult(change)), color)
+                    runBlocking { sidecar.saveHighlights(root, edited) }
+                }
+                assertEquals(listOf(saved.minBy { it.character }.copy(color = HighlightColor.Blue)),
+                    runBlocking { sidecar.loadHighlights(root) })
+                assertEquals("[1,0]", evaluate(webView,
+                    "[...document.querySelectorAll('section')].map(s=>s.querySelectorAll('.hoshi-highlight-blue').length)"))
+            }
+        } finally {
+            bookRoot.deleteRecursively()
+            if (copied) instrumentation.runOnMainSync {
+                val clip = previousClip
+                if (clip != null) clipboard.setPrimaryClip(clip)
+                else if (Build.VERSION.SDK_INT >= 28) clipboard.clearPrimaryClip()
+            }
+            destroyFixture(webView)
+        }
     }
 
     private fun createWebView(): HoshiReaderWebView {

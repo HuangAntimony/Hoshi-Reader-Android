@@ -46,7 +46,7 @@ This project brings [Hoshi Reader](https://github.com/Manhhao/Hoshi-Reader) to A
 
 ### Reading
 
-- Read vertically or horizontally in paginated or continuous mode; paragraph mode centers each page's content and adds sentence limits, optional text animation and tap-blank-to-advance.
+- Read vertically or horizontally in paginated mode or scroll continuously across chapters. Paragraph mode centers each page's content and adds sentence limits, optional text animation and tap-blank-to-advance.
 - Download or import fonts and customize layout and furigana display.
 - Search the full book, jump between chapters, and turn pages with volume keys.
 - Browse illustrations fullscreen or in a gallery, with zoom, save, and share actions.

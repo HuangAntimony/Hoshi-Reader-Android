@@ -238,7 +238,14 @@ class EpubBookParserTest {
         val second = parser().parsePacked(archive, cacheRoot)
 
         assertEquals(firstRoot?.canonicalFile, second.rootDirectory?.canonicalFile)
+        assertTrue(first.packedExtractionKey != null)
+        assertEquals(first.packedExtractionKey, second.packedExtractionKey)
         assertEquals(1, cacheRoot.listFiles().orEmpty().count { it.isDirectory })
+
+        writeMinimalEpubArchive(archive, title = "Replacement edition")
+        val replacement = parser().parsePacked(archive, cacheRoot)
+        assertEquals("Replacement edition", replacement.title)
+        assertTrue(first.packedExtractionKey != replacement.packedExtractionKey)
     }
 
     @Test

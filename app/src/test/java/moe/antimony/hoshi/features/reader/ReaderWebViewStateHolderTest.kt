@@ -3,8 +3,10 @@ package moe.antimony.hoshi.features.reader
 import androidx.compose.ui.unit.IntSize
 import kotlin.io.path.createTempDirectory
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -36,7 +38,7 @@ class ReaderWebViewStateHolderTest {
         assertEquals(epoch + 1, holder.webViewRestoreEpoch)
         assertTrue(holder.isWebViewRestoring)
         assertEquals(ReaderChapterPosition(2, 0.0), holder.backTargetPosition)
-        assertNull(holder.recordContinuousScrollProgress(0.9, epoch))
+        assertNull(holder.recordContinuousScrollProgress(ReaderChapterPosition(holder.readerPosition.loadPosition.index, 0.9), epoch))
         holder.markWebViewRestored()
         assertEquals(ReaderChapterPosition(3, 0.1), holder.readerPosition.displayedPosition)
     }
@@ -58,7 +60,7 @@ class ReaderWebViewStateHolderTest {
         holder.jumpToWithHistory(ReaderChapterPosition(3, 0.1))
         holder.markWebViewRestored()
         val oldEpoch = holder.webViewRestoreEpoch
-        holder.recordContinuousScrollDisplayProgress(0.67, oldEpoch)
+        holder.recordContinuousScrollProgress(ReaderChapterPosition(holder.readerPosition.loadPosition.index, 0.67), oldEpoch)
 
         assertTrue(holder.onRendererTerminated(ReaderRendererTermination(0)))
 
@@ -67,11 +69,11 @@ class ReaderWebViewStateHolderTest {
         assertEquals(1, holder.webViewGeneration)
         assertTrue(holder.isWebViewRestoring)
         assertFalse(holder.canAcceptReaderNavigationInput())
-        assertNull(holder.recordContinuousScrollProgress(0.9, oldEpoch))
+        assertNull(holder.recordContinuousScrollProgress(ReaderChapterPosition(holder.readerPosition.loadPosition.index, 0.9), oldEpoch))
         assertFalse(holder.onRendererTerminated(ReaderRendererTermination(0)))
         assertEquals(1, holder.webViewGeneration)
         holder.markWebViewRestored()
-        assertNull(holder.recordContinuousScrollProgress(0.9, oldEpoch))
+        assertNull(holder.recordContinuousScrollProgress(ReaderChapterPosition(holder.readerPosition.loadPosition.index, 0.9), oldEpoch))
         assertEquals(ReaderChapterPosition(3, 0.67), holder.readerPosition.displayedPosition)
     }
 
@@ -216,16 +218,17 @@ class ReaderWebViewStateHolderTest {
         val holder = stateHolder(initialIndex = 2)
 
         val next = holder.goToNextChapter(lastIndex = 3)
-        val ignored = holder.recordContinuousScrollProgress(0.72, holder.webViewRestoreEpoch)
+        val ignored = holder.recordContinuousScrollProgress(ReaderChapterPosition(holder.readerPosition.loadPosition.index, 0.72), holder.webViewRestoreEpoch)
 
         assertEquals(ReaderChapterPosition(index = 3, progress = 0.0), next)
         assertNull(ignored)
         assertEquals(ReaderChapterPosition(index = 3, progress = 0.0), holder.readerPosition.displayedPosition)
 
         holder.markWebViewRestored()
-        val saved = holder.recordContinuousScrollProgress(0.12, holder.webViewRestoreEpoch)
+        val saved = holder.recordContinuousScrollProgress(ReaderChapterPosition(4, 0.12), holder.webViewRestoreEpoch)
 
-        assertEquals(ReaderChapterPosition(index = 3, progress = 0.12), saved)
+        assertEquals(ReaderChapterPosition(index = 4, progress = 0.12), saved)
+        assertEquals(next, holder.readerPosition.loadPosition)
         assertEquals(saved, holder.readerPosition.displayedPosition)
     }
 
@@ -443,7 +446,7 @@ class ReaderWebViewStateHolderTest {
 
         holder.goToNextChapter(lastIndex = 3)
         holder.markWebViewRestored()
-        val staleProgress = holder.recordContinuousScrollProgress(0.72, oldEpoch)
+        val staleProgress = holder.recordContinuousScrollProgress(ReaderChapterPosition(holder.readerPosition.loadPosition.index, 0.72), oldEpoch)
 
         assertNull(staleProgress)
         assertEquals(ReaderChapterPosition(index = 3, progress = 0.0), holder.readerPosition.displayedPosition)
@@ -457,7 +460,7 @@ class ReaderWebViewStateHolderTest {
 
         holder.goToNextChapter(lastIndex = 3)
         holder.markWebViewRestored()
-        val staleProgress = holder.recordContinuousScrollDisplayProgress(1.0, oldEpoch)
+        val staleProgress = holder.recordContinuousScrollProgress(ReaderChapterPosition(holder.readerPosition.loadPosition.index, 1.0), oldEpoch)
 
         assertNull(staleProgress)
         assertEquals(ReaderChapterPosition(index = 3, progress = 0.0), holder.readerPosition.displayedPosition)
@@ -613,8 +616,40 @@ class ReaderWebViewStateHolderTest {
         }
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun syncedLayoutSettingsReloadAtDisplayedPosition() {
+    fun rapidAppearanceEditsRestoreOnlyTheFinalLayoutAndDismissalFlushesThePreview() = runTest {
+        val holder = stateHolder(initialIndex = 1)
+        val initial = holder.effectiveSettings
+        holder.markWebViewRestored()
+        holder.recordDisplayedProgress(0.35)
+        holder.openAppearanceFromMenu()
+        val epoch = holder.webViewRestoreEpoch
+        var preview: Job? = null
+        repeat(5) { step ->
+            preview?.cancel()
+            preview = launch { holder.syncSettings(initial.copy(fontSize = initial.fontSize + step + 1)) }
+            advanceTimeBy(150)
+            assertEquals(epoch, holder.webViewRestoreEpoch)
+        }
+        preview?.join()
+        assertEquals(initial.fontSize + 5, holder.effectiveSettings.fontSize)
+        assertEquals(epoch + 1, holder.webViewRestoreEpoch)
+        assertEquals(ReaderChapterPosition(1, 0.35), holder.readerPosition.loadPosition)
+
+        val final = holder.effectiveSettings.copy(horizontalPadding = 12)
+        val pending = launch { holder.syncSettings(final) }
+        runCurrent()
+        holder.dismissAppearance()
+        pending.cancel()
+        val dismissedAt = testScheduler.currentTime
+        holder.syncSettings(final)
+        assertEquals(dismissedAt, testScheduler.currentTime)
+        assertEquals(final, holder.effectiveSettings)
+    }
+
+    @Test
+    fun syncedLayoutSettingsReloadAtDisplayedPosition() = runTest {
         val holder = stateHolder(initialIndex = 1)
         holder.markWebViewRestored()
         holder.recordDisplayedProgress(0.35)
@@ -629,7 +664,7 @@ class ReaderWebViewStateHolderTest {
     }
 
     @Test
-    fun syncedChromeOnlySettingsDoNotReloadWebView() {
+    fun syncedChromeOnlySettingsDoNotReloadWebView() = runTest {
         val holder = stateHolder(initialIndex = 1)
         holder.markWebViewRestored()
         val previousEpoch = holder.webViewRestoreEpoch
@@ -641,7 +676,7 @@ class ReaderWebViewStateHolderTest {
     }
 
     @Test
-    fun syncedEInkModeDoesNotReloadWebView() {
+    fun syncedEInkModeDoesNotReloadWebView() = runTest {
         val holder = stateHolder(initialIndex = 1)
         holder.markWebViewRestored()
         val previousEpoch = holder.webViewRestoreEpoch
@@ -653,7 +688,7 @@ class ReaderWebViewStateHolderTest {
     }
 
     @Test
-    fun paragraphEInkSwitchReloadsAtDisplayedPositionInBothDirections() {
+    fun paragraphEInkSwitchReloadsAtDisplayedPositionInBothDirections() = runTest {
         for (eInk in listOf(false, true)) {
             val settings = ReaderSettings(paragraphMode = true, eInkMode = eInk)
             val holder = ReaderWebViewStateHolder(settings, ReaderChapterPosition(1, 0.1))
@@ -673,12 +708,12 @@ class ReaderWebViewStateHolderTest {
     }
 
     @Test
-    fun appliedPopupSettingsDoNotReloadWebView() {
+    fun syncedPopupSettingsDoNotReloadWebView() = runTest {
         val holder = stateHolder(initialIndex = 1)
         holder.markWebViewRestored()
         val previousEpoch = holder.webViewRestoreEpoch
 
-        holder.applySettings(
+        holder.syncSettings(
             ReaderSettings(
                 popupWidth = 420,
                 popupHeight = 360,
@@ -757,7 +792,7 @@ class ReaderWebViewStateHolderTest {
     }
 
     @Test
-    fun syncedParagraphRevealSpeedDoesNotReloadWebView() {
+    fun syncedParagraphRevealSpeedDoesNotReloadWebView() = runTest {
         val holder = stateHolder(initialIndex = 1)
         holder.markWebViewRestored()
         val previousEpoch = holder.webViewRestoreEpoch
@@ -953,7 +988,7 @@ class ReaderWebViewStateHolderTest {
     }
 
     @Test
-    fun firstBackCanCloseReaderWithoutRevealingChrome() {
+    fun firstBackCanCloseReaderWithoutRevealingChrome() = runTest {
         val holder = stateHolder()
         holder.syncSettings(ReaderSettings(exitReaderOnFirstBack = true))
         holder.enterFocusModeForReaderInteraction()
@@ -963,7 +998,7 @@ class ReaderWebViewStateHolderTest {
     }
 
     @Test
-    fun backNavigationClosesReaderWithVisibleChromeForEitherPreference() {
+    fun backNavigationClosesReaderWithVisibleChromeForEitherPreference() = runTest {
         for (exitOnFirstBack in listOf(false, true)) {
             val holder = stateHolder()
             holder.syncSettings(ReaderSettings(exitReaderOnFirstBack = exitOnFirstBack))
@@ -974,7 +1009,7 @@ class ReaderWebViewStateHolderTest {
     }
 
     @Test
-    fun changingFirstBackPreferencePreservesContentAndUsesLatestValue() {
+    fun changingFirstBackPreferencePreservesContentAndUsesLatestValue() = runTest {
         val holder = stateHolder(initialIndex = 2, initialProgress = 0.4)
         holder.markWebViewRestored()
         holder.enterFocusModeForReaderInteraction()

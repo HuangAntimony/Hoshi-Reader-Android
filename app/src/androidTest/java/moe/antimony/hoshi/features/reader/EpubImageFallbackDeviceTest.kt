@@ -128,7 +128,7 @@ class EpubImageFallbackDeviceTest {
         val image = "data:image/png;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP)
         withWebView { webView ->
             for (mode in ReaderViewMode.entries) for (vertical in listOf(true, false)) {
-                renderAndCheck(webView, "<html><head></head><body><div><p><img src='$image'/></p></div></body></html>",
+                renderAndCheck(webView, "<div><p><img src='$image'/></p></div>",
                     mode, vertical, "generated-${mode.name}-$vertical")
             }
         }
@@ -283,7 +283,7 @@ class EpubImageFallbackDeviceTest {
         }
     }
 
-    private fun renderAndCheck(webView: WebView, html: String, mode: ReaderViewMode, vertical: Boolean, label: String) {
+    private fun renderAndCheck(webView: WebView, content: String, mode: ReaderViewMode, vertical: Boolean, label: String) {
         val assets = ReaderWebAssets.load(instrumentation.targetContext)
         val settings = ReaderSettings(viewMode = mode, verticalWriting = vertical, horizontalPadding = 3, verticalPadding = 0, fontSize = 27)
         val loaded = CountDownLatch(1)
@@ -296,7 +296,8 @@ class EpubImageFallbackDeviceTest {
             webView.webViewClient = object : WebViewClient() {
                 override fun onPageFinished(view: WebView, url: String) { loaded.countDown() }
             }
-            webView.loadDataWithBaseURL("https://appassets.androidplatform.net/epub/fixture.xhtml", html.replace("</head>", "$setup</head>"), "text/html", "UTF-8", null)
+            val html = "<html><head>$setup</head>${readerFixtureBody(mode, content)}</html>"
+            webView.loadDataWithBaseURL("https://appassets.androidplatform.net/epub/fixture.xhtml", html, "text/html", "UTF-8", null)
         }
         assertTrue("$label load", loaded.await(15, TimeUnit.SECONDS))
         composeRule.waitUntil(15_000) { evaluate(webView, "Boolean(window.testRestored)") == "true" }

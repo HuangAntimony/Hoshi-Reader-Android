@@ -14,6 +14,14 @@ class SasayakiCueDisplayCoordinatorTest {
     private val otherChapterCue = SasayakiMatch("c", 30.0, 32.0, "c", 1, 0, 3)
 
     @Test
+    fun wholeBookDocumentKeepsCrossChapterCuesWithFollowingDisabled() {
+        val coordinator = SasayakiCueDisplayCoordinator()
+        val action = coordinator.update(otherChapterCue, currentChapterIndex = null, autoScroll = false, hasPlayedOnce = true)
+        assertDisplay(action, otherChapterCue, reveal = false)
+        assertDisplay(coordinator.refresh(cueA, currentChapterIndex = null), cueA, reveal = false)
+    }
+
+    @Test
     fun displaysCueInCurrentChapterAndTracksCurrentCueStartTime() {
         val coordinator = SasayakiCueDisplayCoordinator()
 

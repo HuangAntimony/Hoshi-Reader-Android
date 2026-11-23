@@ -1,21 +1,41 @@
+  sasayakiRootForCue: function(cue) {
+    if (!this.chapterRoot) return document.body;
+    return Number.isInteger(cue?.chapterIndex) ? this.chapterRoot(cue.chapterIndex) :
+      (this.sasayakiRoot || this.chapterRoot());
+  },
+  selectSasayakiChapter: function(cue) {
+    var root = this.sasayakiRootForCue(cue);
+    if (root !== this.sasayakiRoot) {
+      if (this.sasayakiRoot) {
+        this.resetSasayakiCues();
+        this.chapterIndexes?.delete(this.sasayakiRoot);
+        this.appliedCueJson = null;
+      }
+      this.sasayakiRoot = root;
+    }
+  },
   collectSasayakiCueRanges: function(cues) {
     if (!cues.length) return [];
     var entries = [];
-    var walker = this.createWalker();
+    var root = this.sasayakiRootForCue(cues[0]);
+    if (!root) return [];
+    var walker = this.createWalker(root);
     var node;
     while (node = walker.nextNode()) entries.push({ node: node, text: node.textContent });
     var domText = window.hoshiReaderDomText;
-    var index = domText.createSasayakiTextIndex(document.body, entries);
+    var index = domText.createSasayakiTextIndex(root, entries);
     return cues.map(function(cue) {
       return { id: cue.id, ranges: domText.sasayakiSegments(index, index.range(cue.start, cue.length)) };
     });
   },
-   applySasayakiCues: function(cues) {
+   applySasayakiCues: function(cues, rebuildOffsets = true) {
+     this.selectSasayakiChapter(cues[0]);
      var cueJson = JSON.stringify(cues);
      if (this.appliedCueJson === cueJson) return;
      window.hoshiParagraph?.finishTextAnimation();
      this.appliedCueJson = cueJson;
      var activeCueId = this.activeCueId;
+     var hadInlineTargets = this.cueWrappers.size > 0;
      this.resetSasayakiCues();
      var cueRanges = this.collectSasayakiCueRanges(cues);
      this.rememberSasayakiCueSources(cueRanges);
@@ -23,13 +43,14 @@
        this.cueGeometryRanges = this.buildSasayakiGeometryRanges(cueRanges);
      }
      this.prepareSasayakiInlineTargets(cueRanges);
-     this.buildNodeOffsets();
+     if ((hadInlineTargets || this.cueWrappers.size > 0) && rebuildOffsets) this.buildNodeOffsets(this.sasayakiRoot);
      if (activeCueId && this.hasSasayakiCueTarget(activeCueId)) {
        this.activeCueId = activeCueId;
        this.refreshSasayakiCuePresentation();
      }
    },
   wrapSasayakiCue: function(cue) {
+    this.selectSasayakiChapter(cue);
     if (this.isEInkMode()) {
       this.ensureSasayakiCueGeometry(cue);
       return this.cueGeometryRanges.get(cue.id) || [];
@@ -43,7 +64,7 @@
      var geometryRanges = this.buildSasayakiGeometryRanges(cueRanges).get(cue.id) || [];
      if (geometryRanges.length) this.cueGeometryRanges.set(cue.id, geometryRanges);
      this.prepareSasayakiInlineTargets(cueRanges);
-    this.buildNodeOffsets();
+    this.buildNodeOffsets(this.sasayakiRoot);
     return this.sasayakiInlineTargetsForCue(cue.id);
   },
   wrapSasayakiCueRanges: function(cueRanges) {
@@ -115,6 +136,7 @@
   },
   ensureSasayakiCueGeometry: function(cue) {
     if (!cue) return;
+    this.selectSasayakiChapter(cue);
     var cueId = typeof cue === 'string' ? cue : cue.id;
     if (!cueId) return;
     var existing = this.cueGeometryRanges.get(cueId);
@@ -187,19 +209,20 @@
        this.applyInlineSasayakiCue(this.activeCueId);
      }
    },
-  sasayakiMediaElements: function() {
-    return Array.from(document.body.querySelectorAll('img, svg, image, video, canvas, picture, table, iframe, object, embed')).filter(function(element) {
+  sasayakiMediaElements: function(scope = document.body) {
+    var roots = Array.isArray(scope) ? scope : [scope];
+    return roots.flatMap(root => Array.from(root.querySelectorAll('img, svg, image, video, canvas, picture, table, iframe, object, embed'))).filter(function(element) {
       if (!window.hoshiReaderMediaSemantics.shouldHoldMedia(element)) return false;
       var rect = element.getBoundingClientRect();
       return rect && rect.width > 0 && rect.height > 0;
     });
   },
-  sasayakiMediaStopsBetween: function(startScroll, endScroll, includeStartBoundary, includeEndBoundary) {
+  sasayakiMediaStopsBetween: function(startScroll, endScroll, includeStartBoundary, includeEndBoundary, scope) {
     if (includeEndBoundary === undefined) includeEndBoundary = includeStartBoundary;
     var forward = startScroll <= endScroll;
     var seen = new Set();
     var stops = [];
-    var elements = this.sasayakiMediaElements();
+    var elements = this.sasayakiMediaElements(scope);
     for (var i = 0; i < elements.length; i++) {
       var scroll = this.sasayakiMediaScrollForElement(elements[i]);
       if (scroll === null || scroll === undefined) continue;

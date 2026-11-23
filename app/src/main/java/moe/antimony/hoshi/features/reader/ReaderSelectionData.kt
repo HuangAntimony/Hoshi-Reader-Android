@@ -6,6 +6,7 @@ data class ReaderSelectionData(
     val rect: ReaderSelectionRect,
     val normalizedOffset: Int?,
     val sentenceOffset: Int? = null,
+    val chapterIndex: Int? = null,
 )
 
 data class ReaderSelectionRect(

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { webcrypto } from 'node:crypto';
 import test from 'node:test';
 import vm from 'node:vm';
 import { TextRangeFixture } from './dom-range-fixture.mjs';
@@ -39,9 +40,10 @@ function readerSource(url, options = {}) {
         .replace('__HOSHI_READER_TEXT_SEMANTICS_SCRIPT__', options.textSemanticsScript ?? readerTextSemanticsSource())
         .replace('__HOSHI_READER_DOM_TEXT_SCRIPT__', options.domTextScript ?? readerDomTextSource())
         .replace('__HOSHI_READER_MEDIA_SEMANTICS_SCRIPT__', options.mediaSemanticsScript ?? readerMediaSemanticsSource())
+        .replaceAll('__HOSHI_INITIAL_CHAPTER_INDEX__', String(options.initialChapterIndex ?? 0))
         .replaceAll('__HOSHI_RESTORE_TOKEN_LITERAL__', JSON.stringify('restore-token'))
-        .replaceAll('__HOSHI_CONTINUOUS_HORIZONTAL_PADDING_RATIO__', String(options.horizontalPaddingRatio ?? 0))
-        .replaceAll('__HOSHI_CONTINUOUS_VERTICAL_PADDING_RATIO__', String(options.verticalPaddingRatio ?? 0))
+        .replaceAll('__HOSHI_CONFIGURE_CONTINUOUS_VIEWPORT__',
+            `window.hoshiReader.configureViewport(${options.horizontalPaddingRatio ?? 0}, ${options.verticalPaddingRatio ?? 0}, 0, 0, 1, 0, 1)`)
         .replaceAll('__HOSHI_VERTICAL_PADDING_BLOCK_RATIO__', '0')
         .replaceAll('__HOSHI_VERTICAL_PADDING_GAP_RATIO__', '0')
         .replaceAll('__HOSHI_IMAGE_WIDTH_VIEWPORT_RATIO__', '1')
@@ -50,6 +52,8 @@ function readerSource(url, options = {}) {
         .replaceAll('__HOSHI_BLUR_IMAGES__', 'false')
         .replaceAll('__HOSHI_TRAILING_SPACER_HEIGHT_LITERAL__', JSON.stringify('0px'))
         .replaceAll('__HOSHI_TRAILING_SPACER_WIDTH_LITERAL__', JSON.stringify('0px'))
+        .replaceAll('__HOSHI_INITIAL_HIGHLIGHTS__',
+            options.initialHighlights ? `function() { ${options.initialHighlights} }` : 'null')
         .replaceAll('__HOSHI_RESTORE_SCRIPTS__', options.restoreScripts ?? '');
 }
 
@@ -130,6 +134,7 @@ class TestElement extends TestNode {
         this.tagName = tagName.toUpperCase();
         this.childNodes = [];
         this.className = '';
+        this.dataset = {};
         this.style = testStyle();
         this.classList = {
             add: (...names) => {
@@ -235,6 +240,7 @@ class TestElement extends TestNode {
         const selectors = selector.split(',').map((item) => item.trim().toUpperCase());
         let node = this;
         while (node) {
+            if (selector === '[data-hoshi-chapter]' && node.dataset?.hoshiChapter !== undefined) return node;
             if (node.nodeType === 1 && selectors.includes(node.tagName)) return node;
             node = node.parentNode;
         }
@@ -436,6 +442,19 @@ function queryTagSelectorList(selector) {
 }
 
 function loadReader(body, sourceUrl = readerPaginatedUrl, options = {}) {
+    if (sourceUrl === readerContinuousUrl) {
+        if (body.tagName !== 'BODY') {
+            const content = body;
+            body = new TestElement('body');
+            body.appendChild(content);
+        }
+        if (!body.childNodes.some(node => node.dataset?.hoshiChapter !== undefined)) {
+            const section = new TestElement('section');
+            section.dataset.hoshiChapter = '0';
+            for (const child of [...body.childNodes]) section.appendChild(child);
+            body.appendChild(section);
+        }
+    }
     body.scrollLeft ??= 0;
     body.scrollTop ??= 0;
     body.clientWidth ??= 480;
@@ -484,6 +503,7 @@ function loadReader(body, sourceUrl = readerPaginatedUrl, options = {}) {
             return head.childNodes.find((node) => node.tagName === 'META' && node.name === 'viewport') ?? null;
         },
         querySelectorAll(selector) {
+            if (selector === 'body > [data-hoshi-chapter]') return body.childNodes.filter(node => node.dataset?.hoshiChapter !== undefined);
             if (selector === 'ruby') return queryRuby(body);
             const tagSelector = queryTagSelectorList(selector);
             if (tagSelector) return queryByTags(body, tagSelector);
@@ -492,10 +512,10 @@ function loadReader(body, sourceUrl = readerPaginatedUrl, options = {}) {
         getElementsByTagName(tagName) {
             return tagName.toLowerCase() === 'head' ? [head] : [];
         },
-        addEventListener() {},
+        addEventListener(event, listener) { options.documentEvents?.set(event, listener); },
     };
     const window = {
-        addEventListener() {},
+        addEventListener(event, listener) { options.windowEvents?.set(event, listener); },
         innerHeight: 800,
         innerWidth: 480,
         scrollX: 0,
@@ -517,9 +537,6 @@ function loadReader(body, sourceUrl = readerPaginatedUrl, options = {}) {
             return { writingMode: options.writingMode ?? 'vertical-rl', getPropertyValue: () => '' };
         },
     };
-    if (options.scrollMessages) {
-        window.HoshiReaderScroll = { postMessage: token => options.scrollMessages.push(token) };
-    }
     if (options.restoreMessages) {
         window.HoshiReaderRestore = {
             postMessage(message) {
@@ -531,15 +548,18 @@ function loadReader(body, sourceUrl = readerPaginatedUrl, options = {}) {
     const css = options.css ?? { highlights: { delete() {}, set() {} } };
     vm.runInNewContext(readerSource(sourceUrl, options), {
         CSS: css,
+        crypto: webcrypto,
         Highlight: class extends Set { constructor(...ranges) { super(ranges); } },
         URL,
         document,
+        performance: { now: options.now ?? (() => 0) },
         Node: { ELEMENT_NODE: 1, TEXT_NODE: 3 },
         NodeFilter: { SHOW_TEXT: 4, FILTER_ACCEPT: 1, FILTER_REJECT: 2 },
         setTimeout: options.setTimeout ?? function(callback) {
             callback();
             return 0;
         },
+        clearTimeout: options.clearTimeout ?? function() {},
         requestAnimationFrame: options.requestAnimationFrame ?? function(callback) {
             callback();
             return 0;
@@ -547,7 +567,12 @@ function loadReader(body, sourceUrl = readerPaginatedUrl, options = {}) {
         cancelAnimationFrame() {},
         window,
     });
-    return { reader: window.hoshiReader, document, head, window };
+    const reader = window.hoshiReader;
+    if (sourceUrl === readerContinuousUrl) {
+        // Unit tests also exercise reader methods independently of asynchronous initialization.
+        reader.chapters = document.querySelectorAll('body > [data-hoshi-chapter]');
+    }
+    return { reader, document, head, window };
 }
 
 function rubyParagraph() {
@@ -569,7 +594,7 @@ function rubyParagraph() {
 for (const sourceUrl of [readerPaginatedUrl, readerContinuousUrl]) {
     test(`${sourceUrl.pathname.split('/').pop()} counts Korean and skips ruby fallback in offsets and cues`, () => {
         const body = new TestElement('body');
-        body.appendChild(new TestText('𠮟가、'));
+        const intro = body.appendChild(new TestText('𠮟가、'));
         const ruby = new TestElement('ruby');
         const base = new TestText('한글');
         ruby.appendChild(base);
@@ -588,7 +613,7 @@ for (const sourceUrl of [readerPaginatedUrl, readerContinuousUrl]) {
         assert.equal(reader.nodeStartRawOffsets.get(base), 3);
         assert.equal(reader.nodeStartOffsets.get(tail), 4);
         assert.equal(reader.nodeStartRawOffsets.get(tail), 5);
-        assert.equal(reader.textOffsetForCharCount(body.firstChild, 1), 2);
+        assert.equal(reader.textOffsetForCharCount(intro, 1), 2);
 
         reader.isEInkMode = () => false;
         reader.applySasayakiCues([{ id: 'korean', start: 2, length: 2 }]);
@@ -891,6 +916,7 @@ test('paged and continuous readers use shared media setup', () => {
                 documentScope: scope === document,
                 blurImages: options.blurImages,
                 hasImageBridge: options.imageBridge === window.HoshiReaderImage,
+                liveBlur: !!options.liveBlur,
                 waitForImages: options.waitForImages
               });
               return Promise.resolve();
@@ -906,7 +932,8 @@ test('paged and continuous readers use shared media setup', () => {
         assert.equal(window.__mediaSetupCalls[0].documentScope, true);
         assert.equal(window.__mediaSetupCalls[0].blurImages, false);
         assert.equal(window.__mediaSetupCalls[0].hasImageBridge, true);
-        assert.equal(window.__mediaSetupCalls[0].waitForImages, true);
+        assert.equal(window.__mediaSetupCalls[0].waitForImages, sourceUrl === readerPaginatedUrl);
+        assert.equal(window.__mediaSetupCalls[0].liveBlur, sourceUrl === readerContinuousUrl);
     });
 });
 
@@ -925,6 +952,20 @@ test('paged and continuous readers use actual viewport height', () => {
     assert.equal(continuous.document.documentElement.style.getPropertyValue('--hoshi-continuous-height'), '800px');
     assert.equal(continuous.document.documentElement.style.getPropertyValue('--hoshi-reader-visible-height'), '800px');
     assert.equal(continuous.document.documentElement.style.getPropertyValue('--page-height'), '800px');
+});
+
+test('continuous viewport sets its insets and illustration bounds without laying out book text', () => {
+    const { reader, window, document } = loadReader(new TestElement('body'), readerContinuousUrl);
+    window.innerWidth = 400;
+    window.innerHeight = 800;
+    reader.contentViewport = () => assert.fail('viewport setup must not measure the book');
+    reader.configureViewport(0.1, 0.125, 0.05, 0.1, 0.75, 1, 0.5);
+    const value = key => document.documentElement.style.getPropertyValue('--hoshi-' + key);
+    assert.equal(value('continuous-left'), '40px');
+    assert.equal(value('continuous-top'), '100px');
+    assert.equal(value('reader-visible-height'), '600px');
+    assert.equal(value('image-max-width'), '239px');
+    assert.equal(value('image-max-height'), '300px');
 });
 
 test('paginated restoreProgress at chapter start avoids eager pagination metrics', async () => {
@@ -961,8 +1002,8 @@ test('paginated restoreProgress at chapter start avoids eager pagination metrics
     assert.equal(builtMetrics, 0);
 });
 
-test('reader initialization waits for fonts and images before indexing and restoring', async () => {
-    for (const [sourceUrl, paragraphMode] of [[readerPaginatedUrl, false], [readerPaginatedUrl, true], [readerContinuousUrl, false]]) for (const fontsFirst of [false, true]) {
+test('paginated initialization waits for fonts and images before indexing and restoring', async () => {
+    for (const paragraphMode of [false, true]) for (const fontsFirst of [false, true]) {
         const body = new TestElement('body');
         const { paragraph, ruby } = rubyParagraph();
         body.appendChild(paragraph);
@@ -986,7 +1027,7 @@ test('reader initialization waits for fonts and images before indexing and resto
           };
         `;
         const restoreScripts = "window.__events.push('restore'); window.hoshiReader.restoreProgress(0);";
-        const { reader, window, document } = loadReader(body, sourceUrl, {
+        const { reader, window, document } = loadReader(body, readerPaginatedUrl, {
             mediaSemanticsScript,
             fontsReady,
             paragraphMode,
@@ -1038,6 +1079,36 @@ test('reader initialization waits for fonts and images before indexing and resto
         for (let i = 0; i < 10; i += 1) await Promise.resolve();
         assert.deepEqual(events, [...measured, 'restore'], 'counts must be ready before restore/media holds');
     }
+});
+
+test('continuous initialization restores while later chapters still contain unloaded images', async () => {
+    const body = new TestElement('body');
+    const opening = body.appendChild(new TestElement('section'));
+    opening.dataset.hoshiChapter = '0';
+    const text = opening.appendChild(new TestText('本文'));
+    const later = body.appendChild(new TestElement('section'));
+    later.dataset.hoshiChapter = '1';
+    const image = later.appendChild(new TestElement('img'));
+    image.complete = false;
+    let fontsLoaded;
+    const restoreMessages = [];
+    const { reader } = loadReader(body, readerContinuousUrl, {
+        fontsReady: new Promise(resolve => { fontsLoaded = resolve; }),
+        restoreScripts: 'window.hoshiReader.restoreProgress(0);',
+        restoreMessages,
+        setTimeout() { assert.fail('continuous restore must not wait for an image layout timer'); },
+    });
+
+    reader.initialize();
+    await Promise.resolve();
+    assert.deepEqual(restoreMessages, []);
+    assert.equal(typeof image.onload, 'function');
+    fontsLoaded();
+    await new Promise(resolve => setImmediate(resolve));
+
+    assert.deepEqual(restoreMessages, ['restore-token']);
+    assert.equal(reader.nodeStartOffsets.get(text), 0);
+    assert.equal(image.complete, false);
 });
 
 test('measurement initializes without fetching playback image-reference counts', async () => {
@@ -1159,6 +1230,21 @@ for (const vertical of [true, false]) {
         assert.equal(reader.calculateProgress(), 0.5);
     });
 
+    test(`continuous progress skips every text run on a clipped preceding ${vertical ? 'column' : 'line'}`, () => {
+        const body = new TestElement('body');
+        for (const [i, word] of ['読書', 'の', '時間', '次'].entries()) {
+            const text = new TestText(word);
+            text.rects = [vertical
+                ? (i < 3 ? testRect(0, 20, 479, 499) : testRect(0, 20, 450, 470))
+                : (i < 3 ? testRect(-19, 1) : testRect(10, 30))];
+            body.appendChild(text);
+        }
+        const { reader } = loadReader(body, readerContinuousUrl, {
+            writingMode: vertical ? 'vertical-rl' : 'horizontal-tb',
+        });
+        assert.equal(reader.calculateProgress(), 5 / 6);
+    });
+
     test(`continuous restore aligns the actual ${vertical ? 'column' : 'line'} without splitting text nodes`, async () => {
         const body = new TestElement('body');
         const text = new TestText('前𠮟가後');
@@ -1182,7 +1268,7 @@ for (const vertical of [true, false]) {
         assert.equal(body.scrollTop, vertical ? 0 : 920);
         assert.equal(window.scrollX, 0);
         assert.equal(window.scrollY, 0);
-        assert.equal(body.firstChild, text);
+        assert.equal(reader.chapterRoot().firstChild, text);
         assert.equal(text.textContent, '前𠮟가後');
         assert.deepEqual(restoreMessages, ['restore-token']);
     });
@@ -1224,7 +1310,7 @@ for (const vertical of [true, false]) {
     });
 }
 
-test('continuous restoreProgress zero resets every WebView scroll surface', async () => {
+test('continuous restoreProgress zero aligns the chapter start and resets outer WebView scrolling', async () => {
     const body = new TestElement('body');
     body.scrollTop = 11;
     body.scrollLeft = -22;
@@ -1247,8 +1333,8 @@ test('continuous restoreProgress zero resets every WebView scroll surface', asyn
     assert.equal(window.scrollY, 0);
     assert.equal(document.documentElement.scrollTop, 0);
     assert.equal(document.documentElement.scrollLeft, 0);
-    assert.equal(body.scrollTop, 0);
-    assert.equal(body.scrollLeft, 0);
+    const [alignment] = reader.chapterRoot().scrollIntoViewCalls;
+    assert.deepEqual({ ...alignment }, { block: 'start', inline: 'nearest', behavior: 'instant' });
     assert.deepEqual(restoreMessages, ['restore-token']);
 });
 
@@ -1461,7 +1547,8 @@ test('Sasayaki highlight applies active DOM state without CSS Highlight API', ()
         reader.applySasayakiCues([{ id: 'cue', start: 0, length: 4 }]);
         reader.highlightSasayakiCue('cue', false);
 
-        const wrappers = body.childNodes.filter((node) => node.nodeType === 1);
+        const content = sourceUrl === readerContinuousUrl ? reader.chapterRoot() : body;
+        const wrappers = content.childNodes.filter((node) => node.nodeType === 1);
         const wrapper = wrappers[0];
         assert.equal(wrappers.length, 1);
         assert.equal(wrapper.nodeType, 1);
@@ -1487,6 +1574,22 @@ test('paragraph following never installs a missing cue or changes the running an
     assert.equal(reader.sasayakiCueTargetScroll(missing), null);
     assert.equal(reader.highlightSasayakiCue(missing, true), null);
     assert.deepEqual([...reader.cueWrappers.keys()], ['first']);
+});
+
+test('ordinary pagination retains its text nodes and measurements while switching prepared TTS cues', () => {
+    const body = new TestElement('body');
+    body.appendChild(new TestText('前半後半'));
+    const { reader } = loadReader(body, readerPaginatedUrl);
+    const cues = [{ id: 'tts-0-0', start: 0, length: 2 }, { id: 'tts-0-2', start: 2, length: 2 }];
+    reader.applySasayakiCues(cues);
+    const metrics = reader.buildPaginationMetrics();
+    const entries = reader.indexedTextNodes;
+
+    for (const cue of cues) reader.highlightSasayakiCue(cue, false);
+
+    assert.equal(reader.activeCueId, cues[1].id);
+    assert.equal(reader.paginationMetrics, metrics);
+    assert.equal(reader.indexedTextNodes, entries);
 });
 
 test('paragraph appearance refresh leaves cue installation to document setup', () => {
@@ -1532,6 +1635,38 @@ test('non e-ink Sasayaki chapter load keeps iOS-style wrappers without e-ink geo
     }
 });
 
+test('chapter setup indexes text once after restoring saved and narration highlights', async () => {
+    for (const sourceUrl of [readerPaginatedUrl, readerContinuousUrl]) {
+        const body = new TestElement('body');
+        body.appendChild(new TestText('京都東京大阪'));
+        const { reader, window } = loadReader(body, sourceUrl, {
+            highlightsScript: fs.readFileSync(new URL('../../main/assets/hoshi-web/reader/highlights.js', import.meta.url), 'utf8'),
+            initialHighlights: `
+                const records = [
+                    { id: 'saved-1', color: 'blue', offset: 0, text: '京都' },
+                    { id: 'saved-2', color: 'blue', offset: 2, text: '東京' },
+                ];
+                window.hoshiHighlights.applyHighlights(${sourceUrl === readerContinuousUrl ? '{ 0: records }' : 'records'}, false);
+                window.hoshiReader.applySasayakiCues([{ id: 'cue', start: 4, length: 2 }], false);
+            `,
+            restoreScripts: 'window.__restored = true;',
+        });
+        const build = reader.buildNodeOffsets.bind(reader);
+        const counts = [];
+        reader.buildNodeOffsets = () => {
+            counts.push([window.hoshiHighlights.highlights.size, reader.cueWrappers.size]);
+            build();
+        };
+
+        reader.initialize();
+        for (let i = 0; i < 30; i++) await Promise.resolve();
+
+        assert.equal(window.__restored, true);
+        assert.deepEqual(counts, [[2, 1]]);
+        assert.equal(reader.nodeStartOffsets.get(reader.cueWrappers.get('cue')[0].firstChild), 4);
+    }
+});
+
 test('Sasayaki cue includes punctuation between text nodes inside the same cue', () => {
     for (const sourceUrl of [readerPaginatedUrl, readerContinuousUrl]) {
         const body = new TestElement('body');
@@ -1558,12 +1693,15 @@ test('e-ink Sasayaki chapter load keeps geometry available for id-only highlight
         reader.renderSasayakiOverlay = () => {
             overlayRendered += 1;
         };
+        reader.buildNodeOffsets();
+        const offsets = reader.nodeStartOffsets;
 
         reader.applySasayakiCues([{ id: 'cue', start: 0, length: 4 }]);
         const result = reader.highlightSasayakiCue('cue', false);
 
         assert.equal(result, null);
         assert.equal(reader.cueWrappers.size, 0);
+        assert.equal(reader.nodeStartOffsets, offsets);
         assert.equal((reader.cueGeometryRanges.get('cue') ?? []).length, 1);
         assert.equal(reader.activeCueId, 'cue');
         assert.equal(overlayRendered, 2);
@@ -1752,22 +1890,6 @@ test('continuous Sasayaki media stop plan skips a visible image when the target 
     assert.deepEqual(Array.from(stops), []);
 });
 
-test('continuous vertical Sasayaki chapter-end media stop plan follows forward scroll direction', () => {
-    const body = new TestElement('body');
-    body.appendChild(imgAt(0, 500, 120, 420));
-    body.appendChild(imgAt(0, 500, -520, -220));
-    const { reader, document } = loadReader(body, readerContinuousUrl, { writingMode: 'vertical-rl' });
-    body.scrollWidth = 3_000;
-    body.scrollLeft = -480;
-
-    const stops = reader.sasayakiMediaStopsToChapterEnd();
-
-    assert.deepEqual(
-        Array.from(stops, (stop) => stop.scroll),
-        [-540, -1_180],
-    );
-});
-
 test('paginated Sasayaki media stop chapter-end plan includes an image-only first page', () => {
     const body = new TestElement('body');
     body.scrollHeight = 800;
@@ -1905,10 +2027,10 @@ test('Sasayaki DOM punctuation indexing preserves the existing walker character 
         const script = new TestElement('script');
         script.appendChild(new TestText('ignored'));
         body.appendChild(script);
-        body.appendChild(new TestText('「二。」'));
+        const tail = body.appendChild(new TestText('「二。」'));
         const { reader } = loadReader(body, sourceUrl);
         reader.buildNodeOffsets();
-        const cue = { id: 'cue', start: reader.nodeStartOffsets.get(body.childNodes[2]), length: 1 };
+        const cue = { id: 'cue', start: reader.nodeStartOffsets.get(tail), length: 1 };
         const [{ ranges }] = reader.collectSasayakiCueRanges([cue]);
         assert.equal(ranges.map(({ node, start, end }) => node.textContent.slice(start, end)).join(''), '「二。」');
     }
@@ -2015,16 +2137,20 @@ for (const sourceUrl of [readerPaginatedUrl, readerContinuousUrl]) {
         select(4, 2);
         assert.equal(highlights.createHighlight('green', 'unused').action, 'removed');
         assert.equal(highlights.highlights.size, 2);
-        assert.equal(highlights.textForRange(0, 9).text, 'あ 、𠮟東京、東京');
-        assert.equal(highlights.textForRange(4, 2).textFurigana, '東京(とうきょう)');
+        select(0, 9);
+        assert.equal(highlights.createHighlight('yellow', 'full').text, 'あ 、𠮟東京、東京');
         // Reloading persisted data must also rebuild exact-range identity.
-        const restored = loadReader(new TestElement('body'), sourceUrl, {
+        const restoredBody = new TestElement('body');
+        restoredBody.appendChild(new TestText('あ 、𠮟東京、東京'));
+        const restored = loadReader(restoredBody, sourceUrl, {
             highlightsScript: fs.readFileSync(new URL('../../main/assets/hoshi-web/reader/highlights.js', import.meta.url), 'utf8'),
         });
-        restored.document.body.appendChild(new TestText('あ 、𠮟東京、東京'));
-        restored.window.hoshiHighlights.applyHighlights([{ id: 'saved', color: 'blue', offset: 3, text: '𠮟東京' }]);
-        assert.equal(restored.window.hoshiHighlights.findHighlight(3, 3), 'saved');
-        assert.equal(restored.window.hoshiHighlights.findHighlight(3, 2), null);
+        const records = [{ id: 'saved', color: 'blue', offset: 3, text: '𠮟東京' }];
+        const continuous = sourceUrl === readerContinuousUrl;
+        restored.window.hoshiHighlights.applyHighlights(continuous ? { 0: records } : records);
+        const root = continuous ? restored.reader.chapterRoot() : restoredBody;
+        assert.equal(restored.window.hoshiHighlights.findHighlight(3, 3, root), 'saved');
+        assert.equal(restored.window.hoshiHighlights.findHighlight(3, 2, root), null);
     });
 }
 
@@ -2090,46 +2216,132 @@ for (const vertical of [true, false]) {
         assert.equal(reader.sasayakiCueRectIsVisible(testRect(100, 120, 100, 120)), true);
     });
 
-    test(`continuous ${vertical ? 'vertical' : 'horizontal'} chapter boundaries use body scroll extent`, () => {
-        const body = new TestElement('body');
-        body.scrollWidth = vertical ? 1_480 : 480;
-        body.scrollHeight = vertical ? 800 : 1_800;
-        const { reader } = loadReader(body, readerContinuousUrl, {
-            writingMode: vertical ? 'vertical-rl' : 'horizontal-tb',
-        });
-        assert.equal(reader.isAtChapterBoundary('backward'), true);
-        assert.equal(reader.isAtChapterBoundary('forward'), false);
-        body.scrollLeft = vertical ? -500 : 0;
-        body.scrollTop = vertical ? 0 : 500;
-        assert.equal(reader.isAtChapterBoundary('backward'), false);
-        assert.equal(reader.isAtChapterBoundary('forward'), false);
-        body.scrollLeft = vertical ? -1_000 : 0;
-        body.scrollTop = vertical ? 0 : 1_000;
-        assert.equal(reader.isAtChapterBoundary('forward'), true);
-    });
-
     test(`continuous progress measures the inset ${vertical ? 'right' : 'top'} content edge`, () => {
         const body = new TestElement('body');
         body.rect = vertical ? testRect(0, 800, 48, 432) : testRect(80, 720, 0, 480);
+        const before = new TestText('先');
+        before.rects = [vertical ? testRect(0, 20, 460, 480) : testRect(30, 50)];
         const text = new TestText('前後');
         text.rangeRects = (start, end) => (vertical
             ? [testRect(0, 20, 440, 460), testRect(0, 20, 400, 420)]
             : [testRect(50, 70), testRect(100, 120)]).slice(start, end);
+        body.appendChild(before);
         body.appendChild(text);
-        const { reader } = loadReader(body, readerContinuousUrl, {
+        const { reader, document } = loadReader(body, readerContinuousUrl, {
             writingMode: vertical ? 'vertical-rl' : 'horizontal-tb',
         });
-        assert.equal(reader.calculateProgress(), 0.5);
+        let ranges = 0;
+        const createRange = document.createRange;
+        document.createRange = () => {
+            ranges++;
+            return createRange();
+        };
+
+        assert.equal(reader.calculateProgress(), 2 / 3);
+        assert.equal(ranges, 1);
     });
 }
 
-test('continuous body scroll reports the current document token', () => {
-    const messages = [];
+for (const vertical of [false, true]) {
+    test(`whole-book native scroll reports chapter-local positions in ${vertical ? 'vertical' : 'horizontal'} writing`, () => {
+        const body = new TestElement('body');
+        const sections = [0, 1].map(index => {
+            const section = new TestElement('section');
+            section.dataset.hoshiChapter = String(index);
+            body.appendChild(section);
+            for (const text of ['本文', '海']) section.appendChild(new TestText(text));
+            return section;
+        });
+        const axisRect = (start, end) => vertical ? testRect(0, 100, 480 - end, 480 - start) : testRect(start, end);
+        let offset = 0;
+        for (const [i, section] of sections.entries()) {
+            section.getBoundingClientRect = () => axisRect(i * 1000 - offset, (i + 1) * 1000 - offset);
+            section.childNodes.forEach((node, j) => {
+                node.rangeRects = () => [axisRect(i * 1000 + j * 200 - offset, i * 1000 + j * 200 + 20 - offset)];
+            });
+        }
+        const timers = new Map();
+        let nextTimer = 0;
+        const { reader, window } = loadReader(body, readerContinuousUrl, {
+            writingMode: vertical ? 'vertical-rl' : 'horizontal-tb',
+            setTimeout(callback, delay) { timers.set(++nextTimer, { callback, delay }); return nextTimer; },
+            clearTimeout(id) { timers.delete(id); },
+        });
+        const reports = [];
+        window.HoshiReaderScroll = { postProgress: (...args) => reports.push(args) };
+        reader.initialize();
+        reader.notifyRestoreComplete();
+        const scroll = body.listeners.get('scroll');
+        const run = delay => {
+            const [id, timer] = [...timers].find(([, timer]) => timer.delay === delay);
+            timers.delete(id);
+            timer.callback();
+        };
+        assert.equal(reader.positionOnExit(), null);
+        offset = 1100;
+        body[vertical ? 'scrollLeft' : 'scrollTop'] = vertical ? -offset : offset;
+        assert.deepEqual({ ...reader.positionOnExit() }, { chapterIndex: 1, progress: 2 / 3 });
+        scroll();
+        scroll();
+        assert.equal(timers.size, 2);
+        run(80);
+        assert.deepEqual(reports, [['restore-token', 1, 2 / 3, false]]);
+        run(180);
+        assert.deepEqual(reports[1], ['restore-token', 1, 2 / 3, true]);
+        assert.equal(reader.positionOnExit(), null);
+        assert.equal(reader.nodeStartOffsets.get(sections[1].firstChild), 0);
+        assert.equal(reader.nodeStartOffsets.get(sections[0].firstChild), 0);
+        offset = 0;
+        assert.deepEqual({ ...reader.visiblePosition() }, { chapterIndex: 0, progress: 0 });
+    });
+}
+
+test('continuous scroll reuses chapter counts and probes logarithmically many text ranges', () => {
     const body = new TestElement('body');
-    const { reader } = loadReader(body, readerContinuousUrl, { scrollMessages: messages });
+    const count = 1024;
+    let reads = 0;
+    for (let index = 0; index < count; index++) {
+        const text = new TestText('𠮟、山');
+        text.rangeRects = () => {
+            reads++;
+            return [testRect((index - 550) * 20, (index - 549) * 20)];
+        };
+        body.appendChild(text);
+    }
+    const { reader } = loadReader(body, readerContinuousUrl, { writingMode: 'horizontal-tb' });
+    reader.buildNodeOffsets();
+    reader.createWalker = () => assert.fail('scroll must reuse the current chapter text index');
+    assert.equal(reader.visiblePosition().progress, 550 / count);
+    assert.ok(reads < 20, `measured ${reads} text ranges`);
+});
+
+test('direct jumps scope duplicate fragments to their destination and drop superseded restores', async () => {
+    const body = new TestElement('body');
+    const targets = [];
+    for (const index of [0, 1]) {
+        const section = new TestElement('section');
+        section.dataset.hoshiChapter = String(index);
+        const target = new TestElement('p');
+        target.dataset.hoshiId = 'same-id';
+        targets.push(target);
+        section.appendChild(target);
+        section.querySelectorAll = query => query.includes('[data-hoshi-id]') ? [target] : [];
+        body.appendChild(section);
+    }
+    const restoreMessages = [];
+    const { reader, window } = loadReader(body, readerContinuousUrl, { initialChapterIndex: 1, restoreMessages });
+    window.hoshiSelection = { options: {} };
     reader.initialize();
-    body.listeners?.get('scroll')?.();
-    assert.deepEqual(messages, ['restore-token']);
+    const first = reader.jumpToChapter(0, 0, 'same-id', 'first');
+    const second = reader.jumpToChapter(1, 0, 'same-id', 'second');
+    assert.equal(await first, false);
+    assert.equal(await second, true);
+    assert.equal(targets[0].scrollIntoViewCalls, undefined);
+    assert.equal(targets[1].scrollIntoViewCalls.length, 1);
+    assert.deepEqual(restoreMessages, ['second']);
+    assert.equal(window.hoshiSelection.options.nativeSelectionToken, 'second');
+    assert.equal(await reader.jumpToChapter(2, 0, 'same-id', 'missing'), false);
+    assert.equal(window.hoshiSelection.options.nativeSelectionToken, 'second');
 });
 
 for (const sourceUrl of [readerPaginatedUrl, readerContinuousUrl]) {
@@ -2143,11 +2355,12 @@ for (const sourceUrl of [readerPaginatedUrl, readerContinuousUrl]) {
         ordinary.src = '../images/art.jpg';
         body.appendChild(repeated);
         body.appendChild(ordinary);
-        const { reader, window } = loadReader(body, sourceUrl);
+        const continuous = sourceUrl === readerContinuousUrl;
+        const { reader, window } = loadReader(body, sourceUrl, { writingMode: continuous ? 'horizontal-tb' : 'vertical-rl' });
         window.hoshiReaderMediaSemantics.setImageReferenceCounts({ 'images/divider.jpg': 3, 'images/art.jpg': 2 });
         reader.pageHeight = 800;
         assert.deepEqual(Array.from(reader.sasayakiMediaElements()), [ordinary]);
-        assert.equal(reader.sasayakiMediaStopsToChapterEnd().length, 1);
+        if (!continuous) assert.equal(reader.sasayakiMediaStopsToChapterEnd().length, 1);
         assert.equal(body.querySelectorAll('img').length, 2);
     });
 }
@@ -2398,43 +2611,45 @@ test('page boundary counting yields through a large collapsed prefix', () => {
     assert.ok(yields >= 25, 'a long prefix must let the cooperative driver yield');
 });
 
-test('paginated preparation loads the selected font before exposing document layout', async () => {
-    const events = [];
-    const { reader, window, document } = loadReader(new TestElement('body'), readerPaginatedUrl, {
-        mediaSemanticsScript: `window.hoshiReaderMediaSemantics = {
-            loadImageReferenceCounts() { return Promise.resolve(); },
-            setupReaderImages() { return Promise.resolve(); }
-        };`,
-        restoreScripts: 'window.__restored = true;',
+for (const mode of [readerPaginatedUrl, readerContinuousUrl]) {
+    test(`${mode.pathname} loads the selected font before exposing document layout`, async () => {
+        const events = [];
+        const { reader, window, document } = loadReader(new TestElement('body'), mode, {
+            mediaSemanticsScript: `window.hoshiReaderMediaSemantics = {
+                loadImageReferenceCounts() { return Promise.resolve(); },
+                setupReaderImages() { return Promise.resolve(); }
+            };`,
+            restoreScripts: 'window.__restored = true;',
+        });
+        let loaded;
+        document.fonts.load = font => {
+            assert.equal(font, 'italic 600 43px \"CustomFont\"');
+            events.push('font');
+            return new Promise(resolve => { loaded = resolve; });
+        };
+        const style = window.getComputedStyle;
+        window.getComputedStyle = (...args) => ({ ...style(...args), fontStyle: 'italic', fontWeight: '600',
+            fontSize: '43px', fontFamily: 'CustomFont, serif',
+            getPropertyValue: name => name === '--hoshi-preload-face' ? '\"CustomFont\"' : '' });
+        window.hoshiReaderDocumentPreparation = { resume() { events.push('layout'); } };
+        reader.initialize();
+        for (let i = 0; i < 20; i++) await Promise.resolve();
+        assert.deepEqual(events, ['font']);
+        assert.equal(window.__restored, undefined);
+        loaded();
+        for (let i = 0; i < 30; i++) await Promise.resolve();
+        assert.deepEqual(events, ['font', 'layout']);
+        assert.equal(window.__restored, true);
     });
-    let loaded;
-    document.fonts.load = font => {
-        assert.equal(font, 'italic 600 43px \"CustomFont\"');
-        events.push('font');
-        return new Promise(resolve => { loaded = resolve; });
-    };
-    const style = window.getComputedStyle;
-    window.getComputedStyle = (...args) => ({ ...style(...args), fontStyle: 'italic', fontWeight: '600',
-        fontSize: '43px', fontFamily: 'CustomFont, serif',
-        getPropertyValue: name => name === '--hoshi-preload-face' ? '\"CustomFont\"' : '' });
-    window.hoshiReaderDocumentPreparation = { resume() { events.push('layout'); } };
-    reader.initialize();
-    for (let i = 0; i < 20; i++) await Promise.resolve();
-    assert.deepEqual(events, ['font']);
-    assert.equal(window.__restored, undefined);
-    loaded();
-    for (let i = 0; i < 30; i++) await Promise.resolve();
-    assert.deepEqual(events, ['font', 'layout']);
-    assert.equal(window.__restored, true);
-});
+}
 
 test('publisher and fallback fonts are not explicitly preloaded', () => {
-    const { reader, window, document } = loadReader(new TestElement('body'));
+    const { window, document } = loadReader(new TestElement('body'));
     const style = window.getComputedStyle;
     window.getComputedStyle = (...args) => ({ ...style(...args), fontFamily: 'Publisher, CjkOnly',
         getPropertyValue: () => '' });
     document.fonts.load = () => { throw new Error('an unused publisher or fallback face must not be loaded'); };
-    assert.equal(reader.preloadBodyFont(), null);
+    assert.equal(window.hoshiReaderViewport.preloadBodyFont(), null);
 });
 
 for (const scheduling of ['postTask', 'messageChannel', 'timer']) {
@@ -2489,5 +2704,73 @@ for (const scheduling of ['postTask', 'messageChannel', 'timer']) {
         assert.ok(turns > 3, 'large scans must yield between batches');
         assert.deepEqual(Array.from(await pending), expected);
         assert.equal(closedPorts, channels * 2, 'fallback ports must be released after every task');
+    });
+}
+
+test('whole-book native selection splits chapter-local highlight offsets and restores each span independently', () => {
+    const body = new TestElement('body');
+    const sections = ['猫𠮟犬', '犬𠮟猫'].map((text, index) => {
+        const section = body.appendChild(new TestElement('section'));
+        section.dataset.hoshiChapter = String(index);
+        section.appendChild(new TestText(text));
+        return section;
+    });
+    const { reader, document, window } = loadReader(body, readerContinuousUrl, {
+        highlightsScript: fs.readFileSync(new URL('../../main/assets/hoshi-web/reader/highlights.js', import.meta.url), 'utf8'),
+    });
+    reader.initialize();
+    const range = document.createRange();
+    range.setStart(sections[0].firstChild, 1);
+    range.setEnd(sections[1].firstChild, 3);
+    window.getSelection = () => ({ rangeCount: 1, getRangeAt: () => range, removeAllRanges() {} });
+    const h = window.hoshiHighlights;
+    const result = h.createHighlight('yellow', 'first');
+    assert.equal(result.action, 'batch');
+    const [a, b] = result.changes;
+    assert.deepEqual([a.chapterIndex, a.start, a.offset, a.text], [0, 1, 1, '𠮟犬']);
+    assert.deepEqual([b.chapterIndex, b.start, b.offset, b.text], [1, 0, 0, '犬𠮟']);
+    assert.notEqual(a.id, b.id);
+    h.removeHighlight(a.id);
+    h.removeHighlight(b.id);
+    h.applyHighlights({ 0: [{ ...a, color: 'yellow' }], 1: [{ ...b, color: 'yellow' }] });
+    for (const record of [a, b]) {
+        const entry = h.highlights.get(record.id);
+        assert.equal(entry.root, sections[record.chapterIndex]);
+        assert.equal(entry.wrappers.map(wrapper => wrapper.textContent).join(''), record.text);
+    }
+    const existing = h.highlights.get(b.id).wrappers[0];
+    h.reconcileBookHighlights({ 1: [{ ...b, color: 'pink' }] });
+    assert.equal(h.highlights.has(a.id), false);
+    assert.equal(h.highlights.get(b.id).wrappers[0], existing);
+    assert.equal(existing.classList.contains('hoshi-highlight-pink'), true);
+});
+
+for (const eInk of [false, true]) {
+    test(`whole-book ${eInk ? 'e-ink' : 'inline'} narration follows source chapter while browsing another`, () => {
+        const body = new TestElement('body');
+        const sections = ['東京', '大阪'].map((text, index) => {
+            const section = body.appendChild(new TestElement('section'));
+            section.dataset.hoshiChapter = String(index);
+            section.appendChild(new TestText(text));
+            return section;
+        });
+        const { reader } = loadReader(body, readerContinuousUrl);
+        reader.initialize();
+        const seen = [];
+        const createWalker = reader.createWalker.bind(reader);
+        reader.createWalker = root => { seen.push(root); return createWalker(root); };
+        reader.isEInkMode = () => eInk;
+        for (const chapterIndex of [1, 0]) {
+            const cue = { id: 'same-id', start: 0, length: 2, chapterIndex };
+            reader.applySasayakiCues([cue]);
+            reader.highlightSasayakiCue(cue, false);
+            const target = eInk ? reader.cueGeometryRanges.get(cue.id)[0].startContainer :
+                reader.cueWrappers.get(cue.id)[0];
+            assert.equal(target.textContent, chapterIndex === 1 ? '大阪' : '東京');
+            assert.equal(target.parentElement.closest('[data-hoshi-chapter]'), sections[chapterIndex]);
+            assert.equal(reader.activeChapterIndex, 0);
+            assert.equal(seen.every(root => root === sections[chapterIndex]), true);
+            seen.length = 0;
+        }
     });
 }

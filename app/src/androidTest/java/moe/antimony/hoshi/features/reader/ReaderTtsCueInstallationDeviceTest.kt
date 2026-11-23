@@ -8,6 +8,30 @@ import org.junit.Test
 
 /** Only an isolated WebView and captured callbacks; no persisted reader state. */
 class ReaderTtsCueInstallationDeviceTest {
+    @Test fun duplicateDeliveryWaitsForTheSameInstallation() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        instrumentation.runOnMainSync {
+            val callbacks = mutableListOf<ValueCallback<String>>()
+            var ready = 0
+            val view = object : WebView(instrumentation.targetContext) {
+                override fun evaluateJavascript(script: String, resultCallback: ValueCallback<String>?) {
+                    resultCallback?.let(callbacks::add)
+                }
+            }
+            try {
+                val version = Any()
+                repeat(2) { view.applyReaderSasayakiCues("chapter", "[]", version) { ready++ } }
+                assertEquals(1, callbacks.size)
+                assertEquals(0, ready)
+                callbacks.single().onReceiveValue("null")
+                assertEquals(2, ready)
+                view.applyReaderSasayakiCues("chapter", "[]", version) { ready++ }
+                assertEquals(3, ready)
+                assertEquals(1, callbacks.size)
+            } finally { view.destroy() }
+        }
+    }
+
     @Test fun restoredDocumentsDoNotReinstallTheirInitialCuesButAcceptChangesAndNewVersions() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         instrumentation.runOnMainSync {

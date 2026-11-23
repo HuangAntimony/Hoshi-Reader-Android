@@ -2,25 +2,6 @@ package moe.antimony.hoshi.features.reader
 
 import moe.antimony.hoshi.features.sync.SyncProvider
 
-internal enum class ReaderProgressPersistenceEvent {
-    PaginatedPageTurnCompleted,
-    ContinuousScrollChanged,
-    ContinuousScrollIdle,
-}
-
-internal enum class ReaderProgressPersistenceAction {
-    DisplayOnly,
-    SaveBookmark,
-}
-
-internal fun readerProgressPersistenceAction(
-    event: ReaderProgressPersistenceEvent,
-): ReaderProgressPersistenceAction = when (event) {
-    ReaderProgressPersistenceEvent.PaginatedPageTurnCompleted -> ReaderProgressPersistenceAction.SaveBookmark
-    ReaderProgressPersistenceEvent.ContinuousScrollChanged -> ReaderProgressPersistenceAction.DisplayOnly
-    ReaderProgressPersistenceEvent.ContinuousScrollIdle -> ReaderProgressPersistenceAction.SaveBookmark
-}
-
 internal enum class ReaderLifecycleAutoSyncEvent {
     Resume,
     Pause,

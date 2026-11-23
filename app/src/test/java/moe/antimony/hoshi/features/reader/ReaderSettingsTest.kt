@@ -108,7 +108,7 @@ class ReaderSettingsTest {
     }
 
     @Test
-    fun defaultsMatchIosUserConfigFirstRunValuesWithAndroidFontPreset() {
+    fun defaultsFollowIosFirstRunSettingsWithAndroidOverrides() {
         val settings = ReaderSettings()
 
         assertFalse(settings.eInkMode)
@@ -136,7 +136,6 @@ class ReaderSettingsTest {
         assertFalse(settings.showReadingTime)
         assertTrue(settings.showProgress)
         assertFalse(settings.showChapterProgress)
-        assertEquals(20, settings.chapterSwipeDistance)
         assertEquals(72, settings.pageSwipeThresholdPx)
         assertTrue(settings.popupSwipeToDismiss)
         assertEquals(30, settings.popupSwipeThreshold)
@@ -404,10 +403,20 @@ class ReaderSettingsTest {
         assertEquals("fixed !important", body["position"])
         assertEquals("auto !important", body["overflow-x"])
         assertEquals("hidden !important", body["overflow-y"])
+        assertEquals("contain auto !important", body["overscroll-behavior"])
         assertEquals("var(--hoshi-continuous-height, 100.0vh) !important", body["height"])
         assertEquals("hidden !important", root["overflow"])
         assertFalse(body.containsKey("column-width"))
         assertFalse(body.containsKey("column-gap"))
+    }
+
+    @Test
+    fun horizontalContinuousReaderContainsOverscrollOnTheVerticalAxis() {
+        val css = ReaderContentStyles.styleTag(
+            ReaderSettings(viewMode = ReaderViewMode.Continuous, verticalWriting = false),
+        )
+
+        assertEquals("auto contain !important", cssDeclarationsForSelector(css, "body")["overscroll-behavior"])
     }
 
     @Test

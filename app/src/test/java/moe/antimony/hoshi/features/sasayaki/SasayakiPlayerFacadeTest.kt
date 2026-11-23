@@ -145,7 +145,7 @@ class SasayakiPlayerFacadeTest {
 
         override fun load(
             request: SasayakiPlaybackRuntimeLoadRequest,
-            getCurrentChapterIndex: () -> Int,
+            getCurrentChapterIndex: () -> Int?,
             onCue: (SasayakiMatch, Boolean, SasayakiCueRevealSource) -> Unit,
             onClearCue: () -> Unit,
         ): SasayakiPlaybackControllerContract {

@@ -66,6 +66,7 @@ import moe.antimony.hoshi.content.ContentLanguageProfile
 import moe.antimony.hoshi.epub.EpubBook
 import moe.antimony.hoshi.epub.HighlightColor
 import moe.antimony.hoshi.features.dictionary.DictionarySettings
+import moe.antimony.hoshi.features.dictionary.openPopupExternalLink
 import moe.antimony.hoshi.features.sasayaki.SasayakiSettings
 import moe.antimony.hoshi.webview.applyHoshiWebViewSecurityDefaults
 
@@ -85,12 +86,8 @@ internal fun ChapterWebView(
     onRestoreStarted: () -> Unit,
     onBeforeDocumentLoad: () -> Unit = {},
     onRestoreCompleted: () -> Unit,
-    onNextChapter: () -> Boolean,
-    onPreviousChapter: () -> Boolean,
     onSaveBookmark: (progress: Double) -> Unit,
-    onDisplayProgress: (progress: Double) -> Unit,
-    onContinuousScrollDisplayProgress: (progress: Double, restoreEpoch: Int) -> Unit,
-    onContinuousScrollProgress: (progress: Double, restoreEpoch: Int) -> Unit,
+    onContinuousPosition: (ReaderChapterPosition, restoreEpoch: Int, settled: Boolean) -> Unit,
     onInternalLink: (ReaderInternalLinkTarget) -> Unit,
     scanNonJapaneseText: Boolean,
     selectionScanLength: Int,
@@ -117,6 +114,7 @@ internal fun ChapterWebView(
     readerPopupResourceHandler: ReaderLookupPopupResourceHandler,
     readerPopupFrames: List<ReaderLookupPopupFramePayload>,
     fontManager: ReaderFontManager,
+    documentCache: ReaderBookDocumentCache? = null,
     systemDark: Boolean,
     onBeforeRestoreVisible: (WebView) -> ReaderRestoreBeforeVisibleAction? = { null },
     modifier: Modifier = Modifier,
@@ -130,9 +128,7 @@ internal fun ChapterWebView(
     val currentOnRendererTerminated = rememberUpdatedState(onRendererTerminated)
     val currentOnTextSelected = rememberUpdatedState(onTextSelected)
     val currentOnSaveBookmark = rememberUpdatedState(onSaveBookmark)
-    val currentOnDisplayProgress = rememberUpdatedState(onDisplayProgress)
-    val currentOnContinuousScrollDisplayProgress = rememberUpdatedState(onContinuousScrollDisplayProgress)
-    val currentOnContinuousScrollProgress = rememberUpdatedState(onContinuousScrollProgress)
+    val currentOnContinuousPosition = rememberUpdatedState(onContinuousPosition)
     val currentOnClearLookupPopup = rememberUpdatedState(onClearLookupPopup)
     val currentOnReaderTapOutside = rememberUpdatedState(onReaderTapOutside)
     val currentOnReaderInput = rememberUpdatedState(onReaderInput)
@@ -142,8 +138,6 @@ internal fun ChapterWebView(
     val currentOnHighlightChanged = rememberUpdatedState(onHighlightChanged)
     val currentReaderPopupResourceHandler = rememberUpdatedState(readerPopupResourceHandler)
     val currentReaderPopupFrames = rememberUpdatedState(readerPopupFrames)
-    val currentOnNextChapter = rememberUpdatedState(onNextChapter)
-    val currentOnPreviousChapter = rememberUpdatedState(onPreviousChapter)
     val currentIsWebViewRestoring = rememberUpdatedState(isWebViewRestoring)
     val currentWebViewRestoreEpoch = rememberUpdatedState(webViewRestoreEpoch)
     val currentOnBeforeDocumentLoad = rememberUpdatedState(onBeforeDocumentLoad)
@@ -164,7 +158,6 @@ internal fun ChapterWebView(
                 .coerceAtLeast(1),
         )
     }
-    val continuousScrollProgressScheduler = remember { ReaderContinuousScrollProgressScheduler() }
     val chapter = book.chapters[chapterPosition.index]
     var readerWebView by remember { mutableStateOf<WebView?>(null) }
     val fontLibraryState by fontManager.libraryState.collectAsState()
@@ -181,7 +174,8 @@ internal fun ChapterWebView(
         )
     }
     val fontFaceUrl = fontRenderSpec.faces.firstOrNull()?.url
-    val baseUrl = remember(chapter) { "https://appassets.androidplatform.net/epub/${chapter.href}" }
+    val wholeBook = readerSettings.viewMode == ReaderViewMode.Continuous
+    val baseUrl = if (wholeBook) READER_BOOK_URL else "https://appassets.androidplatform.net/epub/${chapter.href}"
     val readerContentReloadKey = remember(readerSettings) {
         readerSettings.readerContentReloadKey()
     }
@@ -221,44 +215,37 @@ internal fun ChapterWebView(
         readerSetupReloadKey = readerSetupReloadKey,
         webViewViewportSize = webViewViewportSize,
     )
+    val bookLayoutKey = if (wholeBook) ContinuousBookLayout(
+        readerContentReloadKey, readerSetupReloadKey.copy(initialProgress = 0.0, initialFragment = null),
+        webViewViewportSize,
+    ) else null
     val restoreToken = readerWebViewRestoreToken(loadKey, webViewRestoreEpoch)
     val currentRestoreToken = rememberUpdatedState(restoreToken)
-    val readerSetupScript = remember(
-        chapter,
-        chapterPosition.progress,
-        chapterFragment,
-        readerContentReloadKey,
-        appearanceUpdateKey,
-        fontFaceUrl,
-        fontRenderSpec,
-        systemDark,
-        scanNonJapaneseText,
-        contentLanguageProfile,
-        webViewViewportCssSize,
-        sasayakiTextColor,
-        sasayakiBackgroundColor,
-        chapterSasayakiCuesJson,
-        chapterHighlightsJson,
-        restoreToken,
-        readerWebAssets,
-    ) {
-        readerSetupScript(
-            initialProgress = chapterPosition.progress,
-            initialFragment = chapterFragment,
-            settings = readerSettings,
-            fontFaceUrl = fontFaceUrl,
-            fontRenderSpec = fontRenderSpec,
-            systemDark = systemDark,
-            scanNonJapaneseText = scanNonJapaneseText,
-            contentLanguageProfile = contentLanguageProfile,
-            webViewViewportCssSize = webViewViewportCssSize,
-            sasayakiTextColor = sasayakiTextColor,
-            sasayakiBackgroundColor = sasayakiBackgroundColor,
-            sasayakiCuesJson = chapterSasayakiCuesJson,
-            highlightsJson = chapterHighlightsJson,
-            restoreToken = restoreToken,
-            assets = readerWebAssets,
-        )
+    fun setupScript() = readerSetupScript(
+        initialProgress = chapterPosition.progress,
+        initialFragment = chapterFragment,
+        settings = readerSettings,
+        fontFaceUrl = fontFaceUrl,
+        fontRenderSpec = fontRenderSpec,
+        systemDark = systemDark,
+        scanNonJapaneseText = scanNonJapaneseText,
+        contentLanguageProfile = contentLanguageProfile,
+        webViewViewportCssSize = webViewViewportCssSize,
+        sasayakiTextColor = sasayakiTextColor,
+        sasayakiBackgroundColor = sasayakiBackgroundColor,
+        sasayakiCuesJson = chapterSasayakiCuesJson,
+        highlightsJson = chapterHighlightsJson,
+        restoreToken = restoreToken,
+        assets = readerWebAssets,
+        initialChapterIndex = chapterPosition.index,
+    )
+    LaunchedEffect(readerWebView, readerAppearanceScript, isWebViewRestoring) {
+        if (!isWebViewRestoring) readerWebView?.evaluateJavascript(readerAppearanceScript, null)
+    }
+    LaunchedEffect(readerWebView, wholeBook, readerSettings.blurImages, isWebViewRestoring) {
+        if (wholeBook && !isWebViewRestoring) {
+            readerWebView?.evaluateJavascript("window.hoshiReaderMediaSemantics?.setImageBlur(${readerSettings.blurImages})", null)
+        }
     }
     LaunchedEffect(readerWebView, restoreToken, readerSettings.usesPageCounts, isWebViewRestoring) {
         readerWebView?.evaluateJavascript("window.hoshiReaderPageReporting = ${readerSettings.usesPageCounts}; window.hoshiReader?.notifyPageChanged?.();", null)
@@ -266,6 +253,7 @@ internal fun ChapterWebView(
     val currentOnRestoreAccepted = rememberUpdatedState<(WebView, String) -> ReaderRestoreCompletionAction?> { restoredWebView, reportedRestoreToken ->
         if (!restoredWebView.acceptsReaderUpdates()) return@rememberUpdatedState null
         if (restoredWebView != readerWebView || reportedRestoreToken != restoreToken) return@rememberUpdatedState null
+        (restoredWebView as HoshiReaderWebView).continuousDocumentKey = bookLayoutKey
         readerRestoreCompletionAfterVisibleAction(
             chapterFragment = chapterFragment,
             evaluateProgress = { callback ->
@@ -287,10 +275,15 @@ internal fun ChapterWebView(
             }
         }
     }
+    LaunchedEffect(readerWebView, wholeBook, restoreToken, isWebViewRestoring, chapterHighlightsJson) {
+        val webView = readerWebView ?: return@LaunchedEffect
+        if (wholeBook && !isWebViewRestoring && webView.tag == restoreToken) {
+            webView.evaluateJavascript("window.hoshiHighlights?.reconcileBookHighlights(${chapterHighlightsJson ?: "{}"})", null)
+        }
+    }
     val handleRendererTerminated: (WebView) -> Unit = { view ->
         val readerView = view as HoshiReaderWebView
         if (!readerView.isReleased) {
-            continuousScrollProgressScheduler.reset(view::removeCallbacks)
             if (readerWebView === view) readerWebView = null
             currentOnRendererTerminated.value(view)
             releaseReaderWebView(readerView)
@@ -334,20 +327,6 @@ internal fun ChapterWebView(
                     "HoshiReaderImage",
                 )
                 ReaderLookupPopupWebBridge.install(this, readerPopupBridgeHolder, isActive = { acceptsReaderUpdates })
-                webViewClient = EpubWebViewClient(
-                    book = book,
-                    fontManager = fontManager,
-                    onInternalLink = onInternalLink,
-                    popupResourceHandler = { currentReaderPopupResourceHandler.value },
-                    onRendererTerminated = handleRendererTerminated,
-                ) { view ->
-                    view.evaluateReaderSetupScript(
-                        source = readerSetupScript,
-                        restoreToken = restoreToken,
-                        sasayakiCuesJson = chapterSasayakiCuesJson,
-                        cuesVersion = chapterCuesVersion,
-                    )
-                }
                 readerWebView = this
                 onWebViewReady(this)
             }
@@ -388,76 +367,26 @@ internal fun ChapterWebView(
                 ReaderViewMode.Continuous -> {
                     webView.bindReaderTouchListener(readerSettings to selectionScanLength) {
                         ContinuousScrollTouchListener(
-                            settings = readerSettings,
                             shouldIgnoreReaderGesture = ::shouldIgnoreReaderGestureEvent,
                             onTap = { x, y -> selectAt(x, y) { currentOnReaderTapOutside.value() } },
                             onScrollGesture = { currentOnReaderInteraction.value() },
-                            onNextChapter = {
-                                currentOnReaderInteraction.value()
-                                currentOnClearLookupPopup.value()
-                                val changed = currentOnNextChapter.value()
-                                if (changed) webView.hideForReaderRestore()
-                                changed
-                            },
-                            onPreviousChapter = {
-                                currentOnReaderInteraction.value()
-                                currentOnClearLookupPopup.value()
-                                val changed = currentOnPreviousChapter.value()
-                                if (changed) webView.hideForReaderRestore()
-                                changed
-                            },
                         )
                     }
                     webView.setOnScrollChangeListener(null)
-                    webView.onContinuousScroll = {
-                        continuousScrollProgressScheduler.onScrollChanged(
-                            isRestoring = currentIsWebViewRestoring.value,
-                            restoreEpoch = currentWebViewRestoreEpoch.value,
-                            evaluateProgress = { callback ->
-                                webView.evaluateJavascript(ReaderPaginationScripts.progressInvocation(), callback)
-                            },
-                            onProgressChanged = { progress, restoreEpoch ->
-                                when (readerProgressPersistenceAction(ReaderProgressPersistenceEvent.ContinuousScrollChanged)) {
-                                    ReaderProgressPersistenceAction.DisplayOnly -> {
-                                        currentOnContinuousScrollDisplayProgress.value(progress, restoreEpoch)
-                                    }
-                                    ReaderProgressPersistenceAction.SaveBookmark -> {
-                                        currentOnContinuousScrollProgress.value(progress, restoreEpoch)
-                                    }
-                                }
-                            },
-                            onProgressIdle = { progress, restoreEpoch ->
-                                when (readerProgressPersistenceAction(ReaderProgressPersistenceEvent.ContinuousScrollIdle)) {
-                                    ReaderProgressPersistenceAction.DisplayOnly -> currentOnDisplayProgress.value(progress)
-                                    ReaderProgressPersistenceAction.SaveBookmark -> {
-                                        currentOnContinuousScrollProgress.value(progress, restoreEpoch)
-                                    }
-                                }
-                            },
-                            onClearLookupPopup = currentOnClearLookupPopup.value,
-                            postDelayed = webView::postDelayed,
-                            removeCallback = webView::removeCallbacks,
-                            cancelIdleSave = {
-                                readerPendingProgressSaveCallbacks.remove(webView)?.let(webView::removeCallbacks)
-                            },
-                            scheduleIdleSave = { callback, delayMillis ->
-                                lateinit var saveCallback: Runnable
-                                saveCallback = Runnable {
-                                    if (readerPendingProgressSaveCallbacks[webView] == saveCallback) {
-                                        readerPendingProgressSaveCallbacks.remove(webView)
-                                    }
-                                    callback.run()
-                                }
-                                readerPendingProgressSaveCallbacks[webView] = saveCallback
-                                webView.postDelayed(saveCallback, delayMillis)
-                            },
-                        )
+                    webView.onContinuousScroll = { position, settled ->
+                        if (!currentIsWebViewRestoring.value && position.index in book.chapters.indices) {
+                            if (currentReaderPopupFrames.value.isNotEmpty()) currentOnClearLookupPopup.value()
+                            val epoch = currentWebViewRestoreEpoch.value
+                            webView.pendingContinuousSave = if (settled) null else {
+                                { currentOnContinuousPosition.value(position, epoch, true) }
+                            }
+                            currentOnContinuousPosition.value(position, epoch, settled)
+                        }
                     }
                 }
                 ReaderViewMode.Paginated,
                 -> {
-                    continuousScrollProgressScheduler.reset(webView::removeCallbacks)
-                    readerPendingProgressSaveCallbacks.remove(webView)?.let(webView::removeCallbacks)
+                    webView.pendingContinuousSave = null
                     webView.setOnScrollChangeListener(null)
                     webView.onContinuousScroll = null
                     webView.bindReaderTouchListener(readerSettings to selectionScanLength) {
@@ -502,25 +431,47 @@ internal fun ChapterWebView(
                     }
                 }
             }
-            webView.evaluateJavascript(readerAppearanceScript, null)
             if (!readerWebViewReadyToLoad(webViewViewportSize) || !chapterCuesReady) return@AndroidView
             if (webView.tag != restoreToken) {
                 if (!currentIsWebViewRestoring.value) {
                     currentOnRestoreStarted.value()
                     return@AndroidView
                 }
+                val previousLayout = webView.continuousDocumentKey
                 currentOnBeforeDocumentLoad.value()
                 webView.prepareForDocument(restoreToken)
+                // Ruby preparation changes text nodes for vertical writing. Changing direction needs a fresh DOM and indexes.
+                if (bookLayoutKey != null && previousLayout?.content?.verticalWriting == bookLayoutKey.content.verticalWriting) {
+                    val layout = if (previousLayout == bookLayoutKey) "" else {
+                        val css = readerDocumentCss(readerSettings, webViewViewportCssSize, fontFaceUrl, fontRenderSpec,
+                            systemDark, sasayakiTextColor, sasayakiBackgroundColor, contentLanguageProfile, readerWebAssets)
+                        """document.querySelectorAll('ruby.furigana-hidden').forEach(ruby => ruby.classList.remove('furigana-hidden'));
+                           document.getElementById('hoshi-reader-content-style').textContent = ${readerJavaScriptStringLiteral(css)};
+                           window.hoshiSelection.setupFurigana(${readerJavaScriptStringLiteral(readerSettings.furiganaMode.name)});
+                           window.scanNonJapaneseText = $scanNonJapaneseText;
+                           ${ReaderPaginationScripts.configureContinuousViewportInvocation(readerSettings)};
+                        """.trimIndent()
+                    }
+                    val fragment = chapterFragment?.let(::readerJavaScriptStringLiteral) ?: "null"
+                    val token = readerJavaScriptStringLiteral(restoreToken)
+                    webView.evaluateJavascript(
+                        "$layout window.hoshiReader.jumpToChapter(${chapterPosition.index}, ${chapterPosition.progress}, $fragment, $token)",
+                        null,
+                    )
+                    return@AndroidView
+                }
+                webView.continuousDocumentKey = null
                 webView.hideForReaderRestore()
                 webView.webViewClient = EpubWebViewClient(
                     book = book,
-                    fontManager = fontManager,
+                    resources = ReaderWebResourceBridge(book, fontManager, documentCache),
                     onInternalLink = onInternalLink,
                     popupResourceHandler = { currentReaderPopupResourceHandler.value },
                     onRendererTerminated = handleRendererTerminated,
                 ) { view ->
+                    if (view.tag != restoreToken) return@EpubWebViewClient
                     view.evaluateReaderSetupScript(
-                        source = readerSetupScript,
+                        source = setupScript(),
                         restoreToken = restoreToken,
                         sasayakiCuesJson = chapterSasayakiCuesJson,
                         cuesVersion = chapterCuesVersion,
@@ -530,7 +481,6 @@ internal fun ChapterWebView(
             }
         },
         onRelease = { webView ->
-            continuousScrollProgressScheduler.reset(webView::removeCallbacks)
             if (readerWebView == webView) {
                 readerWebView = null
             }
@@ -570,6 +520,12 @@ internal fun readerRestoreCompletionAfterVisibleAction(
 internal typealias ReaderRestoreShowAction = () -> Boolean
 internal typealias ReaderRestoreCompletionAction = (ReaderRestoreShowAction) -> Unit
 internal typealias ReaderRestoreBeforeVisibleAction = (ReaderRestoreShowAction, () -> Unit) -> Unit
+
+internal data class ContinuousBookLayout(
+    val content: ReaderContentReloadKey,
+    val setup: ReaderWebViewSetupReloadKey,
+    val viewport: IntSize,
+)
 
 internal data class ReaderWebViewSetupReloadKey(
     val initialProgress: Double,
@@ -715,9 +671,9 @@ internal class HoshiReaderWebView(context: Context) : HoshiWebView(context) {
         readerTouchListener = create()
         setOnTouchListener(readerTouchListener)
     }
-    fun isCurrentReaderTouchListener(listener: View.OnTouchListener): Boolean = readerTouchListener === listener
-
-    var onContinuousScroll: (() -> Unit)? = null
+    var onContinuousScroll: ((ReaderChapterPosition, Boolean) -> Unit)? = null
+    var pendingContinuousSave: (() -> Unit)? = null
+    var continuousDocumentKey: ContinuousBookLayout? = null
     private var documentHasSelection = false
     private val nativeSelectionActivity = MutableStateFlow(false)
     val nativeSelectionState: StateFlow<Boolean> get() = nativeSelectionActivity
@@ -778,6 +734,7 @@ internal class HoshiReaderWebView(context: Context) : HoshiWebView(context) {
 
     fun prepareForDocument(restoreToken: String) {
         if (!acceptsReaderUpdates) return
+        pendingContinuousSave = null
         tag = restoreToken
         clearNativeSelectionState()
     }
@@ -1146,19 +1103,23 @@ private class ReaderHighlightActionModeCallback(
     }
 }
 
-private class EpubWebViewClient(
+internal class EpubWebViewClient(
     private val book: EpubBook,
-    private val fontManager: ReaderFontManager,
+    private val resources: ReaderWebResourceBridge,
     private val onInternalLink: (ReaderInternalLinkTarget) -> Unit,
     private val popupResourceHandler: () -> ReaderLookupPopupResourceHandler?,
     private val onRendererTerminated: (WebView) -> Unit,
     private val onReaderPageFinished: (WebView) -> Unit,
 ) : WebViewClient() {
-    private val resourceBridge = ReaderWebResourceBridge(book, fontManager)
 
     override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
         if (!view.acceptsReaderUpdates()) return true
-        val target = book.resolveInternalReaderLink(request.url?.toString().orEmpty()) ?: return false
+        val uri = request.url ?: return false
+        if (isExternalReaderWebLink(uri.scheme, uri.host)) {
+            if (request.isForMainFrame && request.hasGesture()) view.context.openPopupExternalLink(uri.toString())
+            return true
+        }
+        val target = book.resolveInternalReaderLink(uri.toString()) ?: return false
         onInternalLink(target)
         return true
     }
@@ -1174,12 +1135,42 @@ private class EpubWebViewClient(
     override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
         val uri = request.url ?: return null
         return popupResourceHandler()?.handle(uri)
-            ?: resourceBridge.resourceForUrl(uri.toString())?.toWebResourceResponse()
+            ?: resources.resourceForUrl(uri.toString())?.toWebResourceResponse()
     }
 
     override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
         onRendererTerminated(view)
         return true
+    }
+}
+
+private fun readerDocumentCss(
+    settings: ReaderSettings,
+    webViewViewportCssSize: IntSize,
+    fontFaceUrl: String?,
+    fontRenderSpec: ReaderFontRenderSpec?,
+    systemDark: Boolean,
+    sasayakiTextColor: Long,
+    sasayakiBackgroundColor: Long,
+    contentLanguageProfile: ContentLanguageProfile,
+    assets: ReaderWebAssets,
+): String {
+    val viewportLayout = readerViewportCssLayout(
+        settings = settings,
+        viewportCssWidth = webViewViewportCssSize.width,
+        viewportCssHeight = webViewViewportCssSize.height,
+    )
+    return ReaderContentStyles.css(
+        settings = settings,
+        fontFaceUrl = fontFaceUrl,
+        fontRenderSpec = fontRenderSpec,
+        systemDark = systemDark,
+        sasayakiTextColor = sasayakiTextColor,
+        sasayakiBackgroundColor = sasayakiBackgroundColor,
+        contentLanguageProfile = contentLanguageProfile,
+        readerCssTemplate = assets.readerCss,
+    ).let { css ->
+        "${viewportLayout.cssVariables()}\n$css"
     }
 }
 
@@ -1200,27 +1191,13 @@ internal fun readerSetupScript(
     restoreToken: String,
     assets: ReaderWebAssets,
     measurementOnly: Boolean = false,
+    initialChapterIndex: Int = 0,
 ): String {
     val eInkMode = readerJavaScriptStringLiteral(if (settings.eInkMode) "true" else "false")
     val contentLanguageTag = readerJavaScriptStringLiteral(contentLanguageProfile.htmlLang)
     val selectionLanguageId = readerJavaScriptStringLiteral(contentLanguageProfile.dictionaryLanguageId)
-    val viewportLayout = readerViewportCssLayout(
-        settings = settings,
-        viewportCssWidth = webViewViewportCssSize.width,
-        viewportCssHeight = webViewViewportCssSize.height,
-    )
-    val css = ReaderContentStyles.css(
-        settings = settings,
-        fontFaceUrl = fontFaceUrl,
-        fontRenderSpec = fontRenderSpec,
-        systemDark = systemDark,
-        sasayakiTextColor = sasayakiTextColor,
-        sasayakiBackgroundColor = sasayakiBackgroundColor,
-        contentLanguageProfile = contentLanguageProfile,
-        readerCssTemplate = assets.readerCss,
-    ).let { css ->
-        "${viewportLayout.cssVariables()}\n$css"
-    }.let(::readerJavaScriptStringLiteral)
+    val css = readerJavaScriptStringLiteral(readerDocumentCss(settings, webViewViewportCssSize, fontFaceUrl, fontRenderSpec,
+        systemDark, sasayakiTextColor, sasayakiBackgroundColor, contentLanguageProfile, assets))
     val selectionSupportScript = assets.selectionSupportJs(contentLanguageProfile)
     val selectionScript = assets.selectionJs
     val paginationScript = ReaderPaginationScripts.shellScriptWithRestoreToken(
@@ -1232,6 +1209,7 @@ internal fun readerSetupScript(
         restoreToken = restoreToken,
         assets = assets,
         measurementOnly = measurementOnly,
+        initialChapterIndex = initialChapterIndex,
     ).scriptTagBody()
     return """
         (async function() {
@@ -1239,6 +1217,7 @@ internal fun readerSetupScript(
           document.documentElement.lang = $contentLanguageTag;
           document.documentElement.dataset.hoshiContentLanguage = $contentLanguageTag;
           var style = document.createElement('style');
+          style.id = 'hoshi-reader-content-style';
           style.textContent = $css;
           document.head.appendChild(style);
           window.scanNonJapaneseText = $scanNonJapaneseText;
@@ -1394,10 +1373,7 @@ internal fun WebView.navigatePage(
                 val progress = ReaderPaginationScripts.doubleResult(result) ?: return@evaluateJavascript
                 onTurnCompleted()
                 onDisplayedProgress(progress)
-                when (readerProgressPersistenceAction(ReaderProgressPersistenceEvent.PaginatedPageTurnCompleted)) {
-                    ReaderProgressPersistenceAction.DisplayOnly -> Unit
-                    ReaderProgressPersistenceAction.SaveBookmark -> onSaveProgress(progress)
-                }
+                onSaveProgress(progress)
             }
             ReaderNavigationResult.Blocked -> Unit
             ReaderNavigationResult.Limit -> {
@@ -1413,36 +1389,35 @@ private fun nextReaderPageTurnProgressRequestId(): Long {
 }
 
 internal fun WebView.flushPendingProgressSave() {
-    val progressCallback = readerPendingProgressSaveCallbacks.remove(this) ?: return
-    removeCallbacks(progressCallback)
-    progressCallback.run()
+    val view = this as? HoshiReaderWebView ?: return
+    val save = view.pendingContinuousSave
+    view.pendingContinuousSave = null
+    save?.invoke()
 }
 
 internal class ContinuousScrollTouchListener(
-    private val settings: ReaderSettings,
     private val shouldIgnoreReaderGesture: (MotionEvent) -> Boolean,
     private val onTap: (Float, Float) -> Unit,
     private val onScrollGesture: () -> Unit,
-    private val onNextChapter: () -> Boolean,
-    private val onPreviousChapter: () -> Boolean,
 ) : View.OnTouchListener {
     private var downX = 0f
     private var downY = 0f
     private var downTime = 0L
-    private var gestureGeneration = 0
     private var currentGestureIgnored = false
+    private var gestureDocumentToken: Any? = null
     private val focusTracker = ReaderContinuousScrollFocusTracker()
 
     override fun onTouch(view: View, event: MotionEvent): Boolean {
-        val webView = view as? WebView ?: return false
-        if (shouldIgnoreReaderGesture(event)) {
-            gestureGeneration++
+        val webView = view as? HoshiReaderWebView ?: return false
+        val documentChanged = event.actionMasked != MotionEvent.ACTION_DOWN &&
+            gestureDocumentToken != null && webView.tag != gestureDocumentToken
+        if (documentChanged || shouldIgnoreReaderGesture(event) || event.actionMasked == MotionEvent.ACTION_POINTER_DOWN) {
             currentGestureIgnored = true
             return false
         }
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
-                gestureGeneration++
+                gestureDocumentToken = webView.tag
                 downX = event.x
                 downY = event.y
                 downTime = event.eventTime
@@ -1450,7 +1425,6 @@ internal class ContinuousScrollTouchListener(
                 focusTracker.onDown()
             }
             MotionEvent.ACTION_CANCEL -> {
-                gestureGeneration++
                 currentGestureIgnored = false
                 focusTracker.onCancel()
             }
@@ -1460,9 +1434,9 @@ internal class ContinuousScrollTouchListener(
                 }
             }
             MotionEvent.ACTION_UP -> {
+                focusTracker.onCancel()
                 if (currentGestureIgnored) {
                     currentGestureIgnored = false
-                    focusTracker.onCancel()
                     return false
                 }
                 val dx = event.x - downX
@@ -1476,150 +1450,10 @@ internal class ContinuousScrollTouchListener(
                     onTap(event.x, event.y)
                     return false
                 }
-                handleBoundarySwipe(webView, dx, dy)
-                focusTracker.onCancel()
             }
         }
         return false
     }
-
-    private fun handleBoundarySwipe(webView: WebView, dx: Float, dy: Float) {
-        val threshold = settings.chapterSwipeDistance * webView.resources.displayMetrics.density
-        val direction = if (settings.verticalWriting) {
-            if (abs(dx) < threshold || abs(dx) < abs(dy)) return
-            if (dx > 0) ReaderNavigationDirection.Forward else ReaderNavigationDirection.Backward
-        } else {
-            if (abs(dy) < threshold || abs(dy) < abs(dx)) return
-            if (dy < 0) ReaderNavigationDirection.Forward else ReaderNavigationDirection.Backward
-        }
-        val generation = gestureGeneration
-        val documentToken = webView.tag
-        webView.evaluateJavascript("window.hoshiReader.isAtChapterBoundary('${direction.jsValue}')") { result ->
-            val readerView = webView as? HoshiReaderWebView ?: return@evaluateJavascript
-            if (!readerView.acceptsReaderUpdates || !readerView.isCurrentReaderTouchListener(this) ||
-                readerView.tag != documentToken || generation != gestureGeneration ||
-                readerView.isNativeSelectionActive()
-            ) return@evaluateJavascript
-            if (result == "true") {
-                if (direction == ReaderNavigationDirection.Forward) onNextChapter() else onPreviousChapter()
-            }
-        }
-    }
-
-}
-
-internal class ReaderContinuousScrollProgressScheduler(
-    private val nowMillis: () -> Long = SystemClock::uptimeMillis,
-    private val throttleMs: Long = CONTINUOUS_PROGRESS_THROTTLE_MS,
-    private val idleDelayMs: Long = CONTINUOUS_SCROLL_SAVE_IDLE_DELAY_MS,
-) {
-    private var generation = 0L
-    private var progressInFlight = false
-    private var lastProgressRequestAt: Long? = null
-    private var pendingRequest: ProgressRequest? = null
-    private var throttleCallback: Runnable? = null
-
-    fun onScrollChanged(
-        isRestoring: Boolean,
-        restoreEpoch: Int,
-        evaluateProgress: (((String?) -> Unit) -> Unit),
-        onProgressChanged: (Double, Int) -> Unit,
-        onProgressIdle: (Double, Int) -> Unit,
-        onClearLookupPopup: () -> Unit,
-        postDelayed: (Runnable, Long) -> Unit,
-        removeCallback: (Runnable) -> Unit,
-        cancelIdleSave: () -> Unit,
-        scheduleIdleSave: (Runnable, Long) -> Unit,
-    ) {
-        if (isRestoring) return
-        cancelIdleSave()
-        onClearLookupPopup()
-        val request = ProgressRequest(
-            restoreEpoch = restoreEpoch,
-            evaluateProgress = evaluateProgress,
-            onProgressChanged = onProgressChanged,
-            onProgressIdle = onProgressIdle,
-            removeCallback = removeCallback,
-            scheduleIdleSave = scheduleIdleSave,
-        )
-        pendingRequest = request
-        if (progressInFlight) return
-        val delayMillis = progressRequestDelayMillis()
-        if (delayMillis > 0) {
-            scheduleThrottledProgressRequest(delayMillis, postDelayed)
-            return
-        }
-        pendingRequest = null
-        startProgressRequest(request)
-    }
-
-    fun reset(removeCallback: (Runnable) -> Unit) {
-        generation += 1
-        progressInFlight = false
-        lastProgressRequestAt = null
-        pendingRequest = null
-        throttleCallback?.let(removeCallback)
-        throttleCallback = null
-    }
-
-    private fun progressRequestDelayMillis(): Long {
-        val lastRequestAt = lastProgressRequestAt ?: return 0L
-        return (throttleMs - (nowMillis() - lastRequestAt)).coerceAtLeast(0L)
-    }
-
-    private fun scheduleThrottledProgressRequest(
-        delayMillis: Long,
-        postDelayed: (Runnable, Long) -> Unit,
-    ) {
-        if (throttleCallback != null) return
-        val callback = Runnable {
-            throttleCallback = null
-            val request = pendingRequest ?: return@Runnable
-            pendingRequest = null
-            startProgressRequest(request)
-        }
-        throttleCallback = callback
-        postDelayed(callback, delayMillis)
-    }
-
-    private fun startProgressRequest(request: ProgressRequest) {
-        request.removeThrottleCallback()
-        progressInFlight = true
-        lastProgressRequestAt = nowMillis()
-        val requestGeneration = generation
-        request.evaluateProgress { progressResult ->
-            if (requestGeneration != generation) return@evaluateProgress
-            progressInFlight = false
-            val progress = ReaderPaginationScripts.doubleResult(progressResult)
-            if (progress != null) {
-                request.onProgressChanged(progress, request.restoreEpoch)
-            }
-            val nextRequest = pendingRequest
-            if (nextRequest != null) {
-                pendingRequest = null
-                startProgressRequest(nextRequest)
-            } else if (progress != null) {
-                request.scheduleIdleSave(
-                    Runnable { request.onProgressIdle(progress, request.restoreEpoch) },
-                    idleDelayMs,
-                )
-            }
-        }
-    }
-
-    private fun ProgressRequest.removeThrottleCallback() {
-        throttleCallback?.let(removeCallback)
-        throttleCallback = null
-    }
-
-    private class ProgressRequest(
-        val restoreEpoch: Int,
-        val evaluateProgress: (((String?) -> Unit) -> Unit),
-        val onProgressChanged: (Double, Int) -> Unit,
-        val onProgressIdle: (Double, Int) -> Unit,
-        val removeCallback: (Runnable) -> Unit,
-        val scheduleIdleSave: (Runnable, Long) -> Unit,
-    )
 }
 
 private const val CONTINUOUS_READER_TAP_SLOP = 12f
@@ -1646,9 +1480,11 @@ internal class ReaderContinuousScrollFocusTracker {
 
 internal class ReaderContinuousScrollBridge(private val webView: HoshiReaderWebView) {
     @JavascriptInterface
-    fun postMessage(restoreToken: String) {
+    fun postProgress(restoreToken: String, chapterIndex: Int, progress: Double, settled: Boolean) {
         webView.post {
-            if (webView.acceptsReaderUpdates && webView.tag == restoreToken) webView.onContinuousScroll?.invoke()
+            if (webView.acceptsReaderUpdates && webView.tag == restoreToken && progress.isFinite()) {
+                webView.onContinuousScroll?.invoke(ReaderChapterPosition(chapterIndex, progress.coerceIn(0.0, 1.0)), settled)
+            }
         }
     }
 }
@@ -1689,14 +1525,15 @@ private fun WebView.showAfterReaderRestore(restoreCompletion: ReaderRestoreCompl
     if (!acceptsReaderUpdates()) return
     animate().cancel()
     val generation = readerRestoreGenerations[this] ?: 0L
+    val token = tag
     postVisualStateCallback(
         generation,
         object : WebView.VisualStateCallback() {
             override fun onComplete(requestId: Long) {
                 post {
-                    if (acceptsReaderUpdates() && readerRestoreGenerations[this@showAfterReaderRestore] == generation) {
+                    if (acceptsReaderUpdates() && tag == token && readerRestoreGenerations[this@showAfterReaderRestore] == generation) {
                         restoreCompletion {
-                            if (acceptsReaderUpdates() && readerRestoreGenerations[this@showAfterReaderRestore] == generation) {
+                            if (acceptsReaderUpdates() && tag == token && readerRestoreGenerations[this@showAfterReaderRestore] == generation) {
                                 animate().cancel()
                                 alpha = 1f
                                 true
@@ -1722,24 +1559,36 @@ internal fun WebView.evaluateReaderSetupScript(
     // payload starts with empty cue state. Post-restore delivery must not repeat
     // that installation and invalidate the chapter's warmed text geometry.
     // A changed payload/version still takes the normal update path below.
-    readerAppliedSasayakiCues[this] = ReaderAppliedSasayakiCues(restoreToken, sasayakiCuesJson ?: "[]", cuesVersion)
+    val snapshot = ReaderAppliedSasayakiCues(restoreToken, sasayakiCuesJson ?: "[]", cuesVersion)
+    readerAppliedSasayakiCues[this] = ReaderSasayakiCueInstallation(snapshot)
     evaluateJavascript(source, null)
 }
 
 internal fun WebView.applyReaderSasayakiCues(loadKey: String, cuesJson: String, version: Any? = null, onReady: () -> Unit) {
     if (!acceptsReaderUpdates()) return
-    val appliedCues = ReaderAppliedSasayakiCues(loadKey, cuesJson, version)
-    if (readerAppliedSasayakiCues[this] == appliedCues) { onReady(); return }
-    readerAppliedSasayakiCues[this] = appliedCues
+    val snapshot = ReaderAppliedSasayakiCues(loadKey, cuesJson, version)
+    val current = readerAppliedSasayakiCues[this]
+    if (current?.snapshot == snapshot) {
+        val waiting = current.waiting
+        if (waiting == null) onReady() else waiting += onReady
+        return
+    }
+    val callbacks = mutableListOf(onReady)
+    val installation = ReaderSasayakiCueInstallation(snapshot, callbacks)
+    readerAppliedSasayakiCues[this] = installation
     evaluateJavascript(ReaderPaginationScripts.applySasayakiCuesInvocation(cuesJson)) {
-        if (acceptsReaderUpdates() && readerAppliedSasayakiCues[this] == appliedCues) onReady()
+        installation.waiting = null
+        for (callback in callbacks) {
+            if (!acceptsReaderUpdates() || readerAppliedSasayakiCues[this] !== installation) break
+            callback()
+        }
     }
 }
 
 private fun releaseReaderWebView(webView: HoshiReaderWebView) {
     if (webView.isReleased) return
     webView.animate().cancel()
-    readerPendingProgressSaveCallbacks.remove(webView)?.let(webView::removeCallbacks)
+    webView.pendingContinuousSave = null
     readerRestoreGenerations.remove(webView)
     readerAppliedSasayakiCues.remove(webView)
     readerPageTurnProgressRequestIds.remove(webView)
@@ -1763,13 +1612,15 @@ private data class ReaderAppliedSasayakiCues(
     val version: Any?,
 )
 
+private class ReaderSasayakiCueInstallation(
+    val snapshot: ReaderAppliedSasayakiCues,
+    var waiting: MutableList<() -> Unit>? = null,
+)
+
 private val readerRestoreGenerations = WeakHashMap<WebView, Long>()
-private val readerAppliedSasayakiCues = WeakHashMap<WebView, ReaderAppliedSasayakiCues>()
-private val readerPendingProgressSaveCallbacks = WeakHashMap<WebView, Runnable>()
+private val readerAppliedSasayakiCues = WeakHashMap<WebView, ReaderSasayakiCueInstallation>()
 private val readerPageTurnProgressRequestIds = WeakHashMap<WebView, Long>()
 private var readerPageTurnProgressRequestId = 0L
-private const val CONTINUOUS_PROGRESS_THROTTLE_MS = 50L
-private const val CONTINUOUS_SCROLL_SAVE_IDLE_DELAY_MS = 250L
 
 
 private const val ReaderSasayakiMatchFileName = "sasayaki_match.json"
