@@ -377,6 +377,25 @@ test('iframe render messages forward only non-null source text', () => {
     }
 });
 
+test('a popup for another word reuses a parked frame instead of loading a new one', () => {
+    const scene = popupHost();
+    const shells = () => scene.document.getElementById('hoshi-reader-popup-layer')?.children
+        .filter(child => child.className === 'hoshi-reader-popup-shell') ?? [];
+    const show = id => scene.host.renderStack({ popups: [{ ...rootPopupPayload(), id, contentKey: id }] });
+
+    show('first');
+    show('second');
+    assert.equal(shells().length, 2, 'the first switch loads a second frame');
+    scene.host.renderStack({ popups: [] });
+    assert.equal(shells().length, 2, 'both frames stay loaded once the popups close');
+
+    show('third');
+    show('fourth');
+    show('fifth');
+    assert.equal(shells().length, 2, 'later switches reuse the two frames');
+    assert.deepEqual(shells().map(shell => shell.dataset.popupId).sort(), ['', 'fifth']);
+});
+
 test('unmatched source submissions replace old entries and subsequent source-only content', () => {
     const scene = popupHost();
     const original = { ...rootPopupPayload(), entriesCount: 1, initialEntryJson: '{"expression":"猫"}', contentKey: 'original' };
