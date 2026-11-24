@@ -621,11 +621,14 @@ and copying an asset snapshot creates independent template caches.
 - DOM selection state owns the navigation lock. `blocked` is distinct from a
   chapter-boundary `limit` result.
 - Reader, Dictionary and Process Text use the same iframe popup host and native
-  service bridge. After reader restore, the popup host preloads the idle iframe
-  for the current popup URL and reuses it across continuous chapter boundaries.
-  The host signals the iframe once content and selection geometry allow it to
-  show. Initial glossary rendering yields at that point so the first dictionary
-  can paint before the remaining sections are built. `popup.js`'s
+  service bridge. After reader restore, the popup host preloads the root iframe
+  for the current popup URL and reuses it across word changes and continuous
+  chapter boundaries. Nested popups have their own frames. Resetting a frame
+  settles its pending bridge requests with null. The host accepts messages for
+  the active popup ID from its own frame, and the frame accepts replies for its
+  current popup ID. The host signals the iframe once content and selection
+  geometry allow it to show. Initial glossary rendering yields at that point
+  so the first dictionary can paint before the remaining sections are built. `popup.js`'s
   `hoshiPopupGeometry` owns CSS-zoom coordinates.
   It converts between unscaled layout coordinates and visual scroll/viewport
   coordinates. `popup-gestures.js` recognizes gestures through per-pointer events,

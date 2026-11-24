@@ -138,11 +138,13 @@ function popupHost(options = {}) {
         document,
         window,
         host: window.hoshiReaderPopupHost,
-        dispatchMessage: (data) => {
+        dispatchMessage: (data, source = document.querySelectorAll('.hoshi-reader-popup-shell')
+            .find(shell => shell.dataset.popupId === data.popupId)
+            ?.querySelector('.hoshi-reader-popup-iframe')?.contentWindow) => {
             messageListeners.forEach((listener) => listener({
                 origin: 'https://appassets.androidplatform.net',
                 data,
-                source: {},
+                source,
             }));
         },
         dispatchWindowEvent: (type, event) => {
@@ -392,6 +394,61 @@ test('unmatched source submissions replace old entries and subsequent source-onl
     assert.equal(renders.length, 3);
     assert.deepEqual(renders.slice(1).map(message => message.sourceText), ['──猫がいる。', '──別の文章。']);
     assert.equal(renders[2].entriesCount, 0);
+});
+
+test('a root lookup replaces its word in the loaded iframe and dismisses child frames', () => {
+    const { document, host } = popupHost();
+    const root = rootPopupPayload();
+    host.renderStack({ popups: [root, { ...root, id: 'child' }] });
+    const iframes = () => document.querySelectorAll('.hoshi-reader-popup-iframe');
+    const [rootIframe, childIframe] = iframes();
+    assert.notEqual(rootIframe, childIframe);
+    const messages = [];
+    rootIframe.contentWindow.postMessage = message => messages.push(message);
+    rootIframe.dispatchEvent('load');
+    messages.length = 0;
+
+    host.renderStack({ popups: [{ ...root, id: 'next-word' }] });
+    assert.deepEqual(iframes(), [rootIframe]);
+    assert.deepEqual(messages.map(message => message.type), ['resetPopup', 'renderPopup']);
+    assert.equal(messages.at(-1).popupId, 'next-word');
+
+    host.renderStack({ popups: [] });
+    host.renderStack({ popups: [{ ...root, id: 'reopened' }] });
+    assert.deepEqual(iframes(), [rootIframe]);
+    assert.equal(messages.at(-1).popupId, 'reopened');
+});
+
+test('only the current popup and its iframe can update readiness or call native services', () => {
+    const { document, window, host, dispatchMessage } = popupHost();
+    const nativeMessages = [];
+    window.HoshiReaderPopup = { postMessage: message => nativeMessages.push(JSON.parse(message)) };
+    const root = rootPopupPayload();
+    host.renderStack({ popups: [root] });
+    const oldSource = document.querySelectorAll('.hoshi-reader-popup-iframe')[0].contentWindow;
+    host.renderStack({ popups: [{ ...root, id: 'next-word' }] });
+    const shell = document.querySelectorAll('.hoshi-reader-popup-shell')
+        .find(item => item.dataset.popupId === 'next-word');
+    const source = shell.querySelector('.hoshi-reader-popup-iframe').contentWindow;
+    const ready = { source: 'hoshi-popup-iframe', name: 'contentReady', popupId: 'next-word' };
+    dispatchMessage({ ...ready, popupId: 'root', name: 'openLink' }, oldSource);
+    dispatchMessage({ ...ready, popupId: 'root' }, oldSource);
+    dispatchMessage({ ...ready, popupId: null }, source);
+    dispatchMessage(ready, {});
+    assert.equal(shell.dataset.contentReady, 'false');
+    assert.deepEqual(nativeMessages, []);
+
+    dispatchMessage(ready, source);
+    assert.equal(shell.dataset.contentReady, 'true');
+    assert.deepEqual(nativeMessages.map(message => message.popupId), ['next-word']);
+
+    const replies = [];
+    source.postMessage = message => replies.push(message);
+    host.resolveMessage('root', '1', 'old');
+    host.resolveMessage('next-word', '2', 'current');
+    assert.deepEqual(JSON.parse(JSON.stringify(replies)), [
+        { type: 'reply', popupId: 'next-word', id: '2', body: 'current' },
+    ]);
 });
 
 test('active iframe rerenders when same popup id receives new entry payload', () => {

@@ -25,6 +25,52 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class LookupPopupMiningWebViewTest {
     @Test
+    fun popupResetSettlesRequestsAndRepliesRequireTheCurrentPopup() {
+        withPopup(useAnkiConnect = false, preventAccidentalDuplicates = false) { webView ->
+            evaluate(webView, """
+                (async function() {
+                    const send = data => window.dispatchEvent(new MessageEvent('message', {
+                        data, origin: 'https://appassets.androidplatform.net', source: window
+                    }));
+                    function startRequest(popupId, recordResult) {
+                        send({type: 'renderPopup', popupId, entriesCount: 0});
+                        return new Promise(resolve => {
+                            function requestPosted({data}) {
+                                if (data.name !== 'duplicateCheck' || data.popupId !== popupId) return;
+                                window.removeEventListener('message', requestPosted);
+                                resolve(data.id);
+                            }
+                            window.addEventListener('message', requestPosted);
+                            window.HoshiAndroidPopup.requestMessage('duplicateCheck', {}).then(recordResult);
+                        });
+                    }
+                    let oldResult = 'pending';
+                    let currentResult = 'pending';
+                    const oldId = await startRequest('old', value => { oldResult = value; });
+                    send({type: 'resetPopup'});
+                    await Promise.resolve();
+                    const resultAfterReset = oldResult;
+                    const currentId = await startRequest('current', value => { currentResult = value; });
+                    send({type: 'reply', popupId: 'old', id: oldId, body: 'late'});
+                    send({type: 'reply', popupId: 'old', id: currentId, body: 'wrong-popup'});
+                    await Promise.resolve();
+                    const resultAfterLateReply = currentResult;
+                    send({type: 'reply', popupId: 'current', id: currentId, body: 'accepted'});
+                    await Promise.resolve();
+                    return {resultAfterReset, oldResult, resultAfterLateReply, currentResult};
+                })().then(result => { window.miningTestResult = result; })
+                    .catch(error => { window.miningTestResult = {error: String(error)}; });
+                true;
+            """.trimIndent())
+            val result = awaitResult(webView)
+            assertTrue(result.toString(), result.isNull("resultAfterReset") && result.has("resultAfterReset"))
+            assertTrue(result.toString(), result.isNull("oldResult") && result.has("oldResult"))
+            assertEquals(result.toString(), "pending", result.getString("resultAfterLateReply"))
+            assertEquals(result.toString(), "accepted", result.getString("currentResult"))
+        }
+    }
+
+    @Test
     fun successfulMiningLocksOnlyItsFormatAndReopeningAllowsAnotherNote() {
         for (useAnkiConnect in listOf(false, true)) {
             for (preventAccidentalDuplicates in listOf(false, true)) {
@@ -69,12 +115,7 @@ class LookupPopupMiningWebViewTest {
                             .catch(error => { window.miningTestResult = {error: String(error)}; });
                         true;
                     """.trimIndent())
-                    val deadline = SystemClock.uptimeMillis() + 10_000
-                    while (evaluate(webView, "window.miningTestResult !== undefined") != "true" && SystemClock.uptimeMillis() < deadline) {
-                        SystemClock.sleep(25)
-                    }
-                    val raw = evaluate(webView, "JSON.stringify(window.miningTestResult)")
-                    val result = JSONObject(JSONTokener(raw).nextValue() as String)
+                    val result = awaitResult(webView)
                     val scenario = "AnkiConnect=$useAnkiConnect safeguard=$preventAccidentalDuplicates: $result"
                     assertTrue(scenario, result.getBoolean("initiallyEnabled"))
                     assertEquals(scenario, preventAccidentalDuplicates || !useAnkiConnect, result.getBoolean("immediatelyDisabled"))
@@ -85,6 +126,16 @@ class LookupPopupMiningWebViewTest {
                 }
             }
         }
+    }
+
+    private fun awaitResult(webView: WebView): JSONObject {
+        val deadline = SystemClock.uptimeMillis() + 10_000
+        while (evaluate(webView, "window.miningTestResult !== undefined") != "true") {
+            assertTrue("Popup test produced a result", SystemClock.uptimeMillis() < deadline)
+            SystemClock.sleep(25)
+        }
+        val raw = evaluate(webView, "JSON.stringify(window.miningTestResult)")
+        return JSONObject(JSONTokener(raw).nextValue() as String)
     }
 
     private fun withPopup(useAnkiConnect: Boolean, preventAccidentalDuplicates: Boolean, block: (WebView) -> Unit) {
