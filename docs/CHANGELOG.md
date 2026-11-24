@@ -14,6 +14,7 @@ Release notes before v1.3.0 are in [CHANGELOG_ARCHIVE.md](CHANGELOG_ARCHIVE.md).
 - In continuous mode, you can scroll and select text across chapters, and the page stays still when you swipe past either end of the book. ([#110](https://github.com/HuangAntimony/Hoshi-Reader-Android/issues/110), [#185](https://github.com/HuangAntimony/Hoshi-Reader-Android/issues/185))
 - Drag a slider to set the font size or page margins, or use + and − to adjust them one step at a time.
 - When you tap a word in the reader, the first dictionary definition appears while the rest of the entry loads, and tapping another word while the popup is open switches to it sooner.
+- With E-ink optimization on, turning a page shows the new page before the page counter updates instead of after it, so the page appears sooner.
 
 ### Fixed
 

@@ -405,6 +405,12 @@ and copying an asset snapshot creates independent template caches.
   carry the document token, chapter index and local progress. Live reports drive
   the footer and statistics. Settled reports save the bookmark, and explicit exit
   reads the visible position before disposing the reader.
+- A paged turn records position, statistics and bookmark when its result
+  arrives. With E-ink optimization on, the reader chrome keeps showing its
+  previous state while `HoshiReaderWebView.undrawnPageTurn` is set, from the
+  turn request until the turned page's frame is drawn (at once for a result that
+  turns nothing, 500 ms at most): an e-ink panel finishes one update before it
+  starts the next, so chrome redrawn first would hold the page back.
 - Native selections can span sections in the same WebView. Lookup offsets
   belong to the selected node's chapter. A cross-chapter highlight produces
   one chapter-local record per selected chapter in a single repository write.
