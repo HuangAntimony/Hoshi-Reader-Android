@@ -39,6 +39,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.node.Ref
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
@@ -1264,7 +1265,7 @@ fun ReaderWebView(
         fontLibraryState.revision, contentLanguageProfile, profileState.effectiveProfileId) { mutableStateOf(ReaderPageCounts()) }
     var pageLocation by remember(book, stateHolder.webViewRestoreEpoch) { mutableStateOf<Pair<Int, Int>?>(null) }
     val pageIndex = pageCounts.index.takeIf { effectiveSettings.usesPageCounts }
-    val chromeState = remember(
+    val currentChromeState = remember(
         book,
         readerPosition.displayedPosition,
         stateHolder.backTargetPosition,
@@ -1296,6 +1297,12 @@ fun ReaderWebView(
             },
         )
     }
+    // An e-ink panel finishes one update before it starts the next. Chrome redrawn ahead of a turned
+    // page would make the page wait for that update, so it keeps what it shows until the page is drawn.
+    val shownChromeState = remember { Ref<ReaderChromeState>() }
+    val pageTurnUndrawn = effectiveSettings.eInkMode && (webView as? HoshiReaderWebView)?.undrawnPageTurn != null
+    if (!pageTurnUndrawn) shownChromeState.value = currentChromeState
+    val chromeState = shownChromeState.value ?: currentChromeState
     fun commitSasayakiRestoreLanding(progress: Double?) {
         val savedPosition = progress?.let(stateHolder::recordDisplayedProgress)
             ?: stateHolder.readerPosition.displayedPosition
